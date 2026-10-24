@@ -27,6 +27,12 @@ import { buildCompanySummary, publicRowsHeading, reportsProvenanceLine, reportsS
 import { feedRowVerdict } from '@/lib/reports/feedFilter.js'
 import { looksLikeBotOrLinkText, trimToSentence } from '@/lib/reports/excerptText.js'
 import { displayPay } from '@/lib/jobs/pay.js'
+import { jobsSearchHref } from '@/lib/searchRoute'
+import { reportCardOutcome } from '@/lib/reportCardOutcome'
+import { splitWebReviews, webResearchNote } from '@/lib/webReviewQuotes'
+import { replyTiming, REPORT_WHEN_YOU_HEAR } from '@/lib/replyTiming'
+import { useCompanySeed } from '@/components/CompanySeed'
+import { httpHref } from '@/lib/safeHref.js'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -156,10 +162,16 @@ function ConfidenceBadge({ sum, webCount }: { sum: CompanySummary; webCount: num
   }
   if (!sum.confidence) return null
   const color = sum.confidence.level === 'high' ? 'var(--green)' : sum.confidence.level === 'moderate' ? 'var(--amber)' : 'var(--red)'
+  // The word is capped below "High" until enough reports come from Seen users, and the badge names where
+  // the reports came from — the reports section below says the same (lib/companyPageSummary.ts).
+  const src = sum.confidence.sources
   return (
-    <span className="co-dq" style={{ color }}>
-      {sum.confidence.emoji} {sum.confidence.label}
-    </span>
+    <>
+      <span className="co-dq" style={{ color }} title={sum.confidence.capNote || undefined}>
+        {sum.confidence.emoji} {sum.confidence.label}
+      </span>
+      {src ? <span className="co-dq" style={{ color: 'var(--muted)', flexBasis: '100%' }}>{src.charAt(0).toUpperCase() + src.slice(1)}</span> : null}
+    </>
   )
 }
 
@@ -237,19 +249,28 @@ function HiringFunnel({ rows }: { rows: Array<{ label: string; n: number; pct: n
 // did not accept as a first-hand applicant account (kind 'public_commentary') carries no sentiment /
 // outcome label, only "Commentary" (owner 2026-10-24: a Reddit AutoModerator notice read "~ Mixed").
 // Quotes with links or bot text are filtered out before this renders (shownWebReviews).
+//
+// An entry with NO source link is not a quote: it is the old web-research pipeline's paraphrase
+// ("Aggregated research · 2025: Applicants say the first step is…"), which read as machine-written to
+// the conversion audit's visitors (2026-10-24). Those are folded into ONE collapsed note at the end,
+// plainly labelled, never in quote marks; the section's count is unchanged (lib/webReviewQuotes.ts).
 function WebReviewsSection({ reviews, hidden }: { reviews: WebReview[]; hidden: number }) {
   if (!reviews || reviews.length === 0) return null
+  const { quotes, summaries } = splitWebReviews(reviews)
   const sentColor = (s: string) => s === 'positive' ? 'var(--green)' : s === 'negative' ? 'var(--red)' : 'var(--amber)'
   const sentLabel = (s: string) => s === 'positive' ? '✓ Positive' : s === 'negative' ? '✗ Negative' : '~ Mixed'
   const sentBorder = (s: string) => s === 'positive' ? 'rgba(16,185,129,.3)' : s === 'negative' ? 'rgba(239,68,68,.3)' : 'rgba(245,158,11,.3)'
   return (
     <div style={{ padding: '0 0 1.5rem' }}>
-      <div className="co-sec-lbl" style={{ marginBottom: '.75rem' }}>
-        What people are saying online
-      </div>
+      {quotes.length > 0 && (
+        <div className="co-sec-lbl" style={{ marginBottom: '.75rem' }}>
+          What people are saying online
+        </div>
+      )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
-        {reviews.map((rv, i) => {
+        {quotes.map((rv, i) => {
           const account = rv.kind === 'applicant_outcome'
+          const href = httpHref(rv.url)
           return (
           <div key={i} style={{
             background: 'var(--card)', border: `1px solid ${account ? sentBorder(rv.sentiment) : 'var(--line2)'}`,
@@ -264,11 +285,22 @@ function WebReviewsSection({ reviews, hidden }: { reviews: WebReview[]; hidden: 
                 : <span style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', fontWeight: 600, color: 'var(--muted)' }}>{rv.kind === 'employee_review' ? '💼 Employee review' : '💬 Commentary'}</span>}
               {rv.source && <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>{displayPlatform(rv.source)}</span>}
               {rv.year && <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>{rv.year}</span>}
+              {href && <a href={href} target="_blank" rel="nofollow ugc noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--blue)', textDecoration: 'none' }}>Source ↗</a>}
             </div>
           </div>
           )
         })}
       </div>
+      {summaries.length > 0 && (
+        <details className="co-research-note" style={{ marginTop: quotes.length ? '.8rem' : 0, background: 'var(--surface)', border: '1px dashed var(--line2)', borderRadius: 8, padding: '.15rem .9rem' }}>
+          <summary style={{ cursor: 'pointer', listStyle: 'none', padding: '.6rem 0', minHeight: 44, display: 'flex', alignItems: 'center', fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--muted)', lineHeight: 1.5 }}>
+            {webResearchNote(summaries.length)}
+          </summary>
+          <ul style={{ margin: '0 0 .7rem', paddingLeft: '1.1rem', fontFamily: 'var(--body)', fontSize: '.78rem', color: 'var(--muted)', lineHeight: 1.6 }}>
+            {summaries.map((rv, i) => <li key={i}>{trimToSentence(rv.text, 300)}</li>)}
+          </ul>
+        </details>
+      )}
       {hidden > 0 && (
         <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--muted)', marginTop: '.6rem', lineHeight: 1.6 }}>
           {hidden} quote{hidden === 1 ? '' : 's'} not shown: {hidden === 1 ? 'it contains' : 'they contain'} links or moderator-bot text, which is never a first-hand account.
@@ -364,9 +396,14 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const { isLoggedIn } = useAuth()
 
   const [reports, setReports] = useState<Report[]>([])
-  const [score, setScore] = useState<CompanyScore | null>(null)
-  const [industry, setIndustry] = useState('')
-  const [loading, setLoading] = useState(true)
+  // The same list with no city filter — null until it has loaded (lib/companyPageSummary.ts sources).
+  const [allReports, setAllReports] = useState<Report[] | null>(null)
+  // First paint from the server's stored row (components/CompanySeed.tsx) when it is gradeable — the
+  // grade, answer sentence and stats are in the HTML; the live /api/reports read below replaces it.
+  const seed = useCompanySeed()
+  const [score, setScore] = useState<CompanyScore | null>(seed as CompanyScore | null)
+  const [industry, setIndustry] = useState(seed?.industry || '')
+  const [loading, setLoading] = useState(!seed)
   const [error, setError] = useState('')
   const [notFound, setNotFound] = useState(false)
   // Self-filling pages: the score API reports when this company is queued for public-discussion
@@ -521,7 +558,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const [reportsLoading, setReportsLoading] = useState(true)
   useEffect(() => {
     let alive = true
-    setLoading(true)
+    if (!seed) setLoading(true) // a seeded hero stays on screen while the live read runs
     setError('')
     fetch(`/api/reports?type=score&name=${encodeURIComponent(companyName)}`)
       .then(async sRes => {
@@ -555,7 +592,13 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
         if (!alive || !rRes.ok) return
         const rJson = await rRes.json() as { reports?: Report[]; ok?: boolean }
         // Newest experience first by its REAL date (imported rows: the source's posted date).
-        if (rJson.reports) setReports(sortReportsByDate(rJson.reports))
+        if (rJson.reports) {
+          const sorted = sortReportsByDate(rJson.reports)
+          setReports(sorted)
+          // The hero badge names where the reports came from — from the UNFILTERED list, so typing a
+          // city into the reports filter never changes the grade's source counts.
+          if (!location) setAllReports(sorted)
+        }
       })
       .catch(() => {})
       .finally(() => { if (alive) setReportsLoading(false) })
@@ -619,8 +662,11 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   // ONE summary object (lib/companyPageSummary.ts) feeds every count, rate, confidence label and sentence on
   // this page — hero, odds, breakdown, the reports list, the share card. Before it, each block did its
   // own arithmetic and the page said 48, 77 and 28 for the same company (audit 2026-10-23/24).
-  const sum = buildCompanySummary(score, reports)
+  const sum = buildCompanySummary(score, reports, { sourceReports: allReports })
   const fpReports = sum.applicantReports
+  // "How long until they reply?" — only from real numbers (lib/replyTiming.ts): the stored average, else
+  // the median of ≥5 listed reports that name a wait, else an honest "not enough data yet".
+  const timing = replyTiming(score?.avg_wait_days, (allReports ?? reports).map(r => r.wait_days))
   const webEst = sum.webClaim
   // Honest status line: only while the enrichment worker has this company queued/running AND the
   // page has no first-party reports to show. It promises nothing about what will be found.
@@ -661,17 +707,6 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const shownWebReviews = webReviews.filter(rv => !looksLikeBotOrLinkText(rv.text))
   const updatedLine = graded ? lastUpdatedLabel(score.updated_at) : ''
 
-  const ocLabel: Record<string, string> = {
-    ghosted: '👻 Ghosted', autoreject: '🤖 Auto-rejected',
-    human: '✅ Got response', hired: '🎉 Hired',
-    offer: '🎁 Offer', interview: '📞 Interview',
-    rejected: '❌ Rejected', waiting: '⏳ Waiting',
-  }
-  const ocClass: Record<string, string> = {
-    ghosted: 'v-r', autoreject: 'v-y', rejected: 'v-y',
-    human: 'v-g', hired: 'v-g', offer: 'v-g', interview: 'v-b', waiting: 'v-n',
-  }
-
   if (!loading && notFound) {
     return (
       <div className="page-full">
@@ -685,11 +720,18 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
             Can&apos;t verify &ldquo;{companyName}&rdquo;
           </h1>
           <p style={{ color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: '.72rem', lineHeight: 1.7, marginBottom: '1.75rem' }}>
-            We couldn&apos;t find this company online. Make sure you&apos;re using the official company name — we need to verify it exists before scoring.
+            We couldn&apos;t find a company by that name. Looking for a job instead? Search open roles — or use the company&apos;s official name to check how it treats applicants.
           </p>
-          <a href="/companies" style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 9, padding: '.65rem 1.3rem', fontFamily: 'var(--mono)', fontSize: '.72rem', fontWeight: 600, color: 'var(--blue)', textDecoration: 'none' }}>
-            ← Back to company scoreboard
-          </a>
+          {/* A job title typed into a company box lands here (conversion audit 2026-10-24: "barista").
+              The primary way on is the job search for the same words (lib/searchRoute.ts). */}
+          <div style={{ display: 'flex', gap: '.6rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <a href={jobsSearchHref(companyName)} className="btn-shine" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, gap: '.4rem', background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', border: 'none', borderRadius: 9, padding: '.65rem 1.3rem', fontFamily: 'var(--display)', fontSize: '.85rem', fontWeight: 800, color: '#fff', textDecoration: 'none', maxWidth: '100%', minWidth: 0, overflowWrap: 'anywhere' }}>
+              See &ldquo;{companyName}&rdquo; jobs →
+            </a>
+            <a href="/companies" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, gap: '.4rem', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 9, padding: '.65rem 1.3rem', fontFamily: 'var(--mono)', fontSize: '.75rem', fontWeight: 600, color: 'var(--blue)', textDecoration: 'none' }}>
+              Browse company grades
+            </a>
+          </div>
         </div>
       </div>
     )
@@ -867,7 +909,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                   {/* One sentence for assistive tech; the letter + rolling digits are presentational. */}
                   <span className="co-grade-score">
                     <span className="sr-only">{`Seen Grade ${g}, ${score.overall_score} out of 100`}</span>
-                    <span aria-hidden="true"><Odometer value={score.overall_score} /> / 100</span>
+                    <span aria-hidden="true"><Odometer value={score.overall_score} instant={!!seed} /> / 100</span>
                   </span>
                   {verdict && <p className="co-verdict">{verdict}</p>}
                   <div className="co-grade-meta">
@@ -992,7 +1034,14 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
           <div className="co-secs">
             {graded && (
               <Section id="odds" icon="📅" title="Your odds here" open={open.odds} onToggle={toggle}
-                summary={`${score.avg_wait_days != null ? `${score.avg_wait_days}d typical wait · ` : ''}${sum.ratesShown ? `${respPct}% hear back` : `too few applicant reports for a rate (${fpReports} of ${MIN_REPORTS_FOR_RATES})`} · your response probability & industry rank`}>
+                summary={`${timing.short} · ${sum.ratesShown ? `${respPct}% hear back` : `too few applicant reports for a rate (${fpReports} of ${MIN_REPORTS_FOR_RATES})`} · your response probability & industry rank`}>
+                <div className="co-card" style={{ marginBottom: '1rem' }}>
+                  <div className="co-sec-lbl" style={{ marginBottom: '.45rem' }}>How long until they reply</div>
+                  <p style={{ margin: 0, fontSize: '.9rem', color: 'var(--text)', lineHeight: 1.55 }}>{timing.line}</p>
+                  {!timing.known && (
+                    <a href={reportHref} style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--green)', textDecoration: 'none' }}>{REPORT_WHEN_YOU_HEAR} →</a>
+                  )}
+                </div>
                 <HiringProbability responseRate={score.response_rate} ghostRate={score.ghost_rate} overallScore={score.overall_score} reportCount={fpReports} mentionCount={sum.mentions} context={sum.oddsContext} />
                 {benchmark && (
                   <div style={{ margin: '1rem 0 0' }}>
@@ -1026,7 +1075,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                       <span>Avg rounds</span><b>{score.avg_rounds != null ? score.avg_rounds : '—'}</b>
                     </div>
                     <div className="co-kv">
-                      <span>Avg timeline</span><b>{score.avg_wait_days != null ? `${score.avg_wait_days} days` : '—'}</b>
+                      <span>Typical wait</span><b>{timing.known ? `${timing.days} days` : 'Not enough data yet'}</b>
                     </div>
                   </div>
                   {(() => { const rows = ghostStageRows(hiringReports); const n = rows.reduce((a, r) => a + r.n, 0); return rows.length > 0 && (
@@ -1082,24 +1131,26 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                         ? <div className="co-sec-lbl" style={{ margin: '1.1rem 0 .6rem' }}>{publicRowsHeading(sum.listed)}</div>
                         : null
                     const roleLine = r.role && !/^unknown/i.test(r.role) ? r.role : ''
+                    // One outcome per card: the chip and the "ghosted at …" stage come from one helper.
+                    const card = reportCardOutcome(r, { employee, commentary })
                     return (
                       <div key={r.id} style={{ display: 'contents' }}>
                       {heading}
                       <div className={`rcard${r.outcome ? ` outcome-${r.outcome}` : ''}${isPublic ? ' rcard-public' : ''}`} style={isPublic ? { borderStyle: 'dashed' } : undefined}>
                         <div className="rc-hd">
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            {(roleLine || r.ghost_stage) && (
+                            {(roleLine || card.ghostStage) && (
                               <div className="rc-role">
                                 {roleLine}
-                                {r.ghost_stage && <span style={{ color: 'var(--muted)' }}>{roleLine ? ' · ' : ''}ghosted at {r.ghost_stage.replace(/_/g, ' ')}</span>}
+                                {card.ghostStage && <span style={{ color: 'var(--muted)' }}>{roleLine ? ' · ' : ''}ghosted at {card.ghostStage}</span>}
                               </div>
                             )}
                             <div className="rc-meta">
                               {[r.city ? `📍 ${r.city}` : '', r.rounds ? `${r.rounds} round${r.rounds !== 1 ? 's' : ''}` : '', when].filter(Boolean).join(' · ')}
                             </div>
                           </div>
-                          <span className={`vibe rc-outcome ${employee || commentary ? 'v-n' : (ocClass[r.outcome] || 'v-n')}`} title={commentary ? 'Not the poster’s own applicant account under Seen’s rules — shown as commentary, no outcome' : undefined}>
-                            {employee ? '💼 Employee review' : commentary ? '💬 Commentary' : (ocLabel[r.outcome] || r.outcome)}
+                          <span className={`vibe rc-outcome ${card.cls}`} title={commentary ? 'Not the poster’s own applicant account under Seen’s rules — shown as commentary, no outcome' : undefined}>
+                            {card.label}
                           </span>
                         </div>
                         {body && <div className="rc-body">{body}</div>}

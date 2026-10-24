@@ -21,12 +21,16 @@ type Props = {
   delay?: number
   /** Left-pad with zeros to this many digits. */
   minDigits?: number
+  /** Render at the value from the first (server) paint — no roll from 0. For a figure that is the
+   *  page's answer (the company grade): it must be readable before the bundle hydrates. A later
+   *  `value` change still rolls from the current digits. */
+  instant?: boolean
   className?: string
   style?: CSSProperties
 }
 
-export default function Odometer({ value, prefix, suffix, start = true, delay = 0, minDigits = 1, className = '', style }: Props) {
-  const [armed, setArmed] = useState(false)
+export default function Odometer({ value, prefix, suffix, start = true, delay = 0, minDigits = 1, className = '', style, instant = false }: Props) {
+  const [armed, setArmed] = useState(instant)
 
   useEffect(() => {
     if (!start) return

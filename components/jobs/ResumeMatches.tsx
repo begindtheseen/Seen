@@ -7,7 +7,7 @@
 // moment a search is typed; rows are short so the search stays at the top of a 390px phone.
 
 import type { Job } from '@/lib/types'
-import { Score } from '@/lib/score'
+import ListingScoreRing from '@/components/jobs/ListingScoreRing'
 import { displayCompanyName } from '@/lib/companyDisplay'
 import { displayPay } from '@/lib/jobs/pay.js'
 
@@ -37,7 +37,6 @@ export default function ResumeMatches({ jobs, loading, skills, city, citySource,
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
           {rows.map(job => {
-            const risk = Score.risk(job.score)
             return (
               <button
                 key={job.id}
@@ -45,9 +44,7 @@ export default function ResumeMatches({ jobs, loading, skills, city, citySource,
                 onClick={() => onOpen(job)}
                 style={{ display: 'flex', alignItems: 'center', gap: '.7rem', width: '100%', minWidth: 0, textAlign: 'left', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '.55rem .75rem', cursor: 'pointer', color: 'inherit' }}
               >
-                <div className={`sring ${risk}`} style={{ width: 34, height: 34, flexShrink: 0 }} title={job.score == null ? 'Not enough signal in this listing to score it' : undefined}>
-                  <div className="sring-n" style={{ fontSize: '.7rem' }}>{job.score ?? '–'}</div>
-                </div>
+                <ListingScoreRing score={job.score} size={34} caption={false} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontFamily: 'var(--display)', fontSize: '.84rem', fontWeight: 700, color: 'var(--white)', letterSpacing: '-.015em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{job.title}</div>
                   <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayCompanyName(job.company)}{job.location ? ` · ${job.location}` : ''}{displayPay(job) ? ` · ${displayPay(job)}` : ''}</div>

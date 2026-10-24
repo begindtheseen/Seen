@@ -313,6 +313,11 @@ export function useJobSearch() {
         if (u.posted) setPosted(u.posted as PostedFilter)
         filtersRef.current = { niche: u.niche as NicheFilter, level: u.level as LevelFilter, jobType: u.type as TypeFilter, posted: u.posted as PostedFilter }
         searchJobs(u.q, u.loc || '', { radius: u.radius })
+      } else if (u.loc) {
+        // A city with no title (the homepage box with only "City or remote" filled): pre-fill the
+        // location and wait for a title — a search needs one. Claims the seed so nothing stomps it.
+        autoSearchedRef.current = true
+        setLocation(u.loc)
       }
     } catch {}
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -325,7 +330,9 @@ export function useJobSearch() {
   //      never stomps it.
   //   2) signed-in: the profile HOME location as a pre-fill (re-runs when profile loads late).
   //   3) signed-out: the last recent search (restores query + loc) — also a "set" location.
-  //   4) GPS auto-locate — ONLY when nothing above is stored (signed-out first visit).
+  //   4) nothing — the browser location prompt is asked ONLY when the person taps 📍 (requestGpsLocation).
+  //      It used to fire on load for a first visit, so a Google landing met a permission prompt before
+  //      any results (conversion audit 2026-10-24); same for a signed-in account with no city on file.
   useEffect(() => {
     if (!ready) return                     // wait until logged-in state + profile are known
     if (autoSearchedRef.current) return    // an explicit ?q search already ran
@@ -342,18 +349,14 @@ export function useJobSearch() {
 
     // 2) Signed-in → the profile HOME city wins. `ready` flips before the profile row arrives
     //    (lib/auth.tsx loads it after the session), so we wait for the row (profile is a dep) rather
-    //    than fall through to GPS while a home city may still be incoming. A signed-in account with
-    //    NO city on file gets the same geolocation a guest gets — the live audit (2026-10-23) saw a
-    //    member start on "📍 Anywhere" while a guest got Phoenix. Order: profile city → GPS → Anywhere.
+    //    than fall through while a home city may still be incoming. No city on file → the 📍 button.
     if (isLoggedIn) {
       if (!profile) return
       if (profile.city) {
         autoSearchedRef.current = true
         setLocationRaw(profile.city)
         searchJobs(undefined, profile.city)
-        return
       }
-      if (typeof navigator !== 'undefined' && navigator.geolocation) requestGpsLocation()
       return
     }
 
@@ -369,11 +372,7 @@ export function useJobSearch() {
         return
       }
     } catch {}
-
-    // 4) Nothing stored anywhere → GPS auto-locate (signed-out first visit only).
-    if (typeof navigator !== 'undefined' && navigator.geolocation) {
-      requestGpsLocation()
-    }
+    // 4) Nothing stored anywhere → no prompt; the 📍 button asks when tapped.
   }, [ready, isLoggedIn, profile === null, profile?.city]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch resume-powered recommendations when logged in

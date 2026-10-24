@@ -30,6 +30,8 @@ export type GrowthScore = {
   data_source?: string | null
   risk_level: 'safe' | 'warn' | 'danger' | null
   industry?: string | null
+  /** Stored evidence quality — the page's confidence word (lib/companyPageSummary.ts confidenceFrom). */
+  data_quality?: string | null
   waste?: number | null
   summary?: string | null
   /** When the stored score was last (re)computed — the "Last updated" under the grade. */
@@ -172,6 +174,7 @@ export function growthScoreFromRow(row: Record<string, any> | null | undefined):
     data_source: row.data_source ?? null,
     risk_level: gradeable ? (s >= 70 ? 'safe' : s >= 40 ? 'warn' : 'danger') : null,
     industry: row.industry || null,
+    data_quality: row.data_quality ?? null,
     waste: gradeable ? row.waste_score ?? null : null,
     summary: /^estimated baseline/i.test(String(row.raw_summary || '')) ? null : (row.raw_summary || null),
     updated_at: scoreUpdatedAt(row),
@@ -193,7 +196,7 @@ async function scoreFromDb(name: string): Promise<ScoreRead> {
   const creds = sbCreds()
   if (!creds) return { score: null, ok: false }
   const headers = { apikey: creds.key, Authorization: `Bearer ${creds.key}` }
-  const sel = `select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,avg_rounds,report_count,first_party_report_count${await mentionSel(creds.url, headers)},web_report_count,data_source,waste_score,industry,raw_summary,avg_tenure_months,tenure_sample_count,created_at,expires_at`
+  const sel = `select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,avg_rounds,report_count,first_party_report_count${await mentionSel(creds.url, headers)},web_report_count,data_source,data_quality,waste_score,industry,raw_summary,avg_tenure_months,tenure_sample_count,created_at,expires_at`
   try {
     const enc = encodeURIComponent(name.toLowerCase().trim())
     let r = await fetch(`${creds.url}/rest/v1/company_scores?company_name=ilike.${enc}&${sel}&order=created_at.desc&limit=1`, { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })

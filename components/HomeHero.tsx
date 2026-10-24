@@ -1,16 +1,14 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { RecentSearchesStore } from '@/lib/stores/RecentSearches'
-import { useIntroGate } from '@/lib/hooks/useIntroGate'
 import { firstPartyReportCount } from '@/lib/server/reportCounts'
 import { isGradeableScore } from '@/lib/gradeGate'
+import { homeSearchRoute, type ResolveCandidate } from '@/lib/searchRoute'
 import KineticText from '@/components/motion/KineticText'
 import WorkspacePreview, { type ProofScore } from '@/components/home/WorkspacePreview'
 import styles from './HomeHero.module.css'
-
-const JOB_KEYWORDS = ['engineer', 'developer', 'manager', 'analyst', 'designer', 'nurse', 'coordinator', 'specialist', 'director', 'associate', 'assistant', 'recruiter', 'sales', 'marketing', 'accountant', 'therapist', 'technician']
 
 
 // Real proof, not a promise: a genuine company's real hiring behaviour rendered in the
@@ -47,7 +45,21 @@ const EXAMPLES: Array<{ label: string; slug: string }> = [
   { label: 'McDonald’s', slug: 'mcdonalds' },
 ]
 
-const slugify = (n: string) => encodeURIComponent(n.toLowerCase().trim().replace(/\s+/g, '-'))
+// The company resolver every company box uses (POST /api/reports {action:'resolve'}). null = the
+// lookup failed, so the route falls back to the company page (lib/searchRoute.ts).
+async function resolveCompany(q: string, signal?: AbortSignal): Promise<ResolveCandidate[] | null> {
+  try {
+    const r = await fetch('/api/reports', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'resolve', query: q }),
+      signal,
+    })
+    if (!r.ok) return null
+    const d = await r.json() as { candidates?: ResolveCandidate[] }
+    return Array.isArray(d.candidates) ? d.candidates : []
+  } catch { return null }
+}
 
 export default function HomeHero() {
   const router = useRouter()
@@ -56,24 +68,37 @@ export default function HomeHero() {
   const [proof, setProof] = useState<ProofScore>(FEATURED_SEED)
   const [proofLive, setProofLive] = useState(false) // true once the live leaderboard refresh landed
 
-  // Entrance choreography starts as soon as the display font is available (useIntroGate)
-  // — there is no blocking intro; the hero rising IS the opening.
-  const ready = useIntroGate()
+  // Entrance choreography is CSS from the first paint (HomeHero.module.css .stage, motion.css .kt):
+  // it never waits for this bundle to hydrate, so the headline and lede paint with the HTML.
 
-  // Preserve the original routing logic: company queries → /company/<slug>,
-  // job-style queries → /jobs?q=&loc=
-  const doSearch = useCallback(() => {
+  // "Company or job title": a company Seen knows → its page; anything else → job search
+  // (lib/searchRoute.ts). The lookup starts while the visitor types, so Enter rarely waits on it.
+  const resolved = useRef(new Map<string, Promise<ResolveCandidate[] | null>>())
+  const lookup = useCallback((q: string) => {
+    const key = q.trim().toLowerCase()
+    let p = resolved.current.get(key)
+    if (!p) { p = resolveCompany(key); resolved.current.set(key, p) }
+    return p
+  }, [])
+  useEffect(() => {
+    const q = query.trim()
+    if (q.length < 2) return
+    const t = setTimeout(() => { void lookup(q) }, 250)
+    return () => clearTimeout(t)
+  }, [query, lookup])
+  const [routing, setRouting] = useState(false)
+
+  const doSearch = useCallback(async () => {
     const q = query.trim()
     const l = location.trim()
-    if (!q) return
-    const isJobSearch = JOB_KEYWORDS.some(k => q.toLowerCase().includes(k)) || (q.split(' ').length > 1 && !!l)
-    if (isJobSearch) {
-      router.push(`/jobs?q=${encodeURIComponent(q)}&loc=${encodeURIComponent(l)}`)
-    } else {
-      RecentSearchesStore.push(q, l)
-      router.push(`/company/${slugify(q)}`)
-    }
-  }, [query, location, router])
+    if (!q && !l) return
+    setRouting(true)
+    const candidates = q ? await lookup(q) : []
+    const route = homeSearchRoute(q, l, candidates)
+    if (!route) { setRouting(false); return }
+    if (route.kind === 'company') RecentSearchesStore.push(q, l)
+    router.push(route.href)
+  }, [query, location, router, lookup])
 
   // Live-refresh the proof card from the real leaderboard when the API is reachable
   // (production). Falls back to the real captured seed when it isn't (e.g. local build).
@@ -112,14 +137,14 @@ export default function HomeHero() {
 
   return (
     <>
-      <section className={`${styles.hero}${ready ? ' ' + styles.heroIn : ''}`}>
+      <section className={styles.hero}>
         <span className={`${styles.eyebrow} ${styles.stage} ${styles.d1}`}>
           <span className={styles.pulse} />
           Real hiring outcomes from real applicants
         </span>
 
         {/* Kinetic headline: each word rises from behind its own clip, 42ms apart. */}
-        <KineticText as="h1" className={styles.title} in={ready} delay={120}>
+        <KineticText as="h1" className={styles.title} in delay={120}>
           See who actually <span className={styles.grad}>responds</span> before you apply.
         </KineticText>
 
@@ -131,7 +156,7 @@ export default function HomeHero() {
         <form
           className={`${styles.search} ${styles.stage} ${styles.d4}`}
           onSubmit={(e) => { e.preventDefault(); doSearch() }}
-          aria-label="Check a company"
+          aria-label="Check a company or find jobs"
         >
           <label className={styles.field}>
             <SearchIcon />
@@ -157,7 +182,7 @@ export default function HomeHero() {
               aria-label="City or remote"
             />
           </label>
-          <button className={`${styles.go} btn-shine`} type="submit">Check company</button>
+          <button className={`${styles.go} btn-shine`} type="submit" disabled={routing}>{routing ? 'Searching…' : 'Search'}</button>
         </form>
 
         {/* One tap to first value — real companies with real scores. */}

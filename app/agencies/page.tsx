@@ -3,7 +3,7 @@ import { pageMetadata } from '@/lib/seo'
 import Link from 'next/link'
 import { getScoresByNames, slugify, grade, riskColor, riskLabel, pct, MIN_REPORTS_FOR_GRADE, type LeaderboardRow } from '@/lib/growth'
 import { publicDiscussionCountPath, parseExactCount, publicDiscussionShare } from '@/lib/server/reportCounts'
-import { STAFFING_AGENCIES, type StaffingAgency } from '@/lib/agencies'
+import { STAFFING_AGENCIES, agencyPageSlug, type StaffingAgency } from '@/lib/agencies'
 import { pickActiveSponsor } from '@/lib/server/sponsorSlot'
 import { jsonLdHtml } from '@/lib/jsonLd'
 import { notEnoughReviewsLabel } from '@/lib/gradeGate'
@@ -35,7 +35,7 @@ export const revalidate = 3600
 export const metadata: Metadata = pageMetadata({
   title: 'Staffing Agency Ghost Index — Which Agencies Ghost Candidates',
   description:
-    'A live index of major staffing agencies — Robert Half, Aerotek, Insight Global, TEKsystems, Randstad and more — ranked by applicant-reported ghost and response rates, from outcomes submitted to Seen or shared publicly in discussion threads and on review sites. Agencies without reports are labeled, never given a made-up rate.',
+    'A live index of major staffing agencies — Robert Half, Insight Global, Randstad, Addison Group, Express and more — ranked by applicant-reported ghost and response rates, from outcomes submitted to Seen or shared publicly in discussion threads and on review sites. Agencies without reports are labeled, never given a made-up rate.',
   keywords: [
     'staffing agency ghosting', 'staffing agency ghost rate', 'do staffing agencies ghost',
     'recruiter ghosted me', 'staffing agency reviews', 'best staffing agencies', 'worst staffing agencies',
@@ -79,22 +79,25 @@ function ReportedRow({ r, rank }: { r: Ranked; rank: number }) {
   const reply = pct(s.response_rate)
   const n = r.reports
   const thin = n < 10
+  const pub = r.publicDiscussion
+  // Rates sit under the name (not in a right-hand column) so the name keeps the row's width on a phone
+  // — the audit saw "Robert / Half" squeezed to 8 characters at 390px.
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '.85rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '.85rem 1rem', marginBottom: '.55rem' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '.85rem 1rem', marginBottom: '.55rem' }}>
       <div style={{ ...mono('var(--fs-62)', 'var(--muted)'), width: 18, textAlign: 'right', flexShrink: 0 }}>{rank}</div>
       <div style={{ fontFamily: 'var(--display)', fontSize: '1.5rem', fontWeight: 800, color: accent, width: 30, textAlign: 'center', flexShrink: 0 }}>{grade(s.overall_score)}</div>
       <div style={{ minWidth: 0, flex: 1 }}>
         <Link href={`/company/${r.slug}`} className="tap" style={{ fontFamily: 'var(--display)', fontSize: '.92rem', fontWeight: 700, color: 'var(--white)', textDecoration: 'none' }}>{r.agency.name}</Link>
-        <div style={{ ...mono('var(--fs-60)', 'var(--dim)'), marginTop: '.15rem' }}>
-          {n.toLocaleString()} report{n !== 1 ? 's' : ''}
-          {r.publicDiscussion ? ` · ${r.publicDiscussion.toLocaleString()} from public threads & review sites` : ''}
-          {` · ${riskLabel(s.risk_level)}`}
-          {thin ? ' · early signal — low confidence' : ''}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.15rem .7rem', marginTop: '.2rem' }}>
+          {ghost != null && <span style={mono('var(--fs-62)', 'var(--red)')}>{ghost}% ghost</span>}
+          {reply != null && <span style={mono('var(--fs-62)', 'var(--green)')}>{reply}% reply</span>}
         </div>
-      </div>
-      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-        {ghost != null && <div style={mono('var(--fs-62)', 'var(--red)')}>{ghost}% ghost</div>}
-        {reply != null && <div style={mono('var(--fs-62)', 'var(--green)')}>{reply}% reply</div>}
+        <div style={{ ...mono('var(--fs-60)', 'var(--dim)'), marginTop: '.15rem', lineHeight: 1.5 }}>
+          {n.toLocaleString()} report{n !== 1 ? 's' : ''}
+          {pub ? (pub >= n ? ', all from public posts' : ` · ${pub.toLocaleString()} from public posts`) : ''}
+          {` · ${riskLabel(s.risk_level)}`}
+          {thin ? ' · early signal, low confidence' : ''}
+        </div>
       </div>
       <ReportCta agencyName={r.agency.name} />
     </div>
@@ -121,16 +124,19 @@ function BuildingRow({ r }: { r: Ranked }) {
   )
 }
 
-// Row for an agency we have NO data on at all. Explicit empty state — never a made-up number.
-function EmptyRow({ r }: { r: Ranked }) {
+// Agencies we have NO data on: one compact card of names below the graded rows — never a row each
+// that reads like half the index is empty (conversion audit 2026-10-24), and never a made-up number.
+function NoDataList({ rows }: { rows: Ranked[] }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '.85rem', background: 'var(--surface)', border: '1px dashed var(--line2)', borderRadius: 10, padding: '.85rem 1rem', marginBottom: '.55rem' }}>
-      <div style={{ fontFamily: 'var(--display)', fontSize: '1.5rem', fontWeight: 800, color: 'var(--muted)', width: 30, textAlign: 'center', flexShrink: 0 }}>—</div>
-      <div style={{ minWidth: 0, flex: 1 }}>
-        <Link href={`/company/${r.slug}`} className="tap" style={{ fontFamily: 'var(--display)', fontSize: '.92rem', fontWeight: 700, color: 'var(--sub)', textDecoration: 'none' }}>{r.agency.name}</Link>
-        <div style={{ ...mono('var(--fs-60)', 'var(--muted)'), marginTop: '.15rem' }}>No reports yet — be the first</div>
+    <div style={{ background: 'var(--surface)', border: '1px dashed var(--line2)', borderRadius: 10, padding: '.9rem 1rem' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.1rem .9rem' }}>
+        {rows.map(r => (
+          <Link key={r.agency.name} href={`/company/${r.slug}`} className="tap" style={{ ...mono('var(--fs-62)', 'var(--sub)'), textDecoration: 'none' }}>{r.agency.name}</Link>
+        ))}
       </div>
-      <ReportCta agencyName={r.agency.name} />
+      <div style={{ ...mono('var(--fs-60)', 'var(--muted)'), marginTop: '.5rem', lineHeight: 1.6 }}>
+        Applied through one? <Link href="/report?outcome=ghosted" className="tap" style={{ color: 'var(--blue)', textDecoration: 'none' }}>Report what happened →</Link> Your report is its first data point.
+      </div>
     </div>
   )
 }
@@ -194,7 +200,8 @@ export default async function AgenciesPage() {
         || hit.score.first_party_report_count > row.score.first_party_report_count
         || (hit.score.first_party_report_count === row.score.first_party_report_count && hit.score.report_count > row.score.report_count)) row = hit
     }
-    return { agency, row, slug: slugify(row ? row.name : agency.name), reports: row ? row.score.first_party_report_count : 0 }
+    const reports = row ? row.score.first_party_report_count : 0
+    return { agency, row, slug: agencyPageSlug(agency.name, row?.name, reports), reports }
   })
 
   // Public-discussion split, read only for agencies that actually have first-party reports.
@@ -257,7 +264,7 @@ export default async function AgenciesPage() {
           sub={<>
             Staffing agencies are the highest-volume gatekeepers in hiring — and the most common source of &ldquo;the recruiter just disappeared&rdquo; stories. This index tracks {STAFFING_AGENCIES.length} major agencies by what applicants actually report: who replies, who ghosts, and how long it takes.
             {totalReports > 0
-              ? ` It currently reflects ${totalReports.toLocaleString()} applicant-reported outcome${totalReports !== 1 ? 's' : ''}${totalPublic ? ` (${totalPublic.toLocaleString()} shared publicly in discussion threads or on review sites)` : ''} and grows with every new one.`
+              ? ` It currently reflects ${totalReports.toLocaleString()} applicant-reported outcome${totalReports !== 1 ? 's' : ''}${totalPublic ? (totalPublic >= totalReports ? `, all shared publicly in discussion threads or on review sites — none submitted to Seen yet` : ` (${totalPublic.toLocaleString()} shared publicly in discussion threads or on review sites)`) : ''}, and grows with every new one.`
               : ' No agency has applicant-reported outcomes on Seen yet — it grows with every report submitted.'}
           </>}
         />
@@ -282,7 +289,7 @@ export default async function AgenciesPage() {
         {reported.length > 0 && (
           <section style={{ marginBottom: '2.4rem' }}>
             <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Ranked by reported ghost rate</h2>
-            <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 300 }}>{`Agencies with enough evidence for a grade — at least one report submitted to Seen and ${MIN_REPORTS_FOR_GRADE} pieces in total, counting applicant accounts shared publicly in discussion threads and on review sites (labeled and down-weighted) and online mentions at half weight — worst ghost rate first. Rows with fewer than 10 reports are marked low confidence.`}</p>
+            <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 300 }}>{`Agencies with enough evidence for a grade: at least one real applicant report and ${MIN_REPORTS_FOR_GRADE} pieces in total. Applicant accounts shared publicly in discussion threads and on review sites count (labeled and down-weighted), online mentions count half. Worst ghost rate first; rows with fewer than 10 reports are marked low confidence.`}</p>
             {reported.map((r, i) => <ReportedRow key={r.agency.name} r={r} rank={i + 1} />)}
           </section>
         )}
@@ -297,9 +304,9 @@ export default async function AgenciesPage() {
 
         {unlisted.length > 0 && (
           <section style={{ marginBottom: '2.4rem' }}>
-            <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>No data yet</h2>
-            <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 300 }}>We have nothing on these agencies yet — and we won&apos;t invent a number. If you&apos;ve applied through one, your report is the first data point.</p>
-            {unlisted.map(r => <EmptyRow key={r.agency.name} r={r} />)}
+            <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Not enough reports yet ({unlisted.length})</h2>
+            <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 300 }}>No applicant reports on these agencies yet, so no grade or rate — we won&apos;t invent a number.</p>
+            <NoDataList rows={unlisted} />
           </section>
         )}
 

@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { signupHref, trialSignupHref } from '@/lib/signupIntent.js'
@@ -22,6 +22,10 @@ const YEARLY  = `$${PRO_PRICING.yearly_per_month.toFixed(2)}`
 const MONTHLY_NUM = PRO_PRICING.monthly
 const YEARLY_TOTAL = PRO_PRICING.yearly_total                        // 83.88
 const ANNUAL_SAVINGS = +(MONTHLY_NUM * 12 - YEARLY_TOTAL).toFixed(2) // ~35.99
+const ANNUAL_SAVE_PCT = Math.round((1 - YEARLY_TOTAL / (MONTHLY_NUM * 12)) * 100)
+// "Get Pro free" — the cheapest way to Pro, from the SAME constants the server grants with
+// (lib/server/growthRewards.js). It used to be FAQ question 5, collapsed at the bottom.
+const FREE_PRO_LINE = `Or get Pro free: ${proDaysLabel(REPORT_REWARD_PRO_DAYS)} for each application outcome you report, ${proDaysLabel(REFERRAL_REWARD_PRO_DAYS)} for each friend you invite.`
 
 // One-time SKUs — prices/grants come from the SAME constants the server fulfills with.
 const SPRINT = ONE_TIME_SKUS.sprint       // $14.99 · 30 credits + 7 days Pro
@@ -43,11 +47,13 @@ const FREE_FEATURES = [
   'Report your own experience',
 ]
 
+// Outcome first (what a job seeker gets), then the mechanics. Each line is something Pro's code grants:
+// unlimited job insights + résumé optimize/scan/tailor (gateAI with no daily cap), Human Voice (proOnly).
 const PRO_FEATURES = [
-  'Unlimited AI credits — no daily cap',
+  'Know what a job really wants before you apply — AI insights on every listing, unlimited',
+  'A résumé tailored to every application — no daily credit cap',
   'Ghost risk alerts when companies change behavior',
   'AI company deep-dive analysis',
-  'Unlimited AI job insights per listing',
   'Human Voice — rewrites that sound like you, not a bot',
   'Priority support',
   'Early access to every new feature',
@@ -68,12 +74,12 @@ const COMPARISON: [string, string | boolean, string | boolean][] = [
 ]
 
 const FAQ = [
+  // Growth rewards (lib/server/growthRewards.js) — rendered from the same constants the server grants with.
+  { q: 'Can I get Pro without paying?', a: `Yes. Report what happened with an application on your tracker and get ${proDaysLabel(REPORT_REWARD_PRO_DAYS)}, once per application that has been on your tracker for at least ${dayWord(REPORT_REWARD_MIN_TRACKED_DAYS)}, up to ${dayWord(REPORT_REWARD_MONTHLY_CAP_DAYS)} a month. Every outcome earns the same. Invite a friend with your link from the dashboard: when they track their first application, you both get ${proDaysLabel(REFERRAL_REWARD_PRO_DAYS)} (you are rewarded for up to ${REFERRAL_MAX_REWARDED} friends). Earned Pro time is added on top of any you have, and it never renews or charges you.` },
   { q: 'What is Human Voice?', a: 'AI-optimized résumés often sound generic — and some companies auto-filter applications that read as machine-written. Human Voice rewrites your optimized bullets so they sound like you: varied sentence structure, natural rhythm, every keyword kept. Your words, your voice, still ATS-ready.' },
   { q: 'How do free AI credits work?', a: `The first time you use an AI tool you get a ${WELCOME_CREDITS}-credit welcome bonus for that day (the first action uses one of them). From then on you get ${FREE_DAILY_CREDITS} free AI ${CREDIT_WORD} a day, reset at ${CREDIT_RESET_LABEL} (California time). Each credit covers one AI action, and every button that spends one says so: optimize your résumé for a job, run the ATS scanner, build your application advantage, or generate AI insights for a listing nobody has analyzed yet. Uploading and parsing your résumé is free. You can earn up to ${MAX_DAILY_EARN} more credits a day by tracking your applications and answering quick surveys about companies you've worked with. Purchased credits never reset.` },
   { q: 'How does the free trial work?', a: `Pro starts with ${PRO_TRIAL_DAYS} days free — no card required. If you add a payment method before the trial ends, your plan renews at the price you chose; cancel anytime. If you don't add one, nothing is charged and access simply ends.` },
   { q: 'What if I don\'t want a subscription?', a: `Pay once, own it: the Interview Sprint (${skuPrice(SPRINT.amount_cents)}) gives you ${SPRINT.credits} AI credits plus ${SPRINT.pro_days} days of full Pro access, and the Credit Pack (${skuPrice(CREDITS20.amount_cents)}) adds ${CREDITS20.credits} AI credits. Purchased credits never expire and roll over every day — no auto-renewal, ever.` },
-  // Growth rewards (lib/server/growthRewards.js) — rendered from the same constants the server grants with.
-  { q: 'Can I get Pro without paying?', a: `Yes. Report what happened with an application on your tracker and get ${proDaysLabel(REPORT_REWARD_PRO_DAYS)}, once per application that has been on your tracker for at least ${dayWord(REPORT_REWARD_MIN_TRACKED_DAYS)}, up to ${dayWord(REPORT_REWARD_MONTHLY_CAP_DAYS)} a month. Every outcome earns the same. Invite a friend with your link from the dashboard: when they track their first application, you both get ${proDaysLabel(REFERRAL_REWARD_PRO_DAYS)} (you are rewarded for up to ${REFERRAL_MAX_REWARDED} friends). Earned Pro time is added on top of any you have, and it never renews or charges you.` },
   { q: 'Can I cancel Pro?', a: 'Yes, anytime — no contracts. You keep Pro until the end of your billing period. We don\'t trap you.' },
   // What the code does (api/user-sync.js save_resume → profiles.resume_text; delete_resume / delete_account
   // clear it): the résumé is STORED on the profile — the old answer ("processed in-memory … immediately
@@ -83,11 +89,12 @@ const FAQ = [
   { q: 'What if I hit the daily limit?', a: `Free users get ${FREE_DAILY_CREDITS} ${CREDIT_WORD}/day, back at ${CREDIT_RESET_LABEL}. Track an application to earn one back. Answer a 10-second survey to earn more — up to ${MAX_DAILY_EARN} a day. Or upgrade to Pro for unlimited.` },
 ]
 
-function PricingPageInner() {
+export default function PricingPage() {
   const router = useRouter()
-  const params = useSearchParams()
   const { isLoggedIn } = useAuth()
-  const [yearly, setYearly] = useState(true) // annual is the recommended default
+  // Monthly first: a cold visitor's first price is the monthly one, not the yearly total (conversion
+  // audit 2026-10-24: the first price seen was "$83.88"). Yearly stays one tap away with its saving.
+  const [yearly, setYearly] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [upgraded, setUpgraded] = useState(false)
@@ -104,7 +111,12 @@ function PricingPageInner() {
   // double-tap created two Stripe sessions (audit 2026-10-24). The ref closes the gap synchronously.
   const checkoutInFlight = useRef(false)
 
+  // The Stripe return (?upgraded=1&purchase=&session_id=) is read from window.location after mount.
+  // useSearchParams needed a <Suspense> boundary that turned the WHOLE page into a client render, so a
+  // cold visitor saw nothing until the bundle hydrated (LCP ~3.8 s on a throttled phone — conversion
+  // audit 2026-10-24); now the page is in the server HTML.
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
     if (params.get('upgraded') === '1') {
       setUpgraded(true)
       const bought = params.get('purchase')
@@ -119,7 +131,7 @@ function PricingPageInner() {
           .catch(() => { /* webhook still covers it if confirm fails */ })
       }
     }
-  }, [params])
+  }, [])
 
   useEffect(() => {
     fetch('/api/stripe?action=status')
@@ -286,10 +298,10 @@ function PricingPageInner() {
             <span style={{ color: '#818cf8' }}>Now get through to the ones who don't.</span>
           </h1>
           <p style={{ color: 'var(--sub)', fontSize: '.85rem', lineHeight: 1.7, maxWidth: 480, margin: '0 auto 1.75rem' }}>
-            Seen shows you which companies actually respond — free. Pro gives you the résumé edge to land the ones worth your time.
+            Seen shows you which companies actually respond — free. Pro gives you unlimited AI help for the ones worth your time: what each job really wants, and a résumé tailored to it.
           </p>
 
-          {/* Billing toggle — annual is recommended */}
+          {/* Billing toggle — monthly by default; yearly shows its saving */}
           <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '.55rem' }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', maxWidth: '100%', gap: '.5rem .75rem', background: 'var(--card)', border: `1px solid ${yearly ? 'rgba(99,102,241,.4)' : 'var(--line)'}`, borderRadius: 24, padding: '.4rem .95rem', transition: 'border-color .2s', boxShadow: yearly ? '0 0 22px rgba(99,102,241,.18)' : 'none' }}>
               <span id="bill-monthly" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-68)', color: yearly ? 'var(--muted)' : 'var(--white)' }}>Monthly</span>
@@ -313,7 +325,7 @@ function PricingPageInner() {
                 Yearly
               </span>
               <span style={{ background: 'linear-gradient(90deg,#4f46e5,#7c3aed)', color: '#fff', fontFamily: 'var(--mono)', fontSize: 'var(--fs-52)', fontWeight: 700, letterSpacing: '.05em', padding: '.18rem .55rem', borderRadius: 100, whiteSpace: 'nowrap' }}>
-                BEST VALUE · SAVE 30%
+                {`BEST VALUE · SAVE ${ANNUAL_SAVE_PCT}%`}
               </span>
             </div>
             <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', color: yearly ? 'var(--green)' : 'var(--muted)', minHeight: '.9rem' }}>
@@ -471,6 +483,10 @@ function PricingPageInner() {
                   {yearly ? ` $${YEARLY_TOTAL.toFixed(2)}/yr` : ` ${MONTHLY}/mo`} after the trial — cancel anytime;
                   without one, access simply ends and you&apos;re never charged.
                 </div>
+                <div data-testid="free-pro-line" style={{ marginTop: '.8rem', padding: '.6rem .75rem', border: '1px solid rgba(16,185,129,.3)', background: 'rgba(16,185,129,.08)', borderRadius: 8, fontFamily: 'var(--body)', fontSize: 'var(--fs-72)', color: 'var(--text)', textAlign: 'center', lineHeight: 1.55 }}>
+                  {FREE_PRO_LINE}{' '}
+                  <a href="#get-pro-free" onClick={() => { const d = document.getElementById('get-pro-free'); if (d instanceof HTMLDetailsElement) d.open = true }} style={{ color: 'var(--green)', textDecoration: 'none', whiteSpace: 'nowrap' }}>How it works ↓</a>
+                </div>
               </>
             )}
           </div>
@@ -568,7 +584,7 @@ function PricingPageInner() {
         {/* FAQ */}
         <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.2rem', fontWeight: 800, color: 'var(--white)', marginBottom: '1rem' }}>Questions</h2>
         {FAQ.map(item => (
-          <details key={item.q} style={{ marginBottom: '.6rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10 }}>
+          <details key={item.q} id={item.q === 'Can I get Pro without paying?' ? 'get-pro-free' : undefined} style={{ marginBottom: '.6rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, scrollMarginTop: '5rem' }}>
             <summary style={{ padding: '.85rem 1.25rem', fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 700, color: 'var(--white)', cursor: 'pointer', listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.5rem' }}>
               <span>{item.q}</span>
               <span className="dt-chev" style={{ color: 'var(--dim)', fontWeight: 400, fontSize: 'var(--fs-70)', flexShrink: 0 }}>▾</span>
@@ -601,10 +617,3 @@ function PricingPageInner() {
   )
 }
 
-export default function PricingPage() {
-  return (
-    <Suspense>
-      <PricingPageInner />
-    </Suspense>
-  )
-}
