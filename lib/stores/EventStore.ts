@@ -1,8 +1,16 @@
 'use client'
 
-import { CHECK_SCHEDULE } from '../constants'
-import type { DueCheck } from '../types'
-import { nextCheck, daysSince, type NextCheck } from './checkSchedule'
+import type { CheckType } from '../constants'
+import type { Application, DueCheck } from '../types'
+import { nextCheck, type NextCheck } from './checkSchedule'
+import { answeredFromEvents, isCheckType, pickDueCheck, snoozedUntilFromEvents } from './checkEvents'
+
+// The device ledger of check-in answers (seen_hevents_v1) and snoozes (seen_check_snooze). Since
+// audit 3 (2026-10-24, H3) the TRUTH lives on the application: every answer is a `check_answered`
+// event and every "Later" a `check_snoozed` event in app.events, synced to the account. This ledger
+// is only an offline cache — what is here and not yet in app.events is pushed by the tracker on load
+// (pendingLedger). Due checks are derived from the union of both, so an answer given offline still
+// stops the question on this device until it reaches the account.
 
 const KEY = 'seen_hevents_v1'
 const SNOOZE_KEY = 'seen_check_snooze'
@@ -31,7 +39,7 @@ export const EventStore = {
     const e: StoredEvent = {
       type: '',
       ...evt,
-      id: evt.id || ('hev_' + now + '_' + Math.random().toString(36).slice(2, 6)),
+      id: evt.id || ('hev_' + now + '_' + (this.get().length + 1).toString(36)),
       createdAt: now,
     }
     // Anti-gaming: flag mass submissions
@@ -43,7 +51,7 @@ export const EventStore = {
     const all = this.get()
     if (!all.find(x => x.id === e.id)) {
       all.unshift(e)
-      localStorage.setItem(KEY, JSON.stringify(all))
+      try { localStorage.setItem(KEY, JSON.stringify(all)) } catch {}
     }
     // The tracker's handleUpdate files ONE community report per terminal outcome (quick_submit);
     // the day-30 check used to file a second copy here (down-weighted + held for review every time).
@@ -59,58 +67,68 @@ export const EventStore = {
     return this.get().filter(e => (e.company || '').toLowerCase() === k)
   },
 
+  /** Answered on THIS device (the cache). The application's events are the account's answer. */
   hasCheck(appId: string, checkType: string): boolean {
     return this.get().some(e => e.appId === appId && e.type === checkType)
   },
 
-  /** The check types already answered for one application (feeds checkSchedule.nextCheck). */
-  answeredChecks(appId: string): string[] {
-    const types = new Set(CHECK_SCHEDULE.map(c => c.type as string))
-    return this.get().filter(e => e.appId === appId && types.has(e.type)).map(e => e.type)
+  /** The check types answered for one application: its events (account) ∪ this device's cache. */
+  answeredChecks(app: Pick<Application, 'id' | 'events'>): CheckType[] {
+    const out = answeredFromEvents(app.events)
+    for (const e of this.get()) if (e.appId === app.id && isCheckType(e.type)) out.add(e.type)
+    return [...out]
+  },
+
+  /** When a snoozed check comes back (events ∪ this device's snooze cache), or null when not snoozed. */
+  snoozedUntil(app: Pick<Application, 'id' | 'events'>, checkType: CheckType, now = Date.now()): number | null {
+    const fromEvents = snoozedUntilFromEvents(app.events, checkType, now)
+    const local = this._getSnoozed()[app.id + ':' + checkType]
+    const fromDevice = typeof local === 'number' && local > now ? local : null
+    if (fromEvents == null) return fromDevice
+    if (fromDevice == null) return fromEvents
+    return Math.max(fromEvents, fromDevice)
+  },
+
+  /**
+   * Cached answers for this application that are not yet in its events — the tracker pushes each as
+   * a `check_answered` marker on load (offline answers, and answers given before H3 shipped).
+   */
+  pendingLedger(app: Pick<Application, 'id' | 'events'>): StoredEvent[] {
+    const onAccount = answeredFromEvents(app.events)
+    return this.get().filter(e => e.appId === app.id && isCheckType(e.type) && !onAccount.has(e.type))
   },
 
   /**
    * When this application is next asked a check-in (7 / 14 / 30 days after applying), or null once
    * all three are answered. The card prints it as "Next check-in Oct 30 — did they respond?".
    */
-  nextCheck(app: import('../types').Application, now = Date.now()): NextCheck | null {
+  nextCheck(app: Application, now = Date.now()): NextCheck | null {
     if (app.status !== 'active') return null
-    return nextCheck(app.appliedAt, this.answeredChecks(app.id), now)
+    return nextCheck(app.appliedAt, this.answeredChecks(app), now)
   },
 
-  dueChecks(apps: import('../types').Application[]): DueCheck[] {
+  /**
+   * ONE question per application at a time (lib/stores/checkEvents pickDueCheck): the earliest
+   * unanswered check in schedule order, the final-outcome question first from day 30, and a snoozed
+   * check holds the application. Only OPEN applications are asked. Most overdue first.
+   */
+  dueChecks(apps: Application[], now = Date.now()): DueCheck[] {
     const due: DueCheck[] = []
-    const snoozed = this._getSnoozed()
-
-    // ONE question per application at a time: the earliest unanswered check in schedule order
-    // (response → interview → outcome). An old application used to queue all of its overdue
-    // checks at once, so "Did they schedule interviews?" was asked before "Did they respond?".
-    // If that earliest check is snoozed, the application waits — a later check never jumps it.
-    // Only OPEN applications are asked — a card already marked ghosted/rejected/hired/withdrawn has
-    // its answer, so it must not keep raising "Did they respond?" at day 7/14/30.
-    for (const app of apps.filter(a => a.status === 'active')) {
-      const days = daysSince(app.appliedAt) // California calendar days — the card's "Day N"
-      const chk = CHECK_SCHEDULE.find(c => days >= c.day && !this.hasCheck(app.id, c.type))
-      if (!chk) continue
-      const snoozeKey = app.id + ':' + chk.type
-      if (snoozed[snoozeKey] && Date.now() < snoozed[snoozeKey]) continue
-      due.push({
-        app,
-        checkType: chk.type,
-        day: chk.day,
-        daysElapsed: days,
-        label: chk.label,
-        q: chk.q,
-        overdue: days - chk.day,
-      })
+    for (const app of apps) {
+      const answered = new Set<string>(this.answeredChecks(app))
+      const d = pickDueCheck(app, answered, t => this.snoozedUntil(app, t, now), now)
+      if (d) due.push(d)
     }
     return due.sort((a, b) => b.overdue - a.overdue)
   },
 
-  snooze(appId: string, checkType: string, hours = 24): void {
+  /** Cache a snooze on this device (the account copy is the `check_snoozed` event the tracker writes). */
+  snooze(appId: string, checkType: string, hours = 24): number {
     const s = this._getSnoozed()
-    s[appId + ':' + checkType] = Date.now() + hours * 3600000
+    const until = Date.now() + hours * 3600000
+    s[appId + ':' + checkType] = until
     try { localStorage.setItem(SNOOZE_KEY, JSON.stringify(s)) } catch {}
+    return until
   },
 
   _getSnoozed(): Record<string, number> {

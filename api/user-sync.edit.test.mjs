@@ -33,8 +33,8 @@ function install() {
     const body = opts.body ? JSON.parse(opts.body) : null;
     const m = opts.method || 'GET';
     if (m === 'GET') return Response.json(rows.filter((r) => match(r, u)));
-    const represent = /return=representation/.test(String((opts.headers || {}).Prefer || ''));
-    if (m === 'PATCH') { patches.push({ url: u.pathname + u.search, body }); const hit = rows.filter((r) => match(r, u)); for (const r of hit) Object.assign(r, body); return represent ? Response.json(hit) : new Response(null, { status: 204 }); }
+    // PostgREST answers `Prefer: return=representation` with the rows the PATCH matched.
+    if (m === 'PATCH') { patches.push({ url: u.pathname + u.search, body }); const hit = rows.filter((r) => match(r, u)); for (const r of hit) Object.assign(r, body); return Response.json(hit); }
     if (m === 'POST') { rows.push({ ...body }); return Response.json([body], { status: 201 }); }
     return new Response(null, { status: 405 });
   };
@@ -52,7 +52,7 @@ test('Edit: company / role / location / platform / appliedAt land on the row as 
   const { t, patches } = install();
   const applied = Date.parse('2026-10-18T19:00:00.000Z');
   const r = await call({ action: 'update_application', id: APP, changes: { company: ' Walmart ', role: 'Cashier', location: 'Tempe, AZ', platform: 'Indeed', appliedAt: applied } });
-  assert.deepEqual(r.body, { ok: true });
+  assert.equal(r.body.ok, true);
   assert.equal(patches.length, 1);
   assert.match(patches[0].url, new RegExp(`id=eq\\.${APP}&user_id=eq\\.${UID}`), 'scoped to the signed-in user');
   const row = t.applications[0];
@@ -68,7 +68,7 @@ test('Edit: company / role / location / platform / appliedAt land on the row as 
 test('a blank company or role, a bad date, and unknown keys are ignored — the row keeps what it had', async () => {
   const { t, patches } = install();
   const r = await call({ action: 'update_application', id: APP, changes: { company: '  ', role: '', appliedAt: 'not a date', employer_stage: 'Hired', user_id: 'someone-else' } });
-  assert.deepEqual(r.body, { ok: true });
+  assert.equal(r.body.ok, true);
   assert.equal(patches.length, 0, 'nothing allowed → no PATCH');
   assert.equal(t.applications[0].company_name, 'Walmrat');
   assert.equal(t.applications[0].user_id, UID);

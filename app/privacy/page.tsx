@@ -138,7 +138,7 @@ export default function PrivacyPage() {
             We keep account data for as long as your account is active and as needed to provide the service,
             then delete or anonymize it within a reasonable period, except where longer retention is required
             by law or for legitimate business or security purposes. When you delete your account in Settings,
-            your profile, résumé, tracker entries, saved jobs, credits and sign-in record are removed and the
+            any active subscription is cancelled first, then your profile, résumé, tracker entries, saved jobs, credits and sign-in record are removed and the
             reports you submitted stay published without any link to you (they are de-identified, not deleted,
             because they are already part of a company&apos;s public record). Public-discussion items may be
             retained in aggregated or de-identified form. <Placeholder>counsel to set specific retention periods</Placeholder>

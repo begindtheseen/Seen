@@ -1,7 +1,9 @@
 // Ownership + hygiene + round trips through the real api/user-sync.js handler (locally signed HS256
 // token, in-memory PostgREST that honours `Prefer: return=representation` like the real one).
-//   M3 (audit 2026-10-24): update/remove of an id the caller does not own answer 404, the other
-//       user's row is untouched; a row deleted elsewhere is a 404; a client-local id is "not_synced".
+//   M3 (audit 2026-10-24): remove of an id the caller does not own answers 404, the other user's
+//       row is untouched; a row deleted elsewhere is a 404; a client-local id is "not_synced".
+//       update_application is compare-and-set (#355): a row the caller cannot see — another
+//       user's, or deleted elsewhere — answers 410 gone (the client treats 410 and 404 alike).
 //   P1: save_profile trims, caps (lib/profileLimits.js) and refuses a blank name.
 //   H2: `load` carries the inbox status (one call for the dashboard), the auth check makes no network
 //       call for a locally verifiable token, and inbox_status is one DB round trip once warm.
@@ -79,11 +81,11 @@ function call(body) {
   });
 }
 
-test('M3: update of another user\'s application is a 404 and their row is untouched', async () => {
+test('M3: update of another user\'s application is a 410 (indistinguishable from deleted) and their row is untouched', async () => {
   const { t } = install();
   const r = await call({ action: 'update_application', id: THEIRS, changes: { stage: 'Offer', status: 'hired' } });
-  assert.equal(r.status, 404);
-  assert.deepEqual(r.body, { ok: false, reason: 'not_found' });
+  assert.equal(r.status, 410);
+  assert.deepEqual(r.body, { error: 'gone' });
   const theirs = t.applications.find((a) => a.id === THEIRS);
   assert.equal(theirs.stage, 'Applied');
   assert.equal(theirs.status, 'active');
@@ -93,8 +95,17 @@ test('M3: update of another user\'s application is a 404 and their row is untouc
 test('M3: update of my own application is a 200 and lands', async () => {
   const { t } = install();
   const r = await call({ action: 'update_application', id: MINE, changes: { stage: 'Interview' } });
-  assert.deepEqual(r, { status: 200, body: { ok: true } });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.ok, true);
   assert.equal(t.applications.find((a) => a.id === MINE).stage, 'Interview');
+});
+
+test('M3: update of my application after it was removed elsewhere is a 410, not a false ok', async () => {
+  const { t } = install();
+  assert.deepEqual(await call({ action: 'remove_application', id: MINE }), { status: 200, body: { ok: true } });
+  const r = await call({ action: 'update_application', id: MINE, changes: { stage: 'Interview' } });
+  assert.deepEqual(r, { status: 410, body: { error: 'gone' } });
+  assert.equal(t.applications.length, 1);
 });
 
 test('M3: remove of another user\'s application is a 404; mine is removed; a second remove is a 404', async () => {
