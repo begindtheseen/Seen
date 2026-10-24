@@ -72,7 +72,7 @@ export default async function handler(req, res) {
           || null;
         if (row) {
           // Prod's job_insights has no description_summary column until migration
-          // 20261024130000 is applied; the summary is a deterministic excerpt of the posting the
+          // 20261024140000 is applied; the summary is a deterministic excerpt of the posting the
           // caller sent, so it is rebuilt here (free) rather than lost.
           const summary = row.description_summary ?? (needsSummary && job && company && jobDescription
             ? buildJobInsights({ title: job, company, description: jobDescription, needsSummary: true }).description_summary : '');
