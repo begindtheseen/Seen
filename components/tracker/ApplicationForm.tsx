@@ -59,17 +59,17 @@ export default function ApplicationForm({ title, initial, notice, submitLabel, b
             {notice && <div role="status" className={s.notice}>{notice}</div>}
             <div className={s.field}>
               <label htmlFor="af-company">Company *</label>
-              <input id="af-company" className={s.input} value={form.company} onChange={set('company')} placeholder="e.g. Target" autoFocus maxLength={COMPANY_MAX} aria-describedby="af-company-n" />
+              <input autoComplete="off" id="af-company" className={s.input} value={form.company} onChange={set('company')} placeholder="e.g. Target" autoFocus maxLength={COMPANY_MAX} aria-describedby="af-company-n" />
               <Counter id="af-company-n" value={form.company} max={COMPANY_MAX} />
             </div>
             <div className={s.field}>
               <label htmlFor="af-role">Role *</label>
-              <input id="af-role" className={s.input} value={form.role} onChange={set('role')} placeholder="e.g. Cashier" maxLength={ROLE_MAX} aria-describedby="af-role-n" />
+              <input autoComplete="off" id="af-role" className={s.input} value={form.role} onChange={set('role')} placeholder="e.g. Cashier" maxLength={ROLE_MAX} aria-describedby="af-role-n" />
               <Counter id="af-role-n" value={form.role} max={ROLE_MAX} />
             </div>
             <div className={s.field}>
               <label htmlFor="af-location">Location</label>
-              <input id="af-location" className={s.input} value={form.location} onChange={set('location')} placeholder="e.g. Phoenix, AZ or Remote" maxLength={LOCATION_MAX} aria-describedby="af-location-n" />
+              <input autoComplete="off" id="af-location" className={s.input} value={form.location} onChange={set('location')} placeholder="e.g. Phoenix, AZ or Remote" maxLength={LOCATION_MAX} aria-describedby="af-location-n" />
               <Counter id="af-location-n" value={form.location} max={LOCATION_MAX} />
             </div>
             <div className={s.two}>

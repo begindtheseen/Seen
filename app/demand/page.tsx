@@ -220,7 +220,7 @@ export default function DemandPage() {
 
           {/* Filters */}
           <div className="demand-filters">
-            <input
+            <input autoComplete="off"
               type="text"
               placeholder="Filter by city or state..."
               value={locFilter}

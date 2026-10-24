@@ -67,28 +67,6 @@
 .pinBusy { color: var(--blue); }
 .pinOff { opacity: 0.3; cursor: default; }
 
-.suggs {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  z-index: 50;
-  background: var(--card);
-  border: 1px solid var(--line2);
-  border-radius: 8px;
-  margin-top: 2px;
-  overflow: hidden;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-}
-.sugg {
-  padding: 0.5rem 0.8rem;
-  font-family: var(--mono);
-  font-size: 0.68rem;
-  color: var(--sub);
-  cursor: pointer;
-}
-.sugg:hover { background: var(--surface); }
-
 .radius {
   flex: none;
   background: var(--card);
@@ -150,24 +128,6 @@
   .go { flex: 1 1 auto; padding: 0.62rem 0.95rem; }
 }
 
-/* On a phone the city box is full width and the [radius · Search] row sits right under it, so an
-   absolutely positioned suggestion list landed ON the Search button (358×37 over "Search →", live
-   audit 2026-10-23: the first thumb tap picked the city already typed, the second searched). The list
-   now flows in the document and pushes that row down, and each row is a real 44px tap target. */
-@media (max-width: 768px) {
-  .suggs {
-    position: static;
-    margin-top: 0.35rem;
-    box-shadow: none;
-  }
-  .sugg {
-    min-height: 44px;
-    display: flex;
-    align-items: center;
-    padding: 0.5rem 0.9rem;
-  }
-}
-
 /* "Other openings" — the rows below every match that only share a word with the search (audit H9). */
 .divider {
   display: flex;
@@ -222,5 +182,5 @@
 
 /* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
 @media (max-width: 768px) {
-  .sugg, .notice, .cityLine { font-size: 0.75rem; }
+  .notice, .cityLine { font-size: 0.75rem; }
 }

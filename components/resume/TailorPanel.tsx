@@ -136,11 +136,11 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
           </div>
         )}
         <div className={s.row}>
-          <div><span className={s.label}>Job title</span><input className={s.input} value={job.title} onChange={(e) => setJob({ ...job, title: e.target.value })} placeholder="Sales Associate" /></div>
-          <div><span className={s.label}>Company</span><input className={s.input} value={job.company} onChange={(e) => setJob({ ...job, company: e.target.value })} placeholder="GNC" /></div>
+          <div><span className={s.label}>Job title</span><input autoComplete="off" className={s.input} value={job.title} onChange={(e) => setJob({ ...job, title: e.target.value })} placeholder="Sales Associate" /></div>
+          <div><span className={s.label}>Company</span><input autoComplete="off" className={s.input} value={job.company} onChange={(e) => setJob({ ...job, company: e.target.value })} placeholder="GNC" /></div>
         </div>
         <span className={s.label}>Job description</span>
-        <textarea className={`${s.input} ${s.area}`} rows={5} value={job.description} onChange={(e) => setJob({ ...job, description: e.target.value })} placeholder="Paste the posting — requirements, responsibilities, the lot." />
+        <textarea autoComplete="off" className={`${s.input} ${s.area}`} rows={5} value={job.description} onChange={(e) => setJob({ ...job, description: e.target.value })} placeholder="Paste the posting — requirements, responsibilities, the lot." />
         <div className={s.opts} style={{ marginTop: '.6rem', justifyContent: 'space-between' }}>
           <label className={s.dim} style={{ display: 'flex', alignItems: 'center', gap: '.4rem', cursor: pro ? 'pointer' : 'default' }}>
             <input type="checkbox" checked={polish && pro === true} disabled={pro !== true} onChange={(e) => { if (pro !== true) { onNeed('pro'); return } setPolish(e.target.checked) }} />
@@ -248,7 +248,7 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
               {(plan.prompts || []).map((p) => (
                 <div key={p.id} style={{ marginBottom: '.55rem' }}>
                   <span className={s.label}>{p.roleTitle}{p.company ? ` · ${p.company}` : ''}</span>
-                  <input className={s.input} value={answers[p.id] || ''} placeholder={p.question} onChange={(e) => setAnswers((a) => ({ ...a, [p.id]: e.target.value }))} />
+                  <input autoComplete="off" className={s.input} value={answers[p.id] || ''} placeholder={p.question} onChange={(e) => setAnswers((a) => ({ ...a, [p.id]: e.target.value }))} />
                   <div className={s.muted} style={{ marginTop: '.15rem' }}>{p.why}</div>
                 </div>
               ))}

@@ -93,13 +93,13 @@ function DisputeForm({ companyName, presetPermalink, onClose }: {
         {DISPUTE_REASONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
       </select>
       <label style={labelStyle}>What should we know?</label>
-      <textarea
+      <textarea autoComplete="off"
         value={detail} onChange={e => setDetail(e.target.value)} rows={3} maxLength={2000}
         placeholder="Explain the correction. Good-faith detail helps us act on it."
         style={{ ...inputStyle, resize: 'vertical', minHeight: 64 }}
       />
       <label style={labelStyle}>Contact email <span style={{ color: 'var(--muted)', textTransform: 'none' }}>(optional — only if you want a reply)</span></label>
-      <input value={contact} onChange={e => setContact(e.target.value)} maxLength={200} placeholder="you@company.com" style={inputStyle} />
+      <input autoComplete="off" value={contact} onChange={e => setContact(e.target.value)} maxLength={200} placeholder="you@company.com" style={inputStyle} />
       {err && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--red)', marginTop: '.4rem' }}>{err}</div>}
       <div style={{ display: 'flex', gap: '.5rem', marginTop: '.75rem' }}>
         <button onClick={submit} disabled={state === 'sending'} style={{ ...btnPrimary, opacity: state === 'sending' ? 0.6 : 1 }}>

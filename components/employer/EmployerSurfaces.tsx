@@ -49,7 +49,7 @@ export function EmployerSurfaces() {
           onChange={e => setCompany(e.target.value)}
           placeholder="Your company name"
           aria-label="Your company name"
-          autoComplete="organization"
+          autoComplete="off"
           style={{ flex: 1, minWidth: 220, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.7rem .9rem', ...mono('.75rem', 'var(--white)'), outline: 'none' }}
         />
       </div>

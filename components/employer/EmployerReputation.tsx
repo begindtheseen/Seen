@@ -94,7 +94,7 @@ export function EmployerReputation() {
         </div>
       ) : (
         <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', marginBottom: score || loading ? '1.6rem' : 0 }}>
-          <input
+          <input autoComplete="off"
             value={name}
             onChange={e => setName(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') look() }}

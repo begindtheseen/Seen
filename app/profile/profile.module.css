@@ -90,10 +90,6 @@
 .hint { font-family: var(--mono); font-size: 0.58rem; color: var(--dim); margin-top: 0.45rem; line-height: 1.5; }
 .skeleton { height: 2.65rem; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.07); background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.07) 50%, rgba(255,255,255,0.03) 75%); background-size: 200% 100%; animation: pulse 1.3s ease-in-out infinite; }
 
-.suggs { position: absolute; z-index: 200; left: 0; right: 0; top: calc(100% + 6px); background: #0e111c; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; overflow: hidden; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55); animation: riseIn 0.3s var(--ease-out) both; }
-.sugg { padding: 0.62rem 0.95rem; cursor: pointer; font-size: 0.84rem; color: var(--white); transition: background 0.12s ease; }
-.sugg + .sugg { border-top: 1px solid rgba(255, 255, 255, 0.06); }
-.sugg:hover { background: rgba(99, 102, 241, 0.14); }
 
 /* ── Buttons + rows ── */
 .btnRow { display: flex; gap: 0.5rem; flex-wrap: wrap; }
@@ -172,7 +168,7 @@
 @media (max-width: 480px) { .saveT { display: none; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .me, .jumps, .col > *, .suggs, .saveBar { animation: none; }
+  .me, .jumps, .col > *, .saveBar { animation: none; }
   .jump, .primary, .ghost, .input, .select { transition: none; }
   .jump:hover, .primary:hover { transform: none; }
 }

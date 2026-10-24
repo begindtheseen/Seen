@@ -90,11 +90,11 @@ export default function GuestTracker() {
             <form onSubmit={e => { e.preventDefault(); void add() }}>
               <div className={s.field}>
                 <label className={s.label} htmlFor="gt-company">Company</label>
-                <input id="gt-company" className={s.input} type="text" placeholder="e.g. Walmart" maxLength={COMPANY_MAX} value={company} onChange={e => setCompany(e.target.value)} data-testid="gt-company" />
+                <input autoComplete="off" id="gt-company" className={s.input} type="text" placeholder="e.g. Walmart" maxLength={COMPANY_MAX} value={company} onChange={e => setCompany(e.target.value)} data-testid="gt-company" />
               </div>
               <div className={s.field}>
                 <label className={s.label} htmlFor="gt-role">Job title</label>
-                <input id="gt-role" className={s.input} type="text" placeholder="e.g. Cashier" maxLength={ROLE_MAX} value={role} onChange={e => setRole(e.target.value)} data-testid="gt-role" />
+                <input autoComplete="off" id="gt-role" className={s.input} type="text" placeholder="e.g. Cashier" maxLength={ROLE_MAX} value={role} onChange={e => setRole(e.target.value)} data-testid="gt-role" />
               </div>
               <AppliedWhen choice={choice} pickedDay={pickedDay} onChoice={c => { setChoice(c); setError('') }} onPickedDay={setPickedDay} />
               {error && <p className={s.err} role="alert" style={{ marginTop: 0, marginBottom: '.6rem' }}>{error}</p>}

@@ -295,7 +295,7 @@ export function EmployerHub() {
               </div>
             )}
             <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', marginBottom: '1.6rem' }}>
-              <input
+              <input autoComplete="off"
                 value={companyInput}
                 onChange={e => setCompanyInput(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') lookup() }}

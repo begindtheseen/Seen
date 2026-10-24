@@ -152,7 +152,7 @@ function QuestionRow({ q }: { q: NumberQuestion }) {
     <div style={card}>
       <label style={{ display: 'block', fontSize: 'var(--fs-72)', color: 'var(--white)', lineHeight: 1.5, marginBottom: '.4rem' }}>
         {q.question}
-        <input value={answer} onChange={(e) => setAnswer(e.target.value)} inputMode="text" placeholder="e.g. 200" maxLength={60}
+        <input autoComplete="off" value={answer} onChange={(e) => setAnswer(e.target.value)} inputMode="text" placeholder="e.g. 200" maxLength={60}
           style={{ display: 'block', width: '100%', marginTop: '.35rem', background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 7, padding: '.5rem .65rem', color: 'var(--white)', fontSize: '.85rem', boxSizing: 'border-box' }} />
       </label>
       {bullet ? (

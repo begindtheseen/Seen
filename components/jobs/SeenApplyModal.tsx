@@ -155,11 +155,11 @@ export default function SeenApplyModal({ job, onClose, onApplied }: {
     content = (
       <>
         <label style={label} htmlFor="sa-name">Full name</label>
-        <input id="sa-name" style={input} value={name} onChange={e => setName(e.target.value)} autoComplete="name" />
+        <input id="sa-name" style={input} value={name} onChange={e => setName(e.target.value)} autoComplete="off" />
         <label style={label} htmlFor="sa-email">Email</label>
-        <input id="sa-email" style={input} type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" />
+        <input id="sa-email" style={input} type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="off" />
         <label style={label} htmlFor="sa-phone">Phone (optional)</label>
-        <input id="sa-phone" style={input} type="tel" value={phone} onChange={e => setPhone(e.target.value)} autoComplete="tel" />
+        <input id="sa-phone" style={input} type="tel" value={phone} onChange={e => setPhone(e.target.value)} autoComplete="off" />
 
         <span style={label}>Résumé</span>
         {hasSaved && (
@@ -183,7 +183,7 @@ export default function SeenApplyModal({ job, onClose, onApplied }: {
         <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', marginTop: '.3rem' }}>PDF, Word or text · up to 3 MB</div>
 
         <label style={label} htmlFor="sa-note">Note to {job.company} (optional)</label>
-        <textarea id="sa-note" style={{ ...input, minHeight: 80, resize: 'vertical' }} maxLength={2000} value={note} onChange={e => setNote(e.target.value)} />
+        <textarea autoComplete="off" id="sa-note" style={{ ...input, minHeight: 80, resize: 'vertical' }} maxLength={2000} value={note} onChange={e => setNote(e.target.value)} />
 
         <label style={{ display: 'flex', gap: '.55rem', alignItems: 'flex-start', fontSize: '.76rem', color: 'var(--sub)', lineHeight: 1.5, marginTop: '.85rem', cursor: 'pointer' }}>
           <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} style={{ marginTop: '.2rem' }} />

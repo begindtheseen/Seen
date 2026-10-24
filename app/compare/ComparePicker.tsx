@@ -38,10 +38,10 @@ export default function ComparePicker({ initialA = '', initialB = '' }: { initia
 
   return (
     <form onSubmit={submit} style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', alignItems: 'center', maxWidth: 720, margin: '0 auto 2rem' }}>
-      <input value={a} onChange={e => setA(e.target.value)} placeholder="First company"
+      <input autoComplete="off" value={a} onChange={e => setA(e.target.value)} placeholder="First company"
         style={{ flex: '1 1 160px', minWidth: 0, background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 8, padding: '.7rem .9rem', color: 'var(--white)', fontFamily: 'var(--body)', fontSize: '.85rem', outline: 'none' }} />
       <span style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--dim)', fontSize: '.8rem' }}>vs</span>
-      <input value={b} onChange={e => setB(e.target.value)} placeholder="Second company"
+      <input autoComplete="off" value={b} onChange={e => setB(e.target.value)} placeholder="Second company"
         style={{ flex: '1 1 160px', minWidth: 0, background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 8, padding: '.7rem .9rem', color: 'var(--white)', fontFamily: 'var(--body)', fontSize: '.85rem', outline: 'none' }} />
       <button type="submit" className="btn" style={{ flex: '0 0 auto', background: 'linear-gradient(135deg,var(--g-start),var(--g-mid),var(--g-end))', color: '#fff', padding: '.7rem 1.4rem', fontWeight: 800 }}>Compare</button>
     </form>

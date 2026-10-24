@@ -107,9 +107,9 @@ export function EmployerCheckout() {
 
             {isOpen ? (
               <form onSubmit={e => { e.preventDefault(); go(sku) }} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-                <input value={company} onChange={e => setCompany(e.target.value)} placeholder="Company name — exactly as it appears on Seen" aria-label="Company name" autoComplete="organization" required style={inp} />
-                <input type="email" inputMode="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="Work email (receipt + contact)" aria-label="Work email" style={inp} />
-                <input type="url" inputMode="url" value={target} onChange={e => setTarget(e.target.value)} placeholder="Listing URL (optional)" aria-label="Listing URL (optional)" style={inp} />
+                <input value={company} onChange={e => setCompany(e.target.value)} placeholder="Company name — exactly as it appears on Seen" aria-label="Company name" autoComplete="off" required style={inp} />
+                <input type="email" inputMode="email" autoComplete="off" required value={email} onChange={e => setEmail(e.target.value)} placeholder="Work email (receipt + contact)" aria-label="Work email" style={inp} />
+                <input autoComplete="off" type="url" inputMode="url" value={target} onChange={e => setTarget(e.target.value)} placeholder="Listing URL (optional)" aria-label="Listing URL (optional)" style={inp} />
                 {/* What the handler does with the name (api/stripe.js employer_checkout → employerFulfillment.js):
                     it is stored as typed and, for Featured, keyed into employer_perks by that exact name — the
                     checkout does not verify the company exists on Seen. Say so, and offer the check. */}

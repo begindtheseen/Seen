@@ -289,7 +289,7 @@ function StudioInner() {
           <div className={s.card}>
             <div className={s.cardTitle}>Paste your résumé</div>
             <div className={s.dim} style={{ marginBottom: '.6rem' }}>Keep the line breaks — section headings on their own lines, one bullet per line.</div>
-            <textarea className={s.pasteArea} value={pasteText} onChange={(e) => setPasteText(e.target.value)} placeholder={'JORDAN REYES\nPhoenix, AZ · 602-555-0142 · jordan@example.com\n\nEXPERIENCE\nJourneyman Electrician — Desert Power Solutions | Mar 2020 – Present\n• Install and troubleshoot 480V three-phase systems across 14 sites.\n…'} />
+            <textarea autoComplete="off" className={s.pasteArea} value={pasteText} onChange={(e) => setPasteText(e.target.value)} placeholder={'JORDAN REYES\nPhoenix, AZ · 602-555-0142 · jordan@example.com\n\nEXPERIENCE\nJourneyman Electrician — Desert Power Solutions | Mar 2020 – Present\n• Install and troubleshoot 480V three-phase systems across 14 sites.\n…'} />
             <div className={s.findingActions} style={{ marginTop: '.6rem' }}>
               <button type="button" className={s.btnPrimary} onClick={usePasted}>Structure it →</button>
               <button type="button" className={s.btn} onClick={() => setMode(baseDoc ? 'editor' : 'empty')}>Cancel</button>

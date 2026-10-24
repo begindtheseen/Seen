@@ -141,7 +141,7 @@ export default function TrackCta({ company, slug, responsePct = null }: {
               type="text"
               className={s.input}
               placeholder="e.g. Cashier"
-              autoComplete="organization-title"
+              autoComplete="off"
               maxLength={ROLE_MAX}
               value={role}
               onChange={e => setRole(e.target.value)}

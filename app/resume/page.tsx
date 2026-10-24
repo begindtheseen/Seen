@@ -356,7 +356,7 @@ function ResumeInput({ resumeText, setResumeText, resumeMeta, onUpload, onClear,
           onDrop={(e) => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f) onFileDrop(f) }}
           style={{ border: isDragging ? '2px dashed var(--blue)' : '2px dashed var(--line2)', background: isDragging ? 'rgba(59,130,246,0.05)' : 'transparent', borderRadius: 8, transition: 'all .15s' }}
         >
-          <textarea placeholder="Paste your resume text here, or drag & drop a PDF/Word/txt file..." value={resumeText} onChange={e => setResumeText(e.target.value)} rows={8} style={{ ...areaStyle, border: 'none', background: 'transparent' }} />
+          <textarea autoComplete="off" placeholder="Paste your resume text here, or drag & drop a PDF/Word/txt file..." value={resumeText} onChange={e => setResumeText(e.target.value)} rows={8} style={{ ...areaStyle, border: 'none', background: 'transparent' }} />
         </div>
       )}
     </div>
@@ -818,15 +818,15 @@ function ResumePageInner() {
               {(showManual || savedJobs.length === 0) && (
                 <div>
                   {label('Job title')}
-                  <input type="text" placeholder="e.g. Cashier" value={jobTitle} onChange={e => setJobTitle(e.target.value)} style={inputStyle} />
+                  <input autoComplete="off" type="text" placeholder="e.g. Cashier" value={jobTitle} onChange={e => setJobTitle(e.target.value)} style={inputStyle} />
                   {label('Company')}
-                  <input type="text" placeholder="e.g. Target" value={jobCompany} onChange={e => setJobCompany(e.target.value)} onBlur={() => fetchIntel(jobCompany)} style={inputStyle} />
+                  <input autoComplete="off" type="text" placeholder="e.g. Target" value={jobCompany} onChange={e => setJobCompany(e.target.value)} onBlur={() => fetchIntel(jobCompany)} style={inputStyle} />
                   {label('Job URL (optional)')}
-                  <input type="url" placeholder="https://…" value={jobUrl} onChange={e => setJobUrl(e.target.value)} style={inputStyle} />
+                  <input autoComplete="off" type="url" placeholder="https://…" value={jobUrl} onChange={e => setJobUrl(e.target.value)} style={inputStyle} />
                   {label('Job description')}
-                  <textarea placeholder="Paste the job description..." value={jobJD} onChange={e => { setJobJD(e.target.value); setJobSource(null) }} rows={4} style={{ ...areaStyle, marginBottom: '.75rem' }} />
+                  <textarea autoComplete="off" placeholder="Paste the job description..." value={jobJD} onChange={e => { setJobJD(e.target.value); setJobSource(null) }} rows={4} style={{ ...areaStyle, marginBottom: '.75rem' }} />
                   {label('Your background (for Strategy) — optional')}
-                  <textarea placeholder="What draws you to this role? Any unique experience?" value={background} onChange={e => setBackground(e.target.value)} rows={3} style={{ ...areaStyle, marginBottom: '.75rem' }} />
+                  <textarea autoComplete="off" placeholder="What draws you to this role? Any unique experience?" value={background} onChange={e => setBackground(e.target.value)} rows={3} style={{ ...areaStyle, marginBottom: '.75rem' }} />
                 </div>
               )}
 
@@ -1013,7 +1013,7 @@ function ResumePageInner() {
                     <Card>
                       {kicker('Email me this package')}
                       <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
-                        <input type="email" value={emailAddr} onChange={e => setEmailAddr(e.target.value)} placeholder="your@email.com" style={{ flex: 1, minWidth: 160, background: 'var(--surface)', border: '1.5px solid rgba(16,185,129,0.3)', borderRadius: 8, padding: '.5rem .75rem', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-72)', outline: 'none', boxSizing: 'border-box' }} />
+                        <input autoComplete="off" type="email" value={emailAddr} onChange={e => setEmailAddr(e.target.value)} placeholder="your@email.com" style={{ flex: 1, minWidth: 160, background: 'var(--surface)', border: '1.5px solid rgba(16,185,129,0.3)', borderRadius: 8, padding: '.5rem .75rem', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-72)', outline: 'none', boxSizing: 'border-box' }} />
                         <button onClick={emailPackage} disabled={emailState === 'sending' || emailState === 'sent' || !emailAddr.trim()} style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', color: 'var(--green)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-72)', fontWeight: 600, padding: '.5rem .9rem', borderRadius: 8, cursor: 'pointer', opacity: (emailState === 'sending' || !emailAddr.trim()) ? 0.7 : 1 }}>{emailState === 'sent' ? '✓ Sent' : emailState === 'sending' ? 'Sending…' : 'Send →'}</button>
                       </div>
                       {emailState === 'sent' && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--green)', marginTop: '.5rem' }}>✓ Check your email — the apply-tracking link is inside.</div>}

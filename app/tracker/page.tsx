@@ -1053,7 +1053,7 @@ function TrackerPage() {
             </label>
             <label className={`${s.toolField} ${s.toolGrow}`}>
               <span className={s.toolLabel}>Filter</span>
-              <input className={s.input} type="search" value={filterText} onChange={e => setFilterText(e.target.value)} placeholder="Company, role, city or stage" aria-label="Filter applications" maxLength={80} />
+              <input autoComplete="off" className={s.input} type="search" value={filterText} onChange={e => setFilterText(e.target.value)} placeholder="Company, role, city or stage" aria-label="Filter applications" maxLength={80} />
             </label>
             <span className={s.toolCount} aria-live="polite">
               {filterText.trim() ? `${shownApps.length} of ${apps.length} match` : `${apps.length} tracked`}

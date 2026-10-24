@@ -1102,7 +1102,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                   {commentaryN > 0 ? ` ${commentaryN} ${commentaryN === 1 ? 'quote is' : 'quotes are'} commentary, not counted.` : ''}
                   {hiddenPublicN > 0 ? ` ${hiddenPublicN} hidden (links or bot text).` : ''}
                 </div>
-                <input
+                <input autoComplete="off"
                   type="text"
                   placeholder="Filter by city…"
                   aria-label="Filter reports by city"
@@ -1337,7 +1337,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
             <Section id="compare" icon="⚡" title="Compare" open={open.compare} onToggle={toggle}
               summary={compareList.length > 0 ? `${displayName} vs ${compareList.map(c => c.name).join(' & ')}` : 'Side by side with up to 2 other companies'}>
               <div className="co-cmp-form">
-                <input
+                <input autoComplete="off"
                   type="text"
                   placeholder="Company name"
                   aria-label="Company to compare"
