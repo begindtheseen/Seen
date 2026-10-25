@@ -1,0 +1,78 @@
+/* /pricing — one clear menu: Free, Interview Prep (the lead), the Job Search Pass.
+   Phone first: the hero is short and the Interview Prep card (price + button) sits in the first screen
+   at 390px. Every text size here is ≥ .75rem and every control ≥ 44px (CLAUDE.md phone floors). */
+
+.wrap { max-width: 960px; margin: 0 auto; padding: 3rem 1.5rem 4.5rem; width: 100%; box-sizing: border-box; }
+.hero { text-align: center; margin-bottom: 2.25rem; }
+.eyebrow { font-family: var(--mono); font-size: .75rem; text-transform: uppercase; letter-spacing: .2em; color: var(--green); margin-bottom: .55rem; }
+.h1 { font-family: var(--display); font-size: clamp(1.6rem, 4.6vw, 2.4rem); font-weight: 900; color: var(--white); letter-spacing: -.035em; line-height: 1.1; margin: 0 0 .65rem; }
+.lede { color: var(--sub); font-family: var(--body); font-size: .9rem; line-height: 1.6; max-width: 520px; margin: 0 auto; }
+.lede b { color: var(--white); font-weight: 600; }
+
+.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.1rem; align-items: start; margin-bottom: 2.5rem; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 1.5rem; min-width: 0; position: relative; }
+.lead { border: 1.5px solid rgba(16, 185, 129, .5); background: linear-gradient(160deg, rgba(16, 185, 129, .09), rgba(16, 185, 129, .02)); }
+.pass { border-color: rgba(99, 102, 241, .4); }
+.tag { position: absolute; top: -11px; left: 1.25rem; background: var(--green); color: #052e22; font-family: var(--mono); font-size: .75rem; font-weight: 700; letter-spacing: .04em; padding: .15rem .6rem; border-radius: 100px; white-space: nowrap; }
+.name { font-family: var(--mono); font-size: .75rem; text-transform: uppercase; letter-spacing: .14em; color: var(--dim); margin-bottom: .45rem; }
+.lead .name { color: var(--green); }
+.pass .name { color: #a5b4fc; }
+.priceRow { display: flex; align-items: baseline; gap: .45rem; flex-wrap: wrap; margin-bottom: .35rem; }
+.price { font-family: var(--display); font-size: 2.1rem; font-weight: 900; color: var(--white); line-height: 1; }
+.per { font-family: var(--mono); font-size: .8rem; color: var(--sub); }
+.pitch { font-family: var(--body); font-size: .85rem; color: var(--text); line-height: 1.55; margin: .35rem 0 1rem; }
+
+.btn { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 48px; box-sizing: border-box; border-radius: 10px; padding: .75rem 1rem; font-family: var(--display); font-weight: 800; font-size: .9rem; cursor: pointer; text-decoration: none; text-align: center; border: 1px solid transparent; }
+.btn:disabled { opacity: .6; cursor: default; }
+.btnLead { background: var(--green); color: #052e22; }
+.btnPass { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: #fff; }
+.btnFree { background: none; border-color: var(--line2); color: var(--text); }
+.note { font-family: var(--mono); font-size: .75rem; color: var(--sub); text-align: center; margin: .5rem 0 0; }
+.status { font-family: var(--body); font-size: .85rem; color: var(--green); background: rgba(16, 185, 129, .1); border: 1px solid rgba(16, 185, 129, .3); border-radius: 10px; padding: .7rem .85rem; line-height: 1.5; }
+
+.list { list-style: none; margin: 1.1rem 0 0; padding: 0; }
+.list li { display: flex; gap: .5rem; margin-bottom: .45rem; font-family: var(--body); font-size: .82rem; color: var(--sub); line-height: 1.45; }
+.list li::before { content: '✓'; color: var(--dim); flex-shrink: 0; }
+.lead .list li::before { color: var(--green); }
+.pass .list li::before { color: #818cf8; }
+.small { font-family: var(--body); font-size: .78rem; color: var(--muted); line-height: 1.5; margin: .65rem 0 0; }
+
+.err { background: rgba(239, 68, 68, .08); border: 1px solid rgba(239, 68, 68, .25); border-radius: 8px; padding: .6rem .85rem; margin: 0 auto 1.25rem; max-width: 640px; font-family: var(--mono); font-size: .78rem; color: var(--red); line-height: 1.5; text-align: center; }
+
+.manage { max-width: 640px; margin: 0 auto 2rem; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 1.1rem 1.25rem; }
+.manageT { font-family: var(--display); font-size: 1rem; font-weight: 800; color: var(--white); margin: 0 0 .3rem; }
+.manageS { font-family: var(--body); font-size: .82rem; color: var(--sub); line-height: 1.6; margin: 0 0 .75rem; }
+.ghostBtn { min-height: 44px; background: none; border: 1px solid var(--line2); border-radius: 9px; padding: .55rem 1rem; font-family: var(--mono); font-size: .8rem; color: var(--sub); cursor: pointer; }
+.ghostBtn.danger { border-color: rgba(239, 68, 68, .4); color: var(--red); }
+
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .9rem; margin: 0 0 2.5rem; padding: 0; list-style: none; counter-reset: step; }
+.steps li { counter-increment: step; background: var(--raised); border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.1rem; font-family: var(--body); font-size: .82rem; color: var(--sub); line-height: 1.55; min-width: 0; }
+.steps li::before { content: counter(step); display: inline-grid; place-items: center; width: 1.6rem; height: 1.6rem; border-radius: 50%; background: var(--gdim); color: var(--green); font-family: var(--mono); font-size: .78rem; margin-bottom: .45rem; }
+.steps b { color: var(--white); font-weight: 600; display: block; margin-bottom: .2rem; }
+
+.promise { text-align: center; font-family: var(--mono); font-size: .78rem; color: var(--sub); line-height: 1.7; margin: 0 0 2.75rem; }
+.promise span { white-space: nowrap; }
+
+.h2 { font-family: var(--display); font-size: 1.15rem; font-weight: 800; color: var(--white); margin: 0 0 .9rem; }
+.faq { margin-bottom: .55rem; background: var(--card); border: 1px solid var(--line); border-radius: 10px; scroll-margin-top: 5rem; }
+.faq summary { padding: .8rem 1.1rem; min-height: 44px; box-sizing: border-box; font-family: var(--display); font-size: .85rem; font-weight: 700; color: var(--white); cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+.faq summary::-webkit-details-marker { display: none; }
+.faqA { padding: 0 1.1rem .85rem; font-family: var(--body); font-size: .82rem; color: var(--sub); line-height: 1.7; }
+
+/* Phones and narrow tablets: one column, Interview Prep first (the lead), then the pass, then Free. */
+@media (max-width: 860px) {
+  .cards { grid-template-columns: minmax(0, 1fr); gap: 1.4rem; }
+  .cards .lead { order: 1; }
+  .cards .pass { order: 2; }
+  .cards .free { order: 3; }
+  .steps { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 480px) {
+  .wrap { padding: 1.25rem 16px 3.5rem; }
+  .hero { margin-bottom: 1.6rem; }
+  .h1 { font-size: 1.55rem; margin-bottom: .5rem; }
+  .lede { font-size: .85rem; }
+  .card { padding: 1.25rem 1.1rem; }
+  .price { font-size: 1.9rem; }
+  .pitch { margin-bottom: .85rem; }
+}

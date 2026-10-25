@@ -10,7 +10,15 @@
 //                                                  from the résumé, intro, emails. Cached per user +
 //                                                  company + role in interview_preps when that table
 //                                                  exists (migration 20261025120000).
-//   POST {action:'event', event, company?}         funnel counters (funnel_events), allow-listed names.
+//   POST {action:'preview', company, role, stage?} signed in, no gate, no model, no cost: a free taste of the
+//                                                  prep before the ask — 2 questions for the role and 1
+//                                                  coached story from the person's own résumé, built by the
+//                                                  same deterministic path the paid pack falls back to
+//                                                  (guardPack with no model output). {questions, answer,
+//                                                  has_resume}; answer is null without a résumé.
+//   POST {action:'event', event, company?, surface?, sku?}
+//                                                  funnel counters (funnel_events) — lib/server/funnelEvents.js
+//                                                  holds the allow-listed names, surfaces and SKUs.
 
 import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { gateAI } from '../lib/server/credits.js';
@@ -18,10 +26,34 @@ import { chat, llmAvailable, LLMUnavailableError } from '../lib/server/llm.js';
 import { SCORABLE_REPORTS_FILTER } from '../lib/server/reportCounts.js';
 import { ONE_TIME_SKUS } from '../lib/server/creditRules.js';
 import {
-  interviewRecord, payRange, followUpPlan, prepPrompt, guardPack, prepEmails, prepKey, signOffName, prepFamily,
+  interviewRecord, payRange, followUpPlan, prepPrompt, guardPack, fallbackPack, prepEmails, prepKey, signOffName, prepFamily,
 } from '../lib/server/interviewPrep.js';
+import { CLIENT_EVENTS, funnelRow, recordFunnelEvent } from '../lib/server/funnelEvents.js';
 
-export const FUNNEL_EVENTS = ['prep_offer_shown', 'prep_offer_clicked', 'prep_built', 'guest_email_shown', 'guest_email_given'];
+/** The events a browser may post here (checkout and build steps are written by the server). */
+export const FUNNEL_EVENTS = CLIENT_EVENTS;
+
+/** The same readable-résumé bar the build and `mine` use: at least 200 characters of text. */
+const readableResume = (text) => String(text || '').replace(/\s+/g, ' ').length >= 200;
+
+/**
+ * The free preview, from the deterministic pack only (no model, no cost): the first 2 role questions from
+ * the field bank (never the generic openers) and the first coached story from the résumé. Pure.
+ */
+export function previewFrom({ company, role, resumeText, stage = '' }) {
+  const hasResume = readableResume(resumeText);
+  const text = hasResume ? String(resumeText) : '';
+  const pack = guardPack({}, { company, role, resumeText: text, pay: null, stage });
+  const bank = new Set(fallbackPack({ company, role, resumeText: text }).questions.map((q) => q.q));
+  const roleQs = pack.questions.filter((q) => bank.has(q.q));
+  const questions = (roleQs.length >= 2 ? roleQs : pack.questions).slice(0, 2).map((q) => ({ q: q.q, why: q.why }));
+  const a = hasResume ? pack.answers[0] : null;
+  return {
+    questions,
+    answer: a ? { q: a.q, answer: a.answer, resume_fact: a.resume_fact } : null,
+    has_resume: hasResume,
+  };
+}
 
 const clean = (s, n) => String(s || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, n);
 // Legal suffixes dropped so "Ross Stores, Inc." and "ross stores" read the same reports.
@@ -103,18 +135,24 @@ export default async function handler(req, res) {
 
   if (action === 'event') {
     if (await applyRateLimit(req, res, 'interview-record')) return;
-    const event = String(body.event || '');
-    if (!FUNNEL_EVENTS.includes(event)) return res.status(400).json({ error: 'unknown event' });
+    const row = funnelRow({ event: body.event, company, surface: body.surface, sku: body.sku }, { client: true });
+    if (!row) return res.status(400).json({ error: 'unknown event' });
     // Who, when signed in — read from the token without failing the beacon when it is absent.
-    let uid = null;
-    const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
-    if (token) {
-      const u = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${token}` } }).catch(() => null);
-      if (u && u.ok) uid = (await readJson(u))?.id || null;
-    }
-    const r = await db('funnel_events', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ user_id: uid, event, company: company || null }) }).catch(() => null);
-    // A missing table (migration not applied) is not the visitor's problem.
-    return res.status(200).json({ ok: !!(r && r.ok) });
+    row.user_id = await uidFromToken(req, SUPABASE_URL, SERVICE_KEY);
+    // A missing table or column (migration not applied) is not the visitor's problem.
+    return res.status(200).json({ ok: await recordFunnelEvent(db, row) });
+  }
+
+  if (action === 'preview') {
+    if (await applyRateLimit(req, res, 'interview-record')) return;
+    if (!company) return res.status(400).json({ error: 'company required' });
+    const uid = await uidFromToken(req, SUPABASE_URL, SERVICE_KEY);
+    if (!uid) return res.status(401).json({ error: 'Sign in to see your preview' });
+    const pr = await db(`profiles?id=eq.${encodeURIComponent(uid)}&select=resume_text&limit=1`).catch(() => null);
+    const rows = pr && pr.ok ? await readJson(pr) : null;
+    const resumeText = Array.isArray(rows) && rows[0] ? String(rows[0].resume_text || '') : '';
+    const stage = ['Phone Screen', 'Interview', 'Final Round'].includes(body.stage) ? body.stage : '';
+    return res.status(200).json({ ok: true, ...previewFrom({ company, role, resumeText, stage }) });
   }
 
   // A prep pack someone already has is theirs on every device and after their Pro days end (round 2: the
