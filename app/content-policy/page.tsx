@@ -1,14 +1,13 @@
 import type { Metadata } from 'next'
 import { pageMetadata } from '@/lib/seo'
 import Link from 'next/link'
-import { DraftNote, Placeholder, LegalFooter, LEGAL_CONTACT } from '@/components/legal/LegalBits'
+import { LegalMeta, LegalFooter, LEGAL_CONTACT, LEGAL_OPERATOR } from '@/components/legal/LegalBits'
 
-// Content Policy — how Seen sources, attributes, and stands behind the content it hosts.
-// DRAFT for the owner's attorney to review. This page describes the platform's neutral-aggregator
-// posture accurately, grounded in how the system actually works (api/reports.js Reddit ingest +
-// PUBLIC_DISCUSSION_LABEL, user-submitted reports as first-hand claims, aggregate statistics).
-// It states well-known principles (third-party content, opinion, truth) WITHOUT asserting legal
-// conclusions — a licensed attorney must confirm the posture before anyone relies on it.
+// Content Policy — how Seen sources, attributes, and stands behind the content it hosts. Reviewed
+// against the code 2026-10-24: public-discussion labels (lib/reportSource.ts PUBLIC_DISCUSSION_LABEL /
+// PUBLIC_REVIEW_LABEL), lower weights for imported items (api/_utils/companyIntel.js SOURCE_TRUST),
+// first-hand reports as claims, held anonymous reports, moderation (lib/server/reportModeration.js),
+// the 14-business-day dispute window (also on /contact and the FAQ).
 
 export const metadata: Metadata = pageMetadata({
   title: 'Content Policy — How Seen Sources & Stands Behind Its Content',
@@ -34,16 +33,12 @@ export default function ContentPolicyPage() {
         <h1 style={{ fontFamily: 'var(--display)', fontSize: '2rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', margin: '0 0 .35rem' }}>
           Content Policy
         </h1>
-        <p style={{ color: 'var(--sub)', fontSize: '.82rem', margin: '0 0 .6rem' }}>
-          Draft prepared 2026-07-19 · Effective date: <Placeholder>effective date</Placeholder> · Questions?{' '}
-          <a href={`mailto:${LEGAL_CONTACT}`} style={link}>{LEGAL_CONTACT}</a>
-        </p>
-        <DraftNote />
+        <LegalMeta />
 
         <div style={section}>
           <h2 style={h2}>1. What Seen is — a neutral aggregator</h2>
           <p style={p}>
-            Seen (&ldquo;Seen,&rdquo; &ldquo;we,&rdquo; &ldquo;us&rdquo;), operated by <Placeholder>legal entity name</Placeholder>,
+            Seen (&ldquo;Seen,&rdquo; &ldquo;we,&rdquo; &ldquo;us&rdquo;), run by {LEGAL_OPERATOR},
             is a hiring-transparency platform that <strong>aggregates and organizes
             content created by other people</strong>. The material shown on Seen comes from two sources:
             (a) publicly available third-party discussion, and (b) reports submitted by applicants about
@@ -134,10 +129,11 @@ export default function ContentPolicyPage() {
             aggregate figures are presented as <strong>reported outcomes with their basis disclosed</strong>.
           </p>
           <p style={quote}>
-            These are general principles, described here to explain the platform&apos;s design and intent. They
-            are <strong>not legal conclusions</strong>, and nothing here is a promise about how any specific law
-            applies to any specific content or dispute. A licensed attorney must review this posture before
-            anyone relies on it. <Placeholder>counsel to confirm governing framework and jurisdiction</Placeholder>
+            We describe these principles to explain how Seen is designed and why: it organizes what other people
+            say, labels where it came from, and shows the basis of every figure. They are not a promise about how a
+            court would apply the law to any particular piece of content or dispute. These policies and any
+            dispute about them are governed by California law and U.S. federal law, as set out in our{' '}
+            <Link href="/terms" style={link}>Terms of Service</Link>.
           </p>
         </div>
 

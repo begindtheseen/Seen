@@ -3,7 +3,7 @@ import { pageMetadata } from '@/lib/seo'
 import Link from 'next/link'
 import { PRO_TRIAL_DAYS, ONE_TIME_SKUS } from '@/lib/server/creditRules.js'
 import { proPriceLine } from '@/lib/pricing'
-import { LEGAL_CONTACT } from '@/components/legal/LegalBits'
+import { LEGAL_CONTACT, LEGAL_EFFECTIVE } from '@/components/legal/LegalBits'
 
 // /legal is a HUB, not a fourth legal document. Until 2026-10-24 this page was a second, older set of
 // terms that contradicted /terms, /privacy and /content-policy ("your first charge occurs at checkout"
@@ -43,7 +43,7 @@ export default function LegalPage() {
     `Seen Pro starts with a ${PRO_TRIAL_DAYS}-day free trial and asks for no card. Nothing is charged unless you add a payment method; without one, access simply ends.`,
     `Seen Pro is ${proPriceLine()}. It renews until you cancel, and you cancel in Settings → Plan & billing — access continues to the end of the period you paid for.`,
     `One-time purchases never renew: the ${sprint.name} (${usd(sprint.amount_cents)}) adds ${sprint.credits} AI credits and ${sprint.pro_days} days of Pro; the ${pack.name} (${usd(pack.amount_cents)}) adds ${pack.credits} AI credits. Purchased credits do not expire or reset.`,
-    'Your résumé is stored on your profile until you replace it or delete your account, and is used only for your own tools (job matching, fit scores, rewrites). It is never shown to employers or sold.',
+    'Your résumé is stored on your profile until you replace it or delete your account, and is used for your own tools (job matching, fit scores, rewrites). It is never sold, and an employer sees it only if you send it with an application through Seen.',
     'We do not sell personal data. Company scores and reports are aggregated applicant claims and public discussion, not verified facts, and nothing on Seen is legal, employment or financial advice.',
   ]
 
@@ -54,8 +54,8 @@ export default function LegalPage() {
           Legal
         </h1>
         <p style={{ color: 'var(--sub)', fontSize: '.82rem', lineHeight: 1.7, marginBottom: '2rem' }}>
-          Three documents govern Seen. They are drafts awaiting attorney review, and they are the only
-          place our terms live — this page just points to them. Questions:{' '}
+          Three documents govern Seen, all effective {LEGAL_EFFECTIVE}. They are the only place our terms
+          live — this page just points to them. Questions:{' '}
           <a href={`mailto:${LEGAL_CONTACT}`} style={{ color: 'var(--blue)', textDecoration: 'none' }}>{LEGAL_CONTACT}</a>
         </p>
 
@@ -73,8 +73,8 @@ export default function LegalPage() {
         </h2>
         <p style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)', lineHeight: 1.7, margin: '0 0 .9rem' }}>
           Each line below is what the product does today and is stated in the documents above
-          (<Link href="/terms#billing" style={{ color: 'var(--sub)' }}>Terms §8–9</Link>,{' '}
-          <Link href="/privacy" style={{ color: 'var(--sub)' }}>Privacy §2, §6</Link>).
+          (<Link href="/terms#billing" style={{ color: 'var(--sub)' }}>Terms §9–10</Link>,{' '}
+          <Link href="/privacy" style={{ color: 'var(--sub)' }}>Privacy §2–7</Link>).
         </p>
         <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
           {facts.map(f => (

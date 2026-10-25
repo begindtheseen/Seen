@@ -504,6 +504,9 @@ export default async function handler(req, res) {
       'growth_rewards', 'referral_codes',
       // How the account first arrived (migration 20261024180000; also cascades with the auth user).
       'signup_attribution',
+      // Email preferences and send history (045, 20261024190000) and Inbox Autopilot (20261022120000):
+      // the Privacy Policy promises these go with the account.
+      'email_prefs', 'outcome_email_log', 'job_match_email_log', 'inbox_events', 'inbox_addresses',
     ];
     await Promise.all([
       ...userTables.map(t =>
