@@ -234,6 +234,7 @@ test('one score: the free check, the paid package and the Studio tailor print th
   assert.equal(paid.body.fit_score, free.body.fit_score, 'paid = free');
   assert.equal(paid.body.verdict.score, free.body.fit_score);
   assert.equal(studio.body.plan.score.before, free.body.fit_score, 'Studio = free');
+});
 
 // The strategy plan and the scanner read the posting's requirements: a posting that states none
 // is refused BEFORE the credit gate (it charged a credit for a plan about "pay and charlotte").
