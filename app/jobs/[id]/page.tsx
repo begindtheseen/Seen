@@ -29,6 +29,7 @@ import { paragraphs, isDescriptionPreview, stripDanglingEllipsis, endsCutOff } f
 import { isGradeableScore } from '@/lib/gradeGate'
 import ListingScoreRing from '@/components/jobs/ListingScoreRing'
 import EmployerGradeChip from '@/components/jobs/EmployerGradeChip'
+import { JOB_INSIGHTS_VERSION } from '@/lib/jobInsightsVersion.js'
 
 interface Insights {
   what_they_want: string[]
@@ -212,7 +213,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       const raw = localStorage.getItem(cacheKey)
       if (raw) {
         const entry = JSON.parse(raw)
-        if (Date.now() - entry.ts < L1_TTL) { setInsights(entry.data); setInsightsState('done'); return }
+        // an entry from an older generator version is ignored (lib/jobInsightsVersion.js)
+        if (entry.v === JOB_INSIGHTS_VERSION && Date.now() - entry.ts < L1_TTL) { setInsights(entry.data); setInsightsState('done'); return }
         localStorage.removeItem(cacheKey)
       }
     } catch { /* ignore */ }
@@ -227,7 +229,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       const d = await res.json() as InsightsResponse
       if (d._src === 'uncached') { setInsightPrice(typeof d.price === 'number' ? d.price : JOB_INSIGHTS_COST); setInsightsState('uncached'); return }
       if (d.what_they_want?.length) {
-        try { localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data: d })) } catch { /* ignore */ }
+        try { localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), v: JOB_INSIGHTS_VERSION, data: d })) } catch { /* ignore */ }
         setInsights(d as Insights)
         setInsightsState('done')
       } else {
@@ -281,7 +283,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         setInsightNote(`${creditCostLabel(d.cost ?? JOB_INSIGHTS_COST)} used${typeof d.balance === 'number' && d.balance < 900 ? ` · ${d.balance} left` : ''} · ${dailyResetLabel()}`)
       }
       if (d.what_they_want?.length) {
-        try { localStorage.setItem('ji_' + job.id, JSON.stringify({ ts: Date.now(), data: d })) } catch { /* ignore */ }
+        try { localStorage.setItem('ji_' + job.id, JSON.stringify({ ts: Date.now(), v: JOB_INSIGHTS_VERSION, data: d })) } catch { /* ignore */ }
         setInsights(d as Insights); setInsightsState('done')
       } else { setInsights(d as Insights); setInsightsState('unavailable') }
     } catch { setInsightsState('unavailable') }

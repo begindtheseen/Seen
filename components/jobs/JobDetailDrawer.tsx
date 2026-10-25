@@ -17,6 +17,7 @@ import { displayCompanyName } from '@/lib/companyDisplay'
 import { displayPay, payLabel } from '@/lib/jobs/pay.js'
 import { paragraphs, isDescriptionPreview, stripDanglingEllipsis, endsCutOff } from '@/lib/jobs/descriptionText.js'
 import { httpHref } from '@/lib/safeHref.js'
+import { JOB_INSIGHTS_VERSION } from '@/lib/jobInsightsVersion.js'
 import ListingScoreRing from '@/components/jobs/ListingScoreRing'
 
 // ── Job detail drawer helpers ─────────────────────────────────────────────────
@@ -121,7 +122,8 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
       const raw = localStorage.getItem(key)
       if (raw) {
         const e = JSON.parse(raw)
-        if (Date.now() - e.ts < L1_TTL) { setInsights(e.data); setInsightsState('done'); return }
+        // an entry from an older generator version is ignored (lib/jobInsightsVersion.js)
+        if (e.v === JOB_INSIGHTS_VERSION && Date.now() - e.ts < L1_TTL) { setInsights(e.data); setInsightsState('done'); return }
         localStorage.removeItem(key)
       }
     } catch { /* ignore */ }
@@ -134,7 +136,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
       const d = await res.json() as InsightsResponse
       if (d._src === 'uncached') { setInsightPrice(typeof d.price === 'number' ? d.price : JOB_INSIGHTS_COST); setInsightsState('uncached'); return }
       if (d.what_they_want?.length) {
-        try { localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data: d })) } catch { /* ignore */ }
+        try { localStorage.setItem(key, JSON.stringify({ ts: Date.now(), v: JOB_INSIGHTS_VERSION, data: d })) } catch { /* ignore */ }
         setInsights(d as Insights); setInsightsState('done')
       } else { setInsights(d as Insights); setInsightsState('unavailable') }
     } catch { setInsightsState('unavailable') }
@@ -162,7 +164,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
         setInsightNote(`${creditCostLabel(d.cost ?? JOB_INSIGHTS_COST)} used${typeof d.balance === 'number' && d.balance < 900 ? ` · ${d.balance} left` : ''} · ${dailyResetLabel()}`)
       }
       if (d.what_they_want?.length) {
-        try { localStorage.setItem('ji_' + job.id, JSON.stringify({ ts: Date.now(), data: d })) } catch { /* ignore */ }
+        try { localStorage.setItem('ji_' + job.id, JSON.stringify({ ts: Date.now(), v: JOB_INSIGHTS_VERSION, data: d })) } catch { /* ignore */ }
         setInsights(d as Insights); setInsightsState('done')
       } else { setInsights(d as Insights); setInsightsState('unavailable') }
     } catch { setInsightsState('unavailable') }
