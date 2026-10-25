@@ -22,6 +22,7 @@ import { ROLE_MAX } from '@/lib/stores/applicationEdit'
 import type { Application } from '@/lib/types'
 import AppliedWhen from '@/components/track/AppliedWhen'
 import CheckinEmailAsk from '@/components/track/CheckinEmailAsk'
+import InterviewPrepLine from '@/components/company/InterviewPrepLine'
 import s from '@/components/track/track.module.css'
 
 const sameCompany = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
@@ -165,6 +166,7 @@ export default function TrackCta({ company, slug, responsePct = null }: {
       <p className={s.title}>Applied to {company}?</p>
       <p className={s.sub}>Track it and we&apos;ll check in on day 7, 14 and 30.</p>
       <button type="button" className={s.primary} onClick={() => setStep('form')} data-testid="track-open">Track my application</button>
+      <InterviewPrepLine company={company} />
     </section>
   )
 }

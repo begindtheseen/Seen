@@ -40,8 +40,8 @@ function copyFor(reason: UpgradeModalProps['reason'], featureName?: string) {
       return { headline: 'Make your application sound real.', sub: `HumanProof comes with Pro access: the ${PASS.name}, or the ${PREP.pro_days} days that come with ${PREP.name}.` }
     }
     return {
-      headline: `${featureName || 'This tool'} comes with Pro access`,
-      sub: `Get it with the ${PASS.name}, or with the ${PREP.pro_days} days that come with ${PREP.name}.`,
+      headline: featureName ? `Get ${featureName}` : 'This tool comes with Pro access',
+      sub: `It comes with Pro access: the ${PASS.name}, or the ${PREP.pro_days} days that come with ${PREP.name}.`,
     }
   }
   return {

@@ -37,6 +37,9 @@ export default function GuestTracker() {
   const [pickedDay, setPickedDay] = useState('')
   const [error, setError] = useState('')
   const [invite, setInvite] = useState(false)
+  // ?stage=Interview (a company page's "Got an interview at X? Get your prep"): the card is saved at the
+  // Interview stage, so its free interview record and prep preview show at once.
+  const [asInterview, setAsInterview] = useState(false)
 
   useEffect(() => {
     setApps(AppStore.loadSync())
@@ -48,6 +51,7 @@ export default function GuestTracker() {
       setShowForm(true)
       const c = cleanCompany(params.get('company'))
       if (c) setCompany(c)
+      setAsInterview(params.get('stage') === 'Interview')
     }
   }, [params])
 
@@ -64,10 +68,10 @@ export default function GuestTracker() {
     const appliedAt = appliedAtFromChoice(choice, pickedDay)
     if (appliedAt == null) { setError('Pick the day you applied (today or earlier).'); return }
     setError('')
-    const res = await AppStore.add({ company: c, role: r, platform: 'Direct', status: 'active', stage: 'Applied', appliedAt }, false)
+    const res = await AppStore.add({ company: c, role: r, platform: 'Direct', status: 'active', stage: asInterview ? 'Interview' : 'Applied', appliedAt }, false)
     if (res.duplicate) setError(`${c} · ${r} is already on your list.`)
     setApps(AppStore.loadSync())
-    if (!res.duplicate) { setShowForm(false); setCompany(''); setRole(''); setChoice(null); setPickedDay('') }
+    if (!res.duplicate) { setShowForm(false); setCompany(''); setRole(''); setChoice(null); setPickedDay(''); setAsInterview(false) }
   }
 
   // "They called me in" — the guest card moves to Interview on this device (round 2: a guest could only
@@ -102,7 +106,7 @@ export default function GuestTracker() {
 
         {loaded && (showForm || apps.length === 0) && (
           <section className={s.card} aria-label="Track an application">
-            <p className={s.title}>{apps.length ? 'Track another application' : 'Track your first application'}</p>
+            <p className={s.title}>{asInterview ? 'Track your interview' : apps.length ? 'Track another application' : 'Track your first application'}</p>
             <form onSubmit={e => { e.preventDefault(); void add() }}>
               <div className={s.field}>
                 <label className={s.label} htmlFor="gt-company">Company</label>

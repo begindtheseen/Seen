@@ -144,7 +144,7 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
         <div className={s.opts} style={{ marginTop: '.6rem', justifyContent: 'space-between' }}>
           <label className={s.dim} style={{ display: 'flex', alignItems: 'center', gap: '.4rem', cursor: pro ? 'pointer' : 'default' }}>
             <input type="checkbox" checked={polish && pro === true} disabled={pro !== true} onChange={(e) => { if (pro !== true) { onNeed('pro'); return } setPolish(e.target.checked) }} />
-            Polish wording with AI {pro === true ? '' : '· Pro'}
+            Polish wording with AI {pro === true ? '' : '· with Pro access'}
           </label>
           <button type="button" className={s.btnPrimary} onClick={run} disabled={state === 'loading'}>
             {state === 'loading' ? 'Optimizing…' : plan ? 'Re-run for this job →' : 'Optimize for this job →'}<span style={{ marginLeft: '.45rem', fontSize: '.55rem', opacity: .7, fontFamily: 'var(--mono)', fontWeight: 400 }}>· {creditCostLabel(RESUME_OPTIMIZE_COST)}</span>
@@ -298,7 +298,7 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
             <div className={s.card}>
               <span className={s.secTitle}>AI polish {polishRes.available ? `· ${polishRes.changes.length} bullet${polishRes.changes.length === 1 ? '' : 's'}` : ''}</span>
               {!polishRes.available ? (
-                <div className={s.dim} style={{ marginTop: '.4rem' }}>{polishRes.reason === 'pro_required' ? 'Polish is a Pro feature.' : 'The AI polish is not available right now — the optimization above is complete without it.'}</div>
+                <div className={s.dim} style={{ marginTop: '.4rem' }}>{polishRes.reason === 'pro_required' ? 'AI polish comes with Pro access (the Job Search Pass, or Interview Prep).' : 'The AI polish is not available right now — the optimization above is complete without it.'}</div>
               ) : polishRes.changes.length === 0 ? (
                 <div className={s.dim} style={{ marginTop: '.4rem' }}>No wording changes passed the fabrication check — your bullets were already tight.</div>
               ) : polishRes.changes.map((ch) => (

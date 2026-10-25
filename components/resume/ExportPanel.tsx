@@ -112,7 +112,7 @@ export default function ExportPanel({ doc, pro, isLoggedIn, onNeedPro, role }: P
         </div>
         {templated && pro !== true && (
           <div className={s.notice} style={{ marginTop: '.75rem' }}>
-            Free exports carry one small “Optimized with Seen · seenjobs.io” line in the footer. <button type="button" onClick={onNeedPro} style={{ background: 'none', border: 'none', color: '#c7d2fe', fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 700, cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>{isLoggedIn ? 'Go Pro for unbranded files →' : 'Sign in and go Pro for unbranded files →'}</button>
+            Free exports carry one small “Optimized with Seen · seenjobs.io” line in the footer. <button type="button" onClick={onNeedPro} style={{ background: 'none', border: 'none', color: '#c7d2fe', fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 700, cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>Unbranded files come with the Job Search Pass →</button>
           </div>
         )}
         {error && <div className={s.err} style={{ marginTop: '.7rem', marginBottom: 0 }}>{error}</div>}

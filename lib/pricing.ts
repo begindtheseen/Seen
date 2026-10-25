@@ -64,3 +64,8 @@ export const PASS_LINE = `${PASS_PRICE} — ${PASS.pro_days} days of everything`
 export function offerLine(): string {
   return `${PREP.name} is ${PREP_PRICE} for one interview; the ${PASS.name} is ${PASS_PRICE} for ${PASS.pro_days} days of everything, including Interview Prep for every interview. Both are one-time and never renew.`
 }
+
+/** Under every Pro-only lock (HumanProof, AI polish): what unlocks it, priced, once. */
+export const LOCK_NOTE = `Comes with the ${PASS.name} (${PASS_PRICE}) or ${PREP.name} (${PREP_PRICE}). ${ONE_TIME_NOTE}.`
+/** After a tailored résumé: the outcome the pass buys, not a credit count. */
+export const PASS_AFTER_WIN = `Applying to a lot of jobs? The ${PASS.name} tailors every one for ${PASS.pro_days} days →`

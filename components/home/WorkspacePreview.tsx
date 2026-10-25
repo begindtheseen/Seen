@@ -18,6 +18,7 @@ import { gradeLetter } from '@/lib/companyDisplay'
 import Link from 'next/link'
 import Odometer from '@/components/motion/Odometer'
 import styles from './WorkspacePreview.module.css'
+import { PASS } from '@/lib/pricing'
 
 export interface ProofScore {
   name: string
@@ -111,8 +112,8 @@ export default function WorkspacePreview({ proof, live = false }: { proof: Proof
               ))}
             </div>
             <div className={styles.pro}>
-              <b>★ Seen Pro</b>
-              Unlimited AI credits and Human Voice.
+              <b>★ Job Search Pass</b>
+              Every interview prepped, {PASS.pro_days} days.
             </div>
           </div>
 

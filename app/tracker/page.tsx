@@ -31,6 +31,7 @@ import { sortApplications, filterApplications, SORT_MODES, PAGE_SIZE, type SortM
 import { checkAnsweredEvent, checkSnoozedEvent, checkLabel, isSuperseded } from '@/lib/stores/checkEvents'
 import { responded } from '@/lib/stores/outcomes'
 import { companySlug } from '@/lib/cardCopy.js'
+import { cleanCompany } from '@/lib/signupIntent.js'
 import { slugSegment } from '@/lib/safeHref.js'
 import { showToast } from '@/lib/toast'
 import { _sync } from '@/lib/sync'
@@ -91,7 +92,9 @@ function interviewAt(app: Application): string {
   return ev ? String(ev.data!.at) : ''
 }
 
-function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onShare, onReload, intel, check, onAnswer, onSnooze, sync, onRetry, isPro, autoPrep, onSchedule }: {
+function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onShare, onReload, intel, check, onAnswer, onSnooze, sync, onRetry, isPro, autoPrep, leadPrep, onSchedule }: {
+  /** This card reached an interview a moment ago: its Interview Prep opens first and comes into view. */
+  leadPrep: boolean
   /** Saves the interview date the person picked on the prep panel. */
   onSchedule: (id: string, iso: string) => void
   app: Application
@@ -208,7 +211,7 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
       )}
 
       {isActive && PREP_STAGES.includes(app.stage) && (
-        <InterviewPrep appId={app.id} company={app.company} role={app.role} interviewAt={interviewAt(app)} isPro={isPro} autoBuild={autoPrep}
+        <InterviewPrep appId={app.id} company={app.company} role={app.role} interviewAt={interviewAt(app)} isPro={isPro} autoBuild={autoPrep} lead={leadPrep}
           jobId={app.jobId} stage={app.stage} onSchedule={iso => onSchedule(app.id, iso)} />
       )}
 
@@ -434,9 +437,18 @@ function TrackerPage() {
   }, [ready, isLoggedIn, isSeeker, router])
 
   // ?add=1 (the dashboard's "+ Track application") opens the add-application form directly.
+  // &company=<name>&stage=Interview (a company page's "Got an interview at X? Get your prep") fills the
+  // company in and saves the card at the Interview stage, so its prep offer is on it straight away.
+  const [addPreset, setAddPreset] = useState<{ company: string; interview: boolean }>({ company: '', interview: false })
   useEffect(() => {
-    if (searchParams?.get('add') === '1') setShowManual(true)
+    if (searchParams?.get('add') !== '1') return
+    setAddPreset({ company: cleanCompany(searchParams.get('company')), interview: searchParams.get('stage') === 'Interview' })
+    setShowManual(true)
   }, [searchParams])
+
+  // The card that just reached an interview (a stage move or a check-in answer): its Interview Prep
+  // leads, opened and scrolled to — the moment the offer is for (owner decision 2026-10-25).
+  const [leadPrepId, setLeadPrepId] = useState('')
 
   // Pro access decides whether a card's Interview Prep builds right away or offers the $9.99 pack.
   const [isPro, setIsPro] = useState(false)
@@ -455,7 +467,8 @@ function TrackerPage() {
     if (!ready || !isLoggedIn || prepHandled.current) return
     const prep = searchParams?.get('prep') || ''
     const sid = searchParams?.get('session_id') || ''
-    const bought = searchParams?.get('purchase') === 'interview'
+    const purchase = searchParams?.get('purchase') || ''
+    const bought = purchase === 'interview' || purchase === 'pass30'
     if (!prep && !bought) return
     prepHandled.current = true
     const done = () => {
@@ -468,7 +481,8 @@ function TrackerPage() {
         .then(h => fetch('/api/stripe?action=confirm', { method: 'POST', headers: h, body: JSON.stringify({ session_id: sid }) }))
         .then(r => r.json().catch(() => ({})))
         .then((d: { ok?: boolean }) => {
-          if (d?.ok) showToast(prep ? 'Interview Prep is unlocked — building your prep now.' : 'Interview Prep is unlocked — open any interview card and press Build my prep.')
+          const what = purchase === 'pass30' ? 'Your Job Search Pass is on' : 'Interview Prep is unlocked'
+          if (d?.ok) showToast(prep ? `${what} — building your prep now.` : `${what} — open any interview card and press Build my prep.`)
           return refreshPro()
         })
         .catch(() => {})
@@ -588,6 +602,8 @@ function TrackerPage() {
   // (AppStore.update) and its result is shown — a failed one stays on the card as "Not synced · Retry".
   const handleUpdate = async (id: string, changes: Partial<Application>, opts: UpdateOptions = {}): Promise<UpdateResult> => {
     const origApp = apps.find(a => a.id === id)
+    // Reached an interview just now (a stage move or a check-in "Interview" / "Had an interview"): lead with its prep.
+    if (origApp && changes.stage && PREP_STAGES.includes(changes.stage) && !PREP_STAGES.includes(origApp.stage) && (changes.status ?? origApp.status) === 'active') setLeadPrepId(id)
     setApps(prev => prev.map(a => (a.id === id ? { ...a, ...changes } : a)))
     markSaving(id, true)
     const r = await AppStore.update(id, changes, isLoggedIn, opts)
@@ -842,16 +858,18 @@ function TrackerPage() {
   // save shows on the card ("Saving…" / "Not synced · Retry"), never as a form held open for 15 s.
   const handleManualAdd = async (values: FormValues) => {
     const id = 'app_' + Date.now()
-    const pending = AppStore.add({ ...toNewApplication(values), id }, isLoggedIn)
+    const pending = AppStore.add({ ...toNewApplication(values), ...(addPreset.interview ? { stage: 'Interview' } : {}), id }, isLoggedIn)
+    if (addPreset.interview) setLeadPrepId(id)
     markSaving(id, true)
     const now = AppStore.loadSync()
     setApps(now)
     setShowManual(false)
+    setAddPreset({ company: '', interview: false })
     reveal(now.some(a => a.id === id) ? id : (now.find(a => a.company.toLowerCase() === values.company.trim().toLowerCase() && a.role.toLowerCase() === values.role.trim().toLowerCase())?.id || id), now)
     const r = await pending
     markSaving(id, false)
     setApps(AppStore.loadSync())
-    if (r.id !== id) setHighlightId(h => (h === id ? r.id : h))
+    if (r.id !== id) { setHighlightId(h => (h === id ? r.id : h)); setLeadPrepId(l => (l === id ? r.id : l)) }
     if (r.duplicate) showToast(`${values.company.trim()} · ${values.role.trim()} is already on your list.`)
     else if (!r.synced) showToast('Saved on this device — it didn’t reach your account yet. It syncs on its own, or tap “Not synced · Retry”.')
   }
@@ -861,7 +879,7 @@ function TrackerPage() {
     <>
     {/* Add / Edit — one form (components/tracker/ApplicationForm) */}
     {showManual && (
-      <ApplicationForm title="Track application" initial={emptyForm()} submitLabel="Add to tracker →" busyLabel="Adding…" onSubmit={handleManualAdd} onClose={() => setShowManual(false)} />
+      <ApplicationForm title={addPreset.interview ? 'Track your interview' : 'Track application'} initial={{ ...emptyForm(), company: addPreset.company }} submitLabel="Add to tracker →" busyLabel="Adding…" onSubmit={handleManualAdd} onClose={() => { setShowManual(false); setAddPreset({ company: '', interview: false }) }} />
     )}
     {editing && (
       <ApplicationForm key={editKey} title={`Edit · ${editing.company}`} initial={formFromApplication(editing)} notice={editNotice} submitLabel="Save changes" busyLabel="Saving…" onSubmit={handleEditSave} onClose={() => { setEditing(null); setEditNotice('') }} />
@@ -1149,7 +1167,7 @@ function TrackerPage() {
           <div id="trackerList" style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
             {pageApps.map(app => (
               <div key={app.id} style={highlightId === app.id ? { borderRadius: 12, boxShadow: '0 0 0 2px var(--green), 0 0 30px rgba(16,185,129,0.3)', transition: 'box-shadow 2.5s ease' } : undefined}>
-                <AppCard app={app} expanded={expandedId === app.id} setExpanded={open => setExpandedId(open ? app.id : '')} onUpdate={handleUpdate} onEdit={a => { setEditNotice(''); setEditing(a) }} onRemove={handleRemove} onShare={handleShare} onReload={loadApps} intel={companyScores[app.company.toLowerCase().trim()]} check={checkByApp.get(app.id)} onAnswer={handleCheckAnswer} onSnooze={handleSnooze} sync={syncOf(app)} onRetry={handleRetry} isPro={isPro} autoPrep={prepReturn === app.id && isPro} onSchedule={handleSchedule} />
+                <AppCard app={app} expanded={expandedId === app.id} setExpanded={open => setExpandedId(open ? app.id : '')} onUpdate={handleUpdate} onEdit={a => { setEditNotice(''); setEditing(a) }} onRemove={handleRemove} onShare={handleShare} onReload={loadApps} intel={companyScores[app.company.toLowerCase().trim()]} check={checkByApp.get(app.id)} onAnswer={handleCheckAnswer} onSnooze={handleSnooze} sync={syncOf(app)} onRetry={handleRetry} isPro={isPro} autoPrep={prepReturn === app.id && isPro} leadPrep={leadPrepId === app.id} onSchedule={handleSchedule} />
               </div>
             ))}
           </div>
