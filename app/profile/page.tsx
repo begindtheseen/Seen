@@ -579,7 +579,7 @@ export default function ProfilePage() {
                     </div>
                     <span className={`${styles.badge} ${styles.bDim}`}>Current</span>
                   </div>
-                  <p className={styles.cardS} style={{ margin: '0 0 1rem' }}>Seen Pro is {proPriceLine()} — unlimited AI credits and deeper company analysis. It starts with a free trial and no card; if you subscribe, it renews until you cancel, and the cancel button appears right here.</p>
+                  <p className={styles.cardS} style={{ margin: '0 0 1rem' }}>Seen Pro is {proPriceLine()} — unlimited AI credits and Human Voice rewrites. It starts with a free trial and no card; if you subscribe, it renews until you cancel, and the cancel button appears right here.</p>
                   <div className={styles.btnRow}>
                     <button type="button" className={styles.primary} onClick={() => router.push('/pricing')}>See Pro plans →</button>
                   </div>

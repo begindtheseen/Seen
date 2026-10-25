@@ -27,7 +27,7 @@ export default function FAQPage() {
         },
         {
           q: 'Is Seen free for job seekers?',
-          a: 'Yes. Seen is completely free for job seekers and always will be. The core tools — company scores, ghost rates, community feed, job search, and basic tracker — are free forever. Pro is an optional upgrade for unlimited AI credits and deeper company analysis. You can also earn Pro time for free by reporting outcomes from your tracker and by inviting friends.',
+          a: 'Yes. Seen is completely free for job seekers and always will be. The core tools — company scores, ghost rates, community feed, job search, and basic tracker — are free forever. Pro is an optional upgrade for unlimited AI credits and Human Voice rewrites. You can also earn Pro time for free by reporting outcomes from your tracker and by inviting friends.',
         },
         {
           q: 'How is Seen different from Glassdoor or Indeed?',

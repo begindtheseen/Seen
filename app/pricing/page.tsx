@@ -48,12 +48,12 @@ const FREE_FEATURES = [
 ]
 
 // Outcome first (what a job seeker gets), then the mechanics. Each line is something Pro's code grants:
-// unlimited job insights + résumé optimize/scan/tailor (gateAI with no daily cap), Human Voice (proOnly).
+// unlimited job insights + résumé optimize/scan/tailor (gateAI with no daily cap), Human Voice (proOnly),
+// unbranded résumé downloads (lib/server/resumeStudio.js). Never list a feature Pro's code does not grant.
 const PRO_FEATURES = [
   'Know what a job really wants before you apply — AI insights on every listing, unlimited',
   'A résumé tailored to every application — no daily credit cap',
-  'Ghost risk alerts when companies change behavior',
-  'AI company deep-dive analysis',
+  'Résumé downloads without the Seen footer',
   'Human Voice — rewrites that sound like you, not a bot',
   'Priority support',
   'Early access to every new feature',
@@ -65,8 +65,8 @@ const COMPARISON: [string, string | boolean, string | boolean][] = [
   ['Resume AI — scan & optimize', '1 credit each', 'Unlimited'],
   ['AI job insights',           '1 credit each (free once cached)', 'Unlimited'],
   ['Company ghost rates',       true,         true],
-  ['Ghost risk alerts',         false,        true],
-  ['AI company analysis',       false,        true],
+  ['Ghost-risk warnings on your tracker', true, true],
+  ['Résumé downloads without the Seen footer', false, true],
   ['Human Voice (natural rewrite)', false,    true],
   ['Job tracker',               'Unlimited',  'Unlimited'],
   ['Community feed',            true,         true],
@@ -516,7 +516,7 @@ export default function PricingPage() {
                 <div style={{ fontFamily: 'var(--display)', fontSize: '1.9rem', fontWeight: 900, color: 'var(--white)' }}>{skuPrice(SPRINT.amount_cents)}</div>
                 <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--muted)' }}>one-time</div>
               </div>
-              {[`${SPRINT.credits} AI credits — never expire`, `${SPRINT.pro_days} days of full Pro access`, 'Human Voice + ghost alerts during your sprint', 'No renewal — it just ends'].map(f => (
+              {[`${SPRINT.credits} AI credits — never expire`, `${SPRINT.pro_days} days of full Pro access`, 'Human Voice + unlimited AI during your sprint', 'No renewal — it just ends'].map(f => (
                 <div key={f} style={{ display: 'flex', gap: '.5rem', marginBottom: '.45rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-72)', color: 'var(--sub)', lineHeight: 1.45 }}>
                   <span style={{ color: 'var(--green)', flexShrink: 0 }}>✓</span>{f}
                 </div>

@@ -493,7 +493,7 @@ export default function DashboardPage() {
             })}
             {!isPro && (
               <Link href="/pricing" className={styles.lock}>
-                <span>🔒 Unlimited AI credits and deeper company analysis</span><span className={styles.link}>Pro →</span>
+                <span>🔒 Unlimited AI credits and Human Voice rewrites</span><span className={styles.link}>Pro →</span>
               </Link>
             )}
           </section>

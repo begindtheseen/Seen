@@ -242,7 +242,7 @@ function ApplyContent() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
               {[
                 ['📊', 'Expected response window for ' + (co || 'this company')],
-                ['👻', 'Ghost risk alert if they go silent'],
+                ['👻', 'Ghost-risk warning if they go silent'],
                 ['📅', 'Day 7 / 14 / 30 check-in reminders'],
                 ['🎉', 'Outcome card + share image when it closes'],
               ].map(([icon, text]) => (

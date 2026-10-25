@@ -112,7 +112,7 @@ export default function WorkspacePreview({ proof, live = false }: { proof: Proof
             </div>
             <div className={styles.pro}>
               <b>★ Seen Pro</b>
-              Unlimited AI credits and ghost alerts.
+              Unlimited AI credits and Human Voice.
             </div>
           </div>
 

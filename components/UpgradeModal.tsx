@@ -54,12 +54,12 @@ function copyFor(reason: UpgradeModalProps['reason'], featureName?: string) {
     }
     return {
       headline: `${featureName || 'This feature'} is a Pro feature`,
-      sub: `Upgrade to unlock ${featureName || 'this'} — plus unlimited optimization, ghost-risk alerts, and deep company intel.`,
+      sub: `Upgrade to unlock ${featureName || 'this'} — plus unlimited AI credits and Human Voice rewrites.`,
     }
   }
   return {
     headline: 'Stop guessing. Start getting responses.',
-    sub: 'Unlimited résumé optimization, ghost-risk alerts before you apply, and deep company intel — for less than one week of coffee.',
+    sub: 'Unlimited résumé optimization and AI job insights, plus Human Voice rewrites — for less than one week of coffee.',
   }
 }
 
