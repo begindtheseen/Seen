@@ -1,0 +1,130 @@
+{
+  "id": "13-line-cook",
+  "field": "Line cook / food service",
+  "resume": [
+    "Andre Williams",
+    "New Orleans, LA • (504) 555-0102 • andrewilliams.cook@gmail.com",
+    "",
+    "EXPERIENCE",
+    "",
+    "Line Cook — Magnolia Bistro, New Orleans, LA • Mar 2022 – Present",
+    "• Work sauté and grill on a 250-cover Friday and Saturday dinner service",
+    "• Keep ticket times under 14 minutes on my stations during the dinner rush",
+    "• Prep and break down my station, label and date everything, and pass every health inspection since I started",
+    "• Trained 3 new line cooks on the sauté station and our plating guide",
+    "",
+    "Prep Cook — Crescent Catering Co., Metairie, LA • Jun 2020 – Feb 2022",
+    "• Prepped proteins, sauces and sides for events of 50 to 600 guests",
+    "• Ran the walk-in rotation and cut weekly produce waste by about a third",
+    "",
+    "Dishwasher — Frenchmen St. Oyster House, New Orleans, LA • 2019 – 2020",
+    "• Kept dish and pots moving on 300-cover nights and helped prep when the line was short",
+    "",
+    "CERTIFICATIONS",
+    "ServSafe Food Handler (2024)",
+    "",
+    "SKILLS",
+    "Sauté, grill, fryer, knife skills, Creole and Cajun dishes, food safety, inventory rotation",
+    "",
+    "EDUCATION",
+    "GED, 2018"
+  ],
+  "job": {
+    "title": "Line Cook",
+    "company": "The Copper Pelican",
+    "location": "New Orleans, LA",
+    "description": [
+      "The Copper Pelican is a 160-seat Gulf Coast seafood restaurant in the Warehouse District, open for dinner Tuesday–Sunday and brunch on weekends. Our pastry team bakes everything in house.",
+      "",
+      "What you'll do",
+      "- Run your station (sauté, grill or fry) during service and keep tickets moving",
+      "- Prep your station before service to our recipes and portion standards",
+      "- Follow food safety, labeling and sanitation rules",
+      "- Work as a team with the sous chefs, expo and dish",
+      "",
+      "What we need",
+      "- 1+ year of line cook experience in a high-volume, full-service kitchen",
+      "- Solid knife skills and knowledge of basic cooking techniques",
+      "- ServSafe Food Handler card (or get one within 30 days of hire)",
+      "- Able to stand for 8–10 hours, work in a hot kitchen and lift 50 lbs",
+      "- Available evenings and weekends",
+      "",
+      "Nice to have",
+      "- ServSafe Manager certification",
+      "- Seafood experience",
+      "",
+      "Pay",
+      "$17 – $20 per hour plus a share of the tip pool. 4–5 shifts a week. Shift meal every shift."
+    ]
+  },
+  "gold": {
+    "family": [
+      "food_service"
+    ],
+    "must_skills": [
+      {
+        "label": "line cook experience",
+        "match": "line cook|kitchen|cook"
+      },
+      {
+        "label": "knife skills",
+        "match": "knife"
+      },
+      {
+        "label": "ServSafe",
+        "match": "servsafe|food handler"
+      }
+    ],
+    "alternatives": [],
+    "years_min": 1,
+    "traps": [
+      {
+        "term": "ServSafe Manager",
+        "match": "servsafe manager|food (?:safety )?manager cert",
+        "scope": "candidate",
+        "why": "he holds Food Handler only"
+      },
+      {
+        "term": "Pastry",
+        "match": "pastry|bak(?:ed|ing)",
+        "scope": "candidate",
+        "why": "pastry is the restaurant's team, not his"
+      },
+      {
+        "term": "Sous chef",
+        "match": "sous chef",
+        "scope": "candidate",
+        "why": "he is a line cook"
+      }
+    ],
+    "resume_employers": [
+      "Magnolia Bistro",
+      "Crescent Catering Co.",
+      "Frenchmen St. Oyster House"
+    ],
+    "resume_titles": [
+      "Line Cook",
+      "Prep Cook",
+      "Dishwasher"
+    ],
+    "resume_degrees": [
+      "GED"
+    ],
+    "resume_numbers": [
+      "504",
+      "555",
+      "0102",
+      "2022",
+      "250",
+      "14",
+      "3",
+      "2020",
+      "50",
+      "600",
+      "2019",
+      "300",
+      "2024",
+      "2018"
+    ]
+  }
+}
