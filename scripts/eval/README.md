@@ -18,7 +18,7 @@ node scripts/eval/run.mjs --prod \
 | `--tools=fit,optimize,tailor` | run only some tools (ids below) |
 | `--prod` | make live calls for `interview_prep` and `tailor_polish` (needs the account file) |
 | `--jobtext` | also run `interview_prep_jobtext`: Interview Prep with the posting text (the API accepts it; the tracker never sends it) |
-| `--base=https://<preview>.vercel.app` | live calls against a preview instead of production |
+| `--base=https://<preview>.vercel.app` | live calls against a preview instead of production (a protected preview also needs `EVAL_VERCEL_SHARE_FILE`, a file holding a Vercel share link) |
 | `--fresh` | ignore the live-response cache |
 | `--reserve=5` | stop a live tool when `X-RateLimit-Remaining` falls to this |
 | `--pace=15` | seconds between live model calls |

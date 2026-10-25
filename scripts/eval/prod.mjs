@@ -42,6 +42,21 @@ export class ProdClient {
     this.fresh = fresh; this.reserve = reserve; this.paceMs = paceMs; this.wait = wait; this.log = log;
     this.token = null; this.lastCall = 0; this.stopped = {};
   }
+  // A protected Vercel preview: EVAL_VERCEL_SHARE_FILE names a file holding a share link (from Vercel's
+  // "share" / get_access_to_vercel_url). One visit sets the preview's auth cookie; the link itself is never
+  // printed or passed on the command line.
+  async previewCookie() {
+    if (this.cookie !== undefined) return this.cookie;
+    this.cookie = '';
+    const f = process.env.EVAL_VERCEL_SHARE_FILE;
+    if (!f || this.host === 'seenjobs.io') return this.cookie;
+    const share = readFileSync(f, 'utf8').trim();
+    const r = await fetch(share, { redirect: 'manual' });
+    const set = typeof r.headers.getSetCookie === 'function' ? r.headers.getSetCookie() : [r.headers.get('set-cookie')].filter(Boolean);
+    this.cookie = set.map((c) => c.split(';')[0]).join('; ');
+    this.log(`  preview access ${this.cookie ? 'granted' : 'NOT granted'} (${r.status})`);
+    return this.cookie;
+  }
   async signIn() {
     if (this.token) return;
     const { url, anon } = supabasePublic();
@@ -68,7 +83,8 @@ export class ProdClient {
     await this.signIn();
     if (model) { const gap = Date.now() - this.lastCall; if (gap < this.paceMs) await sleep(this.paceMs - gap); }
     const t0 = Date.now();
-    const r = await fetch(`${this.base}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.token}`, Origin: 'https://seenjobs.io' }, body: JSON.stringify(body) });
+    const cookie = await this.previewCookie();
+    const r = await fetch(`${this.base}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.token}`, Origin: 'https://seenjobs.io', ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify(body) });
     const ms = Date.now() - t0;
     if (model) this.lastCall = Date.now();
     const text = await r.text();
