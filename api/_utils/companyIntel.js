@@ -1,3 +1,4 @@
+import { gradeRisk } from '../../lib/gradeScale.js';
 // Company intel fusion — turns ALL the signals we collect about a company into one
 // confidence-gated score, instead of trusting a single web-research estimate. See
 // SCORING.md (§2 sources) and OPPORTUNITY_ENGINE.md (data acquisition).
@@ -147,13 +148,26 @@ export function aggregateOutcomes(rows) {
 // (trust-weighted) resolved reports, and dominate beyond it.
 export const PRIOR_STRENGTH = 8;
 
+// OWNER DECISION 2026-10-25: a company with little evidence leans toward a TYPICAL company until its
+// own reports add up (2 glowing Reddit posts used to make a 100; 1 bad one an F). When there is no
+// web-research prior, rates blend with these population rates at PRIOR_STRENGTH effective reports.
+// Pooled from production on 2026-10-25: 4,467 scorable reports over 1,133 graded companies
+// (response 0.700, ghost 0.297; the 64 companies with 10+ reports pool to 0.722 / 0.267).
+export const POPULATION_PRIOR = { response_rate: 0.7, ghost_rate: 0.3 };
+// How many effective reports the typical-company anchor is worth. At 8 (the web-prior strength)
+// almost every company read as a C — most evidence is public posts at 0.3 trust — so the anchor is
+// lighter: 2 public posts (0.6 effective) still sit near typical, 2 Seen reports move half-way, and
+// 30 Seen reports are ~94% the company's own data. Measured on production 2026-10-25: A 5, B 146,
+// C 621, D 336, F 25 of 1,133 graded companies (was A 617 / F 120 on the old bands, no anchor).
+export const POPULATION_PRIOR_STRENGTH = 2;
+
 // Blend a prior with empirical evidence via sample-weighted shrinkage.
 //   weightEmpirical = effN / (effN + PRIOR_STRENGTH)
 // No evidence → prior; no prior → evidence.
-export function blendRate(prior, empiricalRate, effN) {
+export function blendRate(prior, empiricalRate, effN, strength = PRIOR_STRENGTH) {
   if (empiricalRate == null || !effN) return prior ?? null;
   if (prior == null) return empiricalRate;
-  const w = effN / (effN + PRIOR_STRENGTH);
+  const w = effN / (effN + strength);
   return w * empiricalRate + (1 - w) * prior;
 }
 
@@ -201,8 +215,12 @@ export function fuseCompanyIntel(input = {}) {
   const empWait = waitDen > 0 ? waitNum / waitDen : null;
   const empRounds = roundsDen > 0 ? roundsNum / roundsDen : null;
 
-  const ghost_rate = clamp01(blendRate(num(web.ghost_rate), empGhost, effN));
-  const response_rate = clamp01(blendRate(num(web.response_rate), empResp, effN));
+  // (No evidence at all keeps the old contract: no prior → the neutral 50 baseline, never graded.)
+  const popPrior = effN > 0 ? POPULATION_PRIOR : {};
+  const webGhost = num(web.ghost_rate);
+  const webResp = num(web.response_rate);
+  const ghost_rate = clamp01(webGhost != null ? blendRate(webGhost, empGhost, effN) : blendRate(popPrior.ghost_rate ?? null, empGhost, effN, POPULATION_PRIOR_STRENGTH));
+  const response_rate = clamp01(webResp != null ? blendRate(webResp, empResp, effN) : blendRate(popPrior.response_rate ?? null, empResp, effN, POPULATION_PRIOR_STRENGTH));
   const avg_wait_days = round1(blendRate(num(web.avg_wait_days), empWait, effN));
   const avg_rounds = round1(blendRate(num(web.avg_rounds), empRounds, effN));
   const unpaid_rate = clamp01(num(web.unpaid_rate) ?? 0) ?? 0;
@@ -255,7 +273,7 @@ export function fuseCompanyIntel(input = {}) {
     confidence,
     confidence_label: confidenceLabel(confidence),
     sufficient: confidence >= 0.33,
-    risk_level: overall_score >= 70 ? 'safe' : overall_score >= 40 ? 'warn' : 'danger',
+    risk_level: gradeRisk(overall_score) || 'danger',
     empirical: {
       resolved: rawResolved,
       eff_n: round1(effN),

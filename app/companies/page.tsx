@@ -10,6 +10,7 @@ import { firstPartyReportCount } from '@/lib/server/reportCounts'
 import { isGradeableScore, MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
 import PageHeader from '@/components/shell/PageHeader'
 import { gradeLetter, displayCompanyName } from '@/lib/companyDisplay'
+import { gradeRisk } from '@/lib/gradeScale.js'
 
 interface Company {
   id: string
@@ -339,7 +340,7 @@ export default function CompaniesPage() {
         ) : (
           <div className="ldr-grid">
             {filtered.map((co, i) => {
-              const risk = Score.risk(co.score.overall_score)
+              const risk = (gradeRisk(co.score.overall_score) ?? 'unrated') as ReturnType<typeof Score.risk>
               const g = grade(co.score.overall_score)
               const divider = thinStart >= 0 && i === thinStart ? (
                 <div key="thin-divider" style={{ gridColumn: '1 / -1', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', letterSpacing: '.08em', textTransform: 'uppercase', padding: '.9rem .2rem .3rem', borderTop: '1px solid var(--line)' }}>

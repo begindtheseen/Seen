@@ -76,7 +76,7 @@ const h2: React.CSSProperties = { fontFamily: 'var(--display)', fontSize: '1.15r
 const sub: React.CSSProperties = { color: 'var(--sub)', fontSize: '.78rem', lineHeight: 1.6, margin: '.15rem 0 1.1rem' }
 
 const fmtPct = (v: number | null | undefined) => (v == null ? '—' : `${Number.isInteger(v) ? v : v.toFixed(1)}%`)
-const gradeColor = (g: string | null) => (g === 'A' || g === 'B' ? 'var(--green)' : g === 'C' ? 'var(--amber)' : 'var(--red)')
+const gradeColor = (letter: string | null) => { const g = letter ? letter.charAt(0) : null; return g === 'A' || g === 'B' ? 'var(--green)' : g === 'C' ? 'var(--amber)' : 'var(--red)' }
 const monthLabel = (m: string) => {
   // A 'YYYY-MM' key (already a California month) → "Oct '26" — no clock involved.
   const [y, mm] = m.split('-')

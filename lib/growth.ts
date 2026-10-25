@@ -7,6 +7,7 @@ import { firstPartyReportCount as firstPartyCountOf, webClaimCount, isGradeable,
 import { mentionSel } from '@/lib/server/scoreColumns.js'
 import { scoreUpdatedAt } from '@/lib/server/reportCounts.js'
 import { gradeLetter, displayCompanyName as displayName } from '@/lib/companyDisplay'
+import { gradeRisk } from '@/lib/gradeScale.js'
 
 export { MIN_REPORTS_FOR_GRADE }
 
@@ -109,7 +110,7 @@ function toLeaderboardRow(c: ScoreDbRow): LeaderboardRow {
       mention_count: c.mention_count ?? 0,
       web_report_count: webClaimCount(c),
       data_source: c.data_source ?? null,
-      risk_level: gradeable ? (s >= 70 ? 'safe' : s >= 40 ? 'warn' : 'danger') : null,
+      risk_level: gradeable ? (gradeRisk(s) as 'safe' | 'warn' | 'danger') : null,
       waste: gradeable ? c.waste_score || 0 : null,
     },
   }
@@ -172,7 +173,7 @@ export function growthScoreFromRow(row: Record<string, any> | null | undefined):
     mention_count: row.mention_count ?? 0,
     web_report_count: row.web_report_count ?? null,
     data_source: row.data_source ?? null,
-    risk_level: gradeable ? (s >= 70 ? 'safe' : s >= 40 ? 'warn' : 'danger') : null,
+    risk_level: gradeable ? (gradeRisk(s) as 'safe' | 'warn' | 'danger') : null,
     industry: row.industry || null,
     data_quality: row.data_quality ?? null,
     waste: gradeable ? row.waste_score ?? null : null,

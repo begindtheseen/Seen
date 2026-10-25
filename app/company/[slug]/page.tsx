@@ -33,6 +33,7 @@ import { splitWebReviews, webResearchNote } from '@/lib/webReviewQuotes'
 import { replyTiming, REPORT_WHEN_YOU_HEAR } from '@/lib/replyTiming'
 import { useCompanySeed } from '@/components/CompanySeed'
 import { httpHref } from '@/lib/safeHref.js'
+import { gradeRisk } from '@/lib/gradeScale.js'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -656,7 +657,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
 
   // Only a gradeable score is a verdict — below the report bar there is no letter, number or risk.
   const graded = isGradeableScore(score)
-  const risk = graded ? Score.risk(score.overall_score) : 'warn'
+  const risk = graded ? ((gradeRisk(score.overall_score) ?? 'warn') as ReturnType<typeof Score.risk>) : 'warn'
   const g = graded ? letterGrade(score.overall_score) : '—'
   const ungradedLabel = score && !graded ? notEnoughReviewsLabel(score) : ''
   // ONE summary object (lib/companyPageSummary.ts) feeds every count, rate, confidence label and sentence on
@@ -760,7 +761,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
 
   // Compare cells: an ungraded company shows "Not graded" / "—", never a number standing in for one.
   const cmpScore = (sc: CompanyScore | null) => !sc ? '—' : isGradeableScore(sc) ? String(sc.overall_score) : 'Not graded'
-  const cmpScoreColor = (sc: CompanyScore | null) => isGradeableScore(sc) ? riskColor(Score.risk(sc.overall_score)) : 'var(--muted)'
+  const cmpScoreColor = (sc: CompanyScore | null) => isGradeableScore(sc) ? riskColor((gradeRisk(sc.overall_score) ?? 'warn') as ReturnType<typeof Score.risk>) : 'var(--muted)'
   const cmpGhostColor = (sc: CompanyScore | null) => {
     if (!isGradeableScore(sc) || sc.ghost_rate == null) return 'var(--muted)'
     return sc.ghost_rate > 0.5 ? 'var(--red)' : sc.ghost_rate > 0.3 ? 'var(--amber)' : 'var(--green)'

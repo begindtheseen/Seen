@@ -49,7 +49,7 @@ async function fetchDirectory(): Promise<Row[]> {
 }
 
 const wrap = { maxWidth: 900, margin: '0 auto', padding: '0 1.5rem', width: '100%', boxSizing: 'border-box' as const }
-const gradeColor = (g: string | null) => (g === 'A' || g === 'B' ? 'var(--green)' : g === 'C' ? 'var(--amber)' : g == null ? 'var(--muted)' : 'var(--red)')
+const gradeColor = (letter: string | null) => { const g = letter ? letter.charAt(0) : null; return (g === 'A' || g === 'B' ? 'var(--green)' : g === 'C' ? 'var(--amber)' : g == null ? 'var(--muted)' : 'var(--red)') }
 
 export default async function VerifiedDirectoryPage() {
   const companies = await fetchDirectory()
