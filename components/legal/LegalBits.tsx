@@ -12,7 +12,7 @@ export const LEGAL_OPERATOR = 'Seen, an independent business based in California
 export const LEGAL_OPERATOR_SHORT = 'Seen'
 export const LEGAL_STATE = 'California'
 /** California date the current versions took effect. */
-export const LEGAL_EFFECTIVE = 'October 24, 2026'
+export const LEGAL_EFFECTIVE = 'October 25, 2026'
 
 const meta = { color: 'var(--sub)', fontSize: '.82rem', margin: '0 0 2rem', lineHeight: 1.7 } as const
 

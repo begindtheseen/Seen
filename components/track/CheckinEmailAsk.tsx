@@ -7,7 +7,7 @@
 // application rides along in the sign-up's metadata (lib/pendingApplicationClient.ts) so it lands on
 // the account even when the email is opened on another device or in a mail app's own browser.
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { safeNextPath } from '@/lib/signupIntent.js'
 import { pendingApplicationsForSignup, PENDING_META_KEY } from '@/lib/pendingApplicationClient'
@@ -31,6 +31,18 @@ export default function CheckinEmailAsk({ company, plan, next, inviteWaiting = f
   const co = company || 'them'
   const first = plan[0]
 
+  // Funnel counters (api/interview-prep.js action 'event'): how many guests see this ask, how many give an email.
+  const counted = useRef(false)
+  const beacon = (event: string) => {
+    fetch('/api/interview-prep', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'event', event, company }), keepalive: true }).catch(() => {})
+  }
+  useEffect(() => {
+    if (counted.current) return
+    counted.current = true
+    beacon('guest_email_shown')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   async function send() {
     const addr = email.trim()
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addr)) { setError('Enter a valid email address.'); return }
@@ -52,6 +64,7 @@ export default function CheckinEmailAsk({ company, plan, next, inviteWaiting = f
       return
     }
     // A throttled repeat means a link went out moments ago: that one still works.
+    beacon('guest_email_given')
     setState('sent')
   }
 
@@ -71,11 +84,14 @@ export default function CheckinEmailAsk({ company, plan, next, inviteWaiting = f
 
   return (
     <div data-testid="checkin-ask">
-      <p className={s.sub} style={{ color: 'var(--text)', marginBottom: '.6rem' }}>
-        {first
-          ? <>Want a nudge on {shortDay(first.at)} if {co} hasn&apos;t replied?</>
-          : <>Want an email check-in if {co} hasn&apos;t replied?</>}
+      <p className={s.sub} style={{ color: 'var(--text)', marginBottom: '.35rem', fontWeight: 600 }}>
+        Keep this on your phone too — just your email.
       </p>
+      <ul className={s.small} style={{ margin: '0 0 .6rem', paddingLeft: '1.1rem', lineHeight: 1.6 }}>
+        <li>Your tracker follows you to any device.</li>
+        <li>{first ? <>A check-in on {shortDay(first.at)}</> : <>Email check-ins</>} so {co} can&apos;t quietly drop off your list.</li>
+        <li>If {co} calls you in, Seen shows what happened to others who interviewed there and when to follow up.</li>
+      </ul>
       <form className={s.row} onSubmit={e => { e.preventDefault(); void send() }}>
         <label htmlFor="checkin-email" className="sr-only">Your email</label>
         <input
@@ -90,7 +106,7 @@ export default function CheckinEmailAsk({ company, plan, next, inviteWaiting = f
           data-testid="checkin-email"
         />
         <button type="submit" className={s.primary} disabled={state === 'sending'} data-testid="checkin-submit">
-          {state === 'sending' ? 'Sending…' : 'Remind me'}
+          {state === 'sending' ? 'Sending…' : 'Save it'}
         </button>
       </form>
       {error && <p className={s.err} role="alert">{error}</p>}

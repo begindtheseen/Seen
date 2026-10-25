@@ -28,7 +28,7 @@ const ANNUAL_SAVE_PCT = Math.round((1 - YEARLY_TOTAL / (MONTHLY_NUM * 12)) * 100
 const FREE_PRO_LINE = `Or get Pro free: ${proDaysLabel(REPORT_REWARD_PRO_DAYS)} for each application outcome you report, ${proDaysLabel(REFERRAL_REWARD_PRO_DAYS)} for each friend you invite.`
 
 // One-time SKUs — prices/grants come from the SAME constants the server fulfills with.
-const SPRINT = ONE_TIME_SKUS.sprint       // $14.99 · 30 credits + 7 days Pro
+const PREP = ONE_TIME_SKUS.interview      // $9.99 · prep for an interview + 14 days Pro (owner decision 2026-10-25)
 const CREDITS20 = ONE_TIME_SKUS.credits20 // $4.99 · 20 credits
 const skuPrice = (cents: number) => `$${(cents / 100).toFixed(2)}`
 
@@ -39,7 +39,7 @@ const FREE_FEATURES = [
   // daily reset brings it back to FREE_DAILY_CREDITS. Say exactly that — nowhere else did.
   `${WELCOME_CREDITS}-credit welcome bonus on the day you first use an AI tool`,
   PARSE_LINE,
-  'Earn credits by tracking apps & surveys',
+  'Earn credits by tracking jobs you apply to from Seen & answering surveys',
   'Company ghost rates & trust scores',
   'Job listings filtered by trust',
   'Application tracker (unlimited)',
@@ -77,16 +77,17 @@ const FAQ = [
   // Growth rewards (lib/server/growthRewards.js) — rendered from the same constants the server grants with.
   { q: 'Can I get Pro without paying?', a: `Yes. Report what happened with an application on your tracker and get ${proDaysLabel(REPORT_REWARD_PRO_DAYS)}, once per application that has been on your tracker for at least ${dayWord(REPORT_REWARD_MIN_TRACKED_DAYS)}, up to ${dayWord(REPORT_REWARD_MONTHLY_CAP_DAYS)} a month. Every outcome earns the same. Invite a friend with your link from the dashboard: when they track their first application, you both get ${proDaysLabel(REFERRAL_REWARD_PRO_DAYS)} (you are rewarded for up to ${REFERRAL_MAX_REWARDED} friends). Earned Pro time is added on top of any you have, and it never renews or charges you.` },
   { q: 'What is Human Voice?', a: 'AI-optimized résumés often sound generic — and some companies auto-filter applications that read as machine-written. Human Voice rewrites your optimized bullets so they sound like you: varied sentence structure, natural rhythm, every keyword kept. Your words, your voice, still ATS-ready.' },
-  { q: 'How do free AI credits work?', a: `The first time you use an AI tool you get a ${WELCOME_CREDITS}-credit welcome bonus for that day (the first action uses one of them). From then on you get ${FREE_DAILY_CREDITS} free AI ${CREDIT_WORD} a day, reset at ${CREDIT_RESET_LABEL} (California time). Each credit covers one AI action, and every button that spends one says so: optimize your résumé for a job, run the ATS scanner, build your application advantage, or generate AI insights for a listing nobody has analyzed yet. Uploading and parsing your résumé is free. You can earn up to ${MAX_DAILY_EARN} more credits a day by tracking your applications and answering quick surveys about companies you've worked with. Purchased credits never reset.` },
+  { q: 'How do free AI credits work?', a: `The first time you use an AI tool you get a ${WELCOME_CREDITS}-credit welcome bonus for that day (the first action uses one of them). From then on you get ${FREE_DAILY_CREDITS} free AI ${CREDIT_WORD} a day, reset at ${CREDIT_RESET_LABEL} (California time). Each credit covers one AI action, and every button that spends one says so: optimize your résumé for a job, run the ATS scanner, build your application advantage, or generate AI insights for a listing nobody has analyzed yet. Uploading and parsing your résumé is free. You can earn up to ${MAX_DAILY_EARN} more credits a day by tracking the jobs you apply to from Seen and answering quick surveys about companies you've worked with. Purchased credits never reset.` },
   { q: 'How does the free trial work?', a: `Pro starts with ${PRO_TRIAL_DAYS} days free — no card required. If you add a payment method before the trial ends, your plan renews at the price you chose; cancel anytime. If you don't add one, nothing is charged and access simply ends.` },
-  { q: 'What if I don\'t want a subscription?', a: `Pay once, own it: the Interview Sprint (${skuPrice(SPRINT.amount_cents)}) gives you ${SPRINT.credits} AI credits plus ${SPRINT.pro_days} days of full Pro access, and the Credit Pack (${skuPrice(CREDITS20.amount_cents)}) adds ${CREDITS20.credits} AI credits. Purchased credits never expire and roll over every day — no auto-renewal, ever.` },
+  { q: 'What is Interview Prep?', a: `When an application on your tracker reaches an interview, Seen shows what applicants report about interviewing at that company, the pay on its listings and when to follow up — free. Interview Prep (${skuPrice(PREP.amount_cents)}, once) adds likely questions for the role, answers built only from your own résumé, a 30-second intro, and thank-you and follow-up emails. It also gives you ${PREP.pro_days} days of Pro, so every interview in those days gets its prep too. It never renews.` },
+  { q: 'What if I don\'t want a subscription?', a: `Pay once: Interview Prep (${skuPrice(PREP.amount_cents)}) when you land an interview, or the Credit Pack (${skuPrice(CREDITS20.amount_cents)}) for ${CREDITS20.credits} AI credits that never expire. Neither renews, ever.` },
   { q: 'Can I cancel Pro?', a: 'Yes, anytime — no contracts. You keep Pro until the end of your billing period. We don\'t trap you.' },
   // What the code does (api/user-sync.js save_resume → profiles.resume_text; delete_resume / delete_account
   // clear it): the résumé is STORED on the profile — the old answer ("processed in-memory … immediately
   // discarded") was false while Settings showed the file "On file".
   { q: 'Is my data sold to employers?', a: 'Never. We work for job seekers. Your résumé is stored on your profile so your own tools can use it — job matching, fit scores and rewrites — until you replace it or delete your account (both in Settings). It is never shown to, shared with, or sold to recruiters or employers, and neither is anything else about you.' },
   { q: 'When does Pro activate?', a: 'Instantly after payment. Credits update in real-time — no waiting, no manual activation.' },
-  { q: 'What if I hit the daily limit?', a: `Free users get ${FREE_DAILY_CREDITS} ${CREDIT_WORD}/day, back at ${CREDIT_RESET_LABEL}. Track an application to earn one back. Answer a 10-second survey to earn more — up to ${MAX_DAILY_EARN} a day. Or upgrade to Pro for unlimited.` },
+  { q: 'What if I hit the daily limit?', a: `Free users get ${FREE_DAILY_CREDITS} ${CREDIT_WORD}/day, back at ${CREDIT_RESET_LABEL}. Apply to a job from Seen and track it to earn one back. Answer a 10-second survey to earn more — up to ${MAX_DAILY_EARN} a day. Or upgrade to Pro for unlimited.` },
 ]
 
 export default function PricingPage() {
@@ -132,6 +133,19 @@ export default function PricingPage() {
       }
     }
   }, [])
+
+  // ?buy=<sku>: a guest pressed a one-time buy button, signed up, and came back here — finish what they
+  // started instead of making them find the button again (the Ray persona lost the purchase at sign-up).
+  const buyResumed = useRef(false)
+  useEffect(() => {
+    if (!isLoggedIn || buyResumed.current) return
+    const buy = new URLSearchParams(window.location.search).get('buy')
+    if (buy !== 'interview' && buy !== 'credits20') return
+    buyResumed.current = true
+    try { window.history.replaceState(null, '', '/pricing') } catch { /* ignore */ }
+    handleOneTime(buy)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoggedIn])
 
   useEffect(() => {
     fetch('/api/stripe?action=status')
@@ -211,9 +225,10 @@ export default function PricingPage() {
   }
 
   // One-time purchase (mode:'payment' on the server) — same checkout endpoint, sku body.
-  async function handleOneTime(sku: 'sprint' | 'credits20') {
+  async function handleOneTime(sku: 'interview' | 'credits20') {
     if (!isLoggedIn) {
-      router.push(signupHref({ next: '/pricing' }))
+      // Keep what they were buying through sign-up: /pricing?buy=<sku> resumes the checkout.
+      router.push(signupHref({ next: `/pricing?buy=${sku}` }))
       return
     }
     if (checkoutInFlight.current) return
@@ -249,11 +264,11 @@ export default function PricingPage() {
   }
 
   if (upgraded) {
-    const successTitle = purchasedSku === 'sprint' ? 'Sprint unlocked.'
+    const successTitle = purchasedSku === 'interview' ? 'Interview Prep unlocked.'
       : purchasedSku === 'credits20' ? 'Credits added.'
       : "You're Pro."
-    const successBody = purchasedSku === 'sprint'
-      ? `${SPRINT.credits} AI credits are on your account, plus full Pro access for the next ${SPRINT.pro_days} days. Purchased credits never expire. No subscription — nothing renews.`
+    const successBody = purchasedSku === 'interview'
+      ? `Open your tracker: every application at an interview stage now has a Build my prep button, and you have full Pro for the next ${PREP.pro_days} days. Nothing renews.`
       : purchasedSku === 'credits20'
       ? `${CREDITS20.credits} AI credits are on your account. Purchased credits never expire and roll over every day. No subscription — nothing renews.`
       : `Your ${PRO_TRIAL_DAYS}-day free trial is live — unlimited AI credits and Human Voice, right now. No card on file means nothing is ever charged; access simply ends after the trial unless you add one.`
@@ -267,10 +282,10 @@ export default function PricingPage() {
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '.65rem' }}>
             <button
-              onClick={() => router.push('/resume')}
+              onClick={() => router.push(purchasedSku === 'interview' ? '/tracker' : '/resume')}
               style={{ padding: '.85rem', background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', border: 'none', borderRadius: 10, fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.88rem', color: '#fff', cursor: 'pointer', boxShadow: '0 0 28px rgba(99,102,241,.4)' }}
             >
-              Try Resume AI →
+              {purchasedSku === 'interview' ? 'Open my tracker →' : 'Try Resume AI →'}
             </button>
             <button
               onClick={() => router.push('/jobs')}
@@ -502,31 +517,34 @@ export default function PricingPage() {
               Not ready for a membership?
             </h2>
             <p style={{ color: 'var(--sub)', fontFamily: 'var(--body)', fontSize: 'var(--fs-72)', lineHeight: 1.6, maxWidth: 440, margin: '.4rem auto 0' }}>
-              One payment, no renewals. Purchased credits never expire and roll over every day.
+              One payment, no renewals.
             </p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: '1.25rem' }}>
-            {/* Interview Sprint */}
+            {/* Interview Prep (replaced the Interview Sprint, owner decision 2026-10-25) */}
             <div style={{ background: 'var(--card)', border: '1px solid rgba(16,185,129,.35)', borderRadius: 16, padding: '1.5rem', position: 'relative' }}>
               <div style={{ position: 'absolute', top: -11, left: '50%', transform: 'translateX(-50%)', background: 'var(--green)', color: '#052e22', fontFamily: 'var(--mono)', fontSize: 'var(--fs-52)', fontWeight: 700, letterSpacing: '.08em', padding: '.2rem .7rem', borderRadius: 100, whiteSpace: 'nowrap' }}>
-                BEST FOR AN ACTIVE SEARCH
+                WHEN YOU LAND AN INTERVIEW
               </div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--green)', marginBottom: '.5rem' }}>{SPRINT.name}</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--green)', marginBottom: '.5rem' }}>{PREP.name}</div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '.35rem', marginBottom: '1rem' }}>
-                <div style={{ fontFamily: 'var(--display)', fontSize: '1.9rem', fontWeight: 900, color: 'var(--white)' }}>{skuPrice(SPRINT.amount_cents)}</div>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--muted)' }}>one-time</div>
+                <div style={{ fontFamily: 'var(--display)', fontSize: '1.9rem', fontWeight: 900, color: 'var(--white)' }}>{skuPrice(PREP.amount_cents)}</div>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--muted)' }}>once, per interview</div>
               </div>
-              {[`${SPRINT.credits} AI credits — never expire`, `${SPRINT.pro_days} days of full Pro access`, 'Human Voice + unlimited AI during your sprint', 'No renewal — it just ends'].map(f => (
+              {['Likely questions for the role, and what each one checks', 'Answers built from your own résumé — nothing made up', 'Your 30-second "tell me about yourself"', 'Thank-you and follow-up emails, timed for you', `${PREP.pro_days} days of Pro included · never renews`].map(f => (
                 <div key={f} style={{ display: 'flex', gap: '.5rem', marginBottom: '.45rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-72)', color: 'var(--sub)', lineHeight: 1.45 }}>
                   <span style={{ color: 'var(--green)', flexShrink: 0 }}>✓</span>{f}
                 </div>
               ))}
+              <p style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-68)', color: 'var(--muted)', lineHeight: 1.5, margin: '.6rem 0 0' }}>
+                Best bought from the interview card on your tracker, where it is built for that company and role.
+              </p>
               <button
-                onClick={() => handleOneTime('sprint')}
+                onClick={() => handleOneTime('interview')}
                 disabled={skuLoading !== null}
-                style={{ width: '100%', marginTop: '1rem', background: skuLoading === 'sprint' ? 'var(--line)' : 'rgba(16,185,129,.14)', border: '1px solid rgba(16,185,129,.4)', borderRadius: 9, padding: '.8rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.84rem', color: 'var(--green)', cursor: skuLoading ? 'default' : 'pointer' }}
+                style={{ width: '100%', minHeight: 44, marginTop: '1rem', background: skuLoading === 'interview' ? 'var(--line)' : 'rgba(16,185,129,.14)', border: '1px solid rgba(16,185,129,.4)', borderRadius: 9, padding: '.8rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.84rem', color: 'var(--green)', cursor: skuLoading ? 'default' : 'pointer' }}
               >
-                {skuLoading === 'sprint' ? 'Redirecting…' : `Get the Sprint · ${skuPrice(SPRINT.amount_cents)}`}
+                {skuLoading === 'interview' ? 'Redirecting…' : `Get Interview Prep · ${skuPrice(PREP.amount_cents)}`}
               </button>
             </div>
             {/* Credit Pack */}

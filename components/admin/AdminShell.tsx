@@ -12,6 +12,7 @@ import { SearchDataPanel } from './SearchDataPanel'
 import { JobCrisisBanner, JobRefreshButton, JobRunner, ReportRow, IssueRow, RedditDisputesPanel, ListingTicketsPanel, MergePanel, CompanyExportPanel, CreditsPanel, FlagsPanel, ClustersPanel, JobDedupePanel, AllJobsBrowser, DeployPanel } from './panels'
 import { GhostReportPanel } from './GhostReportPanel'
 import { SignupSourcesPanel } from './SignupSourcesPanel'
+import { RevenueFunnelPanel } from './RevenueFunnelPanel'
 import { LiveBell } from './LiveBell'
 import { EmployerPanel } from './EmployerPanel'
 import { EmployerClaimsPanel } from './EmployerClaimsPanel'
@@ -261,6 +262,8 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
           </Panel>
           {/* First-touch signup attribution (lib/server/attributionReport.js, migration 20261024180000) */}
           <SignupSourcesPanel token={token} />
+          {/* Visitor → paid Interview Prep, step by step (lib/server/revenueFunnel.js, migration 20261025120000) */}
+          <RevenueFunnelPanel token={token} />
           </div>
         )}
 

@@ -31,7 +31,7 @@ const DOCS = [
 const usd = (cents: number) => `$${(cents / 100).toFixed(2)}`
 
 export default function LegalPage() {
-  const sprint = ONE_TIME_SKUS.sprint
+  const prep = ONE_TIME_SKUS.interview
   const pack = ONE_TIME_SKUS.credits20
   // Plain facts, each one implemented in code and stated in the documents above:
   //   trial → api/stripe.js checkout (trial_period_days, payment_method_collection 'if_required');
@@ -42,7 +42,7 @@ export default function LegalPage() {
   const facts = [
     `Seen Pro starts with a ${PRO_TRIAL_DAYS}-day free trial and asks for no card. Nothing is charged unless you add a payment method; without one, access simply ends.`,
     `Seen Pro is ${proPriceLine()}. It renews until you cancel, and you cancel in Settings → Plan & billing — access continues to the end of the period you paid for.`,
-    `One-time purchases never renew: the ${sprint.name} (${usd(sprint.amount_cents)}) adds ${sprint.credits} AI credits and ${sprint.pro_days} days of Pro; the ${pack.name} (${usd(pack.amount_cents)}) adds ${pack.credits} AI credits. Purchased credits do not expire or reset.`,
+    `One-time purchases never renew: ${prep.name} (${usd(prep.amount_cents)}) gives ${prep.pro_days} days of Pro, including interview prep for every application at an interview stage; the ${pack.name} (${usd(pack.amount_cents)}) adds ${pack.credits} AI credits. Purchased credits do not expire or reset.`,
     'Your résumé is stored on your profile until you replace it or delete your account, and is used for your own tools (job matching, fit scores, rewrites). It is never sold, and an employer sees it only if you send it with an application through Seen.',
     'We do not sell personal data. Company scores and reports are aggregated applicant claims and public discussion, not verified facts, and nothing on Seen is legal, employment or financial advice.',
   ]

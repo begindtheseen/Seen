@@ -74,6 +74,7 @@ export default function PrivacyPage() {
             <li style={li}><strong>Applying through Seen:</strong> when you apply to a listing using Seen&apos;s own application form, the name, email, phone number (optional), résumé and answers you submit.</li>
             <li style={li}><strong>Reports:</strong> hiring outcomes you report about companies, and anything you write in them.</li>
             <li style={li}><strong>Inbox Autopilot</strong> (only if you turn it on): from emails you forward to your private Seen address we keep only the facts — company, role, what happened, the sender&apos;s name and domain, and the date — never the email&apos;s text, subject or attachments.</li>
+            <li style={li}><strong>Interview prep:</strong> when you build interview prep for an application, the questions, answers, introduction and emails Seen made for you from your résumé, stored so you can open them again. Deleted with your account.</li>
             <li style={li}><strong>Purchases:</strong> your plan, credit balance, Pro status and the Stripe customer and subscription references. Card details go to Stripe; Seen never sees or stores your full card number.</li>
             <li style={li}><strong>Invites and rewards:</strong> your invite code, who invited you and whom you invited, and a record of each reward.</li>
             <li style={li}><strong>Messages</strong> you send us, and if you buy an employer product, the email and company name you give at checkout.</li>
@@ -83,6 +84,7 @@ export default function PrivacyPage() {
           <ul style={ul}>
             <li style={li}><strong>Sign-in security records:</strong> your IP address and browser type when you sign in, used to keep accounts secure and to spot duplicate or fake accounts that could skew company grades.</li>
             <li style={li}><strong>How you found us:</strong> the first Seen page you landed on, the website that sent you, and any campaign tags in the link, saved with your account when you sign up.</li>
+            <li style={li}><strong>Offer counts:</strong> when an interview-prep offer is shown to you or you press it, we count it (with your account if you are signed in, and the company name) to measure which offers help people.</li>
             <li style={li}><strong>Search history:</strong> the job searches you run while signed in, with how many results they returned.</li>
             <li style={li}><strong>Technical logs:</strong> standard request logs kept by our hosting provider, and IP-address counters we use to limit abuse (for example too many requests in an hour).</li>
             <li style={li}><strong>Product analytics</strong> (only where enabled): page views and feature use, collected with PostHog, never for advertising.</li>
