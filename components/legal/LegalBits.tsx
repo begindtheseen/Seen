@@ -1,44 +1,28 @@
-// Shared pieces of the three legal documents (/terms, /privacy, /content-policy) and the /legal hub.
+// Shared facts for the three legal documents (/terms, /privacy, /content-policy) and the /legal hub.
 //
-// The documents are drafts awaiting attorney review. Two rules, kept here so every document renders
-// them the same way:
-//   • The draft status is ONE calm sentence (DraftNote), not a warning banner — the audit of
-//     2026-10-24 found the amber "⚠ Draft — do not rely on it" box on a page a paying customer is
-//     sent to from checkout.
-//   • Every item the owner / counsel still has to decide renders through <Placeholder> as
-//     "[to be completed: …]" — one consistent style, and a grep for `[PLACEHOLDER` stays empty. The
-//     decisions themselves (legal entity, governing law, venue, liability caps, effective date,
-//     retention periods) are the owner's and are never invented here.
+// Every document reads the operator, effective date, governing state and contact from HERE, so they
+// can never disagree. If the business is later incorporated (an LLC, for example), change
+// LEGAL_OPERATOR and LEGAL_OPERATOR_SHORT once and bump LEGAL_EFFECTIVE; nothing else needs editing.
+// The documents were reviewed line by line against the code on 2026-10-24 (each claim cites the file
+// that implements it in a comment beside it) — keep them true when the product changes.
 
 export const LEGAL_CONTACT = 'hello@seenjobs.io'
+/** Who the agreement is with. A sole-proprietor business today (owner, 2026-10-24). */
+export const LEGAL_OPERATOR = 'Seen, an independent business based in California and operated by its founder'
+export const LEGAL_OPERATOR_SHORT = 'Seen'
+export const LEGAL_STATE = 'California'
+/** California date the current versions took effect. */
+export const LEGAL_EFFECTIVE = 'October 24, 2026'
 
-const noteStyle = {
-  fontFamily: 'var(--mono)',
-  fontSize: '.62rem',
-  color: 'var(--muted)',
-  lineHeight: 1.7,
-  margin: '0 0 2rem',
-} as const
+const meta = { color: 'var(--sub)', fontSize: '.82rem', margin: '0 0 2rem', lineHeight: 1.7 } as const
 
-/** The one-sentence draft status shown under the title of each document. */
-export function DraftNote() {
+/** The line under each document's title: effective date + how to reach us. */
+export function LegalMeta({ label = 'Questions?' }: { label?: string }) {
   return (
-    <p style={noteStyle} role="note">
-      This document is a draft awaiting attorney review; items marked &ldquo;to be completed&rdquo; are
-      still being finalized, and nothing here is legal advice.
+    <p style={meta}>
+      Effective {LEGAL_EFFECTIVE} · {label}{' '}
+      <a href={`mailto:${LEGAL_CONTACT}`} style={{ color: 'var(--blue)', textDecoration: 'none' }}>{LEGAL_CONTACT}</a>
     </p>
-  )
-}
-
-/** An item counsel or the owner must still decide — rendered "[to be completed: …]" everywhere. */
-export function Placeholder({ children }: { children: React.ReactNode }) {
-  return (
-    <span
-      style={{ fontFamily: 'var(--mono)', fontSize: '.92em', color: 'var(--amber)', background: 'var(--adim)', borderRadius: 4, padding: '0 .3em' }}
-      data-placeholder=""
-    >
-      [to be completed: {children}]
-    </span>
   )
 }
 
@@ -46,7 +30,7 @@ export function Placeholder({ children }: { children: React.ReactNode }) {
 export function LegalFooter() {
   return (
     <p style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', marginTop: '2rem', lineHeight: 1.7 }}>
-      Seen is not a law firm and nothing here is legal advice. Questions:{' '}
+      Effective {LEGAL_EFFECTIVE}. Questions about this document:{' '}
       <a href={`mailto:${LEGAL_CONTACT}`} style={{ color: 'var(--sub)' }}>{LEGAL_CONTACT}</a>.
     </p>
   )
