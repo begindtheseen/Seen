@@ -48,6 +48,7 @@ export function wordsToDigits(text) {
     .replace(/\b(twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)[- ](one|two|three|four|five|six|seven|eight|nine)\b/gi, (_, a, b) => String(NUM_WORDS[a.toLowerCase()] + NUM_WORDS[b.toLowerCase()]))
     .replace(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+and\s+a\s+half\b/gi, (_, a) => `${NUM_WORDS[a.toLowerCase()]}.5`)
     .replace(/\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)\b(?=[\s-]+(?:years?|months?|weeks?|days?|calls?|patients?|associates?|reps?|people|new|percent|accounts?|entities|shifts?|trailers?|transactions?|stores?|students?|families|carriers?|hires?|crew|macros?|members?))/gi, (w) => String(NUM_WORDS[w.toLowerCase()]))
+    .replace(/\b(\d+)\s+and\s+a\s+half\b/gi, (_, n) => `${n}.5`)
     .replace(/(\d+) percent\b/gi, '$1%');
 }
 
