@@ -187,3 +187,24 @@ test('prod has no description_summary column: the write retries without it and a
   assert.equal(b.body.cached, true);
   assert.equal(b.body.description_summary, a.body.description_summary, 'the deterministic summary is rebuilt, not lost');
 });
+
+// A posting that states nothing to read is answered free and NEVER written to the shared cache —
+// Groupon's "Relevant experience" filler was charged and cached "free for everyone for 7 days"
+// (paid-tool test, 2026-10-25). A cached row holding no read is never served either.
+const CAR_WASH = 'Join the Sunbelt Express Car Wash family! We are a locally owned express car wash with 6 locations around Charlotte, and we are growing. Weekly pay, free unlimited wash membership, paid training and a fun, friendly team. Starting pay is $14 – $16 per hour. Apply today!';
+test('a posting with nothing to read: free, read:false, never gated, never cached', async () => {
+  for (const probe of [true, false]) {
+    const calls = installFetch();
+    const res = await call({ jobId: 'cw1', job: 'Team Member', company: 'Sunbelt', jobDescription: CAR_WASH, needsSummary: true, probe });
+    assert.equal(res.code, 200);
+    assert.equal(res.body._src, 'unread');
+    assert.equal(res.body.charged, false);
+    assert.deepEqual(res.body.what_they_want, []);
+    assert.ok(!calls.some(c => c.path.includes('consume_credit')), 'never charged');
+    assert.ok(!calls.some(c => c.path === '/rest/v1/job_insights' && c.method === 'POST'), 'never cached');
+  }
+  const stale = installFetch({ cachedRow: { job_id: insightsCacheKey('cw2', DESC), what_they_want: [], hidden_requirements: [], insider_tip: '' } });
+  const res = await call({ jobId: 'cw2', job: 'Specialist', company: 'Acme', jobDescription: DESC, needsSummary: true, probe: true });
+  assert.notEqual(res.body._src, 'db', 'an empty cached row is not served as a read');
+  void stale;
+});
