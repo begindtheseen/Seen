@@ -1,0 +1,150 @@
+{
+  "id": "09-sdr-sales",
+  "field": "SDR / sales",
+  "resume": [
+    "TYLER JOHNSON",
+    "Atlanta, GA • 404-555-0136 • tyler.johnson.sales@gmail.com • linkedin.com/in/tylerjsales",
+    "",
+    "EXPERIENCE",
+    "Sales Development Representative | Pipewell (B2B SaaS) | Atlanta, GA | Jan 2023 – Present",
+    "• Book an average of 18 qualified meetings a month for 4 account executives; 112% of quota for 5 straight quarters",
+    "• Run 60+ personalized emails and 50 calls a day through Outreach sequences into mid-market ops leaders",
+    "• Built a 6-step sequence for logistics prospects that lifted reply rate from 4% to 9%",
+    "• Keep every touch logged in Salesforce; research accounts in ZoomInfo and review calls in Gong",
+    "",
+    "Inside Sales Representative | Peach State Solar | Marietta, GA | Mar 2021 – Dec 2022",
+    "• Called inbound and purchased leads and set 25+ in-home consultations a month for field reps",
+    "• Closed $410K in residential solar contracts in 2022 as a hybrid inside/closing rep",
+    "",
+    "Sales Associate | Fit Republic Gym | Atlanta, GA | 2019 – 2021",
+    "• Sold memberships and personal-training packages; top seller 7 of 24 months",
+    "",
+    "EDUCATION",
+    "B.B.A., Marketing — Georgia State University, 2021",
+    "",
+    "TOOLS",
+    "Salesforce, Outreach, ZoomInfo, Gong, LinkedIn Sales Navigator, Google Sheets"
+  ],
+  "job": {
+    "title": "Sales Development Representative",
+    "company": "Kestrel Security",
+    "location": "Atlanta, GA (hybrid)",
+    "description": [
+      "Kestrel Security protects 1,200 mid-market companies from account takeover and phishing. We're growing our Atlanta sales team.",
+      "",
+      "The role",
+      "SDRs are the start of our sales process. You'll prospect into IT and security leaders, start conversations and set qualified meetings for our Account Executives.",
+      "",
+      "What you'll do",
+      "- Prospect into target accounts by phone, email and LinkedIn",
+      "- Qualify inbound leads within 5 minutes of a demo request",
+      "- Book qualified meetings and hand them off with clear notes",
+      "- Keep your pipeline and activity up to date in our CRM",
+      "",
+      "What you'll need",
+      "- 1+ year of outbound SDR/BDR or inside sales experience",
+      "- Experience with Salesforce or HubSpot CRM",
+      "- Comfortable making 60+ calls a day",
+      "- Experience with a sequencing tool (Outreach, Salesloft, or similar)",
+      "- Coachable, competitive and organized",
+      "",
+      "Nice to have",
+      "- Knowledge of cybersecurity or IT buyers",
+      "",
+      "Compensation",
+      "OTE $75,000 ($55,000 base + $20,000 variable). Hybrid: 3 days a week in our Midtown office. Promotion path to Account Executive in 12–18 months."
+    ]
+  },
+  "gold": {
+    "family": [
+      "sales"
+    ],
+    "must_skills": [
+      {
+        "label": "outbound SDR/inside sales",
+        "match": "sdr|bdr|inside sales|outbound|prospect"
+      },
+      {
+        "label": "CRM",
+        "match": "salesforce|hubspot|crm"
+      },
+      {
+        "label": "sequencing tool",
+        "match": "outreach|salesloft|sequenc"
+      }
+    ],
+    "alternatives": [
+      [
+        "Salesforce",
+        "HubSpot"
+      ],
+      [
+        "Outreach",
+        "Salesloft"
+      ]
+    ],
+    "years_min": 1,
+    "traps": [
+      {
+        "term": "Cybersecurity experience",
+        "match": "cybersecurity|security (?:buyers|experience)|\\bcissp\\b",
+        "scope": "candidate",
+        "why": "he sold logistics SaaS and solar"
+      },
+      {
+        "term": "HubSpot",
+        "match": "hubspot",
+        "scope": "candidate",
+        "why": "he uses Salesforce"
+      },
+      {
+        "term": "Salesloft",
+        "match": "salesloft",
+        "scope": "candidate",
+        "why": "he uses Outreach"
+      },
+      {
+        "term": "Account Executive title",
+        "match": "as an account executive|account executive at",
+        "scope": "candidate",
+        "why": "he is an SDR"
+      }
+    ],
+    "resume_employers": [
+      "Pipewell",
+      "Peach State Solar",
+      "Fit Republic Gym"
+    ],
+    "resume_titles": [
+      "Sales Development Representative",
+      "Inside Sales Representative",
+      "Sales Associate"
+    ],
+    "resume_degrees": [
+      "B.B.A., Marketing"
+    ],
+    "resume_numbers": [
+      "404",
+      "555",
+      "0136",
+      "2",
+      "2023",
+      "18",
+      "4",
+      "112%",
+      "5",
+      "60",
+      "50",
+      "6",
+      "4%",
+      "9%",
+      "2021",
+      "2022",
+      "25",
+      "410",
+      "2019",
+      "7",
+      "24"
+    ]
+  }
+}

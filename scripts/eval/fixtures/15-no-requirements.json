@@ -1,0 +1,71 @@
+{
+  "id": "15-no-requirements",
+  "field": "Posting with no requirements (charging check)",
+  "resume_from": "03-cashier-entry",
+  "job": {
+    "title": "Team Member",
+    "company": "Sunbelt Express Car Wash",
+    "location": "Charlotte, NC",
+    "description": [
+      "Join the Sunbelt Express Car Wash family!",
+      "",
+      "We're a locally owned express car wash with 6 locations around Charlotte, and we're growing. Our team members keep the wash running smoothly and make every customer's visit a good one. We care about our people, our community and a really clean car.",
+      "",
+      "Why work with us?",
+      "- Weekly pay",
+      "- Free unlimited wash membership",
+      "- Paid training",
+      "- A fun, friendly team that has each other's back",
+      "- Room to grow — most of our site managers started as team members",
+      "",
+      "Starting pay is $14 – $16 per hour. We have openings at our Plaza Midwood, South End and University City locations.",
+      "",
+      "Sound like you? Apply today and our hiring team will reach out within a few days. We can't wait to meet you!"
+    ]
+  },
+  "gold": {
+    "family": [
+      "general",
+      "customer_service",
+      "retail"
+    ],
+    "expect_no_requirements": true,
+    "must_skills": [],
+    "alternatives": [],
+    "years_min": null,
+    "traps": [
+      {
+        "term": "Invented requirement",
+        "match": "\\d+\\+? years|degree|licen[cs]e|certif",
+        "scope": "requirements",
+        "why": "the posting states no requirements"
+      }
+    ],
+    "resume_employers": [
+      "QuickFuel Market",
+      "Burger Barn",
+      "Hope Street Food Pantry"
+    ],
+    "resume_titles": [
+      "Cashier",
+      "Crew Member",
+      "Volunteer"
+    ],
+    "resume_degrees": [
+      "High School Diploma"
+    ],
+    "resume_numbers": [
+      "28205",
+      "704",
+      "555",
+      "0161",
+      "05",
+      "2024",
+      "200",
+      "1",
+      "10",
+      "2023",
+      "2022"
+    ]
+  }
+}
