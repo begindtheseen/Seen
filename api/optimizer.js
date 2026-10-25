@@ -404,6 +404,7 @@ export default async function handler(req, res) {
           after_score: result.after_score,
           ai_slop_risk: result.ai_slop_risk,
           flags: result.flags,
+          integrity: result.integrity,
           run_id: runId,
           _engine_version: HUMANPROOF_ENGINE_VERSION,
           _local_model: hpFlags.localModel,

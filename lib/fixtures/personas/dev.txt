@@ -1,0 +1,33 @@
+Dev Patel
+Austin, TX (open to remote) | dev.patel.eng@gmail.com | (512) 555-0187 | github.com/devpatel-go |
+linkedin.com/in/devpatel-eng
+SUMMARY
+Backend engineer with 6 years building payment and ledger systems in Go, Python and PostgreSQL. Owned
+services processing $1.2B/year in card and ACH volume; strong in distributed systems, data modeling, reliability
+and on-call. Looking for senior backend / platform roles, remote or Austin.
+EXPERIENCE
+Senior Backend Engineer — Ledgerline (Series B fintech), Austin, TX Mar 2022 – Jul 2026
+• Led design of a double-entry ledger service in Go on PostgreSQL handling 4M transactions/day; cut
+reconciliation breaks 92%.
+• Built idempotent payment-orchestration APIs (gRPC/REST) across Stripe, Adyen and an ACH processor;
+p99 latency 180ms to 70ms.
+• Migrated batch settlement jobs from cron to Kafka consumers on Kubernetes (EKS); removed a 6-hour daily
+settlement lag.
+• Owned on-call for payments (1-in-5 rotation); wrote runbooks and SLOs that took monthly Sev-2 incidents
+from 7 to 1.
+• Mentored 3 engineers; ran the backend interview loop (40+ interviews).
+Backend Engineer — Carta-like cap table startup "Equitably", Remote Jun 2020 – Feb 2022
+• Wrote Python (FastAPI) services for equity grant workflows; designed Postgres schema with row-level
+security for 900 customer orgs.
+• Introduced Terraform + GitHub Actions CI; deploy time 40 min to 8 min.
+• Built an audit-log pipeline (Postgres logical replication to S3 to Athena) used for SOC 2 Type II evidence.
+Software Engineer — H-E-B Digital, Austin, TX Jul 2018 – May 2020
+• Built Go microservices for curbside order slotting serving 300+ stores; Redis caching cut DB load 60%.
+• Added Prometheus/Grafana monitoring and on-call alerting for the order pipeline.
+
+SKILLS
+Languages: Go, Python, SQL, TypeScript (working). Data: PostgreSQL, Redis, Kafka, DynamoDB, Snowflake.
+Infra: AWS (EKS, RDS, SQS, Lambda), Kubernetes, Docker, Terraform, GitHub Actions. Practices: distributed
+systems, idempotency, event sourcing, observability (Prometheus, Grafana, OpenTelemetry), PCI-DSS, SOC 2.
+EDUCATION
+B.S. Computer Science — The University of Texas at Austin 2018

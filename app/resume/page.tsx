@@ -82,7 +82,7 @@ const realBulletsOf = (p: PaidOptimize | null) => (p?.optimized_bullets || []).f
 interface HpConfirm { text: string; reason: string; placeholder: string }
 interface HpItem { original: string; humanized_text: string; human_signal: number; confirm_before_using?: HpConfirm[]; interview_risk_warnings?: { phrase: string; warning: string }[] }
 interface HpPackage { bullets: HpItem[]; application_message: HpItem | null; carried_warnings: { phrase: string; warning: string }[] }
-interface HumanProofResult { package: HpPackage; humanproof_score: number; before_score: number; after_score: number; ai_slop_risk: 'low' | 'medium' | 'high'; run_id?: string | null }
+interface HumanProofResult { package: HpPackage; humanproof_score: number; before_score: number; after_score: number; ai_slop_risk: 'low' | 'medium' | 'high'; run_id?: string | null; integrity?: { numbers_preserved: boolean; unsupported_claims: number; grounded: boolean } }
 
 interface Insights {
   what_they_want: string[]
@@ -609,7 +609,9 @@ function ResumePageInner() {
 
   async function runHumanProof() {
     const real = realBulletsOf(paid)
-    if (!real.length) { setError('Build your rewrite plan first — HumanProof works on your improved bullets.'); return }
+    // Nothing to humanize is said IN the tab (the old top-of-page error was off screen, so the
+    // button looked dead — 2026-10-25). The idle card already hides the button in that case.
+    if (!real.length) return
     setHpState('loading'); setError('')
     try {
       const res = await fetch('/api/optimizer', {
@@ -912,9 +914,18 @@ function ResumePageInner() {
                       <Card>
                         <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '.95rem', marginBottom: '.3rem' }}>HumanProof</div>
                         <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-65)', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.9rem' }}>
-                          Make your optimized bullets read real — remove generic AI tone and keep them specific, natural, and interview-defensible. Nothing invented.
+                          Make your rewritten bullets read real — remove generic AI tone and keep them specific, natural, and interview-defensible. Every number stays exactly as you wrote it.
                         </p>
-                        <button style={{ ...btnPrimary, background: 'linear-gradient(135deg,#10b981 0%,#3b82f6 100%)' }} onClick={runHumanProof}>Run HumanProof →</button>
+                        {!paid ? (
+                          <>
+                            <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--amber)', lineHeight: 1.6, marginBottom: '.75rem' }} data-testid="hp-needs-plan">HumanProof works on the bullets your rewrite plan improves — build the plan first.</p>
+                            <button style={btnPrimary} onClick={() => setTab('rewrite')}>Go to the rewrite plan →</button>
+                          </>
+                        ) : realBulletsOf(paid).length === 0 ? (
+                          <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--amber)', lineHeight: 1.6, margin: 0 }} data-testid="hp-nothing">Your rewrite plan for this job has no rewritten bullets yet — only bullets for you to write. There is nothing for HumanProof to polish; write those bullets from real work, then come back.</p>
+                        ) : (
+                          <button style={{ ...btnPrimary, background: 'linear-gradient(135deg,#10b981 0%,#3b82f6 100%)' }} onClick={runHumanProof}>Run HumanProof on {realBulletsOf(paid).length} bullet{realBulletsOf(paid).length === 1 ? '' : 's'} →</button>
+                        )}
                       </Card>
                     )}
                     {hpState === 'loading' && <ResultEmpty icon="🗣" text={'Making it sound real…'} />}
@@ -942,6 +953,7 @@ function ResumePageInner() {
                         </Card>
                         <Card>
                           {kicker('Humanized bullets', 'var(--green)')}
+                          {hp.integrity?.grounded && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--green)', marginBottom: '.55rem' }}>✓ Every number kept exactly as you wrote it — nothing added.</div>}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
                             {hp.package.bullets.map((b, i) => (
                               <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.7rem .85rem', display: 'flex', gap: '.6rem', alignItems: 'flex-start' }}>

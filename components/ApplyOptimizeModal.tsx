@@ -846,7 +846,7 @@ export default function ApplyOptimizeModal({
               {/* ONE verdict (score or none, band, one sentence; the hard gate first). */}
               {result.verdict && (
                 <VerdictCard verdict={result.verdict} cached={!!result.cached}
-                  note={result.stealth ? 'Human Voice applied' : 'grounded in your real résumé — nothing invented'} />
+                  note={hpState === 'done' && (hp?.package?.bullets?.length || 0) > 0 ? 'Human Voice applied to your rewritten bullets' : realBullets.length > 0 ? 'grounded in your real résumé — nothing invented' : 'no bullet of yours was rewritten for this job'} />
               )}
 
               {/* Why you match — from the matched requirements and their evidence (E7). */}
