@@ -200,3 +200,50 @@ test('build: when the fact-check call fails, the guard still cuts the draft\'s i
     assert.ok(!res.body.pack.answers.some((x) => /20% coupon/.test(x.answer)), JSON.stringify(res.body.pack.answers));
   } finally { delete process.env.ANTHROPIC_KEY; delete process.env.ANTHROPIC_QUALITY_MODEL; }
 });
+
+// ── The free preview before the ask (owner decisions 2026-10-25) ───────────────────────────────────────
+test('preview: signed in, no gate, no model — 2 role questions and 1 coached story from the résumé', async () => {
+  process.env.ANTHROPIC_KEY = 'must-not-be-used';
+  try {
+    const calls = installFetch({ pro: false });
+    const res = await call({ action: 'preview', company: 'Ross Stores', role: 'Assistant Store Manager', stage: 'Interview' });
+    assert.equal(res.code, 200);
+    assert.equal(res.body.has_resume, true);
+    assert.equal(res.body.questions.length, 2);
+    for (const q of res.body.questions) {
+      assert.ok(q.q.endsWith('?') && q.why, JSON.stringify(q));
+      assert.doesNotMatch(q.q, /^Tell me about yourself|^Why do you want to work at/, 'role questions, not the generic openers');
+    }
+    assert.ok(res.body.answer && RESUME.includes(res.body.answer.resume_fact), 'the story is a real résumé line');
+    assert.ok(calls.every((c) => c.path.startsWith('/rest/v1/') || c.path === '/auth/v1/user'), 'no model call');
+    assert.ok(!calls.some((c) => c.path === '/rest/v1/ai_credits' || c.path === '/rest/v1/credit_transactions'), 'no credit read or charge');
+    assert.ok(!calls.some((c) => c.method !== 'GET' && c.path !== '/rest/v1/rpc/increment_rate_limit'), 'writes nothing but the rate-limit counter');
+  } finally { delete process.env.ANTHROPIC_KEY; }
+});
+
+test('preview without a résumé: questions only, has_resume false', async () => {
+  installFetch({ resume: 'short' });
+  const res = await call({ action: 'preview', company: 'Ross Stores', role: 'Assistant Store Manager' });
+  assert.equal(res.code, 200);
+  assert.equal(res.body.has_resume, false);
+  assert.equal(res.body.answer, null);
+  assert.equal(res.body.questions.length, 2);
+});
+
+test('preview needs sign-in and a company', async () => {
+  installFetch();
+  assert.equal((await call({ action: 'preview', company: 'Ross' }, { auth: false })).code, 401);
+  assert.equal((await call({ action: 'preview', company: '' })).code, 400);
+});
+
+test('event carries surface and sku; checkout steps cannot be posted by a browser', async () => {
+  const calls = installFetch();
+  assert.equal((await call({ action: 'event', event: 'offer_clicked', surface: 'company_page', sku: 'interview', company: 'Ross' })).code, 200);
+  assert.equal((await call({ action: 'event', event: 'pricing_view' }, { auth: false })).code, 200);
+  assert.equal((await call({ action: 'event', event: 'checkout_completed', sku: 'pass30' })).code, 400);
+  const rows = calls.filter((c) => c.path === '/rest/v1/funnel_events').map((c) => JSON.parse(c.body));
+  assert.deepEqual(rows, [
+    { user_id: UID, event: 'offer_clicked', company: 'Ross', surface: 'company_page', sku: 'interview' },
+    { user_id: null, event: 'pricing_view', company: null },
+  ]);
+});
