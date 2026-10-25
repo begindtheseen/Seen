@@ -14,6 +14,7 @@ import SeenFitPanel from '@/components/SeenFitPanel'
 import HumanProofPanel from '@/components/HumanProofPanel'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { useAuth } from '@/lib/auth'
+import { wasOptimized } from '@/lib/optimizedJobs'
 import { trackApplyClick } from '@/lib/trackApply'
 import type { Job } from '@/lib/types'
 import ApplyOptimizeModal from '@/components/ApplyOptimizeModal'
@@ -105,7 +106,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const [showApplyModal, setShowApplyModal] = useState(false)
   const [showCheckpoint, setShowCheckpoint] = useState(false)
   const [checkpointAuto, setCheckpointAuto] = useState(false)
-  // HumanProof says "your application is optimized" only once SeenFit actually ran on this page.
+  // HumanProof says "your application is optimized" only once this person actually ran the paid
+  // optimizer for this job (the modal marks it — lib/optimizedJobs.ts). The free fit check is a
+  // diagnosis, not an optimization: it used to flip this and the copy claimed work never done.
   const [optimized, setOptimized] = useState(false)
   const [showSeenApply, setShowSeenApply] = useState(false)
   const [showShareCard, setShowShareCard] = useState(false)
@@ -244,6 +247,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   useEffect(() => {
     if (job) loadInsights(job)
   }, [job, loadInsights])
+
+  // Set after mount (device storage): was this job optimized by this person in the last 7 days?
+  useEffect(() => { setOptimized(wasOptimized(user?.id, job?.id)) }, [user?.id, job?.id])
 
   // The employer's Seen grade (how it treats applicants), from the same DB-only batch_scores read the
   // job list uses (api/reports.js). Shown only when gradeable — the listing ring grades the post.
@@ -552,7 +558,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         </div>
 
         {/* SeenFit Engine — deterministic, keyless résumé/application optimizer */}
-        <SeenFitPanel job={job} onOptimized={() => setOptimized(true)} />
+        <SeenFitPanel job={job} />
 
         {/* HumanProof — runs AFTER SeenFit: removes generic AI tone, adds truthful work context */}
         <HumanProofPanel job={job} optimized={optimized} />
@@ -668,7 +674,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         {showApplyModal && job && (
           <ApplyOptimizeModal
             job={job}
-            onClose={() => setShowApplyModal(false)}
+            onClose={() => { setShowApplyModal(false); setOptimized(wasOptimized(user?.id, job.id)) }}
             onApplied={() => { setCheckpointAuto(true); setShowCheckpoint(true) }}
           />
         )}
