@@ -6,7 +6,7 @@ import { gateAI, resolveProAccess, resolveAuthedUser } from '../lib/server/credi
 import { RESUME_OPTIMIZE_COST } from '../lib/server/creditRules.js';
 import { previewOnlyError } from '../lib/server/postingGate.js';
 import { optimizeCacheKey, readCachedOptimize, writeCachedOptimize } from '../lib/server/optimizeCache.js';
-import { buildPaidOptimize } from '../lib/server/optimizePackage.js';
+import { buildPaidOptimize, unoptimizableListing } from '../lib/server/optimizePackage.js';
 import { runAdvantage, extractEmployment, extractCareerSignal, buildResumeDocument, resumeFileName } from '../lib/server/resumeAnalysis.js';
 import { scannerFromSeenFit } from '../lib/server/seenfitCompat.js';
 import { extractUploadText } from '../lib/server/resumeUpload.js';
@@ -546,8 +546,11 @@ function drawFooter(doc, LEFT, W, RULE, FOOT, footerBand) {
 //   2. a readable résumé (a corrupted one used to be charged and THEN refused);
 //   3. a real posting — a ≤520-char preview / Adzuna teaser is 422 `preview_only` (D2);
 //   4. the 7-day cache per (user, job, posting text, résumé text) — a hit is returned free with
-//      `cached: true` (C2);  `probe: true` stops here and reports `cached: false` + the price;
-//   5. only then the credit, the package (lib/server/optimizePackage.js — a strict superset of the
+//      `cached: true` (C2);
+//   5. something to optimize against — a posting whose score the free diagnosis withholds (fewer
+//      than 3 requirements read) is 422 `no_requirements`, probe or not, and never charged;
+//      `probe: true` stops here and reports `cached: false` + the price;
+//   6. only then the credit, the package (lib/server/optimizePackage.js — a strict superset of the
 //      free diagnosis, C3) and the cache write.
 async function handleOptimizeTool(req, res, body) {
   try {
@@ -562,6 +565,10 @@ async function handleOptimizeTool(req, res, body) {
     const key = optimizeCacheKey({ uid: authed.uid, jobId, jobDescription, resume });
     const hit = await readCachedOptimize(authed.uid, key);
     if (hit) return res.status(200).json({ ...hit.output, cached: true, cached_at: hit.created_at, charged: false });
+    // A posting with no measurable requirements has nothing to optimize against: refused free,
+    // probe or not, before the credit gate (the modal said "No score" and then charged a credit).
+    const unoptimizable = unoptimizableListing({ resume, jobDescription, job, company });
+    if (unoptimizable) return res.status(422).json({ error: 'no_requirements', ...unoptimizable, cost: 0, charged: false });
     if (body.probe) return res.status(200).json({ cached: false, price: RESUME_OPTIMIZE_COST, charged: false });
 
     const gate = await gateAI(req, 'resume_optimize');

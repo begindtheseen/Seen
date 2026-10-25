@@ -26,7 +26,7 @@ import { chat, llmAvailable, LLMUnavailableError } from '../lib/server/llm.js';
 import { SCORABLE_REPORTS_FILTER } from '../lib/server/reportCounts.js';
 import { ONE_TIME_SKUS } from '../lib/server/creditRules.js';
 import {
-  interviewRecord, payRange, followUpPlan, prepPrompt, guardPack, fallbackPack, prepEmails, prepKey, signOffName, prepFamily,
+  interviewRecord, payRange, followUpPlan, prepPrompt, verifyPrompt, guardPack, fallbackPack, prepEmails, prepKey, signOffName, prepFamily,
 } from '../lib/server/interviewPrep.js';
 import { CLIENT_EVENTS, funnelRow, recordFunnelEvent } from '../lib/server/funnelEvents.js';
 
@@ -218,9 +218,20 @@ export default async function handler(req, res) {
     let pack;
     if (llmAvailable()) {
       try {
+        // Draft → fact-check → guard. The draft and the check both use the stronger model (a paid,
+        // high-stakes pack); the check may only remove or bracket, never add. If the check fails, the
+        // guard still runs on the draft.
         const { system, user } = prepPrompt({ company, role, jobText, resumeText, stage });
-        const raw = await chat({ system, user, maxTokens: 2400, timeoutMs: 45000, json: true });
-        pack = guardPack(raw, { company, role, resumeText, pay, stage });
+        const draft = await chat({ system, user, maxTokens: 3200, timeoutMs: 55000, json: true, tier: 'quality' });
+        let checked = draft;
+        try {
+          const v = verifyPrompt({ company, role, jobText, resumeText, draft });
+          const out = await chat({ system: v.system, user: v.user, maxTokens: 3200, timeoutMs: 50000, json: true, tier: 'quality' });
+          if (out && Array.isArray(out.answers)) checked = out;
+        } catch (e) {
+          if (!(e instanceof LLMUnavailableError)) console.error('[interview-prep] fact-check failed, guarding the draft:', String(e?.message || e).slice(0, 160));
+        }
+        pack = guardPack(checked, { company, role, resumeText, pay, stage });
       } catch (e) {
         if (!(e instanceof LLMUnavailableError)) console.error('[interview-prep] model failed, using the coached pack:', String(e?.message || e).slice(0, 160));
         pack = guardPack({}, { company, role, resumeText, pay, stage });

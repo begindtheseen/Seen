@@ -14,6 +14,7 @@ import SeenFitPanel from '@/components/SeenFitPanel'
 import HumanProofPanel from '@/components/HumanProofPanel'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { useAuth } from '@/lib/auth'
+import { wasOptimized } from '@/lib/optimizedJobs'
 import { trackApplyClick } from '@/lib/trackApply'
 import type { Job } from '@/lib/types'
 import ApplyOptimizeModal from '@/components/ApplyOptimizeModal'
@@ -29,6 +30,7 @@ import { paragraphs, isDescriptionPreview, stripDanglingEllipsis, endsCutOff } f
 import { isGradeableScore } from '@/lib/gradeGate'
 import ListingScoreRing from '@/components/jobs/ListingScoreRing'
 import EmployerGradeChip from '@/components/jobs/EmployerGradeChip'
+import { JOB_INSIGHTS_VERSION } from '@/lib/jobInsightsVersion.js'
 
 interface Insights {
   what_they_want: string[]
@@ -104,7 +106,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const [showApplyModal, setShowApplyModal] = useState(false)
   const [showCheckpoint, setShowCheckpoint] = useState(false)
   const [checkpointAuto, setCheckpointAuto] = useState(false)
-  // HumanProof says "your application is optimized" only once SeenFit actually ran on this page.
+  // HumanProof says "your application is optimized" only once this person actually ran the paid
+  // optimizer for this job (the modal marks it — lib/optimizedJobs.ts). The free fit check is a
+  // diagnosis, not an optimization: it used to flip this and the copy claimed work never done.
   const [optimized, setOptimized] = useState(false)
   const [showSeenApply, setShowSeenApply] = useState(false)
   const [showShareCard, setShowShareCard] = useState(false)
@@ -212,7 +216,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       const raw = localStorage.getItem(cacheKey)
       if (raw) {
         const entry = JSON.parse(raw)
-        if (Date.now() - entry.ts < L1_TTL) { setInsights(entry.data); setInsightsState('done'); return }
+        // an entry from an older generator version is ignored (lib/jobInsightsVersion.js)
+        if (entry.v === JOB_INSIGHTS_VERSION && Date.now() - entry.ts < L1_TTL) { setInsights(entry.data); setInsightsState('done'); return }
         localStorage.removeItem(cacheKey)
       }
     } catch { /* ignore */ }
@@ -227,7 +232,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       const d = await res.json() as InsightsResponse
       if (d._src === 'uncached') { setInsightPrice(typeof d.price === 'number' ? d.price : JOB_INSIGHTS_COST); setInsightsState('uncached'); return }
       if (d.what_they_want?.length) {
-        try { localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data: d })) } catch { /* ignore */ }
+        try { localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), v: JOB_INSIGHTS_VERSION, data: d })) } catch { /* ignore */ }
         setInsights(d as Insights)
         setInsightsState('done')
       } else {
@@ -242,6 +247,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   useEffect(() => {
     if (job) loadInsights(job)
   }, [job, loadInsights])
+
+  // Set after mount (device storage): was this job optimized by this person in the last 7 days?
+  useEffect(() => { setOptimized(wasOptimized(user?.id, job?.id)) }, [user?.id, job?.id])
 
   // The employer's Seen grade (how it treats applicants), from the same DB-only batch_scores read the
   // job list uses (api/reports.js). Shown only when gradeable — the listing ring grades the post.
@@ -281,7 +289,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         setInsightNote(`${creditCostLabel(d.cost ?? JOB_INSIGHTS_COST)} used${typeof d.balance === 'number' && d.balance < 900 ? ` · ${d.balance} left` : ''} · ${dailyResetLabel()}`)
       }
       if (d.what_they_want?.length) {
-        try { localStorage.setItem('ji_' + job.id, JSON.stringify({ ts: Date.now(), data: d })) } catch { /* ignore */ }
+        try { localStorage.setItem('ji_' + job.id, JSON.stringify({ ts: Date.now(), v: JOB_INSIGHTS_VERSION, data: d })) } catch { /* ignore */ }
         setInsights(d as Insights); setInsightsState('done')
       } else { setInsights(d as Insights); setInsightsState('unavailable') }
     } catch { setInsightsState('unavailable') }
@@ -550,7 +558,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         </div>
 
         {/* SeenFit Engine — deterministic, keyless résumé/application optimizer */}
-        <SeenFitPanel job={job} onOptimized={() => setOptimized(true)} />
+        <SeenFitPanel job={job} />
 
         {/* HumanProof — runs AFTER SeenFit: removes generic AI tone, adds truthful work context */}
         <HumanProofPanel job={job} optimized={optimized} />
@@ -666,7 +674,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         {showApplyModal && job && (
           <ApplyOptimizeModal
             job={job}
-            onClose={() => setShowApplyModal(false)}
+            onClose={() => { setShowApplyModal(false); setOptimized(wasOptimized(user?.id, job.id)) }}
             onApplied={() => { setCheckpointAuto(true); setShowCheckpoint(true) }}
           />
         )}

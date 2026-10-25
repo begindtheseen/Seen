@@ -34,6 +34,7 @@ type Pack = {
   questions: { q: string; why: string }[]
   answers: { q: string; answer: string; resume_fact: string; coached?: boolean }[]
   intro: string | null
+  resume_check?: { line: string; note: string }[]
   emails: { thankYou: { subject: string; body: string }; followUp: { subject: string; body: string } }
   follow_up: FollowUp
 }
@@ -263,7 +264,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
                 <p className={s.fact}>Your answers are built from your résumé, so add it first (free). <Link href="/resume?back=tracker" className={s.link}>Add your résumé →</Link></p>
               ) : isPro ? (
                 <button type="button" className={s.cta} disabled={state === 'building'} onClick={build}>
-                  {state === 'building' ? 'Building your prep… (about 20 seconds)' : 'Build my prep →'}
+                  {state === 'building' ? 'Building and fact-checking your prep… (about a minute)' : 'Build my prep →'}
                 </button>
               ) : (
                 <>
@@ -287,6 +288,16 @@ function PackView({ pack, company, fu }: { pack: Pack; company: string; fu: Foll
   return (
     <div className={s.pack}>
       <div className={s.offerTitle}>Your prep for {company}</div>
+      {!!pack.resume_check?.length && (
+        <div className={s.block}>
+          <div className={s.label}>Fix on your résumé before the interview</div>
+          <ul className={s.qs}>
+            {pack.resume_check.map((c, i) => (
+              <li key={i}><strong>“{c.line}”</strong> — {c.note}</li>
+            ))}
+          </ul>
+        </div>
+      )}
       {intro && (
         <div className={s.block}>
           <div className={s.label}>Your 30-second intro</div>

@@ -11,7 +11,6 @@ import { useEffect } from 'react'
 import { useAuth } from '@/lib/auth'
 import { FREE_DAILY_CREDITS, CREDIT_RESET_LABEL } from '@/lib/creditRules'
 import { PREP, PASS, PREP_PRICE, PASS_PRICE, ONE_TIME_NOTE, PASS_INCLUDES, FREE_LINE } from '@/lib/pricing'
-import { humanProofLockCopy } from '@/lib/humanizer/paywall.js'
 import { useCheckout } from '@/lib/useCheckout'
 import { funnelEvent, type OfferSurface } from '@/lib/funnel'
 import ModalPortal from '@/components/ModalPortal'
@@ -37,8 +36,8 @@ function copyFor(reason: UpgradeModalProps['reason'], featureName?: string) {
   }
   if (reason === 'pro') {
     if (featureName === 'HumanProof') {
-      const c = humanProofLockCopy()
-      return { headline: c.headline, sub: `HumanProof comes with Pro access: the ${PASS.name}, or the ${PREP.pro_days} days that come with ${PREP.name}.` }
+      // Not "Your application is optimized" — this opens from pages where nothing was optimized.
+      return { headline: 'Make your application sound real.', sub: `HumanProof comes with Pro access: the ${PASS.name}, or the ${PREP.pro_days} days that come with ${PREP.name}.` }
     }
     return {
       headline: `${featureName || 'This tool'} comes with Pro access`,

@@ -50,7 +50,7 @@ function scoreColor(s: number): string {
 
 const mono = 'var(--mono)'
 
-export default function SeenFitPanel({ job, onOptimized }: { job: Job; /** Called once a SeenFit run succeeds on this page. */ onOptimized?: () => void }) {
+export default function SeenFitPanel({ job }: { job: Job }) {
   const { isLoggedIn } = useAuth()
   const { user } = useAuth() as unknown as { user: { id?: string } | null }
   const [state, setState] = useState<State>('idle')
@@ -95,11 +95,10 @@ export default function SeenFitPanel({ job, onOptimized }: { job: Job; /** Calle
       if (!res.ok || data.error) { setState('error'); return }
       setOut(data)
       setState('done')
-      onOptimized?.()
     } catch {
       setState('error')
     }
-  }, [job, isLoggedIn, user, onOptimized])
+  }, [job, isLoggedIn, user])
 
   // ── Trigger button (idle) ──
   if (state === 'idle') {
