@@ -231,7 +231,7 @@ export default function PricingPage() {
             <p className={s.pitch}>Questions for the role and answers from your own résumé, ready before you walk in.</p>
             {isPro ? <p className={s.status}>Included in your Pro access.</p>
               : paymentsEnabled === false ? notOn
-              : buyBtn('interview', s.btnLead, `Get ${PREP.name} · ${PREP_PRICE}`)}
+              : buyBtn('interview', s.btnLead, `Get ${PREP.name}`)}
             <ul className={s.list}>{PREP_INCLUDES.map(f => <li key={f}>{f}</li>)}</ul>
             <p className={s.small}>Best bought from the interview card on your tracker, where it is built for that company and role. It also opens {PREP.pro_days} days of Pro.</p>
           </section>
@@ -243,7 +243,7 @@ export default function PricingPage() {
             <p className={s.pitch}>Interviewing at more than one place? One price covers every interview for {PASS.pro_days} days.</p>
             {isPro && (sub || !proUntil) ? <p className={s.status}>Included in your Pro access.</p>
               : paymentsEnabled === false ? notOn
-              : buyBtn('pass30', s.btnPass, isPro ? `Add ${PASS.pro_days} more days · ${PASS_PRICE}` : `Get the ${PASS.name} · ${PASS_PRICE}`)}
+              : buyBtn('pass30', s.btnPass, isPro ? `Add ${PASS.pro_days} more days` : 'Get the pass')}
             <ul className={s.list}>{PASS_INCLUDES.map(f => <li key={f}>{f}</li>)}</ul>
           </section>
         </div>
