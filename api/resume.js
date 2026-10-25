@@ -19,6 +19,7 @@ import { parseResume } from '../lib/resume/parse/index.js';
 import { normalizeDoc, docIsEmpty } from '../lib/resume/model.js';
 import { llmAvailable } from '../lib/server/llm.js';
 import { loadSkillTaxonomy } from '../lib/server/skillTaxonomy.js';
+import { fitContext } from '../lib/server/fitContext.js';
 import { canonicalResumeText } from '../lib/resume/canonical.js';
 import { serializeToText } from '../lib/resume/model.js';
 import { docFromBody } from '../lib/server/resumeStudio.js';
@@ -577,7 +578,7 @@ async function handleOptimizeTool(req, res, body) {
     // The canonical text and the shared taxonomy — the same inputs the free fit check and the Studio
     // score, so the three screens print one number (lib/resume/canonical.js, skillTaxonomy.js).
     const resume = canonicalResumeText(body.resume);
-    const taxonomy = await loadSkillTaxonomy();
+    const [taxonomy, fit] = await Promise.all([loadSkillTaxonomy(), fitContext({ company, jobDescription })]);
 
     // The cache key carries the parser + optimizer versions (optimizeCache.js): a result built by an
     // older engine is never served (Tasha got a pre-fix "(1,800 subscribers)." summary, 2026-10-25).
@@ -593,7 +594,7 @@ async function handleOptimizeTool(req, res, body) {
 
     const gate = await gateAI(req, 'resume_optimize');
     if (!gate.ok) return res.status(gate.status).json({ error: gate.error, credits_required: gate.credits_required, pro_required: gate.pro_required, balance: gate.balance ?? 0 });
-    const result = buildPaidOptimize({ resume, jobDescription, job, company, pro: gate.pro, jobId, taxonomy });
+    const result = buildPaidOptimize({ resume, jobDescription, job, company, pro: gate.pro, jobId, taxonomy, fit });
     const stored = await writeCachedOptimize(authed.uid, key, result);
     // charged is what the gate did: a Pro user is never charged (consume_credit answers pro:true)
     return res.status(200).json({ ...result, cached: false, cache_saved: stored, charged: !gate.pro, pro: !!gate.pro, balance: gate.balance });
@@ -639,7 +640,7 @@ async function handleStudio(req, res, body) {
           const preview = previewOnlyError(body);
           if (preview) return res.status(preview.status).json({ ...preview.body, charged: false });
         }
-        const taxonomy = await loadSkillTaxonomy();
+        const [taxonomy, fit] = await Promise.all([loadSkillTaxonomy(), fitContext({ company: body.company, jobDescription: body.jobDescription })]);
         // A posting that states no requirements has nothing to tailor against: refused free, before
         // the credit gate (harness 2026-10-25: charged 1 and returned an unscored plan).
         if (String(body.jobDescription || '').trim()) {
@@ -648,7 +649,7 @@ async function handleStudio(req, res, body) {
         }
         const gate = await gateAI(req, 'resume_tailor');
         if (!gate.ok) return res.status(gate.status).json({ error: gate.error, credits_required: gate.credits_required, pro_required: gate.pro_required, balance: gate.balance ?? 0 });
-        const out = await tailorAction(body, { pro: !!gate.pro, allowPolish: llmAvailable(), taxonomy });
+        const out = await tailorAction(body, { pro: !!gate.pro, allowPolish: llmAvailable(), taxonomy, fit });
         return res.status(200).json({ ...out, balance: gate.balance, pro: !!gate.pro, charged: !gate.pro });
       }
       default: return res.status(400).json({ error: `Unknown action: ${body.action}` });

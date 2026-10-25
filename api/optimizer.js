@@ -23,10 +23,8 @@ import { freeDiagnostic } from '../lib/server/optimizePackage.js';
 import { extractJobFacts } from '../lib/optimizer/extractJobFacts.js';
 import { runHumanProof, HUMANPROOF_ENGINE_VERSION } from '../lib/humanizer/index.js';
 import { buildHumanProofPackage, normalizeBulletList } from '../lib/server/humanizePackage.js';
-import { scoreConfidence } from './_utils/companyScore.js';
-import { firstPartyReportCount, webClaimCount, isGradeable } from '../lib/server/reportCounts.js';
-import { mentionSel } from '../lib/server/scoreColumns.js';
 import { loadSkillTaxonomy } from '../lib/server/skillTaxonomy.js';
+import { fitContext, postingSaysRemote } from '../lib/server/fitContext.js';
 import { canonicalResumeText } from '../lib/resume/canonical.js';
 
 // ── auth: derive the user id from the Supabase JWT (same pattern as api/apply.js) ──
@@ -149,25 +147,6 @@ async function loadPhraseRules(db) {
 // ── taxonomy: the shared loader (lib/server/skillTaxonomy.js) — the paid Optimize and the Studio
 //    read the same overlay, so one résumé + one posting scores one number everywhere ──
 async function loadTaxonomy() { return loadSkillTaxonomy(); }
-
-// ── company process score from the existing company_scores table (by name) ──
-async function getCompanyProcess(db, company) {
-  if (!company) return { score: null, confidence: null };
-  try {
-    const r = await db(`company_scores?company_name=ilike.${encodeURIComponent(company)}&select=overall_score,report_count,first_party_report_count${await mentionSel()},web_report_count,data_source&order=report_count.desc&limit=1`);
-    if (!r.ok) return { score: null, confidence: null };
-    const rows = await r.json();
-    if (!rows?.length) return { score: null, confidence: null };
-    // Grade gate (reportCounts.js): below MIN_REPORTS_FOR_GRADE real reports the company has no
-    // process score — the optimizer treats it as unknown (neutral, labeled "not graded yet").
-    const score = rows[0].overall_score == null || !isGradeable(rows[0]) ? null : Number(rows[0].overall_score);
-    // Canonical confidence from the HONEST split: first-party rows drive it; a web-research claim
-    // alone caps at medium (scoreConfidence). The old cnt/10 on the fused report_count turned a
-    // claimed "3,085 mentions" into full confidence with zero real reports behind it.
-    const confidence = scoreConfidence({ reportCount: firstPartyReportCount(rows[0]), webClaimedCount: webClaimCount(rows[0]) });
-    return { score, confidence };
-  } catch { return { score: null, confidence: null }; }
-}
 
 // ── cached job_facts per job_id (fast repeat runs) ──
 async function getCachedJobFacts(db, jobId) {
@@ -473,7 +452,7 @@ export default async function handler(req, res) {
     }
 
     // ── optimize ────────────────────────────────────────────────────────────────
-    const { resumeText, jobId, jobTitle, company, jobDescription, jobLocation, desiredLocation, remoteOk } = body;
+    const { resumeText, jobId, jobTitle, company, jobDescription } = body;
     if (!resumeText || String(resumeText).trim().length < 40) {
       return res.status(400).json({ error: 'RESUME_REQUIRED', message: 'Provide résumé text (at least 40 characters).' });
     }
@@ -487,9 +466,11 @@ export default async function handler(req, res) {
     const uid = haveDb ? await resolveUid(req, SUPABASE_URL, SERVICE_KEY) : null;
 
     // Taxonomy + company process score (parallel).
-    const [taxonomy, companyProc] = await Promise.all([
+    // the shared scoring context (lib/server/fitContext.js): the same company grade and the same
+    // "remote" reading the paid Optimize and the Studio use, so all three print one number
+    const [taxonomy, fit] = await Promise.all([
       haveDb ? loadTaxonomy() : Promise.resolve(null),
-      haveDb ? getCompanyProcess(db, company) : Promise.resolve({ score: null, confidence: null }),
+      haveDb ? fitContext({ company, jobDescription }) : Promise.resolve({ companyProcessScore: null, companyProcessConfidence: null, remoteOk: postingSaysRemote(jobDescription), jobLocation: null, desiredLocation: null }),
     ]);
 
     // Job facts: extract from the posting the caller sent (fast, deterministic, and always the
@@ -516,11 +497,7 @@ export default async function handler(req, res) {
         company,
         jobDescription,
         jobFacts,
-        companyProcessScore: companyProc.score,
-        companyProcessConfidence: companyProc.confidence,
-        jobLocation: jobLocation || null,
-        desiredLocation: desiredLocation || null,
-        remoteOk: !!remoteOk,
+        ...fit,
       },
       { taxonomy }
     );
