@@ -48,7 +48,8 @@ function copyFor(reason: UpgradeModalProps['reason'], featureName?: string) {
   if (reason === 'pro') {
     if (featureName === 'HumanProof') {
       return {
-        headline: 'Your application is optimized. Now make it sound real.',
+        // Not "Your application is optimized" — this opens from pages where nothing was optimized.
+        headline: 'Make your application sound real.',
         sub: 'Unlock HumanProof to remove generic AI tone, add truthful work context, and make your application interview-ready.',
       }
     }

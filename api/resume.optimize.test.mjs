@@ -137,3 +137,27 @@ test('D2: the free path answers a preview the same way (one paste box for both)'
   assert.equal(r.code, 422);
   assert.equal(r.body.error, 'preview_only');
 });
+
+// Willingness-to-pay test 2026-10-25: the modal said "No score: this listing does not state its
+// requirements" and then spent a credit on the optimize. A posting with nothing to measure is now
+// refused free — probe or not — before gateAI.
+const NO_REQS_JD = `Join the Northwind family! Northwind has proudly served our community for over forty years, and we believe great people make a great company. Our team members enjoy a welcoming culture, a beautiful campus, and leaders who care. We celebrate wins together, give back through volunteer days, and host seasonal events for families. Northwind is an equal opportunity employer and values a diverse workplace. We look forward to meeting you and hearing your story. Apply today to start your journey with one of the region's best places to work. Benefits include medical, dental, vision, paid time off, and an employee discount program.`;
+test('a listing that states no requirements is never charged: probe and press both answer no_requirements', async () => {
+  const uid = '55555555-5555-4555-8555-555555555555';
+  const before = state.charges;
+  const body = { jobDescription: NO_REQS_JD, job: 'Team Member', company: 'Northwind', jobId: 'job-noreq' };
+  const probe = await optimize({ ...body, probe: true }, uid);
+  assert.equal(probe.code, 422, JSON.stringify(probe.body).slice(0, 300));
+  assert.equal(probe.body.error, 'no_requirements');
+  assert.equal(probe.body.requirement_count, 0);
+  assert.equal(probe.body.message, "This listing doesn't list its requirements, so there's nothing to optimize against — no credit used.");
+  assert.equal(probe.body.charged, false);
+  const press = await optimize(body, uid);
+  assert.equal(press.code, 422);
+  assert.equal(press.body.error, 'no_requirements');
+  assert.equal(state.charges, before, 'no credit consumed');
+  // the free diagnosis agrees: no score for the same posting
+  const free = await call(optimizerHandler, { action: 'optimize', resumeText: RESUME, jobTitle: 'Team Member', company: 'Northwind', jobDescription: NO_REQS_JD });
+  assert.equal(free.body.fit_score, null);
+  assert.match(free.body.verdict.sentence, /^No score: this listing does not state its requirements/);
+});
