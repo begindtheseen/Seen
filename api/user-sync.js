@@ -506,7 +506,7 @@ export default async function handler(req, res) {
       'signup_attribution',
       // Email preferences and send history (045, 20261024190000) and Inbox Autopilot (20261022120000):
       // the Privacy Policy promises these go with the account.
-      'email_prefs', 'outcome_email_log', 'job_match_email_log', 'inbox_events', 'inbox_addresses',
+      'email_prefs', 'outcome_email_log', 'job_match_email_log', 'inbox_events', 'inbox_addresses', 'interview_preps',
     ];
     await Promise.all([
       ...userTables.map(t =>

@@ -14,7 +14,8 @@ import { parseResumeFile } from '@/lib/resumeUploadClient'
 import { countWords } from '@/lib/resume/engine-client'
 import type { SavedJob } from '@/lib/types'
 import UpgradeModal from '@/components/UpgradeModal'
-import { FREE_DAILY_CREDITS } from '@/lib/creditRules'
+import { FREE_DAILY_CREDITS, WELCOME_CREDITS } from '@/lib/creditRules'
+import { signupHref } from '@/lib/signupIntent.js'
 import dynamic from 'next/dynamic'
 import { VerdictCard, WhyYouMatch, MissingList, Checklist, PaidPlanView, type Verdict, type ConstraintRow, type PaidPlan } from '@/components/optimizer/Verdict'
 import CreditConfirmDialog from '@/components/CreditConfirmDialog'
@@ -387,6 +388,9 @@ function ResumePageInner() {
   const [analyzed, setAnalyzed] = useState(false)
   const [tab, setTab] = useState<Tab>('fit')
   const [error, setError] = useState('')
+  // A guest pressed a credit button: offer the free account in place of a red "Sign in" error (the Ray
+  // persona read the old banner as a dead end — no sign-up link, no word about the free credits).
+  const [guestGate, setGuestGate] = useState('')
 
   // Fit / SeenFit (anchor analysis)
   const [fitOut, setFitOut] = useState<OptimizerOutput | null>(null)
@@ -568,7 +572,7 @@ function ResumePageInner() {
 
   // PAID: only on a press of the price-tagged button; the first paid action is confirmed once.
   function pressPaid() {
-    if (!isLoggedIn) { setError('Sign in to build your rewrite plan.'); return }
+    if (!isLoggedIn) { setGuestGate('your rewrite plan'); return }
     if (hasConfirmedCreditUse(user?.id)) runPaid()
     else setConfirmPaid(true)
   }
@@ -639,7 +643,7 @@ function ResumePageInner() {
       const data = await res.json().catch(() => ({})) as { credits_required?: boolean } & CombinedResult
       if (data.credits_required) {
         if (isLoggedIn) { setUpgradeReason('credits'); setUpgradeFeature(undefined); setShowUpgrade(true); setAdvState('idle') }
-        else { setError('Sign in to use AI resume features.'); setAdvState('idle') }
+        else { setGuestGate('your application strategy'); setAdvState('idle') }
         return
       }
       if (!res.ok) { setAdvState('error'); return }
@@ -773,6 +777,14 @@ function ResumePageInner() {
           sub={<>One résumé, one job — your fit score, safe rewrites, a human-sounding pass, and the strategy to get through, sharpened with Seen&apos;s data on how this company actually treats applicants.</>}
           actions={<Link href="/resume/studio" className="tap" style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem', background: 'var(--idim)', border: '1px solid var(--imid)', color: '#c7d2fe', borderRadius: 999, padding: '.4rem .85rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', textDecoration: 'none', whiteSpace: 'nowrap' }}>✦ Résumé Studio →</Link>}
         />
+
+        {guestGate && !isLoggedIn && (
+          <div role="status" style={{ background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.3)', borderRadius: 10, padding: '.9rem 1rem', marginBottom: '1rem' }}>
+            <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.95rem', color: 'var(--white)', marginBottom: '.25rem' }}>Make a free account to build {guestGate}</div>
+            <div style={{ fontSize: '.85rem', color: 'var(--sub)', lineHeight: 1.55, marginBottom: '.6rem' }}>You start with {WELCOME_CREDITS} free AI credits, and this uses one. It takes about 30 seconds.</div>
+            <Link href={signupHref({ next: '/resume' })} className="tap" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 1rem', borderRadius: 9, background: 'var(--indigo)', color: '#fff', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', textDecoration: 'none' }}>Create free account →</Link>
+          </div>
+        )}
 
         {error && (
           <div style={{ background: 'var(--rdim)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '.72rem 1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-72)', color: 'var(--red)', marginBottom: '1rem', overflowWrap: 'anywhere' }}>{error}</div>

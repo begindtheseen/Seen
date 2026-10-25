@@ -422,7 +422,7 @@ export default async function handler(req, res) {
     const { uid, email } = await resolveUid(req, env);
     if (!uid) return res.status(401).json({ error: 'Sign in before upgrading' });
 
-    // One-time SKUs (owner-approved 2026-07-04): 'sprint' and 'credits20'. Any other
+    // One-time SKUs: 'interview' (Interview Prep, owner decision 2026-10-25) and 'credits20'. Any other
     // non-empty sku is a client bug — reject rather than silently selling a subscription.
     if (body.sku && !ONE_TIME_SKUS[body.sku]) return res.status(400).json({ error: 'Unknown product' });
     const sku = body.sku && ONE_TIME_SKUS[body.sku] ? body.sku : null;
@@ -465,6 +465,23 @@ export default async function handler(req, res) {
       form.set('line_items[0][price_data][currency]', 'usd');
       form.set('line_items[0][price_data][unit_amount]', String(def.amount_cents));
       form.set('line_items[0][price_data][product_data][name]', `Seen ${def.name}`);
+      if (sku === 'interview') {
+        // Bought from a tracker card: come back to THAT card with the prep open. The application id
+        // is the tracker's own id (client-made), so only id characters are kept.
+        const appId = String(body.application_id || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
+        const company = String(body.company || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 100);
+        const role = String(body.role || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 100);
+        const back = `${origin}/tracker${appId ? `?prep=${encodeURIComponent(appId)}` : ''}`;
+        form.set('success_url', `${back}${appId ? '&' : '?'}purchase=interview&session_id={CHECKOUT_SESSION_ID}`);
+        form.set('cancel_url', back);
+        if (appId) form.set('metadata[application_id]', appId);
+        if (company) {
+          form.set('metadata[company]', company);
+          form.set('line_items[0][price_data][product_data][name]', `Seen ${def.name} — ${company}`);
+        }
+        if (role) form.set('metadata[role]', role);
+        form.set('line_items[0][price_data][product_data][description]', `Prep for your ${company || ''} interview, plus ${def.pro_days} days of Seen Pro. One-time, never renews.`.replace(/\s+/g, ' '));
+      }
     } else {
       // ── SUBSCRIPTION with a 7-day NO-CARD trial (owner-approved 2026-07-04) ───
       form.set('mode', 'subscription');

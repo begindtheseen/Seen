@@ -12,7 +12,7 @@ import ModalPortal from '@/components/ModalPortal'
 const OPT_WORD = FREE_DAILY_CREDITS === 1 ? 'optimization' : 'optimizations'
 
 // One-time SKUs — copy generated from the same constants the server fulfills with.
-const SPRINT = ONE_TIME_SKUS.sprint       // $14.99 · 30 credits + 7 days Pro
+const PREP = ONE_TIME_SKUS.interview      // $9.99 · interview prep + 14 days Pro
 const CREDITS20 = ONE_TIME_SKUS.credits20 // $4.99 · 20 credits
 const skuPrice = (cents: number) => `$${(cents / 100).toFixed(2)}`
 
@@ -31,7 +31,7 @@ const ANNUAL_SAVINGS = +(MONTHLY_NUM * 12 - YEARLY_TOTAL).toFixed(2) // ~35.99
 
 const PRO_BULLETS = [
   { icon: '∞', label: 'Unlimited AI credits', sub: 'No daily cap, optimize every application' },
-  { icon: '📊', label: 'AI company insights', sub: 'Ghost risk, culture, hiring trends' },
+  { icon: '🎯', label: 'Interview prep', sub: 'Questions and answers from your résumé for every interview' },
   { icon: '🗣', label: 'Human Voice', sub: 'Rewrites that sound like you, not a bot' },
   { icon: '⚡', label: 'Priority support', sub: 'Real humans, fast replies' },
 ]
@@ -120,10 +120,10 @@ export default function UpgradeModal({ reason, onClose, featureName }: UpgradeMo
   }
 
   // One-time purchase (mode:'payment' on the server) — same checkout endpoint, sku body.
-  async function handleOneTime(sku: 'sprint' | 'credits20') {
+  async function handleOneTime(sku: 'interview' | 'credits20') {
     if (!isLoggedIn) {
       onClose()
-      router.push(signupHref({ next: '/pricing' }))
+      router.push(signupHref({ next: `/pricing?buy=${sku}` }))
       return
     }
     setSkuLoading(sku)
@@ -277,15 +277,15 @@ export default function UpgradeModal({ reason, onClose, featureName }: UpgradeMo
             </div>
             <div style={{ display: 'flex', gap: '.5rem' }}>
               <button
-                onClick={() => handleOneTime('sprint')}
+                onClick={() => handleOneTime('interview')}
                 disabled={skuLoading !== null || loading}
                 style={{ flex: 1.25, padding: '.6rem .5rem', background: 'rgba(16,185,129,.1)', border: '1px solid rgba(16,185,129,.35)', borderRadius: 10, cursor: skuLoading ? 'default' : 'pointer', textAlign: 'center' }}
               >
                 <div style={{ fontFamily: 'var(--mono)', fontSize: '.66rem', fontWeight: 700, color: 'var(--green)' }}>
-                  {skuLoading === 'sprint' ? 'Redirecting…' : `${SPRINT.name} · ${skuPrice(SPRINT.amount_cents)}`}
+                  {skuLoading === 'interview' ? 'Redirecting…' : `${PREP.name} · ${skuPrice(PREP.amount_cents)}`}
                 </div>
                 <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)', marginTop: '.15rem' }}>
-                  {SPRINT.credits} credits + {SPRINT.pro_days} days of Pro
+                  for an interview + {PREP.pro_days} days of Pro
                 </div>
               </button>
               <button

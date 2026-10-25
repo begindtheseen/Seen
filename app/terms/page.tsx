@@ -36,7 +36,7 @@ const mail = <a href={`mailto:${LEGAL_CONTACT}`} style={link}>{LEGAL_CONTACT}</a
 const usd = (cents: number) => `$${(cents / 100).toFixed(2)}`
 
 export default function TermsPage() {
-  const sprint = ONE_TIME_SKUS.sprint
+  const prep = ONE_TIME_SKUS.interview
   const pack = ONE_TIME_SKUS.credits20
   const featured = EMPLOYER_SKUS.featured30
   const verified = EMPLOYER_SKUS.verified90
@@ -212,11 +212,14 @@ export default function TermsPage() {
         <div style={section} id="one-time">
           <h2 style={h2}>10. One-time purchases, credits and account deletion</h2>
           <p style={p}>
-            Two products are bought once and never renew. The <strong>{sprint.name}</strong> ({usd(sprint.amount_cents)})
-            adds {sprint.credits} AI credits and {sprint.pro_days} days of full Pro access; the{' '}
-            <strong>{pack.name}</strong> ({usd(pack.amount_cents)}) adds {pack.credits} AI credits. Credits are
-            added once Stripe confirms the payment (on your return from checkout or by Stripe&apos;s notice to us,
-            whichever arrives first — never twice).
+            Two products are bought once and never renew. <strong>{prep.name}</strong> ({usd(prep.amount_cents)})
+            gives you {prep.pro_days} days of full Pro access, which includes building interview prep for any
+            application on your tracker that has reached an interview: likely questions for the role, answers built
+            from your résumé, an introduction and email templates. The questions are prepared by Seen for the role;
+            they are not a record of what any employer asks, and Seen does not promise any interview result. The{' '}
+            <strong>{pack.name}</strong> ({usd(pack.amount_cents)}) adds {pack.credits} AI credits. Each is
+            delivered once Stripe confirms the payment (on your return from checkout or by Stripe&apos;s notice to
+            us, whichever arrives first — never twice).
           </p>
           <ul style={ul}>
             <li style={li}>purchased credits do not expire and are not reset by the daily free-credit reset; they are used after your free daily credit;</li>
