@@ -13,16 +13,11 @@ import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { gateAI } from '../lib/server/credits.js';
 import { JOB_INSIGHTS_COST } from '../lib/server/creditRules.js';
 import { buildJobInsights } from '../lib/server/jobInsights.js';
-import { JOB_INSIGHTS_VERSION } from '../lib/jobInsightsVersion.js';
 import { createHash } from 'node:crypto';
 
 // The posting text an insight was built from, as a short stable key (whitespace-insensitive).
 export function hashText(text) {
   return createHash('sha256').update(String(text || '').replace(/\s+/g, ' ').trim()).digest('hex').slice(0, 16);
-}
-// The shared-cache row id for one posting under the CURRENT generator version.
-export function insightsCacheKey(jobId, jobDescription) {
-  return `${String(jobId)}:${JOB_INSIGHTS_VERSION}:${hashText(jobDescription)}`;
 }
 
 export default async function handler(req, res) {
@@ -51,25 +46,30 @@ export default async function handler(req, res) {
   };
 
   // ── DB cache — shared across all users, 7-day TTL ──────────────────────
-  // Keyed by the job, the generator VERSION and the text it was built from:
-  // `${jobId}:${JOB_INSIGHTS_VERSION}:${descHash}` (insightsCacheKey). Every write builds the full
-  // insight (summary included — it is deterministic and free to compute), so ANY visitor's probe
-  // for the same posting is a free hit. Rows written under an older key — the bare jobId (before
-  // 2026-10-24) or `${jobId}:${descHash}` (v2, before 2026-10-25) — are never read: they carry the
-  // answers that dropped Go and invented "Machine Learning, 12+ years" for a Stripe posting and a
-  // "non-negotiable shift" for a salaried role. Bumping the version regenerates them on the next
-  // view with no SQL purge; old rows age out by expires_at.
-  const cacheKey = jobDescription ? insightsCacheKey(jobId, jobDescription) : '';
-  if (cacheKey && SUPABASE_URL && SUPABASE_SERVICE_KEY) {
+  // Keyed by the job AND the text it was built from: `${jobId}:${descHash}`. Every write builds the
+  // full insight (summary included — it is deterministic and free to compute), so ANY visitor's
+  // probe for the same posting is a free hit. Before 2026-10-24 a second visitor's probe answered
+  // cached:false: the write was fire-and-forget after the response (a serverless instance may be
+  // frozen before it lands), and a row whose summary came out empty was skipped for every caller
+  // that asked for one — i.e. every caller. Rows written under the bare jobId before that are still
+  // read (with the old summary rule).
+  const descHash = jobDescription ? hashText(jobDescription) : '';
+  const cacheKey = descHash ? `${String(jobId)}:${descHash}` : '';
+  if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
     try {
+      const keys = [cacheKey, String(jobId)].filter(Boolean).map(k => `"${k.replace(/"/g, '')}"`).join(',');
       const checkRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/job_insights?job_id=eq.${encodeURIComponent(cacheKey)}&expires_at=gt.${new Date().toISOString()}&limit=1`,
+        `${SUPABASE_URL}/rest/v1/job_insights?job_id=in.(${encodeURIComponent(keys)})&expires_at=gt.${new Date().toISOString()}&limit=2`,
         { headers: dbHeaders }
       );
       if (checkRes.ok) {
         const rows = await checkRes.json();
         const list = Array.isArray(rows) ? rows : [];
-        const row = list.find(r => r.job_id === cacheKey) || null;
+        // The posting-keyed row is complete by construction; a legacy bare-id row only when it
+        // carries what the caller needs.
+        const row = list.find(r => cacheKey && r.job_id === cacheKey)
+          || list.find(r => r.job_id === String(jobId) && (!needsSummary || r.description_summary || r.description_summary === undefined))
+          || null;
         if (row) {
           // Prod's job_insights has no description_summary column until migration
           // 20261024140000 is applied; the summary is a deterministic excerpt of the posting the
@@ -114,7 +114,7 @@ export default async function handler(req, res) {
   // was a 400), so a 400 retries without it. ──────
   if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
     const row = {
-      job_id: cacheKey,
+      job_id: cacheKey || String(jobId),
       what_they_want: parsed.what_they_want || [],
       hidden_requirements: parsed.hidden_requirements || [],
       insider_tip: parsed.insider_tip || '',

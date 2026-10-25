@@ -20,8 +20,6 @@ import { VerdictCard, WhyYouMatch, MissingList, Checklist, PaidPlanView, type Ve
 
 // The optimizer's price, rendered from the credit rules — the same literal the server charges.
 const OPTIMIZE_PRICE = creditCostLabel(RESUME_OPTIMIZE_COST)
-// Fallback for the server's 422 no_requirements message (lib/server/optimizePackage.js unoptimizableListing).
-const NO_REQUIREMENTS_NOTE = "This listing doesn't list its requirements, so there's nothing to optimize against — no credit used."
 
 interface OptimizeBullet {
   original: string
@@ -82,7 +80,6 @@ type Step =
   | 'loading-resume'
   | 'checking'
   | 'needs-posting'
-  | 'no-requirements'
   | 'not-logged-in'
   | 'no-resume'
   | 'resume-corrupted'
@@ -221,9 +218,6 @@ export default function ApplyOptimizeModal({
   const [diag, setDiag] = useState<FreeDiagnosis | null>(null)
   const [posting, setPosting] = useState<string | null>(null)
   const [pasteDraft, setPasteDraft] = useState('')
-  // The posting states too few requirements to optimize against: the server refuses it free (422
-  // no_requirements) before any credit — this is its message.
-  const [noReqNote, setNoReqNote] = useState('')
 
   // Copy + download state. The PDF is pre-built in the BACKGROUND while the user reads
   // their results, so the Apply tap can download + redirect fully in-gesture (iOS blocks
@@ -284,10 +278,9 @@ export default function ApplyOptimizeModal({
         fetch('/api/resume', { method: 'POST', headers, body: JSON.stringify({ tool: 'optimize', probe: true, job: job.title, company: job.company, resume: text, ...postingBody(pasted) }) }),
         fetch('/api/optimizer', { method: 'POST', headers, body: JSON.stringify({ action: 'optimize', resumeText: text, jobTitle: job.title, company: job.company, ...postingBody(pasted), remoteOk: /remote/i.test(pasted || job.description || '') }) }),
       ])
-      const probe = await probeRes.json().catch(() => ({})) as OptimizeResult & { error?: string; message?: string }
+      const probe = await probeRes.json().catch(() => ({})) as OptimizeResult & { error?: string }
       const d = await diagRes.json().catch(() => ({})) as FreeDiagnosis & { error?: string }
       if (probe.error === 'preview_only' || d.error === 'preview_only') { setStep('needs-posting'); return }
-      if (probe.error === 'no_requirements') { setNoReqNote(probe.message || NO_REQUIREMENTS_NOTE); setStep('no-requirements'); return }
       if (probe.error === 'RESUME_CORRUPTED') { setStep('resume-corrupted'); return }
       if (probeRes.ok && probe.cached) { showResult(probe); return }
       setDiag(diagRes.ok && d.verdict ? d : null)
@@ -363,7 +356,7 @@ export default function ApplyOptimizeModal({
         }),
       })
       if (!r.ok) {
-        const e = await r.json().catch(() => ({})) as { error?: string; message?: string; credits_required?: boolean; pro_required?: boolean }
+        const e = await r.json().catch(() => ({})) as { error?: string; credits_required?: boolean; pro_required?: boolean }
         if (r.status === 402 || e.credits_required || e.pro_required) {
           setUpgradeReason('credits'); setUpgradeFeature(undefined)
           setShowUpgrade(true)
@@ -372,8 +365,6 @@ export default function ApplyOptimizeModal({
         }
         // A preview-only listing: nothing was charged — ask for the full posting.
         if (e.error === 'preview_only') { setStep('needs-posting'); return }
-        // Nothing to optimize against: refused before the credit gate — nothing was charged.
-        if (e.error === 'no_requirements') { setNoReqNote(e.message || NO_REQUIREMENTS_NOTE); setStep('no-requirements'); return }
         // Saved résumé couldn't be read (often a phone PDF that didn't convert to clean text).
         // Route to a clear recovery step instead of dead-ending on a raw error code.
         if (e.error === 'RESUME_CORRUPTED') { setStep('resume-corrupted'); return }
@@ -671,26 +662,6 @@ export default function ApplyOptimizeModal({
               <label style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.08em' }}>
                 Full job posting
                 <textarea autoComplete="off" data-testid="posting-paste" value={pasteDraft} onChange={e => setPasteDraft(e.target.value)} rows={7} placeholder="Paste the whole posting: duties, requirements, schedule…"
-                  style={{ display: 'block', width: '100%', marginTop: '.35rem', background: 'var(--surface)', border: '1.5px solid var(--line2)', borderRadius: 8, padding: '.65rem .8rem', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: '.8rem', lineHeight: 1.55, boxSizing: 'border-box', textTransform: 'none', letterSpacing: 0 }} />
-              </label>
-              <button style={{ ...btnPrimary, opacity: pasteDraft.trim().length < 200 ? 0.55 : 1 }} disabled={pasteDraft.trim().length < 200}
-                onClick={() => { const t = pasteDraft.trim(); setPosting(t); prepare(resumeText, t) }}>
-                Check this posting · free
-              </button>
-              <button style={btnGhost} onClick={applyWithoutOptimize}>Apply ↗ without optimizing · free</button>
-            </div>
-          )}
-
-          {/* ── no-requirements: the posting states too few requirements — refused free, no credit ── */}
-          {step === 'no-requirements' && (
-            <div className="ai-stack" data-testid="no-requirements">
-              <div style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.22)', borderRadius: 10, padding: '.8rem .95rem' }}>
-                <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '.88rem', marginBottom: '.3rem' }}>Nothing to optimize against</div>
-                <div style={{ fontSize: 'var(--fs-72)', color: 'var(--sub)', lineHeight: 1.6 }}>{noReqNote || NO_REQUIREMENTS_NOTE}</div>
-              </div>
-              <label style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.08em' }}>
-                Have the full posting with its requirements? Paste it
-                <textarea autoComplete="off" value={pasteDraft} onChange={e => setPasteDraft(e.target.value)} rows={6} placeholder="Paste the whole posting: duties, requirements, schedule…"
                   style={{ display: 'block', width: '100%', marginTop: '.35rem', background: 'var(--surface)', border: '1.5px solid var(--line2)', borderRadius: 8, padding: '.65rem .8rem', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: '.8rem', lineHeight: 1.55, boxSizing: 'border-box', textTransform: 'none', letterSpacing: 0 }} />
               </label>
               <button style={{ ...btnPrimary, opacity: pasteDraft.trim().length < 200 ? 0.55 : 1 }} disabled={pasteDraft.trim().length < 200}
