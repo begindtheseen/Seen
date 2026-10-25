@@ -1,26 +1,25 @@
 import type { Metadata } from 'next'
 import { pageMetadata } from '@/lib/seo'
 import Link from 'next/link'
-import { PRO_TRIAL_DAYS, ONE_TIME_SKUS, REPORT_REWARD_PRO_DAYS, REPORT_REWARD_MONTHLY_CAP_DAYS, REPORT_REWARD_MIN_TRACKED_DAYS, REFERRAL_REWARD_PRO_DAYS, REFERRAL_MAX_REWARDED, REFERRAL_CLAIM_WINDOW_DAYS } from '@/lib/server/creditRules.js'
+import { ONE_TIME_SKUS, REPORT_REWARD_PRO_DAYS, REPORT_REWARD_MONTHLY_CAP_DAYS, REPORT_REWARD_MIN_TRACKED_DAYS, REFERRAL_REWARD_PRO_DAYS, REFERRAL_MAX_REWARDED, REFERRAL_CLAIM_WINDOW_DAYS } from '@/lib/server/creditRules.js'
 import { EMPLOYER_SKUS } from '@/lib/server/employerSkus.js'
-import { proPriceLine } from '@/lib/pricing'
 import { LegalMeta, LegalFooter, LEGAL_CONTACT, LEGAL_OPERATOR, LEGAL_OPERATOR_SHORT, LEGAL_STATE } from '@/components/legal/LegalBits'
 
-// Terms of Service. Reviewed against the code 2026-10-24. Every price, trial length and credit grant
+// Terms of Service. Reviewed against the code 2026-10-24; purchases rewritten 2026-10-25 (one-time products only). Every price, trial length and credit grant
 // renders from the constants the server charges and fulfils with (lib/server/creditRules.js,
 // lib/server/employerSkus.js; lib/pricing.test.mjs fails on a hand-typed price). Facts behind the
-// clauses: no-card trial + auto-renew (api/stripe.js trial_period_days + payment_method_collection
-// 'if_required'); in-app cancel at period end (app/profile "Plan & billing" → cancel_subscription);
+// clauses: one-time products only since 2026-10-25 (api/stripe.js checkout refuses anything else); an earlier
+// subscription's auto-renew and in-app cancel at period end (app/profile "Plan & billing" → cancel_subscription);
 // account deletion cancels billing first (api/user-sync.js delete_account → lib/server/stripeCancel.js);
 // one-time fulfilment once (lib/server/stripeFulfillment.js); earned Pro (lib/server/growthRewards.js).
 
 export const metadata: Metadata = pageMetadata({
   title: 'Terms of Service',
   description:
-    'The terms for using Seen: eligibility, acceptable use, what the data is and is not, subscriptions, one-time purchases, employer products, refunds, liability, and how disputes are resolved.',
+    'The terms for using Seen: eligibility, acceptable use, what the data is and is not, one-time purchases, earlier subscriptions, employer products, refunds, liability, and how disputes are resolved.',
   path: '/terms',
   ogTitle: 'Terms of Service | Seen',
-  ogDescription: 'Eligibility, acceptable use, informational-data disclaimer, subscriptions, one-time purchases, employer products, refunds, liability and disputes.',
+  ogDescription: 'Eligibility, acceptable use, informational-data disclaimer, one-time purchases, earlier subscriptions, employer products, refunds, liability and disputes.',
 })
 
 const wrap = { maxWidth: 760, margin: '0 auto', padding: '4rem 2rem', width: '100%', boxSizing: 'border-box' as const }
@@ -37,6 +36,7 @@ const usd = (cents: number) => `$${(cents / 100).toFixed(2)}`
 
 export default function TermsPage() {
   const prep = ONE_TIME_SKUS.interview
+  const pass = ONE_TIME_SKUS.pass30
   const pack = ONE_TIME_SKUS.credits20
   const featured = EMPLOYER_SKUS.featured30
   const verified = EMPLOYER_SKUS.verified90
@@ -187,10 +187,12 @@ export default function TermsPage() {
         </div>
 
         <div style={section} id="billing">
-          <h2 style={h2}>9. Seen Pro subscriptions, renewal and cancellation</h2>
+          <h2 style={h2}>9. Seen Pro subscriptions started before October 25, 2026</h2>
           <p style={p}>
-            Seen Pro is a paid subscription billed through Stripe at {proPriceLine()}. It starts with a{' '}
-            {PRO_TRIAL_DAYS}-day free trial that needs no payment card.
+            Seen no longer starts subscriptions or free trials; what Seen sells now is described in section 10.
+            Until October 25, 2026, Seen Pro was a monthly or yearly subscription billed through Stripe that
+            started with a free trial that needs no payment card. If you have one, it keeps its terms below until
+            it ends.
           </p>
           <p style={quote}>
             <strong>Automatic renewal:</strong> if you add a payment method, your subscription renews
@@ -212,14 +214,18 @@ export default function TermsPage() {
         <div style={section} id="one-time">
           <h2 style={h2}>10. One-time purchases, credits and account deletion</h2>
           <p style={p}>
-            Two products are bought once and never renew. <strong>{prep.name}</strong> ({usd(prep.amount_cents)})
-            gives you {prep.pro_days} days of full Pro access, which includes building interview prep for any
-            application on your tracker that has reached an interview: likely questions for the role, answers built
-            from your résumé, an introduction and email templates. The questions are prepared by Seen for the role;
-            they are not a record of what any employer asks, and Seen does not promise any interview result. The{' '}
-            <strong>{pack.name}</strong> ({usd(pack.amount_cents)}) adds {pack.credits} AI credits. Each is
-            delivered once Stripe confirms the payment (on your return from checkout or by Stripe&apos;s notice to
-            us, whichever arrives first — never twice).
+            Seen sells two products. Each is bought once; neither is a subscription and neither renews.{' '}
+            <strong>{prep.name}</strong> ({usd(prep.amount_cents)}) is for one interview and gives you{' '}
+            {prep.pro_days} days of full Pro access, which includes building interview prep for any application on
+            your tracker that has reached an interview: likely questions for the role, answers built from your
+            résumé, an introduction and email templates. The <strong>{pass.name}</strong>{' '}
+            ({usd(pass.amount_cents)}) gives you {pass.pro_days} days of full Pro access, including that interview
+            prep for every interview in those days; bought while you still have Pro time, its days are added after
+            the time you have. The questions are prepared by Seen for the role; they are not a record of what any
+            employer asks, and Seen does not promise any interview or hiring result. Each purchase is delivered
+            once Stripe confirms the payment (on your return from checkout or by Stripe&apos;s notice to us,
+            whichever arrives first — never twice). The {pack.name} ({pack.credits} AI credits) is no longer sold;
+            credits bought before October 25, 2026 stay on your account.
           </p>
           <ul style={ul}>
             <li style={li}>purchased credits do not expire and are not reset by the daily free-credit reset; they are used after your free daily credit;</li>

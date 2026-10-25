@@ -77,7 +77,6 @@ export default function DashboardPage() {
   // The account's rows could not be read (API down / 500 / no session). The page then shows an error
   // block with Retry and whatever this device last synced — never "0 open · No applications" (R-1).
   const [loadFailed, setLoadFailed] = useState(false)
-  const [isPro, setIsPro] = useState(false)
   // A ghost surge for a tracked company, with the company's current grade when known (api/reports.js
   // ghost_surges). Worded with the base rate, or dropped when the grade is A / the ghost rate < 20%.
   type Surge = { name: string; ghosted_7d: number; gradeable?: boolean | null; overall_score?: number | null; ghost_rate?: number | null }
@@ -130,7 +129,6 @@ export default function DashboardPage() {
     setLoadFailed(!bundle)
     setLoading(false)
     if (!bundle) return
-    setIsPro(!!bundle.credits?.pro)
     setInbox(bundle.inbox)
     const local = localRecentCompanies()
     const seen = new Set(local.map(c => c.slug))
@@ -491,11 +489,9 @@ export default function DashboardPage() {
                 </button>
               )
             })}
-            {!isPro && (
-              <Link href="/pricing" className={styles.lock}>
-                <span>🔒 Unlimited AI credits and Human Voice rewrites</span><span className={styles.link}>Pro →</span>
-              </Link>
-            )}
+            {/* No paid ask here: this card lists ghosting and companies that went quiet, and a pitch next
+                to "you were ghosted" is the scam pattern seekers warn each other about (research
+                2026-10-25). The paid ask lives on the tracker card the day an interview arrives. */}
           </section>
         </div>
 

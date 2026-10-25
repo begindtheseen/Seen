@@ -14,6 +14,9 @@ const nextConfig: NextConfig = {
       // The employer nav and footer call the promote section "Pricing"; people type the obvious URL.
       // It was a 404 (audit 2026-10-24 E-2).
       { source: '/employers/pricing', destination: '/employers#promote', permanent: true },
+      // The 7-day no-card trial is retired (owner decision 2026-10-25): Seen sells one-time products
+      // only. An old trial link or confirmation email lands on the menu instead of a dead page.
+      { source: '/trial', destination: '/pricing', permanent: false },
     ]
   },
 }

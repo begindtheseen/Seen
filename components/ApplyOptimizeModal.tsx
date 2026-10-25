@@ -8,6 +8,7 @@ import { aiHeaders } from '@/lib/aiHeaders'
 import { ResumeStore } from '@/lib/stores/ResumeStore'
 import UpgradeModal from './UpgradeModal'
 import CreditConfirmDialog from './CreditConfirmDialog'
+import { LOCK_NOTE, PASS_AFTER_WIN } from '@/lib/pricing'
 import { RESUME_OPTIMIZE_COST, creditCostLabel, dailyResetLabel, priceLabel } from '@/lib/creditRules'
 import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
 import { trackApplyClick } from '@/lib/trackApply'
@@ -849,7 +850,7 @@ export default function ApplyOptimizeModal({
               {/* ONE verdict (score or none, band, one sentence; the hard gate first). */}
               {result.verdict && (
                 <VerdictCard verdict={result.verdict} cached={!!result.cached}
-                  note={hpState === 'done' && (hp?.package?.bullets?.length || 0) > 0 ? 'Human Voice applied to your rewritten bullets' : realBullets.length > 0 ? 'grounded in your real résumé — nothing invented' : 'no bullet of yours was rewritten for this job'} />
+                  note={hpState === 'done' && (hp?.package?.bullets?.length || 0) > 0 ? 'your rewritten bullets, checked for your own voice' : realBullets.length > 0 ? 'grounded in your real résumé — nothing invented' : 'no bullet of yours was rewritten for this job'} />
               )}
 
               {/* Why you match — from the matched requirements and their evidence (E7). */}
@@ -949,6 +950,7 @@ export default function ApplyOptimizeModal({
                     >
                       Unlock HumanProof
                     </button>
+                    <p style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--muted)', lineHeight: 1.6, margin: '.6rem 0 0' }}>{LOCK_NOTE}</p>
                   </div>
                 )}
 
@@ -999,7 +1001,7 @@ export default function ApplyOptimizeModal({
                     onClick={() => { setUpgradeReason('generic'); setUpgradeFeature(undefined); setShowUpgrade(true) }}
                     style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--body)', fontSize: '.66rem', color: 'var(--sub)', lineHeight: 1.5 }}
                   >
-                    {OPTIMIZE_PRICE} used{balance != null ? ` · ${balance} left` : ''} · {dailyResetLabel()} · <span style={{ color: '#a5b4fc', fontWeight: 700 }}>Pro removes the cap →</span>
+                    {OPTIMIZE_PRICE} used{balance != null ? ` · ${balance} left` : ''} · {dailyResetLabel()} · <span style={{ color: '#a5b4fc', fontWeight: 700 }}>{PASS_AFTER_WIN}</span>
                   </button>
                   <button
                     onClick={() => setUpsellDismissed(true)}

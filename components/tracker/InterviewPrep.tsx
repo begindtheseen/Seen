@@ -6,16 +6,28 @@
 // after interviewing at this company, the pay on its listings, when to follow up). The prep pack itself —
 // questions, answers built from the person's résumé, intro, emails — is $9.99 once (14 days of Pro), or
 // free for anyone who already has Pro. Server: api/interview-prep.js, lib/server/interviewPrep.js.
+//
+// The ask (owner decisions 2026-10-25 — Interview Prep is THE lead product): value before money. A
+// signed-in card shows a free PREVIEW first — 2 real questions for the role and 1 coached story from the
+// person's own résumé (action 'preview': deterministic, no model, no cost) — then "Get my prep — $9.99",
+// then the Job Search Pass as the alternative for someone interviewing at several places. Each step is
+// counted: offer_shown / offer_clicked (surface tracker_prep), prep_preview_shown (lib/funnel.ts).
+// This card only renders on ACTIVE applications at an interview stage — never on a rejected, ghosted or
+// withdrawn one (app/tracker/page.tsx).
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { aiHeaders } from '@/lib/aiHeaders'
-import { ONE_TIME_SKUS } from '@/lib/creditRules'
 import { signupHref } from '@/lib/signupIntent.js'
+import { PREP, PASS, PREP_PRICE, PASS_PRICE, ONE_TIME_NOTE } from '@/lib/pricing'
+import { useCheckout } from '@/lib/useCheckout'
+import { funnelEvent } from '@/lib/funnel'
 import s from './InterviewPrep.module.css'
 
-const SKU = ONE_TIME_SKUS.interview
-const PRICE = `$${(SKU.amount_cents / 100).toFixed(2)}`
+const SKU = PREP
+const PRICE = PREP_PRICE
+
+type Preview = { questions: { q: string; why: string }[]; answer: { q: string; answer: string; resume_fact: string } | null; has_resume: boolean }
 
 type Quote = { text: string; role: string | null; outcome: string; source: string | null; url: string | null }
 type InterviewRecord = {
@@ -52,10 +64,6 @@ function loadRecord(company: string, role: string, interviewAt: string) {
   return recordCache.get(key)!
 }
 
-function beacon(event: string, company: string) {
-  aiHeaders().then(h => fetch('/api/interview-prep', { method: 'POST', headers: h, body: JSON.stringify({ action: 'event', event, company }), keepalive: true })).catch(() => {})
-}
-
 // "1 got an offer, 2 were rejected" — zero counts left out, singular/plural right.
 function afterLine(a: InterviewRecord['after']): string {
   const parts: string[] = []
@@ -81,9 +89,11 @@ function CopyBtn({ text, label = 'Copy' }: { text: string; label?: string }) {
   )
 }
 
-export default function InterviewPrep({ appId, company, role, interviewAt, isPro, autoBuild, jobId, stage, onSchedule, guest = false }: {
+export default function InterviewPrep({ appId, company, role, interviewAt, isPro, autoBuild, jobId, stage, onSchedule, guest = false, lead = false }: {
   /** A guest on this device: the free record and date work; the prep needs a free account first. */
   guest?: boolean
+  /** The card reached an interview a moment ago: open, scrolled into view, the offer leads. */
+  lead?: boolean
   appId: string
   company: string
   role: string
@@ -101,7 +111,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
   const [data, setData] = useState<{ record: InterviewRecord; pay: Pay | null; follow_up: FollowUp } | null>(null)
   const [open, setOpen] = useState(true)
   const [pack, setPack] = useState<Pack | null>(null)
-  const [state, setState] = useState<'idle' | 'building' | 'buying' | 'need_resume' | 'error'>('idle')
+  const [state, setState] = useState<'idle' | 'building' | 'need_resume' | 'error'>('idle')
   const [err, setErr] = useState('')
   const shown = useRef(false)
   const built = useRef(false)
@@ -129,14 +139,43 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
     return () => { live = false }
   }, [company, role, guest])
 
-  // Count the offer once per card per browser session (the funnel's "offer shown" step).
+  // The free preview: 2 role questions + 1 coached story from the résumé (no model, no cost). Signed in,
+  // no pack yet, not Pro (a Pro card builds the real thing in one tap).
+  const [preview, setPreview] = useState<Preview | null>(null)
   useEffect(() => {
-    if (shown.current || isPro) return
+    let live = true
+    if (guest || isPro || pack) return () => { live = false }
+    aiHeaders().then(h => {
+      if (!h.Authorization) return null
+      return fetch('/api/interview-prep', { method: 'POST', headers: h, body: JSON.stringify({ action: 'preview', company, role, stage }) }).then(r => (r.ok ? r.json() : null))
+    }).then((d: (Preview & { ok?: boolean }) | null) => {
+      if (!live || !d?.ok) return
+      setPreview({ questions: d.questions || [], answer: d.answer || null, has_resume: !!d.has_resume })
+      if (typeof d.has_resume === 'boolean') setHasResume(h => (h == null ? d.has_resume : h))
+    }).catch(() => {})
+    return () => { live = false }
+  }, [company, role, stage, guest, isPro, pack])
+
+  // Count the offer once per card per browser session (the funnel's "offer shown" step), and the preview.
+  useEffect(() => {
+    if (shown.current || isPro || pack) return
     shown.current = true
-    const k = `seen_prep_shown_${appId}`
-    try { if (sessionStorage.getItem(k)) return; sessionStorage.setItem(k, '1') } catch { /* private mode */ }
-    beacon('prep_offer_shown', company)
-  }, [appId, company, isPro])
+    funnelEvent('offer_shown', { surface: 'tracker_prep', sku: 'interview', company, once: appId })
+  }, [appId, company, isPro, pack])
+  useEffect(() => {
+    if (preview && preview.questions.length) funnelEvent('prep_preview_shown', { surface: 'tracker_prep', company, once: appId })
+  }, [preview, appId, company])
+
+  // Reached an interview a moment ago: open and bring the prep into view (the moment the offer is for).
+  const boxRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    if (!lead) return
+    setOpen(true)
+    const t = setTimeout(() => boxRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 450)
+    return () => clearTimeout(t)
+  }, [lead])
+
+  const checkout = useCheckout('tracker_prep', { isLoggedIn: !guest, guestHref: () => signupHref({ intent: 'prep', company, next: '/tracker' }) })
 
   async function build() {
     setState('building'); setErr('')
@@ -158,19 +197,8 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoBuild, isPro])
 
-  async function buy() {
-    setState('buying'); setErr('')
-    beacon('prep_offer_clicked', company)
-    try {
-      const h = await aiHeaders()
-      const r = await fetch('/api/stripe?action=checkout', { method: 'POST', headers: h, body: JSON.stringify({ sku: 'interview', application_id: appId, company, role }) })
-      const d = await r.json().catch(() => ({}))
-      if (d.url) { window.location.href = d.url; return }
-      setState('error'); setErr(d.error || 'Checkout is unavailable right now — try again.')
-    } catch {
-      setState('error'); setErr('Network error — check your connection and try again.')
-    }
-  }
+  // Both products come back to THIS card with the prep building (api/stripe.js success_url ?prep=<id>).
+  const buy = (sku: 'interview' | 'pass30') => { setErr(''); void checkout.start(sku, { application_id: appId, company, role }) }
 
   const rec = data?.record
   // Dated advice only for a dated interview (round 2: "send a thank-you by Mon" before a Thursday screen).
@@ -188,7 +216,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
     : { q: `What do you know about ${company}?`, why: 'Name what they sell, who their customers are, and one recent thing you read about them.' }
 
   return (
-    <section className={s.box} onClick={e => e.stopPropagation()} aria-label={`Interview prep for ${company}`}>
+    <section ref={boxRef} className={`${s.box}${lead ? ` ${s.lead}` : ''}`} onClick={e => e.stopPropagation()} aria-label={`Interview prep for ${company}`} data-testid="interview-prep">
       <button type="button" className={s.head} aria-expanded={open} onClick={() => setOpen(!open)}>
         <span className={s.kicker}>🎯 Interview at {company}</span>
         <span className={s.toggle}>{open ? 'Hide' : 'Show'}</span>
@@ -196,6 +224,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
 
       {open && (
         <>
+          {lead && !pack && <p className={s.leadLine} data-testid="prep-lead">They called you in. Here is what Seen knows about {company}&apos;s interviews, and a first look at your prep.</p>}
           {/* FREE — Seen's own data, for everyone */}
           <div className={s.facts}>
             {rec && rec.accounts > 0 ? (
@@ -238,11 +267,28 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
           ) : (
             <div className={s.offer}>
               <div className={s.offerTitle}>Walk in ready for {company}</div>
-              <div className={s.sample}>
-                <div className={s.label}>A question from your prep</div>
-                <b>{sample.q}</b>
-                <span className={s.why}>{sample.why}</span>
-              </div>
+              {preview && preview.questions.length > 0 ? (
+                <div className={s.sample} data-testid="prep-preview">
+                  <div className={s.label}>Free preview of your prep</div>
+                  {preview.questions.map((q, i) => (
+                    <div key={i} className={s.previewQ}><b>{q.q}</b><span className={s.why}>{q.why}</span></div>
+                  ))}
+                  {preview.answer && (
+                    <div className={s.previewA}>
+                      <div className={s.label}>A story from your résumé</div>
+                      <b>{preview.answer.q}</b>
+                      <span className={s.prose}>{preview.answer.answer}</span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className={s.sample}>
+                  <div className={s.label}>A question from your prep</div>
+                  <b>{sample.q}</b>
+                  <span className={s.why}>{sample.why}</span>
+                </div>
+              )}
+              <div className={s.label} style={{ marginTop: '.2rem' }}>The full prep</div>
               <ul className={s.list}>
                 <li>Likely questions for {role ? `${article(role)} ${role}` : 'this role'}, and what each one checks</li>
                 <li>Answers built from <b>your</b> résumé — no invented jobs or numbers</li>
@@ -257,7 +303,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
               )}
               {guest ? (
                 <>
-                  <Link href={signupHref({ next: '/tracker' })} className={s.cta} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>Make a free account to get your prep →</Link>
+                  <Link href={signupHref({ intent: 'prep', company, next: '/tracker' })} onClick={() => funnelEvent('offer_clicked', { surface: 'tracker_prep', sku: 'interview', company })} className={s.cta} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>Make a free account to get your prep →</Link>
                   <p className={s.fine}>Free. Your tracker comes with you. The prep itself is {PRICE} once.</p>
                 </>
               ) : state === 'need_resume' || hasResume === false ? (
@@ -268,13 +314,20 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
                 </button>
               ) : (
                 <>
-                  <button type="button" className={s.cta} disabled={state === 'buying'} onClick={buy}>
-                    {state === 'buying' ? 'Opening checkout…' : `Get my prep — ${PRICE}`}
+                  <button type="button" className={s.cta} disabled={checkout.busy !== null} onClick={() => buy('interview')} data-testid="prep-buy">
+                    {checkout.busy === 'interview' ? 'Opening checkout…' : `Get my prep — ${PRICE}`}
                   </button>
-                  <p className={s.fine}>One-time, never renews. Includes {SKU.pro_days} days of Seen Pro.</p>
+                  <p className={s.fine}>{ONE_TIME_NOTE}. Includes {SKU.pro_days} days of Seen Pro.</p>
+                  <div className={s.passAlt} data-testid="prep-pass-alt">
+                    <span>Interviewing at more than one place? The <b>{PASS.name}</b> ({PASS_PRICE}) covers every interview for {PASS.pro_days} days.</span>
+                    <button type="button" className={s.passBtn} disabled={checkout.busy !== null} onClick={() => buy('pass30')}>
+                      {checkout.busy === 'pass30' ? 'Opening checkout…' : `Get the pass — ${PASS_PRICE}`}
+                    </button>
+                    <span className={s.fine} style={{ margin: 0 }}>{ONE_TIME_NOTE}</span>
+                  </div>
                 </>
               )}
-              {err && <p className={s.err} role="alert">{err}</p>}
+              {(err || checkout.error) && <p className={s.err} role="alert">{err || checkout.error}</p>}
             </div>
           )}
         </>

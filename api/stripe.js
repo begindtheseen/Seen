@@ -1,9 +1,13 @@
 // Stripe payment handler — checkout session creation, webhook processing, customer portal.
-// Env vars required: STRIPE_SECRET_KEY, STRIPE_PRICE_ID_MONTHLY, STRIPE_PRICE_ID_YEARLY,
-//                   STRIPE_WEBHOOK_SECRET, SUPABASE_URL, SUPABASE_SERVICE_KEY, SUPABASE_JWT_SECRET
+// Env vars required: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, SUPABASE_URL, SUPABASE_SERVICE_KEY,
+//                   SUPABASE_JWT_SECRET. Prices are inline (lib/server/creditRules.js ONE_TIME_SKUS).
+// Seen sells one-time products only (Interview Prep, the Job Search Pass). The subscription paths below
+// (confirm of a subscription session, status/cancel/resume, portal, reconcile, webhooks) stay so a Seen
+// Pro subscription or trial started before 2026-10-25 keeps working until it ends.
 
 import { createHmac, timingSafeEqual } from 'crypto';
-import { ONE_TIME_SKUS, PRO_TRIAL_DAYS, firstCreditsRow } from '../lib/server/creditRules.js';
+import { ONE_TIME_SKUS, SELLABLE_SKUS, firstCreditsRow } from '../lib/server/creditRules.js';
+import { funnelRow, recordFunnelEvent, OFFER_SURFACES } from '../lib/server/funnelEvents.js';
 import { internalPath } from '../lib/safeHref.js';
 import { fulfillOneTimeCheckout } from '../lib/server/stripeFulfillment.js';
 import { EMPLOYER_SKUS } from '../lib/server/employerSkus.js';
@@ -422,16 +426,17 @@ export default async function handler(req, res) {
     const { uid, email } = await resolveUid(req, env);
     if (!uid) return res.status(401).json({ error: 'Sign in before upgrading' });
 
-    // One-time SKUs: 'interview' (Interview Prep, owner decision 2026-10-25) and 'credits20'. Any other
-    // non-empty sku is a client bug — reject rather than silently selling a subscription.
-    if (body.sku && !ONE_TIME_SKUS[body.sku]) return res.status(400).json({ error: 'Unknown product' });
-    const sku = body.sku && ONE_TIME_SKUS[body.sku] ? body.sku : null;
-
-    const plan = body.plan === 'yearly' ? 'yearly' : 'monthly';
-    // Use a pre-made Stripe price ID if one is configured; otherwise create the price
-    // INLINE so no Products/prices setup is needed in the Stripe dashboard — the secret
-    // key alone is enough to take subscriptions.
-    const priceId = plan === 'yearly' ? process.env.STRIPE_PRICE_ID_YEARLY : process.env.STRIPE_PRICE_ID_MONTHLY;
+    // Seen sells two one-time products (owner decisions 2026-10-25): Interview Prep and the 30-day Job
+    // Search Pass (SELLABLE_SKUS). Subscriptions, the no-card trial and the Credit Pack are no longer
+    // sold: a request without a sellable sku (an old page asking for {plan}) is refused with a plain
+    // answer — it is never turned into a subscription. Existing subscriptions keep every other path here.
+    const sku = SELLABLE_SKUS.includes(body.sku) ? body.sku : null;
+    if (!sku) {
+      return res.status(400).json(body.sku
+        ? { error: 'Unknown product' }
+        : { error: 'Seen no longer sells subscriptions. The Job Search Pass is one payment and never renews — see /pricing.', retired: 'subscription' });
+    }
+    const surface = OFFER_SURFACES.includes(body.surface) ? body.surface : null;
 
     const origin = req.headers.origin || 'https://seenjobs.io';
 
@@ -451,60 +456,39 @@ export default async function handler(req, res) {
       allow_promotion_codes: 'true',
     });
 
-    if (sku) {
-      // ── ONE-TIME PURCHASE (mode: 'payment', inline price_data) ────────────────
-      // Fulfilled by the webhook AND the return-page confirm (shared idempotency claim
-      // on the session id) — see lib/server/stripeFulfillment.js.
-      const def = ONE_TIME_SKUS[sku];
-      form.set('mode', 'payment');
-      // Include the session id + sku so the return page can confirm-fulfill and show
-      // purchase-specific copy without a webhook.
-      form.set('success_url', `${origin}/pricing?upgraded=1&purchase=${sku}&session_id={CHECKOUT_SESSION_ID}`);
-      form.set('metadata[user_id]', uid);
-      form.set('metadata[sku]', sku);
-      form.set('line_items[0][price_data][currency]', 'usd');
-      form.set('line_items[0][price_data][unit_amount]', String(def.amount_cents));
-      form.set('line_items[0][price_data][product_data][name]', `Seen ${def.name}`);
-      if (sku === 'interview') {
-        // Bought from a tracker card: come back to THAT card with the prep open. The application id
-        // is the tracker's own id (client-made), so only id characters are kept.
-        const appId = String(body.application_id || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
-        const company = String(body.company || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 100);
-        const role = String(body.role || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 100);
-        const back = `${origin}/tracker${appId ? `?prep=${encodeURIComponent(appId)}` : ''}`;
-        form.set('success_url', `${back}${appId ? '&' : '?'}purchase=interview&session_id={CHECKOUT_SESSION_ID}`);
-        form.set('cancel_url', back);
-        if (appId) form.set('metadata[application_id]', appId);
-        if (company) {
-          form.set('metadata[company]', company);
-          form.set('line_items[0][price_data][product_data][name]', `Seen ${def.name} — ${company}`);
-        }
-        if (role) form.set('metadata[role]', role);
-        form.set('line_items[0][price_data][product_data][description]', `Prep for your ${company || ''} interview, plus ${def.pro_days} days of Seen Pro. One-time, never renews.`.replace(/\s+/g, ' '));
-      }
-    } else {
-      // ── SUBSCRIPTION with a 7-day NO-CARD trial (owner-approved 2026-07-04) ───
-      form.set('mode', 'subscription');
-      // Include the session id so the return page can confirm + grant Pro without a webhook.
-      form.set('success_url', `${origin}/pricing?upgraded=1&session_id={CHECKOUT_SESSION_ID}`);
-      form.set('subscription_data[metadata][uid]', uid);
-      if (priceId) {
-        form.set('line_items[0][price]', priceId);
-      } else {
-        // Inline price — Seen Pro $9.99/mo or $83.88/yr. No dashboard product needed.
-        const amount = plan === 'yearly' ? '8388' : '999';
-        const interval = plan === 'yearly' ? 'year' : 'month';
-        form.set('line_items[0][price_data][currency]', 'usd');
-        form.set('line_items[0][price_data][unit_amount]', amount);
-        form.set('line_items[0][price_data][recurring][interval]', interval);
-        form.set('line_items[0][price_data][product_data][name]', 'Seen Pro');
-      }
-      // 7-day free trial, no card required: if no payment method is on file when the
-      // trial ends, the subscription simply CANCELS (nobody is charged without a card);
-      // if one was added, it renews at the plan price. Webhook keeps `pro` in lockstep.
-      form.set('subscription_data[trial_period_days]', String(PRO_TRIAL_DAYS));
-      form.set('subscription_data[trial_settings][end_behavior][missing_payment_method]', 'cancel');
-      form.set('payment_method_collection', 'if_required');
+    // ── ONE-TIME PURCHASE (mode: 'payment', inline price_data) ────────────────
+    // Fulfilled by the webhook AND the return-page confirm (shared idempotency claim on the session
+    // id) — see lib/server/stripeFulfillment.js. Neither product renews.
+    const def = ONE_TIME_SKUS[sku];
+    form.set('mode', 'payment');
+    // Include the session id + sku so the return page can confirm-fulfill and show
+    // purchase-specific copy without a webhook.
+    form.set('success_url', `${origin}/pricing?upgraded=1&purchase=${sku}&session_id={CHECKOUT_SESSION_ID}`);
+    form.set('metadata[user_id]', uid);
+    form.set('metadata[sku]', sku);
+    if (surface) form.set('metadata[surface]', surface);
+    form.set('line_items[0][price_data][currency]', 'usd');
+    form.set('line_items[0][price_data][unit_amount]', String(def.amount_cents));
+    form.set('line_items[0][price_data][product_data][name]', `Seen ${def.name}`);
+    // Bought from a tracker card (the prep offer, or the pass offered under it): come back to THAT card
+    // with the prep open. The application id is the tracker's own id (client-made), so only id
+    // characters are kept.
+    const appId = String(body.application_id || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
+    const company = String(body.company || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 100);
+    const role = String(body.role || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 100);
+    if (sku === 'interview' || appId) {
+      const back = `${origin}/tracker${appId ? `?prep=${encodeURIComponent(appId)}` : ''}`;
+      form.set('success_url', `${back}${appId ? '&' : '?'}purchase=${sku}&session_id={CHECKOUT_SESSION_ID}`);
+      form.set('cancel_url', back);
+      if (appId) form.set('metadata[application_id]', appId);
+      if (company) form.set('metadata[company]', company);
+      if (role) form.set('metadata[role]', role);
+    }
+    if (sku === 'interview') {
+      if (company) form.set('line_items[0][price_data][product_data][name]', `Seen ${def.name} — ${company}`);
+      form.set('line_items[0][price_data][product_data][description]', `Prep for your ${company || ''} interview, plus ${def.pro_days} days of Seen Pro. One-time, never renews.`.replace(/\s+/g, ' '));
+    } else if (sku === 'pass30') {
+      form.set('line_items[0][price_data][product_data][description]', `${def.pro_days} days of everything in Seen Pro. One-time — never renews.`);
     }
     if (existingCustomer) form.set('customer', existingCustomer);
     else if (email) form.set('customer_email', email);
@@ -521,6 +505,7 @@ export default async function handler(req, res) {
     }
 
     const session = await stripeRes.json();
+    await recordFunnelEvent(db(SUPABASE_URL, SERVICE_KEY), funnelRow({ event: 'checkout_started', user_id: uid, sku, surface, company: company || null }));
     return res.status(200).json({ url: session.url });
   }
 

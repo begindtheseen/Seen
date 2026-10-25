@@ -1,7 +1,7 @@
 // Contract tests for Operation 50% monetization (7-day no-card trial + one-time SKUs).
 // The api/stripe.js handler is exercised end-to-end with mocked Stripe + Supabase REST
 // layers so the REAL contracts are asserted:
-//   - checkout (subscription): trial_period_days=7, no-card trial settings
+//   - checkout: only the sellable one-time SKUs (interview, pass30); an old {plan} request is refused
 //   - checkout (sku): mode=payment, inline price_data, metadata.sku + metadata.user_id
 //   - webhook checkout.session.completed (sku): idempotent fulfillment into
 //     purchased_credits + pro_until (NEVER the permanent pro flag)
@@ -90,23 +90,62 @@ const auth = () => ({ authorization: `Bearer ${makeJWT()}` });
 
 // ── CHECKOUT: subscription gets the 7-day NO-CARD trial ─────────────────────────────────
 
-test('checkout (subscription) sends trial_period_days=7 + no-card trial settings', async () => {
+// Owner decision 2026-10-25: the 30-day Job Search Pass replaced monthly/yearly Pro and the trial.
+test('checkout without a sku (an old {plan} request) is refused — no subscription, no trial, no Stripe call', async () => {
+  for (const body of [{ plan: 'monthly' }, { plan: 'yearly' }, {}]) {
+    const calls = installFetch([[c => c.url.includes('/ai_credits?'), () => mockResponse([])]]);
+    const res = await call({ action: 'checkout', body, headers: auth() });
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.jsonBody.retired, 'subscription');
+    assert.match(res.jsonBody.error, /no longer sells subscriptions/);
+    assert.equal(calls.some(c => c.url.includes('api.stripe.com')), false, 'Stripe is never asked for a session');
+  }
+});
+
+test('checkout (sku=pass30) is $19.99 once, never renews, and records checkout_started with its surface', async () => {
   const calls = installFetch([
-    [c => c.url.includes('api.stripe.com/v1/checkout/sessions'), () => mockResponse({ id: 'cs_1', url: 'https://stripe/redirect' })],
+    [c => c.url.includes('/v1/checkout/sessions'), () => mockResponse({ id: 'cs_p', url: 'https://stripe/pass' })],
     [c => c.url.includes('/ai_credits?'), () => mockResponse([])],
   ]);
-  const res = await call({ action: 'checkout', body: { plan: 'monthly' }, headers: auth() });
+  const res = await call({ action: 'checkout', body: { sku: 'pass30', surface: 'pricing' }, headers: auth() });
   assert.equal(res.statusCode, 200);
-  assert.equal(res.jsonBody.url, 'https://stripe/redirect');
+  assert.equal(res.jsonBody.url, 'https://stripe/pass');
+  const form = new URLSearchParams(calls.find(c => c.url.includes('/v1/checkout/sessions')).body);
+  assert.equal(form.get('mode'), 'payment');
+  assert.equal(form.get('line_items[0][price_data][unit_amount]'), '1999');
+  assert.equal(form.get('line_items[0][price_data][product_data][name]'), 'Seen Job Search Pass');
+  assert.equal(form.get('line_items[0][price_data][product_data][description]'), '30 days of everything in Seen Pro. One-time — never renews.');
+  assert.equal(form.get('line_items[0][price_data][recurring][interval]'), null);
+  assert.equal(form.get('subscription_data[trial_period_days]'), null);
+  assert.equal(form.get('metadata[sku]'), 'pass30');
+  assert.equal(form.get('metadata[surface]'), 'pricing');
+  assert.match(form.get('success_url'), /^https:\/\/seenjobs\.io\/pricing\?upgraded=1&purchase=pass30&session_id=\{CHECKOUT_SESSION_ID\}$/);
+  const ev = calls.find(c => c.url.includes('/rest/v1/funnel_events') && c.method === 'POST');
+  assert.ok(ev, 'a checkout_started funnel row');
+  assert.deepEqual(JSON.parse(ev.body), { user_id: UID, event: 'checkout_started', company: null, surface: 'pricing', sku: 'pass30' });
+});
 
-  const stripeCall = calls.find(c => c.url.includes('/v1/checkout/sessions'));
-  const form = new URLSearchParams(stripeCall.body);
-  assert.equal(form.get('mode'), 'subscription');
-  assert.equal(form.get('subscription_data[trial_period_days]'), '7');
-  assert.equal(form.get('subscription_data[trial_settings][end_behavior][missing_payment_method]'), 'cancel');
-  assert.equal(form.get('payment_method_collection'), 'if_required');
-  assert.equal(form.get('metadata[uid]'), UID);
-  assert.equal(form.get('line_items[0][price_data][unit_amount]'), '999');
+test('checkout (sku=pass30) from a tracker card returns to that card', async () => {
+  const calls = installFetch([
+    [c => c.url.includes('/v1/checkout/sessions'), () => mockResponse({ id: 'cs_q', url: 'https://stripe/pass' })],
+    [c => c.url.includes('/ai_credits?'), () => mockResponse([])],
+  ]);
+  await call({ action: 'checkout', body: { sku: 'pass30', surface: 'tracker_prep', application_id: 'app_9', company: 'Walmart', role: 'Cashier' }, headers: auth() });
+  const form = new URLSearchParams(calls.find(c => c.url.includes('/v1/checkout/sessions')).body);
+  assert.equal(form.get('success_url'), 'https://seenjobs.io/tracker?prep=app_9&purchase=pass30&session_id={CHECKOUT_SESSION_ID}');
+  assert.equal(form.get('cancel_url'), 'https://seenjobs.io/tracker?prep=app_9');
+  assert.equal(form.get('metadata[company]'), 'Walmart');
+  assert.equal(form.get('line_items[0][price_data][product_data][name]'), 'Seen Job Search Pass', 'the pass is not named after one company');
+});
+
+test('checkout ignores an unknown surface instead of storing it', async () => {
+  const calls = installFetch([
+    [c => c.url.includes('/v1/checkout/sessions'), () => mockResponse({ id: 'cs_r', url: 'https://stripe/x' })],
+    [c => c.url.includes('/ai_credits?'), () => mockResponse([])],
+  ]);
+  await call({ action: 'checkout', body: { sku: 'interview', surface: '<script>' }, headers: auth() });
+  const form = new URLSearchParams(calls.find(c => c.url.includes('/v1/checkout/sessions')).body);
+  assert.equal(form.get('metadata[surface]'), null);
 });
 
 // ── CHECKOUT: one-time SKUs (mode: payment, inline price_data) ──────────────────────────
@@ -134,15 +173,11 @@ test('checkout (sku=interview) is $9.99, carries the card, and returns to that t
   assert.equal(form.get('subscription_data[trial_period_days]'), null);
 });
 
-test('checkout (sku=credits20) charges $4.99', async () => {
-  const calls = installFetch([
-    [c => c.url.includes('/v1/checkout/sessions'), () => mockResponse({ id: 'cs_3', url: 'https://stripe/pay' })],
-    [c => c.url.includes('/ai_credits?'), () => mockResponse([])],
-  ]);
-  await call({ action: 'checkout', body: { sku: 'credits20' }, headers: auth() });
-  const form = new URLSearchParams(calls.find(c => c.url.includes('/v1/checkout/sessions')).body);
-  assert.equal(form.get('mode'), 'payment');
-  assert.equal(form.get('line_items[0][price_data][unit_amount]'), '499');
+test('checkout (sku=credits20) is refused — the Credit Pack is no longer sold', async () => {
+  const calls = installFetch([[c => c.url.includes('/ai_credits?'), () => mockResponse([])]]);
+  const res = await call({ action: 'checkout', body: { sku: 'credits20' }, headers: auth() });
+  assert.equal(res.statusCode, 400);
+  assert.equal(calls.some(c => c.url.includes('api.stripe.com')), false);
 });
 
 test('checkout rejects an unknown sku instead of silently selling a subscription', async () => {
@@ -187,6 +222,82 @@ test('webhook fulfills interview: pro_until ~14d, no credits, NOT the pro flag',
   const ledger = calls.find(c => c.url.includes('/credit_transactions') && c.method === 'POST' && String(c.body).includes('purchase_interview'));
   assert.ok(ledger, 'writes a purchase ledger row (the funnel counts purchases from it)');
   assert.equal(JSON.parse(ledger.body).delta, 0);
+});
+
+// ── Job Search Pass fulfilment: the 30 days paid for come AFTER any Pro time already left ──────
+function proRowFetch(row, extra = []) {
+  return installFetch([
+    ...extra,
+    [c => c.url.includes('/stripe_events_processed') && c.method === 'POST', () => mockResponse(null, { status: 201 })],
+    [c => c.url.includes('/ai_credits?user_id=eq') && c.method === 'GET', () => mockResponse([row])],
+  ]);
+}
+const passEvent = (o = {}) => {
+  const e = skuEvent({ sku: 'pass30', id: o.id || 'evt_pass', sessionId: o.sessionId || 'cs_pass' });
+  e.data.object.metadata.surface = 'tracker_prep';
+  e.data.object.metadata.company = 'Walmart';
+  return e;
+};
+
+test('webhook fulfills pass30: 30 days added after the Pro time already left; no pro flag; ledger + checkout_completed', async () => {
+  const existing = new Date(Date.now() + 10 * 86400e3).toISOString();
+  const calls = proRowFetch({ user_id: UID, balance: 1, purchased_credits: 2, daily_earned: 0, pro: false, pro_until: existing, stripe_customer_id: 'cus_9' });
+  const raw = JSON.stringify(passEvent());
+  const res = await call({ action: 'webhook', body: raw, headers: { 'stripe-signature': signWebhook(raw) } });
+  assert.equal(res.statusCode, 200);
+  const patch = calls.find(c => c.url.includes(`/ai_credits?user_id=eq.${UID}`) && c.method === 'PATCH');
+  assert.ok(patch, 'grants via an ai_credits PATCH');
+  assert.ok(patch.url.includes(`pro_until=eq.${encodeURIComponent(existing)}`), 'compare-and-set on the pro_until it read');
+  const patched = JSON.parse(patch.body);
+  assert.equal(patched.pro, undefined, 'a one-time purchase never sets the permanent pro flag');
+  assert.equal(patched.purchased_credits, 2, 'the pass adds no credits');
+  assert.equal(Date.parse(patched.pro_until), Date.parse(existing) + 30 * 86400e3, 'GREATEST(pro_until, now) + 30 days');
+  const ledger = calls.find(c => c.url.includes('/credit_transactions') && c.method === 'POST');
+  assert.equal(JSON.parse(ledger.body).reason, 'purchase_pass30');
+  const done = calls.filter(c => c.url.includes('/funnel_events') && c.method === 'POST').map(c => JSON.parse(c.body));
+  assert.deepEqual(done, [{ user_id: UID, event: 'checkout_completed', company: 'Walmart', surface: 'tracker_prep', sku: 'pass30' }]);
+});
+
+test('webhook fulfills pass30 with no Pro time left: now + 30 days', async () => {
+  const calls = proRowFetch({ user_id: UID, balance: 1, purchased_credits: 0, pro: false, pro_until: new Date(Date.now() - 86400e3).toISOString() });
+  const raw = JSON.stringify(passEvent({ id: 'evt_pass2', sessionId: 'cs_pass2' }));
+  await call({ action: 'webhook', body: raw, headers: { 'stripe-signature': signWebhook(raw) } });
+  const until = Date.parse(JSON.parse(calls.find(c => c.url.includes('/ai_credits?user_id=eq') && c.method === 'PATCH').body).pro_until);
+  assert.ok(until > Date.now() + 29.9 * 86400e3 && until < Date.now() + 30.1 * 86400e3);
+});
+
+test('pass30 is fulfilled once: the webhook after the return-page confirm grants nothing', async () => {
+  const calls = installFetch([
+    [c => c.url.includes('/stripe_events_processed') && c.method === 'POST' && String(c.body).includes('fulfill_'), () => mockResponse(null, { ok: false, status: 409 })],
+    [c => c.url.includes('/stripe_events_processed') && c.method === 'POST', () => mockResponse(null, { status: 201 })],
+  ]);
+  const raw = JSON.stringify(passEvent({ id: 'evt_pass3', sessionId: 'cs_pass3' }));
+  const res = await call({ action: 'webhook', body: raw, headers: { 'stripe-signature': signWebhook(raw) } });
+  assert.equal(res.statusCode, 200);
+  assert.equal(calls.some(c => c.url.includes('/ai_credits') && c.method !== 'GET'), false, 'no second grant');
+  assert.equal(calls.some(c => c.url.includes('/funnel_events')), false, 'no second checkout_completed');
+});
+
+test('confirm fulfills a paid pass30 session on the return page', async () => {
+  const calls = installFetch([
+    [c => c.url.includes('/v1/checkout/sessions/'), () => mockResponse({ id: 'cs_pr', mode: 'payment', payment_status: 'paid', status: 'complete', customer: 'cus_9', metadata: { uid: UID, user_id: UID, sku: 'pass30' } })],
+    [c => c.url.includes('/stripe_events_processed') && c.method === 'POST', () => mockResponse(null, { status: 201 })],
+    [c => c.url.includes('/ai_credits?user_id=eq') && c.method === 'GET', () => mockResponse([{ user_id: UID, balance: 0, purchased_credits: 0, pro_until: null }])],
+  ]);
+  const res = await call({ action: 'confirm', body: { session_id: 'cs_pr' }, headers: auth() });
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual([res.jsonBody.ok, res.jsonBody.sku], [true, 'pass30']);
+  const patch = calls.find(c => c.url.includes('/ai_credits?user_id=eq') && c.method === 'PATCH');
+  assert.ok(patch.url.includes('pro_until=is.null'));
+});
+
+test('interview keeps migration 044: GREATEST(pro_until, now + 14) — a second prep never stacks', async () => {
+  const existing = new Date(Date.now() + 10 * 86400e3).toISOString();
+  const calls = proRowFetch({ user_id: UID, balance: 1, purchased_credits: 0, pro: false, pro_until: existing });
+  const raw = JSON.stringify(skuEvent({ sku: 'interview', id: 'evt_int2', sessionId: 'cs_int2' }));
+  await call({ action: 'webhook', body: raw, headers: { 'stripe-signature': signWebhook(raw) } });
+  const until = Date.parse(JSON.parse(calls.find(c => c.url.includes('/ai_credits?user_id=eq') && c.method === 'PATCH').body).pro_until);
+  assert.ok(until > Date.now() + 13.9 * 86400e3 && until < Date.now() + 14.1 * 86400e3);
 });
 
 test('webhook fulfills credits20 for a user with NO credit row: welcome + 20 purchased, no pro_until', async () => {

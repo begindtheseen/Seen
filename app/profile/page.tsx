@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import { _sync } from '@/lib/sync'
 import { markIntentionalSignOut } from '@/lib/sessionExpired'
-import { proPriceLine } from '@/lib/pricing'
+import { offerLine } from '@/lib/pricing'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { ResumeStore } from '@/lib/stores/ResumeStore'
 import { parseResumeFile } from '@/lib/resumeUploadClient'
@@ -533,7 +533,7 @@ export default function ProfilePage() {
                     This is Pro time you earned or bought, not a subscription. It ends on the date above. Nothing renews and nothing is charged.
                   </p>
                   <div className={styles.btnRow}>
-                    <button type="button" className={styles.ghost} onClick={() => router.push('/pricing')}>Plans &amp; credits</button>
+                    <button type="button" className={styles.ghost} onClick={() => router.push('/pricing')}>What’s included</button>
                   </div>
                 </>
               ) : isPro ? (
@@ -565,7 +565,7 @@ export default function ProfilePage() {
                     {sub && (
                       <button type="button" className={styles.ghost} onClick={openBillingPortal} disabled={portalBusy}>{portalBusy ? 'Opening…' : 'Manage billing (Stripe) →'}</button>
                     )}
-                    <button type="button" className={styles.ghost} onClick={() => router.push('/pricing')}>Plans &amp; credits</button>
+                    <button type="button" className={styles.ghost} onClick={() => router.push('/pricing')}>What’s included</button>
                   </div>
                   {sub && <div className={styles.hint}>Manage billing opens Stripe’s portal for your card, invoices and receipts, then returns here.</div>}
                   {subMsg && <div className={`${styles.msg} ${styles.info}`}>{subMsg}</div>}
@@ -579,13 +579,13 @@ export default function ProfilePage() {
                     </div>
                     <span className={`${styles.badge} ${styles.bDim}`}>Current</span>
                   </div>
-                  <p className={styles.cardS} style={{ margin: '0 0 1rem' }}>Seen Pro is {proPriceLine()} — unlimited AI credits and Human Voice rewrites. It starts with a free trial and no card; if you subscribe, it renews until you cancel, and the cancel button appears right here.</p>
+                  <p className={styles.cardS} style={{ margin: '0 0 1rem' }}>{offerLine()}</p>
                   <div className={styles.btnRow}>
-                    <button type="button" className={styles.primary} onClick={() => router.push('/pricing')}>See Pro plans →</button>
+                    <button type="button" className={styles.primary} onClick={() => router.push('/pricing')}>See what’s free and what’s paid →</button>
                   </div>
                 </>
               )}
-              <div className={styles.fine}>See the <a href="/terms#billing">Subscription Terms</a> for renewal, cancellation and refund details.</div>
+              <div className={styles.fine}>See the <a href={sub ? '/terms#billing' : '/terms#one-time'}>Terms</a> for {sub ? 'renewal, cancellation and refund' : 'purchase and refund'} details.</div>
             </section>
 
             {/* ── Invite friends (Seen Pro days for invites and reports; hidden until the growth tables exist) ── */}

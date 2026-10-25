@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import PageHeader from '@/components/shell/PageHeader'
 import { pageMetadata } from '@/lib/seo'
+import { offerLine } from '@/lib/pricing'
 import { REPORT_REWARD_PRO_DAYS, REPORT_REWARD_MONTHLY_CAP_DAYS, REPORT_REWARD_MIN_TRACKED_DAYS, REFERRAL_REWARD_PRO_DAYS, REFERRAL_MAX_REWARDED, REFERRAL_CLAIM_WINDOW_DAYS, dayWord, proDaysLabel } from '@/lib/server/creditRules.js'
 
 export const metadata: Metadata = pageMetadata({
@@ -27,7 +28,7 @@ export default function FAQPage() {
         },
         {
           q: 'Is Seen free for job seekers?',
-          a: 'Yes. Seen is completely free for job seekers and always will be. The core tools — company scores, ghost rates, community feed, job search, and basic tracker — are free forever. Pro is an optional upgrade for unlimited AI credits and Human Voice rewrites. You can also earn Pro time for free by reporting outcomes from your tracker and by inviting friends.',
+          a: `Yes. Company grades and ghost rates, the community feed, job search, the tracker and its check-ins, and résumé match are free forever, with no card. Two things cost money, and only once: ${offerLine()} You can also earn Pro time for free by reporting outcomes from your tracker and by inviting friends.`,
         },
         {
           q: 'How is Seen different from Glassdoor or Indeed?',

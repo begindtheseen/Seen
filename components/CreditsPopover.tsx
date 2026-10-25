@@ -81,7 +81,7 @@ export default function CreditsPopover({ info, onClose, onEarn, onUpgrade }: {
         <div style={row}><span>Free daily credit</span><span style={val}>{FREE_DAILY_CREDITS} · resets at {CREDIT_RESET_LABEL}</span></div>
         <div style={row}><span>Earned today</span><span style={val}>{earned} of {earnCap}</span></div>
         {info.welcome && <div style={row}><span>Welcome bonus</span><span style={val}>{WELCOME_CREDITS} credits, unused</span></div>}
-        <div style={row}><span>Purchased credits</span><span style={val}>never reset</span></div>
+        {(info.purchased ?? 0) > 0 && <div style={row}><span>Purchased credits</span><span style={val}>{info.purchased} · never reset</span></div>}
       </div>
       {/* The arithmetic, in one sentence from the same constants the server enforces (the audit saw
           "10 available · Free daily credit 1 · Welcome bonus 10" and could not tell how they add up). */}
@@ -92,7 +92,7 @@ export default function CreditsPopover({ info, onClose, onEarn, onUpgrade }: {
         Every AI action costs 1 credit and says so on its button. Résumé upload, company grades and the tracker are always free.
       </p>
       <div style={{ display: 'flex', gap: '.4rem' }}>
-        <button type="button" onClick={() => { onClose(); zero ? onUpgrade() : onEarn() }} style={link}>{zero ? 'Top up →' : 'Earn credits →'}</button>
+        <button type="button" onClick={() => { onClose(); zero ? onUpgrade() : onEarn() }} style={link}>{zero ? 'Options →' : 'Earn credits →'}</button>
         <Link href="/pricing" onClick={onClose} style={link}>Pricing →</Link>
       </div>
     </div>

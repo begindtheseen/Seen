@@ -35,3 +35,14 @@
 .sample { border: 1px dashed rgba(16, 185, 129, .35); border-radius: 8px; padding: .55rem .7rem; margin: 0 0 .7rem; font-size: .86rem; color: var(--white); display: flex; flex-direction: column; gap: .2rem; }
 .paste { display: flex; flex-direction: column; gap: .3rem; font-size: .8rem; color: var(--sub); margin: 0 0 .7rem; }
 .paste textarea { width: 100%; box-sizing: border-box; min-height: 72px; background: #0e111c; color: var(--white); border: 1px solid var(--line); border-radius: 8px; padding: .5rem .6rem; font-size: .86rem; font-family: var(--body); resize: vertical; }
+/* Just reached an interview: the card leads (owner decision 2026-10-25). */
+.lead { border-color: rgba(16, 185, 129, .7); box-shadow: 0 0 0 1px rgba(16, 185, 129, .35); }
+.leadLine { margin: 0 0 .6rem; font-size: .86rem; line-height: 1.55; color: var(--white); font-weight: 600; }
+.previewQ { display: flex; flex-direction: column; gap: .1rem; padding: .25rem 0; }
+.previewA { display: flex; flex-direction: column; gap: .2rem; margin-top: .45rem; padding-top: .5rem; border-top: 1px dashed rgba(16, 185, 129, .3); }
+.previewA .prose { margin: 0; font-size: .84rem; color: var(--sub); }
+/* The pass, offered under the prep: second and quieter. */
+.passAlt { margin-top: .8rem; padding: .7rem .75rem; border: 1px solid rgba(99, 102, 241, .35); border-radius: 10px; display: flex; flex-direction: column; gap: .45rem; font-size: .84rem; line-height: 1.5; color: var(--sub); }
+.passAlt b { color: var(--white); }
+.passBtn { min-height: 44px; border: 1px solid rgba(129, 140, 248, .6); background: none; color: #c7d2fe; border-radius: 9px; font-family: var(--display); font-weight: 700; font-size: .86rem; cursor: pointer; padding: .55rem .9rem; }
+.passBtn:disabled { opacity: .6; cursor: default; }

@@ -15,6 +15,7 @@ import { ResumeStore } from '@/lib/stores/ResumeStore'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { useAuth } from '@/lib/auth'
 import UpgradeModal from '@/components/UpgradeModal'
+import { LOCK_NOTE } from '@/lib/pricing'
 import type { Job } from '@/lib/types'
 
 interface Contribution { factor: string; weight: number; raw: number; points: number; reason: string }
@@ -184,6 +185,7 @@ export default function HumanProofPanel({ job, optimized = false }: { job: Job; 
           >
             Unlock HumanProof
           </button>
+          <p style={{ fontFamily: mono, fontSize: '.75rem', color: 'var(--muted)', lineHeight: 1.6, margin: '.65rem 0 0' }}>{LOCK_NOTE}</p>
         </div>
         {showUpgrade && <UpgradeModal reason="pro" featureName="HumanProof" onClose={() => setShowUpgrade(false)} />}
       </div>

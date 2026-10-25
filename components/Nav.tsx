@@ -286,8 +286,8 @@ export default function Nav() {
           </button>
           {/* Credits — subtle monospace chip (Pro shows an unlimited badge). */}
           {isSeeker && isPro && (
-            <Link href="/pricing" className={styles.pro} title="Seen Pro — unlimited AI credits. Manage your membership.">
-              <span className={`${styles.pill} ${styles.proPill}`}>★ <span className={styles.proLong}>Unlimited · </span>PRO</span>
+            <Link href="/pricing" className={styles.pro} title="You have Seen Pro access — see what is included">
+              <span className={`${styles.pill} ${styles.proPill}`}>★ PRO</span>
             </Link>
           )}
           {isSeeker && !isPro && creditBalance !== null && (
@@ -298,7 +298,7 @@ export default function Nav() {
                 aria-haspopup="dialog"
                 aria-expanded={creditsOpen}
                 title={creditBalance === 0
-                  ? `Out of AI credits — ${dailyResetLabel()}. Tap for ways to get more.`
+                  ? `No AI credits left today — ${dailyResetLabel()}. Tap for options.`
                   : `${creditBalance} AI credit${creditBalance === 1 ? '' : 's'} available · ${dailyResetLabel()}`}
                 onClick={() => setCreditsOpen(o => !o)}
               >
@@ -306,7 +306,7 @@ export default function Nav() {
                 <span className={styles.pill}>
                   <span className={styles.chipSpark} />
                   <b>{creditBalance}</b>
-                  <span className={styles.chipLabel}>{creditBalance === 0 ? 'credits · top up' : `credit${creditBalance === 1 ? '' : 's'}`}</span>
+                  <span className={styles.chipLabel}>{`credit${creditBalance === 1 ? '' : 's'}`}</span>
                 </span>
               </button>
               {creditsOpen && (
@@ -415,7 +415,7 @@ export default function Nav() {
             }}
           >
             <span style={{ fontFamily: 'var(--mono)', fontSize: '.66rem', fontWeight: 700, color: 'var(--green)', letterSpacing: '.03em' }}>★ Seen Pro</span>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '.66rem', fontWeight: 700, color: 'var(--green)' }}>Unlimited AI</span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: '.66rem', fontWeight: 700, color: 'var(--green)' }}>What&apos;s included →</span>
           </Link>
         )}
         {isSeeker && !isPro && creditBalance !== null && (
@@ -430,10 +430,10 @@ export default function Nav() {
             }}
           >
             <span style={{ fontFamily: 'var(--mono)', fontSize: '.66rem', fontWeight: 700, color: creditBalance === 0 ? 'var(--red)' : 'var(--white)' }}>
-              {creditBalance === 0 ? '⚠️ Out of AI credits' : `🪙 ${creditBalance} AI credit${creditBalance === 1 ? '' : 's'} left`}
+              {creditBalance === 0 ? 'No AI credits left today' : `🪙 ${creditBalance} AI credit${creditBalance === 1 ? '' : 's'} left`}
             </span>
             <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', fontWeight: 700, color: creditBalance === 0 ? 'var(--red)' : 'var(--blue)' }}>
-              {creditBalance === 0 ? 'Upgrade →' : 'Earn more →'}
+              {creditBalance === 0 ? 'Options →' : 'Earn more →'}
             </span>
           </button>
         )}

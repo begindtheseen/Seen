@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Reveal from '@/components/Reveal'
+import PriceLine from '@/components/home/PriceLine'
 import styles from './LandingMarketingSections.module.css'
 
 // Below the workspace window: the four things only Seen does, each linking to the real page,
@@ -111,6 +112,7 @@ export default function LandingMarketingSections() {
                     Start tracking free
                   </button>
                 </div>
+                <PriceLine />
               </div>
             </div>
           </Reveal>
