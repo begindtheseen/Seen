@@ -6,7 +6,7 @@ import { pageMetadata } from '@/lib/seo'
 // duplicate of /). Rendering is untouched.
 export const metadata: Metadata = pageMetadata({
   title: 'Pricing — Seen Pro with a 7-day free trial',
-  description: 'Seen is free for job seekers. Pro adds unlimited AI credits, ghost alerts and company analysis — 7 days free, no card required, then a monthly or yearly plan. Every price on one page.',
+  description: 'Seen is free for job seekers. Pro adds unlimited AI credits, Human Voice rewrites and résumé downloads without the Seen footer — 7 days free, no card required, then a monthly or yearly plan. Every price on one page.',
   path: '/pricing',
   ogTitle: 'Seen Pricing',
 })

@@ -10,7 +10,8 @@
 --     (api/unsubscribe.js?list=job_matches). Separate from outcome_opt_out: stopping job matches
 --     never stops the Day 7/14/30 check-ins, and the reverse.
 --
--- Additive only. Written by the service key; RLS on with no policy (server-only table pattern).
+-- Additive only. Written by the service key; RLS on with no policy, grants revoked (server-only table).
+-- Applied in prod 2026-10-25 by the owner in the SQL editor, together with 20261022120000_inbox_autopilot.
 
 CREATE TABLE IF NOT EXISTS public.job_match_email_log (
   id        bigserial   PRIMARY KEY,
@@ -26,5 +27,6 @@ CREATE INDEX IF NOT EXISTS idx_job_match_email_log_user_sent ON public.job_match
 CREATE INDEX IF NOT EXISTS idx_job_match_email_log_sent ON public.job_match_email_log (sent_at DESC);
 
 ALTER TABLE public.job_match_email_log ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.job_match_email_log FROM anon, authenticated;
 
 ALTER TABLE public.email_prefs ADD COLUMN IF NOT EXISTS job_match_opt_out boolean NOT NULL DEFAULT false;

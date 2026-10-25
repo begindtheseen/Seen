@@ -679,7 +679,7 @@ export default function ApplyOptimizeModal({
                 <div style={{ fontSize: '2rem', marginBottom: '.75rem' }}>👋</div>
                 <div style={{ fontFamily: 'var(--display)', fontSize: '1rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.35rem' }}>Sign in to apply &amp; track</div>
                 <div style={{ fontSize: '.82rem', color: 'var(--sub)', lineHeight: 1.7, marginBottom: '1.25rem' }}>
-                  Track responses, get ghost alerts, and receive day-7/14/30 check-ins.
+                  Track responses, get ghost-risk warnings, and receive day-7/14/30 check-ins.
                 </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
