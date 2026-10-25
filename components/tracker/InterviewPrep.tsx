@@ -199,7 +199,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
               <div className={s.offerTitle}>Walk in ready for {company}</div>
               <ul className={s.list}>
                 <li>Likely questions for {role ? `${article(role)} ${role}` : 'this role'}, and what each one checks</li>
-                <li>Answers built from <b>your</b> résumé — nothing made up</li>
+                <li>Answers built from <b>your</b> résumé — no invented jobs or numbers</li>
                 <li>Your 30-second “tell me about yourself”</li>
                 <li>Thank-you and follow-up emails, ready to send on the right day</li>
               </ul>

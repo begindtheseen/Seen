@@ -531,7 +531,7 @@ export default function PricingPage() {
                 <div style={{ fontFamily: 'var(--display)', fontSize: '1.9rem', fontWeight: 900, color: 'var(--white)' }}>{skuPrice(PREP.amount_cents)}</div>
                 <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--muted)' }}>once, per interview</div>
               </div>
-              {['Likely questions for the role, and what each one checks', 'Answers built from your own résumé — nothing made up', 'Your 30-second "tell me about yourself"', 'Thank-you and follow-up emails, timed for you', `${PREP.pro_days} days of Pro included · never renews`].map(f => (
+              {['Likely questions for the role, and what each one checks', 'Answers built from your own résumé — no invented jobs or numbers', 'Your 30-second "tell me about yourself"', 'Thank-you and follow-up emails, timed for you', `${PREP.pro_days} days of Pro included · never renews`].map(f => (
                 <div key={f} style={{ display: 'flex', gap: '.5rem', marginBottom: '.45rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-72)', color: 'var(--sub)', lineHeight: 1.45 }}>
                   <span style={{ color: 'var(--green)', flexShrink: 0 }}>✓</span>{f}
                 </div>
