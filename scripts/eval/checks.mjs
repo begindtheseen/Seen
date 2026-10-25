@@ -145,6 +145,25 @@ function negated(text, re) {
   const before = String(text).slice(Math.max(0, m.index - 40), m.index);
   return /\b(?:not|never|no|haven't|hasn't|don't|didn't|without|isn't|wasn't|lack|new to|learn|eager to|ready to|pick up|could|would)\b[^.;]*$/i.test(before);
 }
+// A sentence about what the person WANTS ("…is exactly where I want to take my skills") claims nothing.
+function aspiration(text, re) {
+  const m = new RegExp(re.source, re.flags.replace('g', '')).exec(String(text));
+  if (!m) return false;
+  const sents = String(text).split(/(?<=[.!?])\s+/);
+  let pos = 0;
+  for (const s of sents) { if (m.index >= pos && m.index < pos + s.length + 1) return /\b(want(?:ed)? to|where I want|looking to|hope to|interested in|excited (?:about|to)|eager to|ready to|move into|learn(?:ing)?|grow into)\b/i.test(s); pos += s.length + 1; }
+  return false;
+}
+// The same degree written two ways ("bachelor's" for "B.A.").
+const DEGREE_SAME = [
+  [/^bachelor/i, /\b(bachelor|b\.?a\.?|b\.?s\.?|bsn|b\.?b\.?a\.?)\b/i],
+  [/^master|^masters/i, /\b(master|m\.?a\.?|m\.?s\.?|m\.?ed|mba|msn)\b/i],
+  [/^associate/i, /\b(associate|a\.?a\.?|a\.?s\.?|aas|adn)\b/i],
+];
+function degreeInResume(term, resume) {
+  if (new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(resume)) return true;
+  return DEGREE_SAME.some(([is, any]) => is.test(term) && any.test(resume));
+}
 function trapRe(t) { return new RegExp(t.match, t.caseSensitive ? '' : 'i'); }
 
 // ── broken text ───────────────────────────────────────────────────────────────────────────────────
@@ -245,7 +264,7 @@ export function checkRecord(rec, fx, opts = {}) {
         add('invented_number', it.field, t, `"${n}" is not in the résumé${numberAllowed(n, haveBoth) ? ' (it is the posting\'s number)' : ''}${it.confirm ? ' [flagged confirm-before-using]' : ''}`);
       }
       for (const span2 of orgSpans(t)) {
-        const sl = squash(span2);
+        const sl = squash(span2.replace(/['’]s$/i, ''));
         if (GENERIC_CAPS.has(sl)) continue;
         if (resumeL.includes(sl) || postingL.includes(sl) || companyL.includes(sl) || titleL.includes(sl) || sl.includes(companyL) && companyL.length > 3) continue;
         // every word of the span is in the résumé or the target title → not a new organisation
@@ -254,13 +273,13 @@ export function checkRecord(rec, fx, opts = {}) {
         add('invented_org', it.field, t, `"${span2}" is not in the résumé`);
       }
       for (const [name, re] of TOOL_RES) if (re.test(t) && !re.test(resume) && !negated(t, re)) add('invented_tool', it.field, t, `"${name.replace(/\\/g, '')}" is not in the résumé`);
-      for (const m of t.matchAll(DEGREE_RE)) if (!new RegExp(m[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(resume)) add('invented_degree', it.field, t, `"${m[0]}" is not in the résumé`);
+      for (const m of t.matchAll(DEGREE_RE)) if (!degreeInResume(m[0], resume)) add('invented_degree', it.field, t, `"${m[0]}" is not in the résumé`);
     }
     // traps
     for (const trap of g.traps || []) {
       const scopes = trap.scope === 'any' ? ['claim', 'requirement', 'advice', 'question'] : trap.scope === 'candidate' ? ['claim'] : trap.scope === 'requirements' ? ['requirement'] : [trap.scope];
       if (!scopes.includes(it.kind)) continue;
-      if (trapRe(trap).test(t) && !(it.kind === 'claim' && negated(t, trapRe(trap)))) add('trap', it.field, t, `${trap.term}: ${trap.why}${it.confirm ? ' (flagged "confirm before using")' : ''}`);
+      if (trapRe(trap).test(t) && !(it.kind === 'claim' && (negated(t, trapRe(trap)) || aspiration(t, trapRe(trap))))) add('trap', it.field, t, `${trap.term}: ${trap.why}${it.confirm ? ' (flagged "confirm before using")' : ''}`);
     }
     // broken text
     if (['claim', 'advice', 'question', 'requirement'].includes(it.kind) && rec.tool !== 'ats_check' && it.field !== 'availability') for (const issue of brokenTextIssues(t, it.kind)) add('broken_text', it.field, t, issue);
