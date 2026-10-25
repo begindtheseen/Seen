@@ -7,7 +7,7 @@ import { RESUME_OPTIMIZE_COST } from '../lib/server/creditRules.js';
 import { previewOnlyError } from '../lib/server/postingGate.js';
 import { optimizeCacheKey, readCachedOptimize, writeCachedOptimize } from '../lib/server/optimizeCache.js';
 import { buildPaidOptimize, unoptimizableListing } from '../lib/server/optimizePackage.js';
-import { runAdvantage, extractEmployment, extractCareerSignal, buildResumeDocument, resumeFileName } from '../lib/server/resumeAnalysis.js';
+import { runAdvantage, requirementsStated, extractEmployment, extractCareerSignal, buildResumeDocument, resumeFileName } from '../lib/server/resumeAnalysis.js';
 import { scannerFromSeenFit } from '../lib/server/seenfitCompat.js';
 import { extractUploadText } from '../lib/server/resumeUpload.js';
 import { isReadableResume } from '../lib/server/resumeReadability.js';
@@ -73,6 +73,23 @@ function _normalizeOptimizedPackage(body) {
   };
 }
 
+// When Seen first saw the listing (jobs.created_at — the only date a listing has): the caller's
+// snapshot date, else a read-only lookup by the saved job's id. null when unknown; the strategy plan
+// then makes no timing claim ("Apply within the first 48 hours" was said of a 5-day-old listing).
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+async function listingPostedAt(body) {
+  const given = body && body.postedAt && Date.parse(body.postedAt);
+  if (Number.isFinite(given)) return new Date(given).toISOString();
+  const id = String((body && body.jobId) || '');
+  const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_KEY;
+  if (!UUID_RE.test(id) || !url || !key) return null;
+  try {
+    const r = await fetch(`${url}/rest/v1/jobs?id=eq.${encodeURIComponent(id)}&select=created_at&limit=1`, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
+    const rows = r.ok ? await r.json() : [];
+    return (Array.isArray(rows) && rows[0] && rows[0].created_at) || null;
+  } catch (_) { return null; }
+}
+
 export default async function handler(req, res) {
   const _o = req.headers.origin || '';
   const _devO = !_o || _o.includes('localhost') || _o.includes('127.0.0.1');
@@ -136,12 +153,14 @@ export default async function handler(req, res) {
   // optimize: checks, cache and probe all happen BEFORE the credit gate (handleOptimizeTool).
   if (tool === 'optimize') return handleOptimizeTool(req, res, body);
 
-  // The scanner measures a résumé against a posting's requirements: a posting that states none is
-  // refused free, before the credit gate (it used to charge and answer match_score null — harness
-  // 2026-10-25, the same rule Optimize follows).
-  if (tool === 'scanner' && body.resume && String(body.jobDescription || '').trim()) {
-    const unopt = unoptimizableListing({ resume: canonicalResumeText(body.resume), jobDescription: body.jobDescription, job: body.job, company: body.company, taxonomy: await loadSkillTaxonomy() });
-    if (unopt) return res.status(422).json({ error: 'no_requirements', ...unopt, cost: 0, charged: false });
+  // Nothing to build on → nothing to charge for. The scanner, the strategy plan, the coach and the
+  // proposal read the posting's requirements; a posting that states none (a "join our family" ad) used
+  // to cost a credit (eval harness, 2026-10-25). Decided BEFORE gateAI, the same rule Optimize follows.
+  if (['advantage', 'coach', 'proposal', 'scanner'].includes(tool) && body.jobDescription && String(body.jobDescription).trim()) {
+    const empty = tool === 'scanner'
+      ? (body.resume ? unoptimizableListing({ resume: canonicalResumeText(body.resume), jobDescription: body.jobDescription, job: body.job, company: body.company, taxonomy: await loadSkillTaxonomy() }) : null)
+      : (requirementsStated(body.jobDescription, body.job) ? null : { requirement_count: 0, message: "This listing doesn't state what it requires, so there is nothing to build a strategy on — no credit used." });
+    if (empty) return res.status(422).json({ error: 'no_requirements', ...empty, cost: 0, charged: false });
   }
 
   // Credit gate — 1 credit per call; Pro users are never charged (consume_credit answers pro:true)
@@ -172,7 +191,7 @@ export default async function handler(req, res) {
       const { job, company, resume, jobDescription, background } = body;
       if (!job || !company || !jobDescription) return res.status(400).json({ error: 'Job, company, and job description required' });
       const intelNote = _seenIntel(company, body.companyIntel);
-      const full = runAdvantage({ job, company, resume, jobDescription, background, intelNote, intelStats: _intelStats(body.companyIntel) });
+      const full = runAdvantage({ job, company, resume, jobDescription, background, intelNote, intelStats: _intelStats(body.companyIntel), postedAt: await listingPostedAt(body) });
       // 'coach' historically returns only the playbook keys.
       parsed = {
         hiring_manager_script: full.hiring_manager_script,
@@ -200,7 +219,7 @@ export default async function handler(req, res) {
       const { job, company, resume, jobDescription, background } = body;
       if (!job || !company || !jobDescription) return res.status(400).json({ error: 'Job, company, and job description required' });
       const intelNote = _seenIntel(company, body.companyIntel);
-      parsed = runAdvantage({ job, company, resume, jobDescription, background, intelNote, intelStats: _intelStats(body.companyIntel) });
+      parsed = runAdvantage({ job, company, resume, jobDescription, background, intelNote, intelStats: _intelStats(body.companyIntel), postedAt: await listingPostedAt(body) });
 
     } else {
       return res.status(400).json({ error: 'Unknown tool: ' + tool });

@@ -70,7 +70,8 @@ export default async function handler(req, res) {
         const rows = await checkRes.json();
         const list = Array.isArray(rows) ? rows : [];
         const row = list.find(r => r.job_id === cacheKey) || null;
-        if (row) {
+        // a row that holds no read is never served as one
+        if (row && (row.what_they_want || []).length) {
           // Prod's job_insights has no description_summary column until migration
           // 20261024140000 is applied; the summary is a deterministic excerpt of the posting the
           // caller sent, so it is rebuilt here (free) rather than lost.
@@ -94,6 +95,17 @@ export default async function handler(req, res) {
     return res.status(200).json({ what_they_want: [], hidden_requirements: [], insider_tip: '', description_summary: '', _src: 'empty', cost: 0, charged: false });
   }
 
+  // A posting that states nothing to read (a car-wash "join our family" ad, a teaser) is answered
+  // here, free, and NEVER cached: the generator is deterministic and free to run, so it is run
+  // BEFORE any credit gate. Groupon's "Social Media Specialist" used to come back as the filler
+  // "Relevant experience", charged a credit and was cached "free for everyone for 7 days"
+  // (2026-10-25); an empty read cost a credit on the no-requirements eval posting.
+  const parsed = buildJobInsights({ title: job, company, description: jobDescription, needsSummary: true });
+  if (!parsed.read) {
+    return res.status(200).json({ ...parsed, what_they_want: [], _src: 'unread', cost: 0, charged: false,
+      message: "This listing doesn't state what it requires, so there is nothing to analyze — no credit used. If the employer's site has the full posting, paste it to analyze that." });
+  }
+
   // Probe: the caller only wants to know whether this job is cached. Never gate, never
   // generate, never charge — answer with the price a real call would cost.
   if (probe) {
@@ -104,9 +116,8 @@ export default async function handler(req, res) {
   const gate = await gateAI(req, 'job_insights');
   if (!gate.ok) return res.status(gate.status).json({ error: gate.error, credits_required: gate.credits_required, balance: gate.balance ?? 0, _src: 'no_credits', cost: 0, charged: false });
 
-  // ── Deterministic, KEYLESS generation (no Anthropic). Instant, no rate limits. ──
-  // Always the full insight (summary included) so the shared row serves every later caller.
-  const parsed = buildJobInsights({ title: job, company, description: jobDescription, needsSummary: true });
+  // ── Deterministic, KEYLESS generation (no Anthropic), already run above. The full insight
+  // (summary included) is stored so the shared row serves every later caller. ──
 
   // ── Upsert to DB — safe for concurrent first-opens of the same job. AWAITED: the shared row
   // must exist before the next visitor probes (an un-awaited write may never land). Prod's table

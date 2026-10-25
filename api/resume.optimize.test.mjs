@@ -234,4 +234,22 @@ test('one score: the free check, the paid package and the Studio tailor print th
   assert.equal(paid.body.fit_score, free.body.fit_score, 'paid = free');
   assert.equal(paid.body.verdict.score, free.body.fit_score);
   assert.equal(studio.body.plan.score.before, free.body.fit_score, 'Studio = free');
+
+// The strategy plan and the scanner read the posting's requirements: a posting that states none
+// is refused BEFORE the credit gate (it charged a credit for a plan about "pay and charlotte").
+test('advantage / scanner on a posting with no requirements: 422 no_requirements, never charged', async () => {
+  const CAR_WASH = 'Join the Sunbelt Express Car Wash family! We are a locally owned express car wash with 6 locations around Charlotte, and we are growing. Weekly pay, free unlimited wash membership, paid training and a fun, friendly team. Starting pay is $14 – $16 per hour. Apply today!';
+  for (const tool of ['advantage', 'coach', 'proposal', 'scanner']) {
+    const before = state.charges;
+    const r = await call(resumeHandler, { tool, job: 'Team Member', company: 'Sunbelt Express', resume: RESUME, jobDescription: CAR_WASH }, '33333333-3333-4333-8333-333333333333');
+    assert.equal(r.code, 422, `${tool}: ${JSON.stringify(r.body)}`);
+    assert.equal(r.body.error, 'no_requirements');
+    assert.equal(r.body.charged, false);
+    assert.equal(state.charges, before, `${tool} charged a credit`);
+  }
+  // a real posting still runs (and is charged as before)
+  const before = state.charges;
+  const ok = await call(resumeHandler, { tool: 'advantage', job: A.title, company: A.company, resume: RESUME, jobDescription: A.jd }, '33333333-3333-4333-8333-333333333333');
+  assert.equal(ok.code, 200, JSON.stringify(ok.body));
+  assert.equal(state.charges, before + 1);
 });

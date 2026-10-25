@@ -20,6 +20,7 @@ import { paragraphs, isDescriptionPreview, stripDanglingEllipsis, endsCutOff } f
 import { httpHref } from '@/lib/safeHref.js'
 import { JOB_INSIGHTS_VERSION } from '@/lib/jobInsightsVersion.js'
 import ListingScoreRing from '@/components/jobs/ListingScoreRing'
+import PastePosting from '@/components/jobs/PastePosting'
 
 // ── Job detail drawer helpers ─────────────────────────────────────────────────
 
@@ -32,7 +33,8 @@ interface Insights {
 
 // /api/job-insights answer shape (see that file's header): a probe never charges.
 interface InsightsResponse extends Partial<Insights> {
-  _src?: 'db' | 'generated' | 'empty' | 'uncached' | 'no_credits'
+  _src?: 'db' | 'generated' | 'empty' | 'uncached' | 'no_credits' | 'unread'
+  message?: string
   cached?: boolean
   price?: number
   cost?: number
@@ -49,7 +51,8 @@ interface InsightsResponse extends Partial<Insights> {
 // generating → the paid call is in flight
 // credits → the paid call was refused (out of credits / signed out)
 // preview → the row is a source's teaser of the posting (Adzuna): nothing to analyze, nothing to sell
-type InsightsState = 'loading' | 'done' | 'unavailable' | 'no_desc' | 'uncached' | 'generating' | 'credits' | 'preview'
+// unread → the posting states nothing to read (answered free, never cached); a paste box is offered
+type InsightsState = 'loading' | 'done' | 'unavailable' | 'no_desc' | 'uncached' | 'generating' | 'credits' | 'preview' | 'unread'
 
 const L1_TTL = 24 * 60 * 60 * 1000
 const OPTIMIZE_PRICE = creditCostLabel(RESUME_OPTIMIZE_COST)
@@ -82,6 +85,9 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
   const [saved, setSaved] = useState(() => SavedJobsStore.isSaved(job.id))
   const [insights, setInsights] = useState<Insights | null>(null)
   const [insightsState, setInsightsState] = useState<InsightsState>('loading')
+  // The text the insight runs on: the listing's own, or a full posting the person pasted.
+  const [pastedDesc, setPastedDesc] = useState<string | null>(null)
+  useEffect(() => { setPastedDesc(null) }, [job.id])
   const [insightPrice, setInsightPrice] = useState<number>(JOB_INSIGHTS_COST)
   // The ledger line after a paid generation ("1 credit used · 4 left") and any refusal text.
   const [insightNote, setInsightNote] = useState('')
@@ -137,6 +143,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
         body: JSON.stringify({ jobId: j.id, job: j.title, company: j.company, jobDescription: desc, needsSummary: true, probe: true }),
       })
       const d = await res.json() as InsightsResponse
+      if (d._src === 'unread') { setInsightNote(d.message || ''); setInsightsState('unread'); return }
       if (d._src === 'uncached') { setInsightPrice(typeof d.price === 'number' ? d.price : JOB_INSIGHTS_COST); setInsightsState('uncached'); return }
       if (d.what_they_want?.length) {
         try { localStorage.setItem(key, JSON.stringify({ ts: Date.now(), v: JOB_INSIGHTS_VERSION, data: d })) } catch { /* ignore */ }
@@ -150,15 +157,16 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
   // Step 2 (paid, explicit): generate the insight. Reached only from the price-tagged button,
   // after the one-time confirmation on this account/device.
   const generateInsights = useCallback(async () => {
-    const desc = job.description || ''
+    const desc = pastedDesc || job.description || ''
     setInsightsState('generating'); setInsightNote('')
     try {
       const res = await fetch('/api/job-insights', {
         method: 'POST',
         headers: await aiHeaders(),
-        body: JSON.stringify({ jobId: job.id, job: job.title, company: job.company, jobDescription: desc, needsSummary: true }),
+        body: JSON.stringify({ jobId: pastedDesc ? `${job.id}:pasted` : job.id, job: job.title, company: job.company, jobDescription: desc, needsSummary: true }),
       })
       const d = await res.json() as InsightsResponse
+      if (d._src === 'unread') { setInsightNote(d.message || ''); setInsightsState('unread'); return }
       if (d.credits_required || res.status === 401 || res.status === 402) {
         setInsightNote(d.error || 'Out of AI credits.'); setInsightsState('credits'); return
       }
@@ -168,9 +176,25 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
         setInsightNote(usageLine({ cost: d.cost ?? JOB_INSIGHTS_COST, charged: !!d.charged && !d.pro, pro: !!d.pro, balance: typeof d.balance === 'number' ? d.balance : null }))
       }
       if (d.what_they_want?.length) {
-        try { localStorage.setItem('ji_' + job.id, JSON.stringify({ ts: Date.now(), v: JOB_INSIGHTS_VERSION, data: d })) } catch { /* ignore */ }
+        if (!pastedDesc) { try { localStorage.setItem('ji_' + job.id, JSON.stringify({ ts: Date.now(), v: JOB_INSIGHTS_VERSION, data: d })) } catch { /* ignore */ } }
         setInsights(d as Insights); setInsightsState('done')
       } else { setInsights(d as Insights); setInsightsState('unavailable') }
+    } catch { setInsightsState('unavailable') }
+  }, [job, pastedDesc])
+
+  // A pasted full posting is probed like the listing's own text — free unless they tap Reveal.
+  const analyzePasted = useCallback(async (text: string) => {
+    setPastedDesc(text); setInsightsState('loading'); setInsightNote('')
+    try {
+      const res = await fetch('/api/job-insights', {
+        method: 'POST',
+        headers: await aiHeaders(),
+        body: JSON.stringify({ jobId: `${job.id}:pasted`, job: job.title, company: job.company, jobDescription: text, needsSummary: true, probe: true }),
+      })
+      const d = await res.json() as InsightsResponse
+      if (d._src === 'unread') { setInsightNote(d.message || ''); setInsightsState('unread'); return }
+      if (d._src === 'uncached') { setInsightPrice(typeof d.price === 'number' ? d.price : JOB_INSIGHTS_COST); setInsightsState('uncached'); return }
+      if (d.what_they_want?.length) { setInsights(d as Insights); setInsightsState('done') } else setInsightsState('unavailable')
     } catch { setInsightsState('unavailable') }
   }, [job])
 
@@ -329,7 +353,14 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
             {insightsState === 'preview' && (
               <div style={{ fontSize: '.72rem', color: 'var(--muted)', lineHeight: 1.6 }}>
                 This source gives Seen only a preview of the posting, so there is nothing to analyze yet.{' '}
-                {postingHref ? <a href={postingHref} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--green)' }}>Open the full posting to analyze it ↗</a> : 'Open the full posting on the employer\'s site to analyze it.'}
+                {postingHref ? <a href={postingHref} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--green)' }}>Open the full posting ↗</a> : 'The full posting is on the employer\'s site.'}
+                <PastePosting onAnalyze={analyzePasted} />
+              </div>
+            )}
+            {insightsState === 'unread' && (
+              <div style={{ fontSize: '.72rem', color: 'var(--muted)', lineHeight: 1.6 }}>
+                {insightNote || "This listing doesn't state what it requires, so there is nothing to analyze — no credit used."}
+                <PastePosting onAnalyze={analyzePasted} />
               </div>
             )}
             {(insightsState === 'loading' || insightsState === 'generating') && <Skeleton widths={[80, 65, 72, 58, 68]} h={10} />}
