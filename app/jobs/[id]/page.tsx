@@ -31,6 +31,7 @@ import { isGradeableScore } from '@/lib/gradeGate'
 import ListingScoreRing from '@/components/jobs/ListingScoreRing'
 import EmployerGradeChip from '@/components/jobs/EmployerGradeChip'
 import { JOB_INSIGHTS_VERSION } from '@/lib/jobInsightsVersion.js'
+import PastePosting from '@/components/jobs/PastePosting'
 
 interface Insights {
   what_they_want: string[]
@@ -61,7 +62,8 @@ function numOrNull(v: unknown): number | null {
 
 // /api/job-insights answer shape (see that file's header): a probe never charges.
 interface InsightsResponse extends Partial<Insights> {
-  _src?: 'db' | 'generated' | 'empty' | 'uncached' | 'no_credits'
+  _src?: 'db' | 'generated' | 'empty' | 'uncached' | 'no_credits' | 'unread'
+  message?: string
   price?: number
   cost?: number
   charged?: boolean
@@ -99,7 +101,12 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   // Until 2026-10-24 this page called /api/job-insights WITHOUT probe:true on load, so opening a
   // permalink while signed in generated — and charged — an insight nobody asked for; the drawer had
   // been fixed (PR #351), the permalink page had not. Same two-step flow now.
-  const [insightsState, setInsightsState] = useState<'loading' | 'done' | 'unavailable' | 'no_desc' | 'uncached' | 'generating' | 'credits' | 'preview'>('loading')
+  // unread → the posting states nothing to read (free, never cached); the person can paste the full posting
+  const [insightsState, setInsightsState] = useState<'loading' | 'done' | 'unavailable' | 'no_desc' | 'uncached' | 'generating' | 'credits' | 'preview' | 'unread'>('loading')
+  // The posting text the insight runs on: the listing's own, or one the person pasted (preview rows).
+  const [pastedDesc, setPastedDesc] = useState<string | null>(null)
+  // "About this role": the summary first (it states the pay and what the job asks for), the full posting one tap away
+  const [showFullDesc, setShowFullDesc] = useState(false)
   const [insightPrice, setInsightPrice] = useState<number>(JOB_INSIGHTS_COST)
   const [insightNote, setInsightNote] = useState('')
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -230,6 +237,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         body: JSON.stringify({ jobId: j.id, job: j.title, company: j.company, jobDescription: desc, needsSummary: true, probe: true }),
       })
       const d = await res.json() as InsightsResponse
+      if (d._src === 'unread') { setInsightNote(d.message || ''); setInsightsState('unread'); return }
       if (d._src === 'uncached') { setInsightPrice(typeof d.price === 'number' ? d.price : JOB_INSIGHTS_COST); setInsightsState('uncached'); return }
       if (d.what_they_want?.length) {
         try { localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), v: JOB_INSIGHTS_VERSION, data: d })) } catch { /* ignore */ }
@@ -272,15 +280,16 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   // after the one-time confirmation on this account/device.
   const generateInsights = useCallback(async () => {
     if (!job) return
-    const desc = job.description || ''
+    const desc = pastedDesc || job.description || ''
     setInsightsState('generating'); setInsightNote('')
     try {
       const res = await fetch('/api/job-insights', {
         method: 'POST',
         headers: await aiHeaders(),
-        body: JSON.stringify({ jobId: job.id, job: job.title, company: job.company, jobDescription: desc, needsSummary: true }),
+        body: JSON.stringify({ jobId: pastedDesc ? `${job.id}:pasted` : job.id, job: job.title, company: job.company, jobDescription: desc, needsSummary: true }),
       })
       const d = await res.json() as InsightsResponse
+      if (d._src === 'unread') { setInsightNote(d.message || ''); setInsightsState('unread'); return }
       if (d.credits_required || res.status === 401 || res.status === 402) {
         setInsightNote(d.error || 'Out of AI credits.'); setInsightsState('credits'); return
       }
@@ -289,9 +298,27 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         setInsightNote(`${creditCostLabel(d.cost ?? JOB_INSIGHTS_COST)} used${typeof d.balance === 'number' && d.balance < 900 ? ` · ${d.balance} left` : ''} · ${dailyResetLabel()}`)
       }
       if (d.what_they_want?.length) {
-        try { localStorage.setItem('ji_' + job.id, JSON.stringify({ ts: Date.now(), v: JOB_INSIGHTS_VERSION, data: d })) } catch { /* ignore */ }
+        if (!pastedDesc) { try { localStorage.setItem('ji_' + job.id, JSON.stringify({ ts: Date.now(), v: JOB_INSIGHTS_VERSION, data: d })) } catch { /* ignore */ } }
         setInsights(d as Insights); setInsightsState('done')
       } else { setInsights(d as Insights); setInsightsState('unavailable') }
+    } catch { setInsightsState('unavailable') }
+  }, [job, pastedDesc])
+
+  // The person pasted the full posting (a preview row, or a listing that states nothing): probe it
+  // like the listing's own text — free unless they then tap Reveal.
+  const analyzePasted = useCallback(async (text: string) => {
+    if (!job) return
+    setPastedDesc(text); setInsightsState('loading'); setInsightNote('')
+    try {
+      const res = await fetch('/api/job-insights', {
+        method: 'POST',
+        headers: await aiHeaders(),
+        body: JSON.stringify({ jobId: `${job.id}:pasted`, job: job.title, company: job.company, jobDescription: text, needsSummary: true, probe: true }),
+      })
+      const d = await res.json() as InsightsResponse
+      if (d._src === 'unread') { setInsightNote(d.message || ''); setInsightsState('unread'); return }
+      if (d._src === 'uncached') { setInsightPrice(typeof d.price === 'number' ? d.price : JOB_INSIGHTS_COST); setInsightsState('uncached'); return }
+      if (d.what_they_want?.length) { setInsights(d as Insights); setInsightsState('done') } else setInsightsState('unavailable')
     } catch { setInsightsState('unavailable') }
   }, [job])
 
@@ -348,7 +375,13 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const postingHref = httpHref(job.apply_url)
   // Paragraphs: the row's own newlines (ingest keeps them since 2026-10-24), else the headings and
   // bullets the one-line stored text carries (lib/jobs/descriptionText.js paragraphs).
-  const descParas = paragraphs(insights?.description_summary || (preview ? stripDanglingEllipsis(job.description || '') : (job.description || '')))
+  // "About this role": the summary (what the job is, what it asks for, the pay) with the full posting
+  // one tap away. The summary used to REPLACE the posting with a 1,200-character slice cut mid-word
+  // ("Help define whether new da") that hid the requirements and the pay (2026-10-25).
+  const fullParas = paragraphs(preview ? stripDanglingEllipsis(job.description || '') : (job.description || ''))
+  const summaryParas = paragraphs(insights?.description_summary || '')
+  const descParas = !showFullDesc && summaryParas.length && fullParas.length ? summaryParas : fullParas
+  const foldToFull = !showFullDesc && summaryParas.length > 0 && fullParas.length > 0
 
   return (
     <div className="page-full">
@@ -478,7 +511,14 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           {insightsState === 'preview' && (
             <div style={{ fontSize: '.75rem', color: 'var(--muted)', lineHeight: 1.6 }}>
               This source gives Seen only a preview of the posting, so there is nothing to analyze yet.{' '}
-              {postingHref ? <a href={postingHref} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--green)' }}>Open the full posting to analyze it ↗</a> : 'Open the full posting on the employer\'s site to analyze it.'}
+              {postingHref ? <a href={postingHref} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--green)' }}>Open the full posting ↗</a> : 'The full posting is on the employer\'s site.'}
+              <PastePosting onAnalyze={analyzePasted} />
+            </div>
+          )}
+          {insightsState === 'unread' && (
+            <div style={{ fontSize: '.75rem', color: 'var(--muted)', lineHeight: 1.6 }} data-testid="insights-unread">
+              {insightNote || "This listing doesn't state what it requires, so there is nothing to analyze — no credit used."}
+              <PastePosting onAnalyze={analyzePasted} />
             </div>
           )}
           {insightsState === 'uncached' && (
@@ -542,12 +582,18 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             : descParas.length > 0
               ? <>
                   {descParas.map((p, i) => <p key={i} style={{ fontSize: '.84rem', color: 'var(--sub)', lineHeight: 1.8, margin: '0 0 .85rem' }}>{p}</p>)}
+                  {foldToFull && (
+                    <button type="button" onClick={() => setShowFullDesc(true)} data-testid="read-full-posting"
+                      style={{ background: 'none', border: 'none', padding: '.5rem 0', color: 'var(--green)', fontFamily: 'var(--mono)', fontSize: '.75rem', cursor: 'pointer', minHeight: 44 }}>
+                      Read the full posting ({(job.description || '').length.toLocaleString()} characters) ↓
+                    </button>
+                  )}
                   {preview && (
                     <div style={{ margin: '0 0 .85rem', padding: '.55rem .8rem', background: 'rgba(245,158,11,.07)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--amber)', lineHeight: 1.55 }}>
                       ✂ Preview from {job.source || 'this source'}. The full posting is on the employer&apos;s site{postingHref ? <> — <a href={postingHref} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--amber)' }}>open it ↗</a></> : '.'}
                     </div>
                   )}
-                  {cutOff && !insights?.description_summary && (
+                  {cutOff && !foldToFull && (
                     <div style={{ margin: '0 0 .85rem', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)', lineHeight: 1.55 }}>
                       Continues on the employer&apos;s site{postingHref ? <> — <a href={postingHref} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--green)' }}>open it ↗</a></> : '.'}
                     </div>
