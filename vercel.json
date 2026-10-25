@@ -115,6 +115,9 @@
     },
     "api/cron-job-matches.js": {
       "maxDuration": 300
+    },
+    "api/interview-prep.js": {
+      "maxDuration": 60
     }
   },
   "crons": [

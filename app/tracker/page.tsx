@@ -20,6 +20,7 @@ import WithdrawModal from '@/components/WithdrawModal'
 import PageHeader from '@/components/shell/PageHeader'
 import GuestTracker from '@/components/tracker/GuestTracker'
 import InboxAutopilot from '@/components/tracker/InboxAutopilot'
+import InterviewPrep from '@/components/tracker/InterviewPrep'
 import ApplicationForm from '@/components/tracker/ApplicationForm'
 import ConfirmDialog from '@/components/tracker/ConfirmDialog'
 import StagePipeline from '@/components/tracker/StagePipeline'
@@ -32,6 +33,8 @@ import { responded } from '@/lib/stores/outcomes'
 import { companySlug } from '@/lib/cardCopy.js'
 import { slugSegment } from '@/lib/safeHref.js'
 import { showToast } from '@/lib/toast'
+import { _sync } from '@/lib/sync'
+import { aiHeaders } from '@/lib/aiHeaders'
 import { showReportReward } from '@/lib/rewardNotice'
 import s from '@/components/tracker/tracker.module.css'
 import { LoadError, PageSkeleton } from '@/components/shell/LoadStates'
@@ -80,8 +83,21 @@ const STAGE_RANK = (st: string) => STAGES.indexOf(st as typeof STAGES[number])
 /** A check-in answer only ever RAISES the stage (a "Got a response" never moves a Final Round card back). */
 const raise = (app: Application, stage: string): Partial<Application> => (STAGE_RANK(stage) > STAGE_RANK(app.stage) ? { stage } : {})
 
-function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onShare, onReload, intel, check, onAnswer, onSnooze, sync, onRetry }: {
+// Interview Prep shows from the moment a card reaches an interview stage (lib/server/interviewPrep.js).
+const PREP_STAGES = ['Phone Screen', 'Interview', 'Final Round']
+/** When the card reached an interview: the interview event's date, else the last update. */
+function interviewAt(app: Application): string {
+  const ev = [...(app.events || [])].reverse().find(e => e.type === 'interview_received' || e.type === 'response_received')
+  const ms = ev?.date || app.updatedAt || Date.now()
+  return new Date(ms).toISOString()
+}
+
+function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onShare, onReload, intel, check, onAnswer, onSnooze, sync, onRetry, isPro, autoPrep }: {
   app: Application
+  /** The account has Pro access (subscription, comp, or an Interview Prep window). */
+  isPro: boolean
+  /** Just back from buying Interview Prep for this card — build the pack straight away. */
+  autoPrep: boolean
   /** One card open at a time (the page owns it, so the phone's floating button can get out of its way). */
   expanded: boolean
   setExpanded: (open: boolean) => void
@@ -188,6 +204,10 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
           That was fast — double-check the date?
           <button type="button" className={s.fastBtn} onClick={e => { e.stopPropagation(); onEdit(app) }}>Check the date</button>
         </div>
+      )}
+
+      {isActive && PREP_STAGES.includes(app.stage) && (
+        <InterviewPrep appId={app.id} company={app.company} role={app.role} interviewAt={interviewAt(app)} isPro={isPro} autoBuild={autoPrep} />
       )}
 
       {/* Check-in: asked on the application it is about, not in a separate stack above the list. */}
@@ -416,6 +436,46 @@ function TrackerPage() {
     if (searchParams?.get('add') === '1') setShowManual(true)
   }, [searchParams])
 
+  // Pro access decides whether a card's Interview Prep builds right away or offers the $9.99 pack.
+  const [isPro, setIsPro] = useState(false)
+  const refreshPro = useCallback(() => {
+    if (!isLoggedIn) return Promise.resolve()
+    return _sync('get_credits').then((d) => { const data = d as { pro?: boolean } | null; setIsPro(!!data?.pro) }).catch(() => {})
+  }, [isLoggedIn])
+  useEffect(() => { refreshPro() }, [refreshPro])
+
+  // Back from buying Interview Prep (?prep=<card>&purchase=interview&session_id=…): confirm the purchase
+  // (the webhook may not have landed yet — the confirm shares its idempotency claim), refresh Pro, then
+  // open that card's prep. The query is cleared so a reload does not confirm twice.
+  const [prepReturn, setPrepReturn] = useState('')
+  const prepHandled = useRef(false)
+  useEffect(() => {
+    if (!ready || !isLoggedIn || prepHandled.current) return
+    const prep = searchParams?.get('prep') || ''
+    const sid = searchParams?.get('session_id') || ''
+    const bought = searchParams?.get('purchase') === 'interview'
+    if (!prep && !bought) return
+    prepHandled.current = true
+    const done = () => {
+      if (prep) setPrepReturn(prep)
+      try { window.history.replaceState(null, '', '/tracker') } catch { /* ignore */ }
+      if (prep) setTimeout(() => document.getElementById(`app_${prep}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 400)
+    }
+    if (bought && sid.startsWith('cs_')) {
+      aiHeaders()
+        .then(h => fetch('/api/stripe?action=confirm', { method: 'POST', headers: h, body: JSON.stringify({ session_id: sid }) }))
+        .then(r => r.json().catch(() => ({})))
+        .then((d: { ok?: boolean }) => {
+          if (d?.ok) showToast(prep ? 'Interview Prep is unlocked — building your prep now.' : 'Interview Prep is unlocked — open any interview card and press Build my prep.')
+          return refreshPro()
+        })
+        .catch(() => {})
+        .finally(done)
+    } else {
+      done()
+    }
+  }, [ready, isLoggedIn, searchParams, refreshPro])
+
   // Inbox Autopilot's status arrives inside `load` (one call at mount, not two); undefined = not loaded
   // yet, null = the bundle could not carry it (the panel then asks for itself).
   const [inboxStatus, setInboxStatus] = useState<unknown>(undefined)
@@ -595,7 +655,17 @@ function TrackerPage() {
 
     if (checkType === 'response_check') {
       const rt = data.response_type as string
-      if (rt === 'ghosted') {
+      // "⏳ Not yet" carries no response_type. It used to fall through to "✅ Response received —
+      // {company} responded in N days" (two willingness-to-pay testers hit it, 2026-10-25): nothing
+      // happened, so nothing is announced. A rejection is not a "response received" either.
+      if (data.not_yet || data.got_response === false && !rt) return
+      if (rt === 'rejection') {
+        setUpdateInsight({
+          title: '❌ Rejection logged',
+          body: `${app.company} answered after ${days} days. A rejection still counts as hearing back — it goes into their response record.`,
+          color: 'rgba(156,163,175,0.12)',
+        })
+      } else if (rt === 'ghosted') {
         const ghostPct = score ? Math.round(score.ghost_rate * 100) : null
         setUpdateInsight({
           title: '👻 Ghost documented',
@@ -609,8 +679,8 @@ function TrackerPage() {
         setUpdateInsight({
           title: '📞 Interview unlocked — you\'re ahead',
           body: avgWait
-            ? `You reached the interview stage at ${app.company} in ${days} days. Applicants there wait about ${avgWait} days just for a first response.`
-            : `You reached the interview stage at ${app.company} in ${days} days. Logged — this sharpens ${app.company}'s response data.`,
+            ? `You reached the interview stage at ${app.company} in ${days} days. Applicants there wait about ${avgWait} days just for a first response. Your interview prep is on the card.`
+            : `You reached the interview stage at ${app.company} in ${days} days. Your interview prep is on the card — see what happened to others who interviewed there.`,
           color: 'rgba(99,102,241,0.12)',
         })
       } else if (rt !== 'withdrew') {
@@ -629,7 +699,7 @@ function TrackerPage() {
       if (data.interview_type) {
         setUpdateInsight({
           title: '🗓 Interview stage confirmed',
-          body: `You\'re in the interview stage at ${app.company} after ${days} days. Most applications never get this far.`,
+          body: `You\'re in the interview stage at ${app.company} after ${days} days. Most applications never get this far. Your interview prep is on the card.`,
           color: 'rgba(99,102,241,0.12)',
         })
       }
@@ -1071,7 +1141,7 @@ function TrackerPage() {
           <div id="trackerList" style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
             {pageApps.map(app => (
               <div key={app.id} style={highlightId === app.id ? { borderRadius: 12, boxShadow: '0 0 0 2px var(--green), 0 0 30px rgba(16,185,129,0.3)', transition: 'box-shadow 2.5s ease' } : undefined}>
-                <AppCard app={app} expanded={expandedId === app.id} setExpanded={open => setExpandedId(open ? app.id : '')} onUpdate={handleUpdate} onEdit={a => { setEditNotice(''); setEditing(a) }} onRemove={handleRemove} onShare={handleShare} onReload={loadApps} intel={companyScores[app.company.toLowerCase().trim()]} check={checkByApp.get(app.id)} onAnswer={handleCheckAnswer} onSnooze={handleSnooze} sync={syncOf(app)} onRetry={handleRetry} />
+                <AppCard app={app} expanded={expandedId === app.id} setExpanded={open => setExpandedId(open ? app.id : '')} onUpdate={handleUpdate} onEdit={a => { setEditNotice(''); setEditing(a) }} onRemove={handleRemove} onShare={handleShare} onReload={loadApps} intel={companyScores[app.company.toLowerCase().trim()]} check={checkByApp.get(app.id)} onAnswer={handleCheckAnswer} onSnooze={handleSnooze} sync={syncOf(app)} onRetry={handleRetry} isPro={isPro} autoPrep={prepReturn === app.id && isPro} />
               </div>
             ))}
           </div>

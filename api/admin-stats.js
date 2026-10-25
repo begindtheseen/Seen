@@ -28,6 +28,7 @@ import { pacificDate, pacificDayStart } from '../lib/time/pacific.js';
 import { recentGrants } from '../lib/server/growthRewards.js';
 import { loadSearchOpportunities } from '../lib/server/searchOpportunities.js';
 import { loadAttributionReport } from '../lib/server/attributionReport.js';
+import { loadRevenueFunnel } from '../lib/server/revenueFunnel.js';
 import { browsePath as browseJobsPath, nextCursor as nextJobsCursor, validatePatch as validateJobPatch, restorePatch as jobRestorePatch, isJobId, HOLDERS as JOB_HOLDERS } from '../lib/server/jobAdmin.js';
 
 // Held reports still awaiting a decision: on hold and not already rejected (rejected rows stay held,
@@ -320,6 +321,11 @@ async function _handler(req, res) {
   // ── GET ?action=signup_attribution&days=30: "Where signups come from" (lib/server/attributionReport.js).
   // Read-only, every role. { ready: false } before migration 20261024180000_signup_attribution.sql.
   const getAction = req.method === 'GET' ? String((req.query && req.query.action) || '') : '';
+  // ── GET ?action=revenue_funnel&days=30: "Revenue funnel" (lib/server/revenueFunnel.js). Read-only, every role.
+  if (getAction === 'revenue_funnel') {
+    const out = await loadRevenueFunnel(db, { days: req.query.days });
+    return res.status(200).json(out);
+  }
   if (getAction === 'signup_attribution') {
     const out = await loadAttributionReport(db, { days: req.query.days, stripeKey: process.env.STRIPE_SECRET_KEY || null });
     return res.status(out.ok ? 200 : 502).json(out);
