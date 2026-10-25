@@ -37,6 +37,8 @@ interface HumanProofOutput {
   confirm_before_using: ConfirmItem[]
   interview_risk_warnings: InterviewWarning[]
   changes_made: ChangeMade[]
+  /** What the "grounded" badge may claim (lib/humanizer/index.js): shown only when both hold. */
+  integrity?: { numbers_preserved: boolean; unsupported_claims: number; grounded: boolean }
   explanation: { summary: string; contributions: Contribution[]; notes: string[] }
 }
 
@@ -133,7 +135,7 @@ export default function HumanProofPanel({ job, optimized = false }: { job: Job; 
             Humanize this application
           </button>
           <div style={{ fontFamily: mono, fontSize: '.55rem', color: 'var(--muted)', textAlign: 'center', marginTop: '.45rem' }}>
-            Deterministic — grounded in your real résumé, nothing invented.
+            Deterministic — keeps every number from your résumé exactly and adds no new claims.
           </div>
         </div>
       </div>
@@ -269,7 +271,9 @@ export default function HumanProofPanel({ job, optimized = false }: { job: Job; 
       {/* Safe humanized bullets */}
       {out.safe_bullets.length > 0 && (
         <Section title="SAFE HUMANIZED BULLETS">
-          <div style={{ fontFamily: mono, fontSize: '.58rem', color: 'var(--green)', marginBottom: '.6rem' }}>✓ Grounded in your résumé — no invented numbers, tools, or claims.</div>
+          {out.integrity?.grounded
+            ? <div style={{ fontFamily: mono, fontSize: '.58rem', color: 'var(--green)', marginBottom: '.6rem' }}>✓ Every number from your résumé kept exactly — no invented numbers, tools, or claims.</div>
+            : out.integrity && <div style={{ fontFamily: mono, fontSize: '.58rem', color: 'var(--amber)', marginBottom: '.6rem', lineHeight: 1.5 }}>⚠ {out.integrity.unsupported_claims > 0 ? `${out.integrity.unsupported_claims} figure${out.integrity.unsupported_claims === 1 ? '' : 's'} or tool${out.integrity.unsupported_claims === 1 ? '' : 's'} here ${out.integrity.unsupported_claims === 1 ? 'is' : 'are'} not in your résumé — see “Confirm before using”.` : 'Check these lines against your résumé before using them.'}</div>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
             {out.safe_bullets.map((b, i) => (
               <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.7rem .85rem', display: 'flex', gap: '.6rem', alignItems: 'flex-start' }}>

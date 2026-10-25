@@ -27,7 +27,13 @@ globalThis.fetch = async (url, opts = {}) => {
   const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'Content-Type': 'application/json' } });
   if (u.hostname !== 'db.example') return json({ error: 'unexpected host' }, 500);
   if (u.pathname === '/rest/v1/feature_flags') return json([{ status: 'fully_on' }]);
-  if (u.pathname === '/rest/v1/rpc/consume_credit') { state.charges += 1; state.balance -= 1; return json([{ status: 'ok', balance: state.balance, pro: false }]); }
+  // one graded company for the one-score test (a low process grade moves the fit score)
+  if (u.pathname === '/rest/v1/company_scores') return json(/gradedco/i.test(u.search) ? [{ overall_score: 20, report_count: 40, first_party_report_count: 40, web_report_count: 0, data_source: 'reports' }] : []);
+  if (u.pathname === '/rest/v1/rpc/consume_credit') {
+    // a Pro account is never charged (consume_credit answers 999 and pro:true)
+    if (state.pro) return json([{ status: 'ok', balance: 999, pro: true }]);
+    state.charges += 1; state.balance -= 1; return json([{ status: 'ok', balance: state.balance, pro: false }]);
+  }
   if (u.pathname === '/rest/v1/optimizer_runs') {
     if ((opts.method || 'GET') === 'POST') { const row = JSON.parse(opts.body); state.runs.push({ ...row, created_at: new Date().toISOString() }); return new Response(null, { status: 201 }); }
     const uid = (u.searchParams.get('user_id') || '').replace(/^eq\./, '');
@@ -39,6 +45,8 @@ globalThis.fetch = async (url, opts = {}) => {
 const { default: resumeHandler } = await import('./resume.js');
 const { default: optimizerHandler } = await import('./optimizer.js');
 const { PAID_FIELDS } = await import('../lib/server/optimizePackage.js');
+const { parseResume } = await import('../lib/resume/parse/index.js');
+const DOC = () => parseResume({ text: RESUME, source: 'text' });
 
 function token(sub) {
   const b = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
@@ -160,4 +168,70 @@ test('a listing that states no requirements is never charged: probe and press bo
   const free = await call(optimizerHandler, { action: 'optimize', resumeText: RESUME, jobTitle: 'Team Member', company: 'Northwind', jobDescription: NO_REQS_JD });
   assert.equal(free.body.fit_score, null);
   assert.match(free.body.verdict.sentence, /^No score: this listing does not state its requirements/);
+});
+
+// ── 2026-10-25 writing-tools fixes ─────────────────────────────────────────────────────────────
+test('stale cache: a result stored under an older engine key is never served; fresh:true re-runs', async () => {
+  const uid = '66666666-6666-4666-8666-666666666666';
+  const { createHash } = await import('node:crypto');
+  const { textHash, CACHE_PREFIX, CACHE_VERSION } = await import('../lib/server/optimizeCache.js');
+  assert.match(CACHE_VERSION, /resume_parser_v\d+/);
+  assert.match(CACHE_VERSION, /optimizer_v\d+/);
+  // the key the pre-fix build wrote (no versions in it), holding Tasha's old summary
+  const oldKey = CACHE_PREFIX + createHash('sha256').update([uid, 'job-a', textHash(A.jd), textHash(RESUME)].join('|')).digest('hex').slice(0, 48);
+  state.runs.push({ user_id: uid, job_id: oldKey, output: { summary: { text: 'including (1,800 subscribers).' } }, created_at: new Date().toISOString() });
+  const first = await optimize({}, uid);
+  assert.equal(first.body.cached, false, 'the old row is not served');
+  assert.ok(!/1,800 subscribers\)\./.test(JSON.stringify(first.body)));
+  const reopen = await optimize({}, uid);
+  assert.equal(reopen.body.cached, true);
+  const before = state.charges;
+  const rerun = await optimize({ fresh: true }, uid);
+  assert.equal(rerun.body.cached, false, 'Re-run builds a new package');
+  assert.equal(state.charges, before + 1, 'a re-run for a free user is a new credit');
+});
+
+test('Pro: charged is false and the response says pro — the UI never prints "1 credit used"', async () => {
+  state.pro = true;
+  try {
+    const before = state.charges;
+    const r = await optimize({}, '77777777-7777-4777-8777-777777777777');
+    assert.equal(r.code, 200, JSON.stringify(r.body).slice(0, 200));
+    assert.equal(r.body.charged, false);
+    assert.equal(r.body.pro, true);
+    assert.equal(state.charges, before);
+    const t = await call(resumeHandler, { action: 'tailor', doc: DOC(), jobTitle: A.title, company: A.company, jobDescription: A.jd }, '77777777-7777-4777-8777-777777777777');
+    assert.equal(t.code, 200, JSON.stringify(t.body).slice(0, 200));
+    assert.equal(t.body.charged, false);
+    assert.equal(t.body.pro, true);
+  } finally { state.pro = false; }
+});
+
+test('tailor and scanner refuse a no-requirements posting free, before the credit gate', async () => {
+  const uid = '88888888-8888-4888-8888-888888888888';
+  const before = state.charges;
+  const t = await call(resumeHandler, { action: 'tailor', doc: DOC(), jobTitle: 'Team Member', company: 'Northwind', jobDescription: NO_REQS_JD }, uid);
+  assert.equal(t.code, 422, JSON.stringify(t.body).slice(0, 200));
+  assert.equal(t.body.error, 'no_requirements');
+  assert.equal(t.body.charged, false);
+  const sc = await call(resumeHandler, { tool: 'scanner', resume: RESUME, job: 'Team Member', company: 'Northwind', jobDescription: NO_REQS_JD }, uid);
+  assert.equal(sc.code, 422, JSON.stringify(sc.body).slice(0, 200));
+  assert.equal(sc.body.error, 'no_requirements');
+  assert.equal(state.charges, before, 'nothing charged');
+});
+
+test('one score: the free check, the paid package and the Studio tailor print the same number (graded company, remote posting)', async () => {
+  const uid = '99999999-9999-4999-8999-999999999999';
+  const jd = A.jd + '\nThis role is remote-friendly.';
+  // the client's own remote guess and location are not what the score uses
+  const free = await call(optimizerHandler, { action: 'optimize', resumeText: RESUME, jobTitle: A.title, company: 'GradedCo', jobDescription: jd, remoteOk: false, jobLocation: 'Phoenix, AZ', desiredLocation: 'Boston, MA' }, uid);
+  assert.equal(free.code, 200, JSON.stringify(free.body).slice(0, 200));
+  const paid = await call(resumeHandler, { tool: 'optimize', job: A.title, company: 'GradedCo', resume: RESUME, jobDescription: jd, jobId: 'job-one-score' }, uid);
+  assert.equal(paid.code, 200, JSON.stringify(paid.body).slice(0, 200));
+  const studio = await call(resumeHandler, { action: 'tailor', doc: DOC(), jobTitle: A.title, company: 'GradedCo', jobDescription: jd }, uid);
+  assert.equal(studio.code, 200, JSON.stringify(studio.body).slice(0, 200));
+  assert.ok(typeof free.body.fit_score === 'number');
+  assert.equal(paid.body.fit_score, free.body.fit_score, 'paid = free');
+  assert.equal(paid.body.verdict.score, free.body.fit_score);
+  assert.equal(studio.body.plan.score.before, free.body.fit_score, 'Studio = free');
 });

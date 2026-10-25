@@ -12,7 +12,8 @@ import ApplyCheckpoint from '@/components/ApplyCheckpoint'
 import CreditConfirmDialog from '@/components/CreditConfirmDialog'
 import { trackApplyClick } from '@/lib/trackApply'
 import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
-import { JOB_INSIGHTS_COST, RESUME_OPTIMIZE_COST, creditCostLabel, dailyResetLabel } from '@/lib/creditRules'
+import { JOB_INSIGHTS_COST, RESUME_OPTIMIZE_COST, creditCostLabel, dailyResetLabel, priceLabel, usageLine } from '@/lib/creditRules'
+import { useProStatus } from '@/lib/hooks/useProStatus'
 import { displayCompanyName } from '@/lib/companyDisplay'
 import { displayPay, payLabel } from '@/lib/jobs/pay.js'
 import { paragraphs, isDescriptionPreview, stripDanglingEllipsis, endsCutOff } from '@/lib/jobs/descriptionText.js'
@@ -36,6 +37,7 @@ interface InsightsResponse extends Partial<Insights> {
   price?: number
   cost?: number
   charged?: boolean
+  pro?: boolean
   balance?: number
   credits_required?: boolean
   error?: string
@@ -72,6 +74,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
   onCheckCompany: (company: string) => void
 }) {
   const { user } = useAuth()
+  const pro = useProStatus()
   const panelRef = useRef<HTMLDivElement>(null)
   // Tab cycles inside the drawer; closing returns focus to the job card that opened it.
   useFocusTrap(panelRef, true)
@@ -159,9 +162,10 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
       if (d.credits_required || res.status === 401 || res.status === 402) {
         setInsightNote(d.error || 'Out of AI credits.'); setInsightsState('credits'); return
       }
-      if (d.charged) {
+      // the ledger line says what the server did — a Pro account is never charged (d.pro)
+      if (d.charged || d.pro) {
         window.dispatchEvent(new Event('seen:credits-updated'))
-        setInsightNote(`${creditCostLabel(d.cost ?? JOB_INSIGHTS_COST)} used${typeof d.balance === 'number' && d.balance < 900 ? ` · ${d.balance} left` : ''} · ${dailyResetLabel()}`)
+        setInsightNote(usageLine({ cost: d.cost ?? JOB_INSIGHTS_COST, charged: !!d.charged && !d.pro, pro: !!d.pro, balance: typeof d.balance === 'number' ? d.balance : null }))
       }
       if (d.what_they_want?.length) {
         try { localStorage.setItem('ji_' + job.id, JSON.stringify({ ts: Date.now(), v: JOB_INSIGHTS_VERSION, data: d })) } catch { /* ignore */ }
@@ -172,7 +176,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
 
   function revealInsights() {
     if (!isLoggedIn) { setInsightNote(''); setInsightsState('credits'); return }
-    if (hasConfirmedCreditUse(user?.id)) generateInsights()
+    if (pro === true || hasConfirmedCreditUse(user?.id)) generateInsights()
     else setConfirmOpen(true)
   }
 
@@ -338,10 +342,10 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
                 </div>
                 <button type="button" onClick={revealInsights} data-testid="reveal-insights"
                   style={{ width: '100%', padding: '.62rem .9rem', background: 'rgba(16,185,129,.12)', color: 'var(--green)', border: '1px solid rgba(16,185,129,.4)', borderRadius: 9, fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.8rem', cursor: 'pointer' }}>
-                  Reveal AI insights · {creditCostLabel(insightPrice)}
+                  Reveal AI insights · {priceLabel(insightPrice, pro)}
                 </button>
                 <div style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', color: 'var(--muted)', marginTop: '.4rem', lineHeight: 1.5 }}>
-                  Once generated it is free for everyone for 7 days. {dailyResetLabel()}.
+                  Once generated it is free for everyone for 7 days.{pro === true ? '' : ` ${dailyResetLabel()}.`}
                 </div>
               </div>
             )}
@@ -474,9 +478,9 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
                       type="button"
                       data-testid="drawer-optimize-btn"
                       onClick={() => { onClose(); onApply(job) }}
-                      title={`Optimize your résumé for this job · ${OPTIMIZE_PRICE}`}
+                      title={`Optimize your résumé for this job · ${priceLabel(RESUME_OPTIMIZE_COST, pro)}`}
                       style={{ minWidth: 0, textAlign: 'center', background: 'rgba(99,102,241,.08)', color: '#a5b4fc', borderRadius: 8, padding: '.5rem .5rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.74rem', lineHeight: 1.15, border: '1px solid rgba(99,102,241,.35)', cursor: 'pointer' }}
-                    >Optimize · {OPTIMIZE_PRICE.replace(' ', '\u00a0')}</button>
+                    >Optimize · {priceLabel(RESUME_OPTIMIZE_COST, pro).replace(' ', '\u00a0')}</button>
                   )}
                 </>
               : !seenApply && <button disabled style={{ flex: 1, background: 'var(--raised)', color: 'var(--muted)', border: 'none', borderRadius: 8, padding: '.58rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.82rem', opacity: .45 }}>No apply link</button>

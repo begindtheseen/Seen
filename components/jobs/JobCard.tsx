@@ -9,7 +9,8 @@ import { notify } from '@/lib/notify'
 import type { Job } from '@/lib/types'
 import { takesSeenApply } from '@/lib/seenApplyMode'
 import { trackApplyClick } from '@/lib/trackApply'
-import { RESUME_OPTIMIZE_COST, creditCostLabel } from '@/lib/creditRules'
+import { RESUME_OPTIMIZE_COST, creditCostLabel, priceLabel } from '@/lib/creditRules'
+import { useProStatus } from '@/lib/hooks/useProStatus'
 import ApplyCheckpoint from '@/components/ApplyCheckpoint'
 import { displayCompanyName } from '@/lib/companyDisplay'
 import { displayPay } from '@/lib/jobs/pay.js'
@@ -68,6 +69,7 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
   const [checkpoint, setCheckpoint] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
   const { user, isLoggedIn } = useAuth()
+  const pro = useProStatus()
   // The employer as a person names it: "PLS", not the board slug "plscareers" (lib/companyDisplay.ts).
   // job.company stays the data key for the company lookup behind "Check".
   const companyName = displayCompanyName(job.company) || job.company
@@ -270,11 +272,11 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
                 type="button"
                 style={optimizeBtn}
                 data-testid="optimize-btn"
-                title={optimizedHere ? 'Open your optimization for this job — kept for 7 days, no credit' : `Optimize your résumé for this job · ${OPTIMIZE_PRICE}`}
+                title={optimizedHere ? 'Open your optimization for this job — kept for 7 days, no credit' : `Optimize your résumé for this job · ${priceLabel(RESUME_OPTIMIZE_COST, pro)}`}
                 onClick={e => { e.stopPropagation(); onApply(job) }}
               >
                 {/* opening the modal never charges; it checks the server cache first (C2/E6) */}
-                {optimizedHere ? 'Optimize · cached' : <>Optimize · {OPTIMIZE_PRICE.replace(' ', '\u00a0')}</>}
+                {optimizedHere ? 'Optimize · cached' : <>Optimize · {priceLabel(RESUME_OPTIMIZE_COST, pro).replace(' ', '\u00a0')}</>}
               </button>
             )}
           </>
