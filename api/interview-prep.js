@@ -19,7 +19,7 @@ import { SCORABLE_REPORTS_FILTER } from '../lib/server/reportCounts.js';
 import { detectRoleFamily } from '../lib/application-intelligence/roleOntology.js';
 import { ONE_TIME_SKUS } from '../lib/server/creditRules.js';
 import {
-  interviewRecord, payRange, followUpPlan, prepPrompt, guardPack, fallbackPack, prepEmails, prepKey,
+  interviewRecord, payRange, followUpPlan, prepPrompt, guardPack, fallbackPack, prepEmails, prepKey, signOffName,
 } from '../lib/server/interviewPrep.js';
 
 export const FUNNEL_EVENTS = ['prep_offer_shown', 'prep_offer_clicked', 'prep_built', 'guest_email_shown', 'guest_email_given'];
@@ -152,7 +152,7 @@ export default async function handler(req, res) {
       pack = fallbackPack({ company, role, resumeText });
     }
 
-    const name = clean(prof?.name, 80);
+    const name = signOffName(resumeText, clean(prof?.name, 80));
     const full = {
       company, role,
       built_at: new Date().toISOString(),

@@ -17,7 +17,7 @@ const SKU = ONE_TIME_SKUS.interview
 const PRICE = `$${(SKU.amount_cents / 100).toFixed(2)}`
 
 type Quote = { text: string; role: string | null; outcome: string; source: string | null; url: string | null }
-type Record = {
+type InterviewRecord = {
   accounts: number
   after: { offer: number; rejected: number; ghosted: number; waiting: number }
   resolved: number
@@ -38,7 +38,7 @@ type Pack = {
 }
 
 // One read per company + role per page view, shared by every card that names it.
-const recordCache = new Map<string, Promise<{ record: Record; pay: Pay | null; follow_up: FollowUp } | null>>()
+const recordCache = new Map<string, Promise<{ record: InterviewRecord; pay: Pay | null; follow_up: FollowUp } | null>>()
 function loadRecord(company: string, role: string, interviewAt: string) {
   const key = `${company.toLowerCase()}|${role.toLowerCase()}`
   if (!recordCache.has(key)) {
@@ -53,6 +53,17 @@ function loadRecord(company: string, role: string, interviewAt: string) {
 function beacon(event: string, company: string) {
   aiHeaders().then(h => fetch('/api/interview-prep', { method: 'POST', headers: h, body: JSON.stringify({ action: 'event', event, company }), keepalive: true })).catch(() => {})
 }
+
+// "1 got an offer, 2 were rejected" — zero counts left out, singular/plural right.
+function afterLine(a: InterviewRecord['after']): string {
+  const parts: string[] = []
+  if (a.offer) parts.push(`${a.offer} got an offer`)
+  if (a.rejected) parts.push(`${a.rejected} ${a.rejected === 1 ? 'was' : 'were'} rejected`)
+  if (a.ghosted) parts.push(`${a.ghosted} heard nothing after`)
+  if (a.waiting) parts.push(`${a.waiting} ${a.waiting === 1 ? 'is' : 'are'} still waiting`)
+  return parts.join(', ')
+}
+const article = (w: string) => (/^[aeiou]/i.test(w.trim()) ? 'an' : 'a')
 
 const day = (iso: string) => new Date(iso).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles', weekday: 'short', month: 'short', day: 'numeric' })
 const money = (p: Pay) => p.unit === 'hour'
@@ -78,7 +89,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
   /** Set when the person just came back from buying Interview Prep for this card. */
   autoBuild?: boolean
 }) {
-  const [data, setData] = useState<{ record: Record; pay: Pay | null; follow_up: FollowUp } | null>(null)
+  const [data, setData] = useState<{ record: InterviewRecord; pay: Pay | null; follow_up: FollowUp } | null>(null)
   const [open, setOpen] = useState(true)
   const [pack, setPack] = useState<Pack | null>(null)
   const [state, setState] = useState<'idle' | 'building' | 'buying' | 'need_resume' | 'error'>('idle')
@@ -152,7 +163,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
             {rec && rec.accounts > 0 ? (
               <p className={s.fact}>
                 <b>{rec.accounts} {rec.accounts === 1 ? 'account' : 'accounts'}</b> of interviewing at {company} on Seen
-                {rec.resolved > 0 && <>: {rec.after.offer} got an offer, {rec.after.rejected} were rejected, {rec.after.ghosted} heard nothing after</>}.
+                {afterLine(rec.after) && <>: {afterLine(rec.after)}</>}.
                 {rec.ghostedAfterInterviewPct != null && rec.ghostedAfterInterviewPct >= 20 && <> {rec.ghostedAfterInterviewPct}% were ghosted after interviewing — follow up on time.</>}
                 {rec.rounds != null && rec.rounds > 1 && <> Usually {rec.rounds} rounds.</>}
               </p>
@@ -187,7 +198,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
             <div className={s.offer}>
               <div className={s.offerTitle}>Walk in ready for {company}</div>
               <ul className={s.list}>
-                <li>Likely questions for {role ? `a ${role}` : 'this role'}, and what each one checks</li>
+                <li>Likely questions for {role ? `${article(role)} ${role}` : 'this role'}, and what each one checks</li>
                 <li>Answers built from <b>your</b> résumé — nothing made up</li>
                 <li>Your 30-second “tell me about yourself”</li>
                 <li>Thank-you and follow-up emails, ready to send on the right day</li>
@@ -201,7 +212,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
               ) : (
                 <>
                   <button type="button" className={s.cta} disabled={state === 'buying'} onClick={buy}>
-                    {state === 'buying' ? 'Opening checkout…' : `Get ready for ${company} — ${PRICE}`}
+                    {state === 'buying' ? 'Opening checkout…' : `Get my prep — ${PRICE}`}
                   </button>
                   <p className={s.fine}>One-time, never renews. Includes {SKU.pro_days} days of Seen Pro.</p>
                 </>
@@ -237,6 +248,7 @@ function PackView({ pack, company }: { pack: Pack; company: string }) {
       </div>
       <div className={s.block}>
         <div className={s.label}>Answers from your résumé</div>
+        <p className={s.dim} style={{ margin: '0 0 .45rem' }}>Practice them out loud and make them yours — change any detail that isn&apos;t exactly what happened.</p>
         {pack.answers.map((a, i) => (
           <details key={i} className={s.answer} open={i === 0}>
             <summary>{a.q}</summary>
