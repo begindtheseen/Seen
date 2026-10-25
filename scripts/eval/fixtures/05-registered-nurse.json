@@ -1,0 +1,140 @@
+{
+  "id": "05-registered-nurse",
+  "field": "Registered nurse",
+  "pdf": true,
+  "resume": [
+    "Rebecca Thornton, BSN, RN",
+    "Denver, CO · 303-555-0142 · rthornton.rn@gmail.com",
+    "",
+    "LICENSES & CERTIFICATIONS",
+    "Registered Nurse, Colorado (multistate compact) — exp. 2026",
+    "BLS (American Heart Association) — exp. 2026",
+    "ACLS (American Heart Association) — exp. 2025",
+    "",
+    "EXPERIENCE",
+    "Registered Nurse, Medical-Surgical Unit — St. Aurelia Medical Center, Denver, CO — Aug 2020 to Present",
+    "• Care for 5–6 adult patients per shift on a 32-bed med-surg unit, including post-op, diabetic and COPD patients",
+    "• Serve as charge nurse 2 shifts a week: make assignments, manage admissions and discharges, and support new staff",
+    "• Precepted 7 new graduate nurses through their 12-week orientation",
+    "• Member of the unit's falls committee; falls dropped from 11 to 4 per quarter after we started hourly rounding",
+    "• Document assessments, medication administration and care plans in Epic",
+    "",
+    "Registered Nurse, Float Pool — Front Range Health, Aurora, CO — Jun 2018 to Jul 2020",
+    "• Floated to med-surg, ortho and observation units and picked up shifts in the ED fast track",
+    "• Started IVs, administered IV medications and blood products, and managed PCA pumps",
+    "",
+    "Certified Nursing Assistant — Pinecrest Senior Living, Lakewood, CO — 2015 to 2018",
+    "• Helped 12–14 residents a shift with bathing, mobility, meals and vital signs",
+    "",
+    "EDUCATION",
+    "Bachelor of Science in Nursing — Regis University, Denver, CO, 2018",
+    "",
+    "SKILLS",
+    "Epic, IV therapy, wound care, patient education, charge nurse, preceptor, telemetry monitoring basics (stepdown float shifts)"
+  ],
+  "job": {
+    "title": "Registered Nurse – Telemetry (Nights)",
+    "company": "Summit Ridge Hospital",
+    "location": "Lakewood, CO",
+    "description": [
+      "Summit Ridge Hospital is a 280-bed community hospital and a designated Level III trauma center. This year we are transitioning our clinical documentation from Cerner to Epic.",
+      "",
+      "Position Summary",
+      "The Telemetry RN provides direct care to adult cardiac and medical patients on continuous cardiac monitoring in our 36-bed telemetry unit. Pediatric unit nurses also need PALS; this telemetry role does not.",
+      "",
+      "Essential Functions",
+      "- Assess, plan, implement and evaluate care for 4–5 telemetry patients per shift",
+      "- Interpret cardiac rhythms and respond to changes and alarms",
+      "- Administer medications, including cardiac drips, per protocol",
+      "- Educate patients and families on cardiac diagnoses, medications and discharge needs",
+      "- Work with physicians, pharmacists and case managers on each patient's plan of care",
+      "",
+      "Qualifications",
+      "- Active Colorado RN license or multistate compact license (required)",
+      "- BLS required; ACLS required within 6 months of hire",
+      "- 1+ year of acute care RN experience",
+      "- Telemetry or stepdown experience preferred",
+      "- BSN preferred",
+      "",
+      "Schedule",
+      "Nights, 7:00 PM – 7:30 AM, three 12-hour shifts per week (36 hours), every third weekend and a holiday rotation.",
+      "",
+      "Pay",
+      "$42.00 – $58.00 per hour based on experience, plus a $5.00/hr night differential. Sign-on bonus available."
+    ]
+  },
+  "gold": {
+    "family": [
+      "clinical",
+      "healthcare_support"
+    ],
+    "must_skills": [
+      {
+        "label": "RN license",
+        "match": "\\brn\\b|registered nurse|licen[cs]e"
+      },
+      {
+        "label": "BLS",
+        "match": "\\bbls\\b"
+      },
+      {
+        "label": "ACLS",
+        "match": "\\bacls\\b"
+      }
+    ],
+    "alternatives": [],
+    "years_min": 1,
+    "traps": [
+      {
+        "term": "PALS",
+        "match": "\\bpals\\b",
+        "scope": "any",
+        "why": "the posting says this role does NOT need PALS"
+      },
+      {
+        "term": "Cerner",
+        "match": "cerner",
+        "scope": "candidate",
+        "why": "she charts in Epic; Cerner is the hospital's old system"
+      },
+      {
+        "term": "Telemetry unit experience",
+        "match": "telemetry (?:unit )?experience|telemetry nurse|tele(?:metry)? unit at",
+        "scope": "candidate",
+        "why": "she has only telemetry monitoring basics from float shifts"
+      }
+    ],
+    "resume_employers": [
+      "St. Aurelia Medical Center",
+      "Front Range Health",
+      "Pinecrest Senior Living"
+    ],
+    "resume_titles": [
+      "Registered Nurse, Medical-Surgical Unit",
+      "Registered Nurse, Float Pool",
+      "Certified Nursing Assistant"
+    ],
+    "resume_degrees": [
+      "Bachelor of Science in Nursing"
+    ],
+    "resume_numbers": [
+      "303",
+      "555",
+      "0142",
+      "2026",
+      "2025",
+      "2020",
+      "5",
+      "6",
+      "32",
+      "2",
+      "7",
+      "12",
+      "11",
+      "4",
+      "2018",
+      "2015",
+      "14"
+    ]
+  }
+}

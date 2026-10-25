@@ -1,0 +1,148 @@
+{
+  "id": "10-admin-assistant",
+  "field": "Administrative assistant",
+  "resume": [
+    "Gloria Reyes",
+    "Sacramento, CA 95822",
+    "916-555-0170 • gloria.reyes.admin@gmail.com",
+    "",
+    "PROFILE",
+    "Organized administrative assistant with 9 years supporting attorneys and a busy dental office. Known for calendars that never double-book and invoices that close on time.",
+    "",
+    "EXPERIENCE",
+    "",
+    "Administrative Assistant",
+    "Capitol Valley Law Group, Sacramento, CA",
+    "Mar 2019 – Present",
+    "• Manage calendars, deadlines and court dates for 4 attorneys in Outlook and Clio",
+    "• Process 120+ vendor and client invoices a month in QuickBooks with no late payments in 2024",
+    "• Prepare correspondence, pleadings drafts and exhibit binders in Word; maintain the matter filing system",
+    "• Book travel and file expense reports for attorneys attending out-of-town depositions",
+    "• Answer and route a 6-line phone system and greet clients",
+    "",
+    "Front Desk Receptionist",
+    "River City Dental, Sacramento, CA",
+    "Aug 2016 – Feb 2019",
+    "• Checked in 50+ patients a day, verified insurance and collected co-pays",
+    "• Confirmed next-day appointments by phone, cutting no-shows from 14% to 6%",
+    "",
+    "Data Entry Clerk (Temp)",
+    "StaffPoint Staffing, Sacramento, CA",
+    "2015 – 2016",
+    "• Entered 400+ records a day into client databases at 99% accuracy",
+    "",
+    "EDUCATION",
+    "Certificate, Office Administration — American River College, 2015",
+    "",
+    "SKILLS",
+    "Microsoft Office (Word, Excel, Outlook) • QuickBooks • Clio • Calendar management • Typing 70 WPM • Bilingual (English/Spanish)"
+  ],
+  "job": {
+    "title": "Executive Administrative Assistant",
+    "company": "Delta Bay Engineering",
+    "location": "Sacramento, CA",
+    "description": [
+      "Delta Bay Engineering is a 300-person civil and structural engineering firm. Our engineers design bridges, levees and water systems across Northern California using AutoCAD and Civil 3D.",
+      "",
+      "Position overview",
+      "We're looking for an Executive Administrative Assistant to support our President and two Vice Presidents. You'll be the person who keeps their weeks running.",
+      "",
+      "Key responsibilities",
+      "- Manage complex calendars across three executives and schedule internal and client meetings",
+      "- Coordinate domestic travel and prepare expense reports",
+      "- Prepare presentations, reports and correspondence",
+      "- Organize board and leadership meetings, including agendas and minutes",
+      "- Handle confidential information with discretion",
+      "",
+      "Qualifications",
+      "- 3+ years of administrative experience, including supporting executives or senior leaders",
+      "- Advanced Microsoft Office skills (Outlook, Excel, Word, PowerPoint)",
+      "- Experience coordinating travel and expenses; Concur experience preferred",
+      "- Excellent written communication and attention to detail",
+      "- Discretion with confidential information",
+      "",
+      "Schedule and pay",
+      "On-site, Monday – Friday, 8:00 AM – 5:00 PM. $26 – $31 per hour depending on experience. Medical, dental, vision, 401(k) with 4% match."
+    ]
+  },
+  "gold": {
+    "family": [
+      "administrative"
+    ],
+    "must_skills": [
+      {
+        "label": "administrative experience",
+        "match": "administrative|executive|support"
+      },
+      {
+        "label": "Microsoft Office",
+        "match": "microsoft office|outlook|excel|powerpoint"
+      },
+      {
+        "label": "travel and expenses",
+        "match": "travel|expense"
+      }
+    ],
+    "alternatives": [],
+    "years_min": 3,
+    "traps": [
+      {
+        "term": "AutoCAD",
+        "match": "autocad|civil 3d",
+        "scope": "any",
+        "why": "the engineers' tools in the company blurb"
+      },
+      {
+        "term": "Concur",
+        "match": "concur\\b",
+        "scope": "candidate",
+        "why": "not in the résumé"
+      },
+      {
+        "term": "PowerPoint",
+        "match": "powerpoint",
+        "scope": "candidate",
+        "why": "her résumé lists Word, Excel, Outlook only"
+      },
+      {
+        "term": "Executive support title",
+        "match": "executive assistant at|supported (?:the )?(?:ceo|president)",
+        "scope": "candidate",
+        "why": "she supported attorneys, not executives"
+      }
+    ],
+    "resume_employers": [
+      "Capitol Valley Law Group",
+      "River City Dental",
+      "StaffPoint Staffing"
+    ],
+    "resume_titles": [
+      "Administrative Assistant",
+      "Front Desk Receptionist",
+      "Data Entry Clerk"
+    ],
+    "resume_degrees": [
+      "Certificate, Office Administration"
+    ],
+    "resume_numbers": [
+      "95822",
+      "916",
+      "555",
+      "0170",
+      "9",
+      "2019",
+      "4",
+      "120",
+      "2024",
+      "6",
+      "2016",
+      "50",
+      "14%",
+      "6%",
+      "2015",
+      "400",
+      "99%",
+      "70"
+    ]
+  }
+}

@@ -1,0 +1,138 @@
+{
+  "id": "14-teacher",
+  "field": "Elementary teacher",
+  "resume": [
+    "Megan O'Connor",
+    "Raleigh, NC 27609 · (919) 555-0124 · megan.oconnor.teach@gmail.com",
+    "",
+    "LICENSURE",
+    "North Carolina Initial Professional License — Elementary Education (K–6), 2018",
+    "",
+    "TEACHING EXPERIENCE",
+    "4th Grade Teacher, Oak Grove Elementary School (Wake County Public Schools) — Raleigh, NC, Aug 2019 – Present",
+    "• Teach all core subjects to classes of 24–27 students, including 5–7 students with IEPs or 504 plans each year",
+    "• Raised the share of students reading at grade level from 58% to 81% in one year using small-group guided reading and i-Ready data",
+    "• Lead the 4th-grade PLC: set common assessments and run monthly data meetings with 5 teachers",
+    "• Hold two family conferences a year with every family; 100% attendance in 2023–24 by offering evening and phone slots",
+    "",
+    "Long-Term Substitute (2nd Grade), Cedar Fork Elementary — Morrisville, NC, Jan 2019 – Jun 2019",
+    "• Took over a class of 22 mid-year and kept the existing routines and behavior plan in place",
+    "",
+    "Student Teacher (3rd Grade), Lacy Elementary — Raleigh, NC, Aug 2018 – Dec 2018",
+    "",
+    "EDUCATION",
+    "B.A. Elementary Education, North Carolina State University, 2018",
+    "",
+    "SKILLS",
+    "Guided reading, small-group instruction, classroom management (Responsive Classroom), Google Classroom, i-Ready, Canvas, PowerSchool"
+  ],
+  "job": {
+    "title": "5th Grade Teacher",
+    "company": "Triangle Ridge Charter Academy",
+    "location": "Durham, NC",
+    "description": [
+      "Triangle Ridge Charter Academy is a free, public K–8 charter school serving 650 students in Durham. We believe every child can read, write and reason at a high level.",
+      "",
+      "Position",
+      "5th Grade Homeroom Teacher (ELA and Social Studies), starting August 2025.",
+      "",
+      "Responsibilities",
+      "- Plan and teach engaging ELA and social studies lessons aligned to NC Standard Course of Study",
+      "- Use assessment data to group students and adjust instruction",
+      "- Build a positive, structured classroom culture",
+      "- Communicate weekly with families",
+      "- Collaborate with the 5th-grade team and the EC and ESL teachers",
+      "",
+      "Requirements",
+      "- Bachelor's degree",
+      "- Valid North Carolina teaching license, or eligibility for one",
+      "- Experience teaching upper elementary (grades 3–6)",
+      "- Strong classroom management",
+      "- Comfort using data to drive instruction",
+      "",
+      "Preferred",
+      "- 2+ years of classroom teaching",
+      "- Master's in Education",
+      "- AIG or ESL add-on licensure",
+      "",
+      "Salary",
+      "$48,000 – $58,000 based on the state salary schedule plus a $2,000 charter supplement. 10-month contract; summer PD in July."
+    ]
+  },
+  "gold": {
+    "family": [
+      "education"
+    ],
+    "must_skills": [
+      {
+        "label": "NC teaching license",
+        "match": "licen[cs]"
+      },
+      {
+        "label": "Bachelor's degree",
+        "match": "bachelor'?s|degree"
+      },
+      {
+        "label": "classroom management",
+        "match": "classroom management|classroom"
+      }
+    ],
+    "alternatives": [],
+    "years_min": 2,
+    "traps": [
+      {
+        "term": "Master's",
+        "match": "master'?s|\\bm\\.ed\\b",
+        "scope": "candidate",
+        "why": "she has a B.A."
+      },
+      {
+        "term": "AIG / ESL licensure",
+        "match": "\\baig\\b|esl add-on|esl licen",
+        "scope": "candidate",
+        "why": "not in the résumé"
+      },
+      {
+        "term": "5th grade experience",
+        "match": "5th[- ]grade (?:teacher|experience) at|taught 5th",
+        "scope": "candidate",
+        "why": "she taught 2nd–4th"
+      }
+    ],
+    "resume_employers": [
+      "Oak Grove Elementary School",
+      "Cedar Fork Elementary",
+      "Lacy Elementary"
+    ],
+    "resume_titles": [
+      "4th Grade Teacher",
+      "Long-Term Substitute (2nd Grade)",
+      "Student Teacher (3rd Grade)"
+    ],
+    "resume_degrees": [
+      "B.A. Elementary Education"
+    ],
+    "resume_numbers": [
+      "27609",
+      "919",
+      "555",
+      "0124",
+      "6",
+      "2018",
+      "4",
+      "2019",
+      "24",
+      "27",
+      "5",
+      "7",
+      "504",
+      "58%",
+      "81%",
+      "100%",
+      "2023",
+      "2",
+      "22",
+      "3"
+    ]
+  }
+}

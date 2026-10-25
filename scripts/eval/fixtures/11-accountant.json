@@ -1,0 +1,153 @@
+{
+  "id": "11-accountant",
+  "field": "Accountant",
+  "resume": [
+    "Kevin Tran",
+    "Houston, TX · 713-555-0185 · kevin.tran.acct@gmail.com",
+    "",
+    "SUMMARY",
+    "Staff accountant with 6 years in month-end close, reconciliations and AP. Passed FAR and AUD sections of the CPA exam in 2024; sitting for REG in 2025.",
+    "",
+    "EXPERIENCE",
+    "Bayou Industrial Supply — Houston, TX",
+    "Staff Accountant, Apr 2021 – Present",
+    "• Own month-end close for 3 entities; cut the close from 8 to 5 business days by building a close checklist and reconciliation templates",
+    "• Reconcile 14 bank and balance-sheet accounts each month and prepare the flux analysis for the Controller",
+    "• Prepare journal entries for accruals, prepaid amortization and fixed-asset depreciation in NetSuite",
+    "• Supported the 2023 external audit: built 60+ PBC schedules and answered auditor questions",
+    "",
+    "Gulf Coast Marine Services — Houston, TX",
+    "Accounts Payable Specialist, Jun 2018 – Mar 2021",
+    "• Processed 900+ invoices a month with three-way match in NetSuite and Bill.com",
+    "• Cleaned up 2 years of vendor duplicates and recovered $38K in duplicate payments",
+    "",
+    "Tran Family Nail Salon — Pasadena, TX",
+    "Bookkeeper (part-time), 2016 – 2018",
+    "• Kept the books in QuickBooks and ran bi-weekly payroll for 8 employees",
+    "",
+    "EDUCATION",
+    "B.B.A., Accounting — University of Houston, C.T. Bauer College of Business, 2018",
+    "",
+    "SKILLS",
+    "NetSuite, QuickBooks, Bill.com, Excel (VLOOKUP/XLOOKUP, pivot tables), US GAAP, account reconciliation, month-end close"
+  ],
+  "job": {
+    "title": "Senior Accountant",
+    "company": "Lone Star Energy Partners",
+    "location": "Houston, TX",
+    "description": [
+      "Lone Star Energy Partners owns and operates midstream pipelines and storage terminals across Texas and Louisiana.",
+      "",
+      "Job Summary",
+      "The Senior Accountant owns the close for several of our operating entities and is a go-to resource for audits and reporting.",
+      "",
+      "Responsibilities",
+      "- Lead the monthly and quarterly close for assigned entities, including journal entries, accruals and reconciliations",
+      "- Prepare account reconciliations and variance analysis for management",
+      "- Support external audits and SOX controls testing",
+      "- Improve close processes and documentation",
+      "- Mentor staff accountants",
+      "",
+      "Qualifications",
+      "- Bachelor's degree in Accounting or Finance",
+      "- 4+ years of accounting experience; public accounting experience is a plus",
+      "- CPA preferred",
+      "- Strong knowledge of US GAAP",
+      "- Experience with an ERP system (SAP, Oracle, or NetSuite)",
+      "- Advanced Excel skills",
+      "",
+      "Compensation",
+      "$85,000 – $100,000 base salary plus an annual bonus of up to 10%. Hybrid after 90 days (3 days in office)."
+    ]
+  },
+  "gold": {
+    "family": [
+      "finance_accounting"
+    ],
+    "must_skills": [
+      {
+        "label": "GAAP",
+        "match": "gaap"
+      },
+      {
+        "label": "ERP",
+        "match": "erp|sap|oracle|netsuite"
+      },
+      {
+        "label": "Excel",
+        "match": "excel"
+      },
+      {
+        "label": "Bachelor's degree",
+        "match": "bachelor'?s|degree"
+      }
+    ],
+    "alternatives": [
+      [
+        "SAP",
+        "Oracle",
+        "NetSuite"
+      ]
+    ],
+    "years_min": 4,
+    "traps": [
+      {
+        "term": "CPA (licensed)",
+        "match": "(?<!almost a |not a |not yet a |become a |becoming a )\\bcpa\\b(?! exam| sections?| progress| candidate| track)|certified public accountant|licensed cpa",
+        "scope": "candidate",
+        "why": "he has passed 2 sections; he is not a CPA"
+      },
+      {
+        "term": "SAP",
+        "match": "\\bsap\\b",
+        "scope": "candidate",
+        "why": "he uses NetSuite"
+      },
+      {
+        "term": "Public accounting",
+        "match": "public accounting",
+        "scope": "candidate",
+        "why": "he has none"
+      },
+      {
+        "term": "SOX",
+        "match": "\\bsox\\b",
+        "scope": "candidate",
+        "why": "not in the résumé"
+      }
+    ],
+    "resume_employers": [
+      "Bayou Industrial Supply",
+      "Gulf Coast Marine Services",
+      "Tran Family Nail Salon"
+    ],
+    "resume_titles": [
+      "Staff Accountant",
+      "Accounts Payable Specialist",
+      "Bookkeeper"
+    ],
+    "resume_degrees": [
+      "B.B.A., Accounting"
+    ],
+    "resume_numbers": [
+      "713",
+      "555",
+      "0185",
+      "6",
+      "2024",
+      "2025",
+      "2021",
+      "3",
+      "8",
+      "5",
+      "14",
+      "2023",
+      "60",
+      "2018",
+      "900",
+      "2",
+      "38",
+      "2016"
+    ]
+  }
+}
