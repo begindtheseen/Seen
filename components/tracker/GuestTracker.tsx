@@ -23,6 +23,7 @@ import { hasPendingRef } from '@/lib/referralClient'
 import { loginHref } from '@/lib/safeHref.js'
 import AppliedWhen from '@/components/track/AppliedWhen'
 import CheckinEmailAsk from '@/components/track/CheckinEmailAsk'
+import InterviewPrep from '@/components/tracker/InterviewPrep'
 import s from '@/components/track/track.module.css'
 
 export default function GuestTracker() {
@@ -67,6 +68,21 @@ export default function GuestTracker() {
     if (res.duplicate) setError(`${c} · ${r} is already on your list.`)
     setApps(AppStore.loadSync())
     if (!res.duplicate) { setShowForm(false); setCompany(''); setRole(''); setChoice(null); setPickedDay('') }
+  }
+
+  // "They called me in" — the guest card moves to Interview on this device (round 2: a guest could only
+  // Remove a card, so the "if they call you in…" promise had nowhere to land).
+  async function calledIn(id: string) {
+    await AppStore.update(id, { stage: 'Interview' }, false)
+    setApps(AppStore.loadSync())
+  }
+  async function schedule(id: string, iso: string) {
+    await AppStore.update(id, {}, false, { markers: [{ id: `ev_${Date.now()}`, type: 'interview_scheduled', date: Date.now(), source: 'user', confidence: 'high', data: { at: iso } }] })
+    setApps(AppStore.loadSync())
+  }
+  const scheduledAt = (a: Application) => {
+    const ev = [...(a.events || [])].reverse().find(e => e.type === 'interview_scheduled' && typeof e.data?.at === 'string')
+    return ev ? String(ev.data!.at) : ''
   }
 
   async function remove(id: string) {
@@ -126,7 +142,15 @@ export default function GuestTracker() {
                       {a.role} · Day {daysSince(a.appliedAt)} · applied {shortDay(a.appliedAt)}{a.status !== 'active' ? ` · ${a.status}` : ''}
                     </p>
                   </div>
+                  {a.status === 'active' && a.stage === 'Applied' && (
+                    <button type="button" className={s.ghost} onClick={() => void calledIn(a.id)} data-testid="gt-called-in">📅 They called me in</button>
+                  )}
                   <button type="button" className={s.ghost} onClick={() => void remove(a.id)} aria-label={`Remove ${a.company} ${a.role}`}>Remove</button>
+                  {a.status === 'active' && ['Phone Screen', 'Interview', 'Final Round'].includes(a.stage) && (
+                    <div style={{ flexBasis: '100%', minWidth: 0 }}>
+                      <InterviewPrep guest appId={a.id} company={a.company} role={a.role} interviewAt={scheduledAt(a)} isPro={false} stage={a.stage} onSchedule={iso => void schedule(a.id, iso)} />
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>

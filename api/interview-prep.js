@@ -16,10 +16,9 @@ import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { gateAI } from '../lib/server/credits.js';
 import { chat, llmAvailable, LLMUnavailableError } from '../lib/server/llm.js';
 import { SCORABLE_REPORTS_FILTER } from '../lib/server/reportCounts.js';
-import { detectRoleFamily } from '../lib/application-intelligence/roleOntology.js';
 import { ONE_TIME_SKUS } from '../lib/server/creditRules.js';
 import {
-  interviewRecord, payRange, followUpPlan, prepPrompt, guardPack, prepEmails, prepKey, signOffName,
+  interviewRecord, payRange, followUpPlan, prepPrompt, guardPack, prepEmails, prepKey, signOffName, prepFamily,
 } from '../lib/server/interviewPrep.js';
 
 export const FUNNEL_EVENTS = ['prep_offer_shown', 'prep_offer_clicked', 'prep_built', 'guest_email_shown', 'guest_email_given'];
@@ -40,18 +39,19 @@ export async function readRecord({ supabaseUrl, serviceKey, company, role }) {
   if (!names.length) return null;
   const [repRes, jobRes] = await Promise.all([
     fetch(`${supabaseUrl}/rest/v1/reports?company_name=in.(${inList(names)})&${SCORABLE_REPORTS_FILTER}&select=outcome,rounds,wait_days,report_text,role,platform,ghost_stage&order=created_at.desc&limit=1000`, { headers: h }).catch(() => null),
-    fetch(`${supabaseUrl}/rest/v1/jobs?company=ilike.${encodeURIComponent(names[names.length - 1])}&salary_min=not.is.null&select=title,salary_min,salary_max&limit=400`, { headers: h }).catch(() => null),
+    fetch(`${supabaseUrl}/rest/v1/jobs?company=ilike.${encodeURIComponent(names[names.length - 1])}&or=${encodeURIComponent('(salary_min.not.is.null,salary.not.is.null)')}&select=title,salary,salary_min,salary_max&limit=600`, { headers: h }).catch(() => null),
   ]);
   if (!repRes || !repRes.ok) return null;
   const reports = await repRes.json().catch(() => []);
   const jobs = jobRes && jobRes.ok ? await jobRes.json().catch(() => []) : [];
-  // Pay: the same role family first (a cashier's range is not a store manager's), else the company.
-  const fam = detectRoleFamily(role || '', '').family;
-  const sameFam = fam !== 'general' ? jobs.filter((j) => detectRoleFamily(j.title || '', '').family === fam) : [];
-  const pay = payRange(sameFam.length >= 3 ? sameFam : jobs);
+  // Pay: only from the same kind of role — a software engineer's range is never shown to a warehouse lead
+  // (round 2). A role with no clear field gets the company-wide range, labelled as such.
+  const fam = prepFamily(role);
+  const pool = fam !== 'general' ? jobs.filter((j) => prepFamily(j.title || '') === fam) : jobs;
+  const pay = payRange(pool);
   return {
     record: interviewRecord(reports, { role }),
-    pay: pay ? { ...pay, scope: sameFam.length >= 3 ? 'role' : 'company' } : null,
+    pay: pay ? { ...pay, scope: fam !== 'general' ? 'role' : 'company' } : null,
   };
 }
 
@@ -129,8 +129,15 @@ export default async function handler(req, res) {
     if (await applyRateLimit(req, res, 'interview-record')) return;
     if (!company) return res.status(400).json({ error: 'company required' });
     const uid = await uidFromToken(req, SUPABASE_URL, SERVICE_KEY);
-    if (!uid) return res.status(200).json({ ok: true, pack: null });
-    return res.status(200).json({ ok: true, pack: await readCached(uid) });
+    if (!uid) return res.status(200).json({ ok: true, pack: null, has_resume: null });
+    // Whether a résumé is on file, so the card never sells a prep it cannot build (round 2: Ray paid, then
+    // got "Add your résumé first").
+    const [pack, pr] = await Promise.all([
+      readCached(uid),
+      db(`profiles?id=eq.${encodeURIComponent(uid)}&select=resume_text&limit=1`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    ]);
+    const text = Array.isArray(pr) && pr[0] ? String(pr[0].resume_text || '') : null;
+    return res.status(200).json({ ok: true, pack, has_resume: text == null ? null : text.replace(/\s+/g, ' ').length >= 200 });
   }
 
   if (action === 'build') {

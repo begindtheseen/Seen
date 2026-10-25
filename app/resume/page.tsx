@@ -772,6 +772,12 @@ function ResumePageInner() {
           actions={<Link href="/resume/studio" className="tap" style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem', background: 'var(--idim)', border: '1px solid var(--imid)', color: '#c7d2fe', borderRadius: 999, padding: '.4rem .85rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', textDecoration: 'none', whiteSpace: 'nowrap' }}>✦ Résumé Studio →</Link>}
         />
 
+        {params?.get('back') === 'tracker' && (
+          <Link href="/tracker" className="tap" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, marginBottom: '.75rem', color: 'var(--green)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-72)', textDecoration: 'none' }}>
+            {resumeText ? '✓ Résumé on file — back to your interview prep →' : '← Back to your interview prep (add your résumé first)'}
+          </Link>
+        )}
+
         {guestGate && !isLoggedIn && (
           <div role="status" style={{ background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.3)', borderRadius: 10, padding: '.9rem 1rem', marginBottom: '1rem' }}>
             <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.95rem', color: 'var(--white)', marginBottom: '.25rem' }}>Make a free account to build {guestGate}</div>

@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { ONE_TIME_SKUS } from '@/lib/creditRules'
+import { signupHref } from '@/lib/signupIntent.js'
 import s from './InterviewPrep.module.css'
 
 const SKU = ONE_TIME_SKUS.interview
@@ -79,7 +80,9 @@ function CopyBtn({ text, label = 'Copy' }: { text: string; label?: string }) {
   )
 }
 
-export default function InterviewPrep({ appId, company, role, interviewAt, isPro, autoBuild, jobId, stage, onSchedule }: {
+export default function InterviewPrep({ appId, company, role, interviewAt, isPro, autoBuild, jobId, stage, onSchedule, guest = false }: {
+  /** A guest on this device: the free record and date work; the prep needs a free account first. */
+  guest?: boolean
   appId: string
   company: string
   role: string
@@ -101,6 +104,8 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
   const [err, setErr] = useState('')
   const shown = useRef(false)
   const built = useRef(false)
+  const [hasResume, setHasResume] = useState<boolean | null>(null)
+  const [posting, setPosting] = useState('')
 
   useEffect(() => {
     let live = true
@@ -111,12 +116,17 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
   // A prep this person already has (bought, or built with Pro) shows on every device and after Pro ends.
   useEffect(() => {
     let live = true
+    if (guest) return () => { live = false }
     aiHeaders().then(h => {
       if (!h.Authorization) return null
       return fetch('/api/interview-prep', { method: 'POST', headers: h, body: JSON.stringify({ action: 'mine', company, role }) }).then(r => (r.ok ? r.json() : null))
-    }).then(d => { if (live && d?.pack) setPack(d.pack) }).catch(() => {})
+    }).then(d => {
+      if (!live || !d) return
+      if (d.pack) setPack(d.pack)
+      if (typeof d.has_resume === 'boolean') setHasResume(d.has_resume)
+    }).catch(() => {})
     return () => { live = false }
-  }, [company, role])
+  }, [company, role, guest])
 
   // Count the offer once per card per browser session (the funnel's "offer shown" step).
   useEffect(() => {
@@ -131,7 +141,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
     setState('building'); setErr('')
     try {
       const h = await aiHeaders()
-      const r = await fetch('/api/interview-prep', { method: 'POST', headers: h, body: JSON.stringify({ action: 'build', company, role, application_id: appId, interview_at: interviewAt, job_id: jobId || '', stage }) })
+      const r = await fetch('/api/interview-prep', { method: 'POST', headers: h, body: JSON.stringify({ action: 'build', company, role, application_id: appId, interview_at: interviewAt, job_id: jobId || '', job_text: posting.trim().slice(0, 6000), stage }) })
       const d = await r.json().catch(() => ({}))
       if (r.status === 409 && d.need_resume) { setState('need_resume'); return }
       if (r.status === 402) { setState('idle'); setErr('This needs Interview Prep or Pro.'); return }
@@ -238,8 +248,19 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
                 <li>Your 30-second “tell me about yourself”</li>
                 <li>Thank-you and follow-up emails, ready to send on the right day</li>
               </ul>
-              {state === 'need_resume' ? (
-                <p className={s.fact}>Your answers are built from your résumé. <Link href="/resume" className={s.link}>Add your résumé →</Link> then come back.</p>
+              {!jobId && !guest && (
+                <label className={s.paste}>
+                  <span>Paste the job posting (optional — it makes the questions match this exact job)</span>
+                  <textarea rows={3} value={posting} onChange={e => setPosting(e.target.value)} autoComplete="off" />
+                </label>
+              )}
+              {guest ? (
+                <>
+                  <Link href={signupHref({ next: '/tracker' })} className={s.cta} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>Make a free account to get your prep →</Link>
+                  <p className={s.fine}>Free. Your tracker comes with you. The prep itself is {PRICE} once.</p>
+                </>
+              ) : state === 'need_resume' || hasResume === false ? (
+                <p className={s.fact}>Your answers are built from your résumé, so add it first (free). <Link href="/resume?back=tracker" className={s.link}>Add your résumé →</Link></p>
               ) : isPro ? (
                 <button type="button" className={s.cta} disabled={state === 'building'} onClick={build}>
                   {state === 'building' ? 'Building your prep… (about 20 seconds)' : 'Build my prep →'}
