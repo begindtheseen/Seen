@@ -1,6 +1,6 @@
 # Seen Pro tools — evaluation scorecard (prepfix-preview, 2026-10-25)
 
-Commit `5999b2e` · 15 fixtures · in-process handlers for the deterministic tools · live model calls on `https://seen-md34wxxzz-begindtheseens-projects.vercel.app` for interview_prep, tailor_polish.
+Commit `fba2b29` · 15 fixtures · in-process handlers for the deterministic tools · live model calls on `https://seen-md34wxxzz-begindtheseens-projects.vercel.app` for interview_prep, tailor_polish.
 
 ## Inventory
 
@@ -28,24 +28,25 @@ Commit `5999b2e` · 15 fixtures · in-process handlers for the deterministic too
 
 | Tool | Model? | Ran | Clean records | Invented | Traps | Wrong field | Misread req. | Broken text | Charges | Parse | Round-trip | Mean grade (min) | p50 / max ms | Verdict |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| interview_prep_fallback | no | 14/14 | 14/14 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | — | 2.43 (2) ⚠14 stale | 6 / 40 | FAIL — mean grade 2.43 < 4; a grade of 2 (< 3); 14 stale grade(s) — re-grade |
-| interview_prep | YES | 0/14 | 0/0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | — | — | — / — | FAIL — not run |
+| interview_prep_fallback | no | 14/14 | 14/14 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | — | 2.43 (2) ⚠14 stale | 10 / 62 | FAIL — mean grade 2.43 < 4; a grade of 2 (< 3); 14 stale grade(s) — re-grade |
+| interview_prep | YES | 14/14 | 12/14 | 1 | 0 | 0 | 0 | 1 | 0 | 0 | — | 3.64 (3) ⚠14 stale | 14245 / 15496 | FAIL — 1 invented fact(s); 1 broken-text; mean grade 3.64 < 4; 14 stale grade(s) — re-grade |
+| interview_prep_jobtext | YES | 14/14 | 9/14 | 5 | 1 | 0 | 0 | 0 | 0 | 0 | — | 3.57 (2) ⚠14 stale | 14586 / 16220 | FAIL — 5 invented fact(s); 1 trap(s); mean grade 3.57 < 4; a grade of 2 (< 3); 14 stale grade(s) — re-grade |
 
 ## Pass rate per check
 
 | Check | Class | Records checked | Failing | Findings | Pass rate |
 |---|---|---|---|---|---|
-| invented_number | invented_fact | 14 | 0 | 0 | 100% |
-| invented_org | invented_fact | 14 | 0 | 0 | 100% |
-| invented_tool | invented_fact | 14 | 0 | 0 | 100% |
-| invented_degree | invented_fact | 14 | 0 | 0 | 100% |
-| invented_years | invented_fact | 14 | 0 | 0 | 100% |
-| wrong_family | wrong_field | 14 | 0 | 0 | 100% |
-| other_field_vocab | wrong_field | 14 | 0 | 0 | 100% |
-| trap | trap | 14 | 0 | 0 | 100% |
-| broken_text | broken_text | 14 | 0 | 0 | 100% |
-| error | error | 14 | 0 | 0 | 100% |
-| latency | latency | 14 | 0 | 0 | 100% |
+| invented_number | invented_fact | 42 | 1 | 2 | 97.6% |
+| invented_org | invented_fact | 42 | 2 | 2 | 95.2% |
+| invented_tool | invented_fact | 42 | 0 | 0 | 100% |
+| invented_degree | invented_fact | 42 | 1 | 1 | 97.6% |
+| invented_years | invented_fact | 42 | 1 | 1 | 97.6% |
+| wrong_family | wrong_field | 42 | 0 | 0 | 100% |
+| other_field_vocab | wrong_field | 28 | 0 | 0 | 100% |
+| trap | trap | 42 | 1 | 1 | 97.6% |
+| broken_text | broken_text | 42 | 1 | 1 | 97.6% |
+| error | error | 42 | 0 | 0 | 100% |
+| latency | latency | 42 | 0 | 0 | 100% |
 
 ## Defects, ranked (expert review + automatic checks)
 
@@ -197,70 +198,102 @@ Commit `5999b2e` · 15 fixtures · in-process handlers for the deterministic too
 
 Every finding is in the JSON file next to this one; root cause and fix per group.
 
+### invented_number · interview_prep_jobtext — 2 finding(s) [invented_fact]
+
+- `13-line-cook` answers.answer: "7" is not in the résumé — “Over the past 4 years and 7 months at Magnolia Bistro, I've run both stations during busy dinner service. [Which station do you prefer, and what's your reason—speed, technique, control over the plate?] [Your preference and what that tells you about how you wor”
+- `13-line-cook` intro: "7" is not in the résumé — “I'm a line cook with 4 years and 7 months at Magnolia Bistro, where I work sauté and grill on 250-cover Friday and Saturday nights. I keep ticket times under 14 minutes, prep and break down my station to standard every shift, and I've passed every health inspe”
+
+### invented_org · interview_prep_jobtext — 1 finding(s) [invented_fact]
+
+- `04-customer-service` intro: "Lumen Ridge's" is not in the résumé — “I'm a customer care representative with 5 years of experience on phones, chat and email in insurance and telecom. I handle 60–70 inbound calls a day on billing and account questions, and I keep a 94% customer satisfaction score, which is consistently above my ”
+
+### invented_years · interview_prep_jobtext — 1 finding(s) [invented_fact]
+
+- `11-accountant` intro: says 6 years at Gulf Coast Marine Services; the résumé's dates give 2.8 years there — “I'm a Staff Accountant with 6 years of close and reconciliation experience at Bayou Industrial Supply and Gulf Coast Marine Services.”
+
+### invented_org · interview_prep — 1 finding(s) [invented_fact]
+
+- `13-line-cook` intro: "Fridays and Saturdays" is not in the résumé — “I've been a line cook at Magnolia Bistro since 2022, running sauté and grill on our busiest nights—250-cover Fridays and Saturdays—and keeping ticket times under 14 minutes. Before that I was a prep cook at Crescent Catering, working with everything from small”
+
+### invented_degree · interview_prep_jobtext — 1 finding(s) [invented_fact]
+
+- `14-teacher` intro: "bachelor's" is not in the résumé — “I'm a 4th-grade teacher at Oak Grove Elementary in Raleigh, and I've been teaching since 2019. I hold a North Carolina Elementary Education license and a bachelor's degree in Elementary Education. I'm skilled at using data—especially i-Ready—to group students ”
+
+### trap · interview_prep_jobtext — 1 finding(s) [trap]
+
+- `12-hvac-technician` intro: Building automation: not in the résumé — “I'm an HVAC service technician with 9 years of experience installing and servicing residential systems in the Phoenix heat. Since 2020, I've been at Desert Air Comfort running 5–7 service calls a day, diagnosing and repairing equipment like split systems, heat”
+
+### broken_text · interview_prep — 1 finding(s) [broken_text]
+Root cause: resume_fact points at a header/meta line.  
+Fix: Require resume_fact to be an experience bullet.
+
+- `05-registered-nurse` answers.resume_fact: a "story" built on a role header line, not an accomplishment — “Registered Nurse, Medical-Surgical Unit — St. Aurelia Medical Center, Denver, CO — Aug 2020 to Present”
+
 ## Expert grades
 
-| Fixture | interview_prep_fallback | interview_prep |
-|---|---|---|
-| 01-retail-manager | 2⚠ | deferred |
-| 02-warehouse-lead | 2⚠ | deferred |
-| 03-cashier-entry | 2⚠ | deferred |
-| 04-customer-service | 3⚠ | deferred |
-| 05-registered-nurse | 2⚠ | deferred |
-| 06-backend-engineer | 2⚠ | deferred |
-| 07-data-analyst | 3⚠ | deferred |
-| 08-marketing-coordinator | 2⚠ | deferred |
-| 09-sdr-sales | 3⚠ | deferred |
-| 10-admin-assistant | 2⚠ | deferred |
-| 11-accountant | 2⚠ | deferred |
-| 12-hvac-technician | 3⚠ | deferred |
-| 13-line-cook | 3⚠ | deferred |
-| 14-teacher | 3⚠ | deferred |
-| 15-no-requirements |  |  |
+| Fixture | interview_prep_fallback | interview_prep | interview_prep_jobtext |
+|---|---|---|---|
+| 01-retail-manager | 2⚠ | 4⚠ | 2⚠ |
+| 02-warehouse-lead | 2⚠ | 4⚠ | 4⚠ |
+| 03-cashier-entry | 2⚠ | 4⚠ | 4⚠ |
+| 04-customer-service | 3⚠ | 4⚠ | 4⚠ |
+| 05-registered-nurse | 2⚠ | 3⚠ | 3⚠ |
+| 06-backend-engineer | 2⚠ | 4⚠ | 4⚠ |
+| 07-data-analyst | 3⚠ | 3⚠ | 3⚠ |
+| 08-marketing-coordinator | 2⚠ | 3⚠ | 4⚠ |
+| 09-sdr-sales | 3⚠ | 4⚠ | 4⚠ |
+| 10-admin-assistant | 2⚠ | 3⚠ | 4⚠ |
+| 11-accountant | 2⚠ | 4⚠ | 3⚠ |
+| 12-hvac-technician | 3⚠ | 3⚠ | 4⚠ |
+| 13-line-cook | 3⚠ | 4⚠ | 3⚠ |
+| 14-teacher | 3⚠ | 4⚠ | 4⚠ |
+| 15-no-requirements |  |  |  |
 
 Grade notes (1 = harmful · 3 = usable, no better than free ChatGPT · 5 = worth paying for alone):
 
 - `01-retail-manager` · interview_prep_fallback — **2**: Generic cashier-level questions for a Store Manager ("accuracy at the register"); broken "How would you handle handling a busy register line…". Stories are real bullets.
 - `01-retail-manager` · interview_prep — **4**: Strong, role-specific questions built on her real numbers; answers usable. Defects: intro says "the last three and a half [years] as an Assistant Store Manager" (dates say 5.5); answers add practices not in the résumé ("I also pair them with supervisors…").
+- `01-retail-manager` · interview_prep_jobtext — **2**: Given the posting, the intro claims a requirement she does not have: "I've already been running the day-to-day operations—the schedules, the hiring, the P&L piece". Answers add "I trained all 18 associates and my 3 supervisors on loss prevention basics".
 - `02-warehouse-lead` · interview_prep_fallback — **2**: "Give me an example of when you showed safety." First story is his summary line, not an accomplishment.
 - `02-warehouse-lead` · interview_prep — **4**: Excellent lead-level questions (safety huddle, shorts reconciliation). Intro invents a promotion path: "worked my way up from Material Handler to Forklift Operator" (one combined role).
+- `02-warehouse-lead` · interview_prep_jobtext — **4**: Questions now track the posting (WMS monitoring, 15–25 crew, safety incidents). Intro dropped by the guard.
 - `03-cashier-entry` · interview_prep_fallback — **2**: "How would you handle handling a busy register line…" broken; otherwise generic.
 - `03-cashier-entry` · interview_prep — **4**: Natural, entry-level questions and answers. Defects: "since June of this year" (June 2024), "What drew you back to grocery retail?" (she never worked grocery).
+- `03-cashier-entry` · interview_prep_jobtext — **4**: Good, posting-aware entry-level pack.
 - `04-customer-service` · interview_prep_fallback — **3**: Generic but correct for the field.
 - `04-customer-service` · interview_prep — **4**: Very good, specific to her numbers. Numbers are written as words ("sixty to seventy", "ninety-four percent"), which escapes the digit-only guard.
+- `04-customer-service` · interview_prep_jobtext — **4**: Good; one awkward question ("What does your typical Monday morning look like between 10 AM and 7 PM Eastern?").
 - `05-registered-nurse` · interview_prep_fallback — **2**: Family "general": generic questions for a telemetry RN; two "stories" are her license line and a role header.
 - `05-registered-nurse` · interview_prep — **3**: Questions are genuinely clinical and good (rhythm changes, nights, charge priorities). Intro states "almost four years of experience at St. Aurelia" (dates: 6.2); charge-nurse answer garbles "assignments for five to six patients per nurse". Family field still "general".
+- `05-registered-nurse` · interview_prep_jobtext — **3**: Clinical, posting-aware questions (4–5 tele patients, nights); family still "general"; a header line used as a story.
 - `06-backend-engineer` · interview_prep_fallback — **2**: "Give me an example of when you showed shipping."
 - `06-backend-engineer` · interview_prep — **4**: Strong payments-relevant questions grounded in his bullets. Intro "four years of experience" (7); answers embellish ("I analyzed the queries…").
+- `06-backend-engineer` · interview_prep_jobtext — **4**: Strong posting-aware questions (queues, on-call, compliance); intro dropped.
 - `07-data-analyst` · interview_prep_fallback — **3**: Generic but stories are her strongest bullets.
 - `07-data-analyst` · interview_prep — **3**: Very good questions on her real projects; but an answer moves the Monday-report automation to the wrong employer ("At Twin Lakes, I was generating this Monday sales report…" — it was North Loop).
+- `07-data-analyst` · interview_prep_jobtext — **3**: False premise: "You've worked with Tableau and Power BI. What's your experience…" (no Power BI on her résumé); 2 of 4 answers dropped by the guard.
 - `08-marketing-coordinator` · interview_prep_fallback — **2**: A "story" is a role header ("Social Media Assistant (part-time) — SDSU … (Sep 2022 – May 2024)"); "showed channel fluency".
 - `08-marketing-coordinator` · interview_prep — **3**: Good questions; intro overclaims: "I've spent the last couple years working in marketing at Coastal Coffee Roasters, where I managed their social media" (a 10-week internship); answers add practices not on the résumé.
+- `08-marketing-coordinator` · interview_prep_jobtext — **4**: Good; the intro is accurate now ("the last few months as a marketing intern").
 - `09-sdr-sales` · interview_prep_fallback — **3**: Reasonable sales questions.
 - `09-sdr-sales` · interview_prep — **4**: Sharp SDR questions (volume vs personalisation, inbound vs outbound). Answers embellish method ("I know my conversion rate from call to meeting…").
+- `09-sdr-sales` · interview_prep_jobtext — **4**: Strong.
 - `10-admin-assistant` · interview_prep_fallback — **2**: "How would you handle accuracy, tools used, and handling confidential records?" broken.
 - `10-admin-assistant` · interview_prep — **3**: Only three role questions and none on supporting three executives, travel or board meetings; intro dropped; an answer claims "I've never had a double-booking… I color-code" (not on the résumé).
+- `10-admin-assistant` · interview_prep_jobtext — **4**: Now covers travel, expenses and confidentiality (the posting's asks); one invented practice ("I look ahead two weeks").
 - `11-accountant` · interview_prep_fallback — **2**: "How would you handle reconciliation, accuracy, and any system you list?"; first story is the summary.
 - `11-accountant` · interview_prep — **4**: Strong, honest about the CPA exam; senior-level questions on close, flux, audit and REG timing.
+- `11-accountant` · interview_prep_jobtext — **3**: Good questions but a wrong fact in one: "You've used NetSuite for 3 years now" (since 2018).
 - `12-hvac-technician` · interview_prep_fallback — **3**: Field-correct, generic.
 - `12-hvac-technician` · interview_prep — **3**: Good residential→commercial questions, but the guard dropped 2 of 4 answers and the intro, so the pack is thin.
+- `12-hvac-technician` · interview_prep_jobtext — **4**: Good residential→commercial framing; honest about chillers/RTUs.
 - `13-line-cook` · interview_prep_fallback — **3**: Field-correct, generic.
 - `13-line-cook` · interview_prep — **4**: Natural kitchen questions and answers grounded in his numbers.
+- `13-line-cook` · interview_prep_jobtext — **3**: A question contradicts the résumé: "Tell me about the last time you didn't pass a health inspection" (he passed every one).
 - `14-teacher` · interview_prep_fallback — **3**: Field-correct, generic.
 - `14-teacher` · interview_prep — **4**: Excellent: data-driven reading, IEPs, PLC, 4th→5th transition; answers stay on her facts.
+- `14-teacher` · interview_prep_jobtext — **4**: Excellent.
 
 ## Deferred live calls
 
-- 01-retail-manager · interview_prep: live call failed: eval account file not found: pass --accounts <file> or set EVAL_ACCOUNTS_FILE (columns: name email password user_id)
-- 02-warehouse-lead · interview_prep: live call failed: eval account file not found: pass --accounts <file> or set EVAL_ACCOUNTS_FILE (columns: name email password user_id)
-- 03-cashier-entry · interview_prep: live call failed: eval account file not found: pass --accounts <file> or set EVAL_ACCOUNTS_FILE (columns: name email password user_id)
-- 04-customer-service · interview_prep: live call failed: eval account file not found: pass --accounts <file> or set EVAL_ACCOUNTS_FILE (columns: name email password user_id)
-- 05-registered-nurse · interview_prep: live call failed: eval account file not found: pass --accounts <file> or set EVAL_ACCOUNTS_FILE (columns: name email password user_id)
-- 06-backend-engineer · interview_prep: live call failed: eval account file not found: pass --accounts <file> or set EVAL_ACCOUNTS_FILE (columns: name email password user_id)
-- 07-data-analyst · interview_prep: live call failed: eval account file not found: pass --accounts <file> or set EVAL_ACCOUNTS_FILE (columns: name email password user_id)
-- 08-marketing-coordinator · interview_prep: live call failed: eval account file not found: pass --accounts <file> or set EVAL_ACCOUNTS_FILE (columns: name email password user_id)
-- 09-sdr-sales · interview_prep: live call failed: eval account file not found: pass --accounts <file> or set EVAL_ACCOUNTS_FILE (columns: name email password user_id)
-- 10-admin-assistant · interview_prep: live call failed: eval account file not found: pass --accounts <file> or set EVAL_ACCOUNTS_FILE (columns: name email password user_id)
-- 11-accountant · interview_prep: live call failed: eval account file not found: pass --accounts <file> or set EVAL_ACCOUNTS_FILE (columns: name email password user_id)
-- 12-hvac-technician · interview_prep: live call failed: eval account file not found: pass --accounts <file> or set EVAL_ACCOUNTS_FILE (columns: name email password user_id)
-- 13-line-cook · interview_prep: live call failed: eval account file not found: pass --accounts <file> or set EVAL_ACCOUNTS_FILE (columns: name email password user_id)
-- 14-teacher · interview_prep: live call failed: eval account file not found: pass --accounts <file> or set EVAL_ACCOUNTS_FILE (columns: name email password user_id)
+None.
