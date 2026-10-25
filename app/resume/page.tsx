@@ -31,6 +31,8 @@ const CREDIT_WORD = FREE_DAILY_CREDITS === 1 ? 'credit' : 'credits'
 
 type Tab = 'fit' | 'rewrite' | 'humanproof' | 'strategy' | 'export'
 const OPTIMIZE_PRICE = creditCostLabel(RESUME_OPTIMIZE_COST)
+// Fallback for the server's 422 no_requirements message (lib/server/optimizePackage.js unoptimizableListing).
+const NO_REQUIREMENTS_NOTE = "This listing doesn't list its requirements, so there's nothing to optimize against — no credit used."
 
 // ── SeenFit optimizer output (canonical, from /api/optimizer action:'optimize') ──
 interface Contribution { factor: string; weight: number; raw: number; points: number; reason: string; scored?: boolean }
@@ -396,7 +398,9 @@ function ResumePageInner() {
   const [fitErrRef, setFitErrRef] = useState('') // server error ref for a failed optimize (traceable in api_errors)
   // The paid package (Rewrite tab): probed free after every analysis, bought only on a press.
   const [paid, setPaid] = useState<PaidOptimize | null>(null)
-  const [paidState, setPaidState] = useState<'idle' | 'checking' | 'loading' | 'done' | 'error' | 'preview'>('idle')
+  const [paidState, setPaidState] = useState<'idle' | 'checking' | 'loading' | 'done' | 'error' | 'preview' | 'no_requirements'>('idle')
+  // The server's words when a posting states too few requirements to optimize against (free, 422).
+  const [paidNote, setPaidNote] = useState('')
   const [confirmPaid, setConfirmPaid] = useState(false)
   // A saved job carries its listing source so the server can tell an Adzuna teaser from a posting;
   // the moment the person edits the description it is THEIR pasted posting.
@@ -558,8 +562,9 @@ function ResumePageInner() {
     setPaidState('checking')
     try {
       const res = await fetch('/api/resume', { method: 'POST', headers: await aiHeaders(), body: JSON.stringify({ tool: 'optimize', probe: true, resume: resumeText, job: jobTitle, company: jobCompany, ...postingBody() }) })
-      const data = await res.json().catch(() => ({})) as PaidOptimize & { error?: string }
+      const data = await res.json().catch(() => ({})) as PaidOptimize & { error?: string; message?: string }
       if (data.error === 'preview_only') { setPaidState('preview'); return }
+      if (data.error === 'no_requirements') { setPaidNote(data.message || ''); setPaidState('no_requirements'); return }
       if (res.ok && data.cached) { setPaid(data); setPaidState('done'); return }
       setPaidState('idle')
     } catch { setPaidState('idle') }
@@ -575,9 +580,10 @@ function ResumePageInner() {
     setConfirmPaid(false); setPaidState('loading'); setError('')
     try {
       const res = await fetch('/api/resume', { method: 'POST', headers: await aiHeaders(), body: JSON.stringify({ tool: 'optimize', resume: resumeText, job: jobTitle, company: jobCompany, ...postingBody() }) })
-      const data = await res.json().catch(() => ({})) as PaidOptimize & { error?: string; credits_required?: boolean; pro_required?: boolean }
+      const data = await res.json().catch(() => ({})) as PaidOptimize & { error?: string; message?: string; credits_required?: boolean; pro_required?: boolean }
       if (res.status === 402 || data.credits_required) { setUpgradeReason('credits'); setUpgradeFeature(undefined); setShowUpgrade(true); setPaidState('idle'); return }
       if (data.error === 'preview_only') { setPaidState('preview'); return }
+      if (data.error === 'no_requirements') { setPaidNote(data.message || ''); setPaidState('no_requirements'); return }
       if (!res.ok || data.error) { setPaidState('error'); return }
       if (data.charged) window.dispatchEvent(new Event('seen:credits-updated'))
       setPaid(data); setPaidState('done'); setHp(null); setHpState('idle')
@@ -890,6 +896,7 @@ function ResumePageInner() {
                 {tab === 'rewrite' && (
                   fitState === 'loading' || paidState === 'checking' ? <ResultEmpty icon="⏳" text={'Checking for a plan you already built…'} />
                   : paidState === 'preview' || fitState === 'preview' ? <ResultEmpty icon="📄" text={'This listing only has a summary. Paste the full posting to optimize for it — no credit is used for a preview.'} />
+                  : paidState === 'no_requirements' ? <ResultEmpty icon="📄" text={paidNote || NO_REQUIREMENTS_NOTE} />
                   : paidState === 'loading' ? <ResultEmpty icon="✍️" text={'Building your rewrite plan…'} />
                   : paidState === 'done' && paid ? <RewriteView out={paid} copy={copy} copied={copied} />
                   : fitOut ? (
