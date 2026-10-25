@@ -1,0 +1,668 @@
+# Seen Pro tools — evaluation scorecard (after-reading, 2026-10-25)
+
+Commit `110c79f` · 15 fixtures · in-process handlers for the deterministic tools · live model calls on `https://seenjobs.io` for interview_prep, tailor_polish (from cache — pass --prod to refresh).
+
+## Inventory
+
+| Tool | Model? | Cost | Path |
+|---|---|---|---|
+| parse | no | free | app/resume/page.tsx upload → api/resume.js action:parse → lib/server/resumeUpload.js → lib/resume/parse/index.js parseResume |
+| parse_pdf | no | free | same as parse, from a hanging-indent PDF (lib/resume/extract/pdf.js) |
+| fit | no | free | SeenFitPanel / ApplyOptimizeModal / résumé page → api/optimizer.js action:optimize → lib/optimizer/index.js runOptimizer → freeDiagnostic |
+| optimize | no | 1 credit (Pro: free) | ApplyOptimizeModal, app/resume/page.tsx runPaid → api/resume.js tool:optimize (handleOptimizeTool) → lib/server/optimizePackage.js buildPaidOptimize |
+| scanner | no | 1 credit | (no UI caller found) api/resume.js tool:scanner → lib/server/seenfitCompat.js scannerFromSeenFit |
+| ats_check | no | free | components/resume/ExportPanel.tsx → api/resume.js action:ats_check → lib/resume/render/atsCheck.js |
+| tailor | no | 1 credit (Pro: free) | components/resume/TailorPanel.tsx → api/resume.js action:tailor → lib/server/resumeStudio.js tailorAction → lib/resume/tailor/tailor.js |
+| tailor_polish | YES | Pro only | TailorPanel polish toggle → action:tailor polish:true → lib/resume/tailor/polish.js polishBullets → lib/server/llm.js chat |
+| export | no | free (Pro = no Seen line) | ExportPanel → api/resume.js action:export → lib/resume/render (PDF/DOCX); ApplyOptimizeModal → action:download_resume |
+| insights | no | 1 credit on a cache miss | JobDetailDrawer / app/jobs/[id] "Reveal AI insights" → api/job-insights.js → lib/server/jobInsights.js buildJobInsights |
+| advantage | no | 1 credit | app/resume/page.tsx runAdvantage → api/resume.js tool:advantage → lib/server/resumeAnalysis.js runAdvantage (buildCoach + buildProposal) |
+| humanproof | no | Pro only (gateAI proOnly when humanproof_paid_only is on) | app/resume/page.tsx runHumanProof / ApplyOptimizeModal → api/optimizer.js action:humanize → lib/server/humanizePackage.js → lib/humanizer |
+| interview_prep | YES | Pro / $9.99 Interview Prep | components/tracker/InterviewPrep.tsx → api/interview-prep.js action:build → lib/server/llm.js chat + lib/server/interviewPrep.js guardPack |
+| interview_prep_fallback | no | Pro / $9.99 Interview Prep | api/interview-prep.js action:build when no model / model error → lib/server/interviewPrep.js fallbackPack |
+| interview_prep_jobtext | YES | Pro | interview_prep with job_text (the API accepts it; the tracker never sends it) |
+
+## Pass bar
+
+0 invented facts · 0 traps · 0 wrong-field outputs · 0 broken-text outputs · 0 charges for nothing · round-trip 100% · mean expert grade ≥ 4 with no grade below 3.
+
+| Tool | Model? | Ran | Clean records | Invented | Traps | Wrong field | Misread req. | Broken text | Charges | Parse | Round-trip | Mean grade (min) | p50 / max ms | Verdict |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| parse | no | 15/15 | 9/15 | 0 | 0 | 0 | 0 | 0 | 0 | 16 | — | 3.87 (1) | 2 / 54 | FAIL — 16 parse defect(s); mean grade 3.87 < 4; a grade of 1 (< 3) |
+| fit | no | 15/15 | 15/15 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | — | 2.4 (1) ⚠13 stale | 13 / 120 | FAIL — mean grade 2.4 < 4; a grade of 1 (< 3); 13 stale grade(s) — re-grade |
+| optimize | no | 15/15 | 9/15 | 6 | 0 | 0 | 0 | 2 | 0 | 0 | — | 1.87 (1) ⚠13 stale | 151 / 340 | FAIL — 6 invented fact(s); 2 broken-text; mean grade 1.87 < 4; a grade of 1 (< 3); 13 stale grade(s) — re-grade |
+| humanproof | no | 14/15 | 0/14 | 0 | 0 | 0 | 0 | 14 | 0 | 0 | — | 1 (1) ⚠10 stale | 9 / 19 | FAIL — 14 broken-text; mean grade 1 < 4; a grade of 1 (< 3); 10 stale grade(s) — re-grade |
+| scanner | no | 15/15 | 5/15 | 0 | 0 | 0 | 16 | 0 | 0 | 0 | — | 1.47 (1) ⚠14 stale | 18 / 22 | FAIL — mean grade 1.47 < 4; a grade of 1 (< 3); 14 stale grade(s) — re-grade |
+| advantage | no | 15/15 | 15/15 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | — | 1.87 (1) ⚠15 stale | 17 / 29 | FAIL — mean grade 1.87 < 4; a grade of 1 (< 3); 15 stale grade(s) — re-grade |
+| insights | no | 15/15 | 15/15 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | — | 2.2 (1) ⚠15 stale | 5 / 9 | FAIL — mean grade 2.2 < 4; a grade of 1 (< 3); 15 stale grade(s) — re-grade |
+| tailor | no | 15/15 | 0/15 | 6 | 2 | 0 | 26 | 15 | 1 | 0 | — | 1.4 (1) ⚠12 stale | 109 / 142 | FAIL — 6 invented fact(s); 2 trap(s); 15 broken-text; 1 charge(s) for nothing; mean grade 1.4 < 4; a grade of 1 (< 3); 12 stale grade(s) — re-grade |
+| ats_check | no | 14/14 | 14/14 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | — | 4 (4) | 67 / 397 | PASS |
+| export | no | 14/14 | 14/14 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 100 | 4 (4) ⚠1 stale | 288 / 432 | FAIL — 1 stale grade(s) — re-grade |
+| interview_prep_fallback | no | 14/14 | 12/14 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | — | 2.43 (2) ⚠1 stale | 2 / 14 | FAIL — 2 broken-text; mean grade 2.43 < 4; a grade of 2 (< 3); 1 stale grade(s) — re-grade |
+| interview_prep | YES | 0/14 | 0/0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | — | — | — / — | FAIL — not run |
+| tailor_polish | YES | 0/14 | 0/0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | — | — | — / — | FAIL — not run |
+| parse_pdf | no | 3/3 | 2/3 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | — | 3 (1) | 44 / 46 | FAIL — 4 parse defect(s); mean grade 3 < 4; a grade of 1 (< 3) |
+
+## Pass rate per check
+
+| Check | Class | Records checked | Failing | Findings | Pass rate |
+|---|---|---|---|---|---|
+| invented_number | invented_fact | 88 | 0 | 0 | 100% |
+| invented_org | invented_fact | 88 | 0 | 0 | 100% |
+| invented_tool | invented_fact | 88 | 0 | 0 | 100% |
+| invented_degree | invented_fact | 88 | 0 | 0 | 100% |
+| invented_years | invented_fact | 88 | 10 | 12 | 88.6% |
+| wrong_family | wrong_field | 14 | 0 | 0 | 100% |
+| other_field_vocab | wrong_field | 59 | 0 | 0 | 100% |
+| trap | trap | 164 | 2 | 2 | 98.8% |
+| must_skill_missing | requirement_misread | 75 | 17 | 25 | 77.3% |
+| alternative_as_hard | requirement_misread | 75 | 7 | 13 | 90.7% |
+| years_misread | requirement_misread | 75 | 1 | 1 | 98.7% |
+| invented_requirement | requirement_misread | 75 | 1 | 3 | 98.7% |
+| charge_for_nothing | charge | 75 | 1 | 1 | 98.7% |
+| no_requirements_contract | charge | 15 | 0 | 0 | 100% |
+| broken_text | broken_text | 164 | 16 | 19 | 90.2% |
+| meaning_changed | broken_text | 44 | 14 | 14 | 68.2% |
+| round_trip_missing | round_trip | 14 | 0 | 0 | 100% |
+| pro_branded | round_trip | 14 | 0 | 0 | 100% |
+| export_failed | round_trip | 14 | 0 | 0 | 100% |
+| parse_employer_missing | parse | 18 | 7 | 15 | 61.1% |
+| parse_fake_role | parse | 18 | 1 | 1 | 94.4% |
+| parse_title_fragment | parse | 18 | 3 | 3 | 83.3% |
+| parse_bullet_fragment | parse | 18 | 1 | 1 | 94.4% |
+| error | error | 164 | 0 | 0 | 100% |
+| latency | latency | 164 | 0 | 0 | 100% |
+
+## Defects, ranked (expert review + automatic checks)
+
+1. **[invented_fact] The tailored summary makes up "N+ years of experience" by counting from the earliest job of any kind, and contradicts the résumé's own number** — tailor, optimize (summary); fixtures: 01, 02, 04, 06, 08, 09, 11, 12, 14, 15
+   - `01-retail-manager`: “Customer-facing retail candidate with 12+ years of experience…  (her own summary: "9 years")”
+   - `02-warehouse-lead`: “Hands-on warehouse candidate with 10+ years of experience… (his: "6 years"; counts a line-cook job)”
+   - `08-marketing-coordinator`: “Dependable marketing candidate with 3+ years of experience (new grad: a 10-week internship plus part-time)”
+   - `11-accountant`: “Dependable finance candidate with 10+ years of experience (his: "6 years")”
+   - Root cause: lib/resume/tailor/optimizer.js:232 computes years = experienceSpanYears(base) (first start date of any role → today) and prints it at :256; lib/resume/tailor/tailor.js:102 does the same for the fallback summary.
+   - Fix: Count only roles in the target family, never exceed a number the résumé states itself, and leave the number out when unsure.
+2. **[invented_fact] Interview Prep's spoken intro and answers get tenure and employers wrong, and the guard can't catch it** — interview_prep (model); fixtures: 01, 02, 03, 05, 06, 07, 08
+   - `01-retail-manager`: “the last three and a half [years] as an Assistant Store Manager at Desert Sun Apparel (dates: Apr 2021 – present = 5.5)”
+   - `05-registered-nurse`: “almost four years of experience at St. Aurelia Medical Center (dates: Aug 2020 – present = 6.2)”
+   - `06-backend-engineer`: “I'm a backend engineer with four years of experience (7 years)”
+   - `07-data-analyst`: “At Twin Lakes, I was generating this Monday sales report manually… (that work was at North Loop Retail)”
+   - `08-marketing-coordinator`: “I've spent the last couple years working in marketing at Coastal Coffee Roasters, where I managed their social media (a 10-week internship)”
+   - `02-warehouse-lead`: “before that I worked my way up from Material Handler to Forklift Operator (one combined role)”
+   - Root cause: lib/server/interviewPrep.js prepPrompt (:221) gives the model neither today's date nor per-role tenure, so it does date arithmetic itself. guardPack checks only digit tokens (NUM_RE :145, numbersBacked), so number words ("four", "sixty to seventy") pass, and nothing checks that a story is told about the employer of its resume_fact.
+   - Fix: Put today's date and the computed tenure of each role in the prompt. Normalise number words before numbersBacked. Reject an answer that names a different employer from its resume_fact's role.
+3. **[requirement_misread] False hard gates: degree holders are told "your résumé lists no degree" and an RN is told she has no RN license (score 35, Weak fit)** — fit, optimize, scanner; fixtures: 04, 05, 08, 11, 14
+   - `08-marketing-coordinator`: “35 — Requires a Bachelor's degree; your résumé lists no degree (B.A., Communication, SDSU 2024)”
+   - `11-accountant`: “35 — Requires a Bachelor's degree; your résumé lists no degree (B.B.A., Accounting)”
+   - `05-registered-nurse`: “35 — Requires an RN license; your résumé does not list one ("Rebecca Thornton, BSN, RN"; "Registered Nurse, Colorado (multistate compact)")”
+   - `04-customer-service`: “Requires a high school diploma; your résumé lists no degree (B.A., Communication)”
+   - Root cause: lib/optimizer/extractResumeFacts.js:41 DEGREE_RE ends "b\.a\." with \b, which never matches before ",", a space or end of line, and it has no B.B.A. lib/optimizer/constraints.js:101 checks a certification with hasStemmed(text, "RN license") — a literal phrase with no synonyms.
+   - Fix: End dotted degrees with (?=[\s,;)]|$) and add B.B.A./BSN. Match licenses by acronym and synonym (RN ⇐ "RN", "Registered Nurse"; Food Handler ⇐ "ServSafe Food Handler"; forklift certification ⇐ "Forklift / Reach Truck certification").
+4. **[broken_text] The "filler" rewrite deletes "very" inside "every" and leaves a stray "e" in the person's best bullet** — tailor, optimize (rewrite plan); fixtures: 01, 02, 03, 09, 13, 14, 15
+   - `03-cashier-entry`: “Balanced my drawer to within $1 every shift → Balance my drawer to within $1 e shift.”
+   - `02-warehouse-lead`: “hit rate every week of the season → hit rate e week of the season.”
+   - `09-sdr-sales`: “Keep every touch logged in Salesforce → Keep e touch logged in Salesforce”
+   - `14-teacher`: “with every family → with e family”
+   - Root cause: lib/resume/rewrite/rules.js:160-162 stripFillers: a filler with a trailing space ("very ") gets a lookahead but no leading word boundary, so it matches the end of "every".
+   - Fix: Always prefix the pattern with (?<![A-Za-z-]). Add a regression test with "every".
+5. **[broken_text] HumanProof / Human Voice breaks every message it touches and improves nothing** — humanproof; fixtures: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 13
+   - `01-retail-manager`: “…lines up directly with what the role calls for. → …with what the role calls.”
+   - `02-warehouse-lead`: “Warehouse Shift Lead – 2nd Shift → Warehouse Shift Lead – nd Shift”
+   - Root cause: lib/humanizer/humanizeBullet.js:57 tidy() strips any clause-final and|with|to|by|for even when nothing was removed. :89-93 stripUnsupportedClaims treats the "2" of the job title's "2nd" as an unsupported metric (the title is not in the evidence) and removes the bare digit with no word boundary. Also: the résumé page only offers HumanProof when the paid package has real bullets (app/resume/page.tsx:612), and 0 of 11 packages had any, so the UI path is mostly unreachable.
+   - Fix: Run tidy only at removal sites. Treat the job title and company as evidence. Match metrics with \b…\b.
+6. **[wrong_field] The strategy plan centres the job on company-blurb and non-skill words** — advantage (strategy / 30-60-90); fixtures: 01, 03, 06, 07, 08, 09, 10, 14, 15
+   - `01-retail-manager`: “Take ownership of work centred on machine learning and assistant. / Deliver a result tied to machine learning”
+   - `08-marketing-coordinator`: “Take ownership of work centred on clinics and patients. / The posting also leans on clinics and patients, which your résumé doesn't yet show”
+   - `07-data-analyst`: “Take ownership of work centred on clinics and staffing.”
+   - `14-teacher`: “The posting also leans on studies and social ("social studies" split in two)”
+   - `03-cashier-entry`: “I'd bring my hands-on experience with customer service and hours”
+   - `15-no-requirements`: “my hands-on experience with pay and charlotte”
+   - Root cause: lib/server/resumeAnalysis.js:446 runAdvantage ranks single frequent words over the whole posting, About-us blurb included (rankKeywords); r1/r2/r3 and the gap list (gapCoach :679) come from that ranking. There are no sections and no skill dictionary.
+   - Fix: Rank only the requirement and responsibility sections (reuse parseSections in lib/server/jobInsights.js) and only dictionary skills. Never use the employer's industry words (clinics, patients) as the candidate's work.
+7. **[requirement_misread] The Studio tells candidates they are "fatally" missing credentials they hold, or that the posting does not require** — tailor (gaps); fixtures: 02, 05, 11, 12
+   - `05-registered-nurse`: “RN license (REQUIRED, fatal); PALS (REQUIRED, fatal) — she is an RN; the posting says PALS is not needed”
+   - `12-hvac-technician`: “EPA 608 certification (REQUIRED, fatal) — he holds EPA Section 608 Universal”
+   - `11-accountant`: “CPA license (REQUIRED, fatal) — the posting says "CPA preferred"”
+   - `02-warehouse-lead`: “CDL (REQUIRED, fatal) — CDL is in a sister company's posting”
+   - Root cause: lib/resume/tailor/tailor.js:251-253 coveredByCert drops tokens shorter than 4 characters (RN, EPA, 608, CPA), so these credentials can never match. The level and "fatal" come from lib/application-intelligence/jobParserV2.js, which ignores "preferred", "does not need" and other-company context.
+   - Fix: Match credentials by acronym and synonym. Honour preferred and negation. Read only requirement sections.
+8. **[trap] Job insights lists requirements the posting rules out or that belong to another posting** — insights, tailor; fixtures: 02, 05
+   - `05-registered-nurse`: “What they want: BLS \| ACLS \| PALS … ("Pediatric unit nurses also need PALS; this telemetry role does not.")”
+   - `02-warehouse-lead`: “What they want: Excel \| Forklift \| CDL … ("Our sister company … is also hiring CDL-A drivers")”
+   - Root cause: lib/server/jobInsights.js:629 extractCertifications(signalText): signalText includes the body/blurb, and there is no negation handling.
+   - Fix: Read certifications from requirement sections only. Skip sentences with "does not", "not required" or "separate posting".
+9. **[requirement_misread] Alternatives ("A, B, or similar") become separate hard requirements, and "similar" becomes a requirement** — tailor, insights, fit, scanner; fixtures: 02, 04, 06, 07, 08, 09, 11
+   - `04-customer-service`: “gaps: freshdesk (REQUIRED, risky); servicenow (REQUIRED, risky) — she uses Zendesk, which the posting lists as one of the choices”
+   - `07-data-analyst`: “gaps: power bi (REQUIRED) — she has Tableau ("Tableau or Power BI")”
+   - `02-warehouse-lead`: “gaps: blue yonder (REQUIRED); similar (REQUIRED); email (REQUIRED)”
+   - `08-marketing-coordinator`: “insights: Adobe Creative Suite ("Canva or Adobe Creative Suite"; she has Canva)”
+   - `11-accountant`: “fit: missing sap (required) — "SAP, Oracle, or NetSuite"; he uses NetSuite”
+   - Root cause: Tailor reads requirements through lib/application-intelligence/jobParserV2.js, which splits list items. lib/server/jobInsights.js extractSkills groups choices only within one clause. The fit check's anyOf grouping ("anyof:go|java|python") already works and is not reused.
+   - Fix: One any-of parser shared by fit, tailor, insights and scanner. Drop "similar" and "etc." as requirement labels.
+10. **[requirement_misread] Optimize refuses fully specified trade and teaching postings as "no requirements"** — optimize, fit; fixtures: 12, 14
+   - `12-hvac-technician`: “422 no_requirements: "This listing states only 2 requirements" (4+ years, EPA 608 required, license, roofs/75 lbs, own tools)”
+   - `14-teacher`: “No score; "missing: upselling (preferred)" for a 5th-grade teacher”
+   - Root cause: lib/optimizer requirement extraction reads too few requirements for trades and education. lib/server/optimizePackage.js:45 unoptimizableListing withholds the score under 3 requirements. Certifications, licence, years and physical constraints don't count toward requirement_count.
+   - Fix: Count constraints as requirements, and add trades and education vocabulary. Never surface "upselling" for a teacher.
+11. **[charge] A credit is charged for nothing on a posting that states no requirements (only Optimize refuses correctly)** — insights, advantage, tailor, scanner; fixtures: 15
+   - `15-no-requirements`: “insights: charged 1, what_they_want = [] and boilerplate tips”
+   - `15-no-requirements`: “advantage: charged 1, "the priorities their posting repeats — here, pay, membership, university"”
+   - `15-no-requirements`: “scanner: charged 1, match_score null”
+   - `15-no-requirements`: “tailor: charged 1, and breaks "every shift" → "e shift"”
+   - Root cause: api/job-insights.js:104 calls gateAI with no requirement check. api/resume.js:135 (scanner/advantage/coach/proposal) and :622 (Studio tailor) call gateAI before anything like unoptimizableListing.
+   - Fix: Run lib/server/optimizePackage.js unoptimizableListing before gateAI on all four, and answer no_requirements, charged:false.
+12. **[charge · high] Comped (admin-granted) Pro accounts are treated as free: Interview Prep 402, Studio tailor charged a credit, polish refused** — all credit gates (production); fixtures: eval account
+   - `08-marketing-coordinator`: “POST /api/interview-prep build → 402 pro_required; action:tailor polish:true → polish {available:false, reason:"pro_required"} and balance 10 → 9; meanwhile user-sync get_credits answered pro:true”
+   - Root cause: supabase/migrations/20261021120000_pacific_days_and_admin_counts.sql:40 `v_pro := v_row.pro OR (v_row.pro_until … > now())` ignores ai_credits.comped, which lib/server/creditRules.js:169 hasProAccess (and so get_credits) counts as Pro.
+   - Fix: Add `OR v_row.comped` to consume_credit (the coordinator is fixing this). Verified after a temporary pro_until: 28 live Pro calls left the balance at 9.
+13. **[parse] The parser misreads two common role-header formats and wrapped PDF headers** — parse, parse_pdf (feeds every tool); fixtures: 02, 03, 06, 11, 14
+   - `06-backend-engineer`: “"Software Engineer II, Fieldline — Austin, TX  Mar 2021 – Present" → title "Software Engineer II, Fieldline", company "" (all three roles)”
+   - `11-accountant`: “"Gulf Coast Marine Services — Houston, TX" / "Accounts Payable Specialist, Jun 2018 – Mar 2021" → a 4th role titled "Gulf Coast Marine Services"; AP Specialist has no employer; "Bill.com" read as his website”
+   - `02-warehouse-lead`: “PDF: wrapped header → company "Columbus, OH (Mar 2019", no dates, bullet "Dec 2021)"”
+   - `03-cashier-entry`: “Volunteer / Hope Street Food Pantry → title "Hope Street Food Pantry", no employer”
+   - Root cause: lib/resume/parse (experience header split; mergeWrappedLines) — a "Title, Company" one-liner is not split, a company-only line before a "Title, dates" line is not merged, and a header broken inside "(Mar 2019 –" / "Dec 2021)" is not rejoined. In the PDF path, lib/resume/extract/pdf.js hands the wrapped line over as separate lines.
+   - Fix: Split "Title, Company" when the right side is not a city. Merge company line + title line into one role. Rejoin a header that ends inside an open date range.
+14. **[broken_text] Completed, dated results are rewritten in the present tense** — tailor, optimize, tailor_polish; fixtures: 01, 02, 05, 06, 09, 12, 13, 14
+   - `01-retail-manager`: “Grew store sales 9% … in 2023 → Grow store sales 9% year over year in 2023”
+   - `06-backend-engineer`: “Built the shipment-tracking event service → Build the shipment-tracking event service”
+   - `12-hvac-technician`: “Sold $180K … in 2023 → Sell $180K … in 2023”
+   - Root cause: lib/resume/tailor/optimizer.js:410 sets tense = 'present' for every bullet of a current role; the tense rule in lib/resume/rewrite/rules.js (≈:208) applies it to finished results.
+   - Fix: Keep past tense when a bullet reports a completed result (a year, "from X to Y", "in N months", a total).
+15. **[invented_fact] Generic bullets the person never wrote are added to their roles** — tailor (transferable fill) → export, tailor_polish; fixtures: 01, 02, 03, 05, 06, 10, 11, 14
+   - `06-backend-engineer`: “Resolved day-to-day problems on the spot and escalated only when needed. (engineering intern)”
+   - `14-teacher`: “Trained new teammates on procedures and standards. (student teacher)”
+   - `10-admin-assistant`: “Ran day-to-day office administration: phones, scheduling, records and correspondence. (then polished by the model into "Managed office administration…")”
+   - Root cause: lib/resume/tailor/optimizer.js:505-515 transferable fill writes bullets from a title's implied competencies into the variant (flagged confirm:true, but they are in the doc that is exported and polished).
+   - Fix: Show them as suggestions outside the variant, and never export or polish one the person has not accepted.
+16. **[requirement_misread] "What they want" misses the core requirement and leads with nice-to-haves** — insights; fixtures: 01, 02, 04, 06, 08, 10, 14
+   - `06-backend-engineer`: “Terraform \| PostgreSQL \| SQL \| Kafka \| Reconciliation (no Go/Java/Python; Terraform is a nice-to-have)”
+   - `01-retail-manager`: “Payroll \| Bilingual (Spanish) \| 3+ years \| Bachelor's degree \| Proven Record Hiring (no P&L; Bilingual and Bachelor's are preferred)”
+   - `14-teacher`: “Master's degree \| Carolina Teaching License \| Teaching Upper Elementary \| North Carolina Teaching \| Valid North Carolina”
+   - Root cause: lib/server/jobInsights.js buildJobInsights: dictionary skills are pushed first whatever their section, preferred items are not demoted, and minePhrases emits overlapping fragments.
+   - Fix: Required section first, preferred last and labelled, fragments deduplicated, and the language requirement read as one any-of.
+17. **[broken_text] Template grammar errors in fixed copy** — fit, interview_prep_fallback; fixtures: 01, 02, 03, 06, 10, 11
+   - `01-retail-manager`: “Your an Associate's degree meets the education requirement.”
+   - `03-cashier-entry`: “How would you handle handling a busy register line and a difficult return?”
+   - `06-backend-engineer`: “Give me an example of when you showed shipping.”
+   - Root cause: lib/optimizer/constraints.js:78 `Your ${DEGREE_LABEL[deg]}` where the label starts with "a/an". lib/server/interviewPrep.js:199 wraps an "Expect questions on handling …" sentence in "How would you handle …". familyQuestions turns noun priorities into "showed shipping".
+   - Fix: Strip the article. Rephrase from the risk object. Use a question template per priority.
+18. **[charge] The paid Optimize package is often near-empty: no rewrites, a template message with lowercased skills** — optimize; fixtures: 03, 04, 05, 07, 08, 10, 11, 13
+   - `08-marketing-coordinator`: “My experience with bilingual spanish lines up directly with what the role calls for.”
+   - `11-accountant`: “charged 1 credit: no rewrite, no reorder, no question — a summary ("10+ years") and a one-skill message”
+   - `06-backend-engineer`: “My experience with python, go, and sql lines up…”
+   - Root cause: lib/optimizer/generateApplicationMessage.js:37 joins normalised (lowercased) labels. lib/server/optimizePackage.js rewrite_plan keeps only tense/filler rewrites that pass the grounding guard.
+   - Fix: Use the résumé's own casing. Charge only when the package has at least one rewrite, reorder or question.
+19. **[invented_fact] The tailored summary replaces the candidate's own and drops their strongest credential** — tailor; fixtures: 11
+   - `11-accountant`: “"Passed FAR and AUD sections of the CPA exam in 2024; sitting for REG in 2025" is gone from the tailored résumé for a "CPA preferred" job”
+   - Root cause: lib/server/resumeStudio.js:116 replaceSummary defaults to true; the composed summary (lib/resume/tailor/optimizer.js:256) has no slot for licences or exams.
+   - Fix: Keep the candidate's credential sentence, or default to appending.
+20. **[wrong_field] Interview Prep never receives the posting from the tracker, and RN roles fall back to the "general" family** — interview_prep; fixtures: 05, all
+   - `05-registered-nurse`: “family: general (both the model and the fallback pack); the fallback asks "Give me an example of when you showed reliability" for a telemetry RN”
+   - Root cause: components/tracker/InterviewPrep.tsx:119 posts {action:'build', company, role, application_id, interview_at} with no job_text, although api/interview-prep.js accepts it. lib/application-intelligence/roleOntology.js detectRoleFamily has no clinical family.
+   - Fix: Send the tracked application's posting text, and add a clinical family (or reuse resumeAnalysis CLINICAL_TITLE_RE).
+21. **[broken_text] "Stories" and "proof" are built on non-accomplishment lines** — interview_prep_fallback, advantage; fixtures: 01, 02, 04, 05, 07, 08, 10, 11
+   - `08-marketing-coordinator`: “Tell this one from your résumé: "Social Media Assistant (part-time) — SDSU Associated Students (Sep 2022 – May 2024)"”
+   - `05-registered-nurse`: “Tell this one from your résumé: "Registered Nurse, Colorado (multistate compact) — exp. 2026"”
+   - `01-retail-manager`: “Use your real result: "Retail leader with 9 years on the sales floor…". Lead with that number.”
+   - Root cause: lib/server/interviewPrep.js:161 storyBullets accepts any line of 35+ characters with an -ed word (role headers, licence lines). lib/server/resumeAnalysis.js:509-512 picks the longest quantified line anywhere, including the summary.
+   - Fix: Use experience bullets from the parsed doc only.
+22. **[charge] The legacy ATS scanner (1 credit, no UI caller) gives nonsense fixes and a mismatched score** — scanner; fixtures: 01, 07, 13, 12, 14, 15
+   - `07-data-analyst`: “Sql work that produced 4 years — confirm this figure applies here before using.”
+   - `13-line-cook`: “Food safety work that produced 600 guests — confirm this figure applies here before using.”
+   - `01-retail-manager`: “match_score 98 vs score_summary "100 — …"”
+   - Root cause: lib/server/seenfitCompat.js scannerFromSeenFit + lib/optimizer/generateSafeBullets.js:103 build fixes from any number near a skill word.
+   - Fix: Retire tool:scanner (no caller), or stop it charging and reuse the Studio ats_check.
+23. **[broken_text] Pro polish is trivial and sometimes harmful: it drops posting keywords, flips tense, and changed nothing for the teacher** — tailor_polish (model, Pro); fixtures: 02, 05, 06, 09, 13, 14
+   - `02-warehouse-lead`: “Assign pick waves and labor in Manhattan WMS → Assigned pick waves and labor in WMS (the posting names Manhattan)”
+   - `13-line-cook`: “Trained 3 new line cooks → Train 3 new line cooks”
+   - `14-teacher`: “applied: 0 — every proposal rejected”
+   - Root cause: lib/resume/tailor/polish.js: the firewall (passesFirewall) rejects almost every real verb upgrade (new_word: managed, reduced, improved…), so only cosmetic cuts survive, and nothing re-checks posting keywords or tense after the edit.
+   - Fix: Allow verb swaps from STRONG_VERBS, reject an edit that removes a posting keyword or flips a dated result's tense, and say so when nothing changed.
+
+## Automatic findings by check × tool
+
+Every finding is in the JSON file next to this one; root cause and fix per group.
+
+### invented_years · optimize — 6 finding(s) [invented_fact]
+Root cause: The paid summary is the Studio plan summary (lib/server/optimizePackage.js → tailorResume) — same as tailor (defect #1).  
+Fix: Fixed with tailor.
+
+- `01-retail-manager` summary: "12+ years" contradicts the résumé's own "9 years" — “Customer-facing retail candidate with 12+ years of experience, including Assistant Store Manager at Desert Sun Apparel and Department Supervisor at Valley Home Goods. Strengths in loss prevention, sales and leadership. Grew store sales 9% year over year in 202”
+- `02-warehouse-lead` summary: "10+ years" contradicts the résumé's own "6 years" — “Hands-on warehouse candidate with 10+ years of experience, including Warehouse Lead, Midwest Parcel Logistics and Material Handler / Forklift Operator, Midwest Parcel Logistics. Strengths in safety, warehouse and leadership. Raised pick accuracy from 97.2% to ”
+- `04-customer-service` summary: "10+ years" contradicts the résumé's own "5 years" — “Customer service candidate with 10+ years of experience, including Customer Care Representative II at BayShore Insurance Group and Customer Service Representative at SunCoast Telecom. Strengths in customer service, crm and communication. Keep a 94% CSAT score ”
+- `11-accountant` summary: "10+ years" contradicts the résumé's own "6 years" — “Dependable finance candidate with 10+ years of experience, including Staff Accountant at Bayou Industrial Supply and Accounts Payable Specialist. Strengths in accounting, accuracy and financial reporting. Supported the 2023 external audit: built 60+ PBC schedu”
+- `12-hvac-technician` summary: "11+ years" contradicts the résumé's own "9 years" — “Hands-on skilled trades candidate with 11+ years of experience, including HVAC Service Technician at Desert Air Comfort and HVAC Installer at Valley Climate Systems. Strengths in mechanical repair, troubleshooting and diagnostics. Sold $180K in maintenance agr”
+- `12-hvac-technician` summary: "11+ years" contradicts the résumé's own "9 years" — “Hands-on skilled trades candidate with 11+ years of experience, including HVAC Service Technician at Desert Air Comfort and HVAC Installer at Valley Climate Systems. Strengths in mechanical repair, troubleshooting and diagnostics. Sold $180K in maintenance agr”
+
+### invented_years · tailor — 6 finding(s) [invented_fact]
+Root cause: lib/resume/tailor/optimizer.js:232 experienceSpanYears(base) counts from the first job of any kind; printed at :256 (defect #1).  
+Fix: Count target-family roles only; never exceed the résumé's own stated years.
+
+- `01-retail-manager` summary: "12+ years" contradicts the résumé's own "9 years" — “Customer-facing retail candidate with 12+ years of experience, including Assistant Store Manager at Desert Sun Apparel and Department Supervisor at Valley Home Goods. Strengths in loss prevention, sales and leadership. Grew store sales 9% year over year in 202”
+- `02-warehouse-lead` summary: "10+ years" contradicts the résumé's own "6 years" — “Hands-on warehouse candidate with 10+ years of experience, including Warehouse Lead, Midwest Parcel Logistics and Material Handler / Forklift Operator, Midwest Parcel Logistics. Strengths in safety, warehouse and leadership. Raised pick accuracy from 97.2% to ”
+- `04-customer-service` summary: "10+ years" contradicts the résumé's own "5 years" — “Customer service candidate with 10+ years of experience, including Customer Care Representative II at BayShore Insurance Group and Customer Service Representative at SunCoast Telecom. Strengths in customer service, crm and communication. Keep a 94% CSAT score ”
+- `11-accountant` summary: "10+ years" contradicts the résumé's own "6 years" — “Dependable finance candidate with 10+ years of experience, including Staff Accountant at Bayou Industrial Supply and Accounts Payable Specialist. Strengths in accounting, accuracy and financial reporting. Supported the 2023 external audit: built 60+ PBC schedu”
+- `12-hvac-technician` summary: "11+ years" contradicts the résumé's own "9 years" — “Hands-on skilled trades candidate with 11+ years of experience, including HVAC Service Technician at Desert Air Comfort and HVAC Installer at Valley Climate Systems. Strengths in mechanical repair, troubleshooting and diagnostics. Sold $180K in maintenance agr”
+- `12-hvac-technician` summary: "11+ years" contradicts the résumé's own "9 years" — “Hands-on skilled trades candidate with 11+ years of experience, including HVAC Service Technician at Desert Air Comfort and HVAC Installer at Valley Climate Systems. Strengths in mechanical repair, troubleshooting and diagnostics. Sold $180K in maintenance agr”
+
+### trap · tailor — 2 finding(s) [trap]
+Root cause: lib/application-intelligence/jobParserV2.js reads blurb/negated sentences as requirements; tailor.js:251 coveredByCert (defect #7).  
+Fix: Section-aware, negation-aware parse.
+
+- `01-retail-manager` keywords.missing: Machine learning: only in the company blurb — “Machine Learning”
+- `06-backend-engineer` keywords.missing: Machine Learning: only in the company blurb (risk team) — “Machine Learning”
+
+### must_skill_missing · scanner — 16 finding(s) [requirement_misread]
+Root cause: Requirement extraction misses core requirements: lib/optimizer (extractJobFacts / postingSections) for fit/optimize/scanner; lib/server/jobInsights.js buildJobInsights for insights; lib/application-intelligence/jobParserV2.js for tailor (defects #3, #10, #16).  
+Fix: Read every line of the requirements section; credentials/years/physical count as requirements.
+
+- `01-retail-manager` requirements: "retail management" is a core requirement of the posting — “sales \| loss prevention \| training \| merchandising \| retail \| hiring and team development \| bilingual spanish \| p&l \| workday”
+- `01-retail-manager` requirements: "open availability" is a core requirement of the posting — “sales \| loss prevention \| training \| merchandising \| retail \| hiring and team development \| bilingual spanish \| p&l \| workday”
+- `03-cashier-entry` requirements: "weekend availability" is a core requirement of the posting — “point of sale \| cash handling \| replenishment \| customer service \| bilingual spanish \| retail”
+- `05-registered-nurse` requirements: "RN license" is a core requirement of the posting — “telemetry \| medication administration \| acute care”
+- `05-registered-nurse` requirements: "BLS" is a core requirement of the posting — “telemetry \| medication administration \| acute care”
+- `05-registered-nurse` requirements: "ACLS" is a core requirement of the posting — “telemetry \| medication administration \| acute care”
+- `07-data-analyst` requirements: "Excel" is a core requirement of the posting — “dashboards \| sql \| tableau \| python”
+- `08-marketing-coordinator` requirements: "Bachelor's degree" is a core requirement of the posting — “instagram \| facebook \| social media \| email marketing \| mailchimp \| canva \| bilingual spanish \| proofreading”
+- `10-admin-assistant` requirements: "administrative experience" is a core requirement of the posting — “calendar management \| expense reports \| microsoft office \| microsoft outlook \| excel \| communication \| attention to detail \| confidentiality \| microsoft powerpoint \| travel coordination \| concur”
+- `11-accountant` requirements: "Excel" is a core requirement of the posting — “audit support \| month-end close \| journal entries \| account reconciliation \| accounting \| gaap \| erp systems \| netsuite \| erp systems”
+- `11-accountant` requirements: "Bachelor's degree" is a core requirement of the posting — “audit support \| month-end close \| journal entries \| account reconciliation \| accounting \| gaap \| erp systems \| netsuite \| erp systems”
+- `12-hvac-technician` requirements: "EPA 608" is a core requirement of the posting — “hvac \| refrigeration \| preventive maintenance \| electrical troubleshooting \| hand tools \| building automation”
+- `12-hvac-technician` requirements: "driver's license" is a core requirement of the posting — “hvac \| refrigeration \| preventive maintenance \| electrical troubleshooting \| hand tools \| building automation”
+- `13-line-cook` requirements: "ServSafe" is a core requirement of the posting — “food safety \| knife skills \| cooking techniques”
+- `14-teacher` requirements: "NC teaching license" is a core requirement of the posting — “data-driven instruction \| differentiated instruction \| upper elementary \| classroom management \| esl”
+- `14-teacher` requirements: "Bachelor's degree" is a core requirement of the posting — “data-driven instruction \| differentiated instruction \| upper elementary \| classroom management \| esl”
+
+### alternative_as_hard · tailor — 13 finding(s) [requirement_misread]
+Root cause: Choice lists ("A, B, or similar") split into separate required items — jobParserV2.js (tailor), jobInsights.js extractSkills (insights), seenfitCompat (scanner) (defect #9).  
+Fix: One shared any-of parser.
+
+- `02-warehouse-lead` keywords.missing: the posting offers a choice (Manhattan or Blue Yonder); "Blue Yonder" is listed as required on its own — “blue yonder”
+- `04-customer-service` keywords.missing: the posting offers a choice (Zendesk or Freshdesk or ServiceNow); "Freshdesk" is listed as required on its own — “freshdesk”
+- `04-customer-service` keywords.missing: the posting offers a choice (Zendesk or Freshdesk or ServiceNow); "ServiceNow" is listed as required on its own — “servicenow”
+- `06-backend-engineer` keywords.missing: the posting offers a choice (Kafka or RabbitMQ or SQS); "Kafka" is listed as required on its own — “message queues kafka”
+- `06-backend-engineer` keywords.missing: the posting offers a choice (Kafka or RabbitMQ or SQS); "RabbitMQ" is listed as required on its own — “rabbitmq”
+- `06-backend-engineer` keywords.missing: the posting offers a choice (Go or Java or Python); "Java" is listed as required on its own — “java”
+- `07-data-analyst` keywords.missing: the posting offers a choice (Tableau or Power BI); "Power BI" is listed as required on its own — “power bi”
+- `08-marketing-coordinator` keywords.missing: the posting offers a choice (Canva or Adobe Creative Suite); "Adobe Creative Suite" is listed as required on its own — “adobe creative suite”
+- `08-marketing-coordinator` keywords.missing: the posting offers a choice (HubSpot or Mailchimp); "HubSpot" is listed as required on its own — “email marketing platform hubspot”
+- `08-marketing-coordinator` keywords.missing: the posting offers a choice (HubSpot or Mailchimp); "HubSpot" is listed as required on its own — “hubspot”
+- `09-sdr-sales` keywords.missing: the posting offers a choice (Outreach or Salesloft); "Salesloft" is listed as required on its own — “salesloft”
+- `11-accountant` keywords.missing: the posting offers a choice (SAP or Oracle or NetSuite); "SAP" is listed as required on its own — “erp system sap”
+- `11-accountant` keywords.missing: the posting offers a choice (SAP or Oracle or NetSuite); "Oracle" is listed as required on its own — “oracle”
+
+### must_skill_missing · tailor — 9 finding(s) [requirement_misread]
+Root cause: Requirement extraction misses core requirements: lib/optimizer (extractJobFacts / postingSections) for fit/optimize/scanner; lib/server/jobInsights.js buildJobInsights for insights; lib/application-intelligence/jobParserV2.js for tailor (defects #3, #10, #16).  
+Fix: Read every line of the requirements section; credentials/years/physical count as requirements.
+
+- `01-retail-manager` requirements: "retail management" is a core requirement of the posting — “Bachelor's degree \| workday scheduling \| high-volume store \| workday scheduling \| Machine Learning \| Scheduling \| Sales \| assistant \| associates \| bilingual \| district \| merchandised \| retailer”
+- `01-retail-manager` requirements: "P&L" is a core requirement of the posting — “Bachelor's degree \| workday scheduling \| high-volume store \| workday scheduling \| Machine Learning \| Scheduling \| Sales \| assistant \| associates \| bilingual \| district \| merchandised \| retailer”
+- `01-retail-manager` requirements: "open availability" is a core requirement of the posting — “Bachelor's degree \| workday scheduling \| high-volume store \| workday scheduling \| Machine Learning \| Scheduling \| Sales \| assistant \| associates \| bilingual \| district \| merchandised \| retailer”
+- `03-cashier-entry` requirements: "weekend availability" is a core requirement of the posting — “one of retail, restaurant or volunteer all count \| Must be 18+ \| Must be 18+ \| restaurant \| retail \| volunteer all count \| Cash Handling \| Customer Service \| grocery \| in-store \| balance \| clean \| spanish”
+- `04-customer-service` requirements: "45 WPM typing" is a core requirement of the posting — “High school diploma / GED \| Accuracy \| freshdesk \| servicenow \| zendesk \| Customer Service \| CRM \| phone \| billing \| clear \| email \| questions \| document”
+- `10-admin-assistant` requirements: "administrative experience" is a core requirement of the posting — “powerpoint \| Communication \| Coordination \| powerpoint \| Excel \| Accuracy \| outlook \| word \| prepare \| calendars \| correspondence \| expense \| organize”
+- `12-hvac-technician` requirements: "HVAC service experience" is a core requirement of the posting — “Clean driving record \| Clean driving record \| EPA 608 certification \| Valid driver's license \| repair \| arizona \| control \| diagnose \| equipment \| maintenance \| universal \| valley”
+- `13-line-cook` requirements: "knife skills" is a core requirement of the posting — “basic cooking techniques \| 1+ years experience \| basic cooking techniques \| Food handler's card \| ServSafe certification \| full-service kitchen \| high-volume \| station \| Safety \| dinner \| grill \| house \| labeling \| moving \| tickets”
+- `14-teacher` requirements: "NC teaching license" is a core requirement of the posting — “Master's degree \| classroom \| teaching \| data \| students \| assessment \| carolina \| elementary \| public”
+
+### invented_requirement · tailor — 3 finding(s) [requirement_misread]
+Root cause: Tools emit requirements for a posting that states none.  
+Fix: Return none.
+
+- `15-no-requirements` keywords.matched: the posting states no requirements — “charlotte”
+- `15-no-requirements` keywords.matched: the posting states no requirements — “clean”
+- `15-no-requirements` keywords.matched: the posting states no requirements — “keep”
+
+### years_misread · tailor — 1 finding(s) [requirement_misread]
+Root cause: jobParserV2.js reads "0–2 years" as "2+ years experience" (tailor) (defect #9 family).  
+Fix: A range counts by its lower end, as jobInsights.extractExperience already does.
+
+- `08-marketing-coordinator` gaps: posting asks for 0 years — “2+ years experience”
+
+### charge_for_nothing · tailor — 1 finding(s) [charge]
+Root cause: api/resume.js:622 (defect #11).  
+Fix: Same.
+
+- `15-no-requirements` tailor: charged 1 credit for a posting that states no requirements — “{"decisions":["keep (core) — Cashier @ QuickFuel Market: Kept in full — this is your most relevant experience for this posting.; Retail work covers customer service, cleaning, time management, teamwork — shown in your bullets.","keep (core) — Crew Member @ Bur”
+
+### broken_text · tailor — 15 finding(s) [broken_text]
+Root cause: lib/resume/rewrite/rules.js:160 filler regex without a leading word boundary ("every" → "e"); present tense on dated results (optimizer.js:410); lowercase verbs added as skills (defects #4, #14).  
+Fix: See defects #4 and #14.
+
+- `01-retail-manager` rewrites.to: stray single letter: "drawer e" — “Handled cash, checks and EBT on a busy front end; balanced the drawer e shift.”
+- `01-retail-manager` rewrite: a completed, dated result rewritten in the present tense (was: "Grew store sales 9% year over year in 2023 on $4.2M annual volume") — “Grow store sales 9% year over year in 2023 on $4.2M annual volume.”
+- `02-warehouse-lead` rewrites.to: stray single letter: "rate e" — “Picked and packed 140+ orders an hour during peak and hit rate e week of the season.”
+- `02-warehouse-lead` rewrite: a completed, dated result rewritten in the present tense (was: "Raised pick accuracy from 97.2% to 99.6% in 9 months by re-slotting the 200 fastest-moving SKUs and auditing scans daily") — “Raise pick accuracy from 97.2% to 99.6% in 9 months by re-slotting the 200 fastest-moving SKUs and auditing scans daily.”
+- `03-cashier-entry` rewrites.to: stray single letter: "$1 e" — “Balance my drawer to within $1 e shift for 10 months.”
+- `05-registered-nurse` rewrite: a completed, dated result rewritten in the present tense (was: "Precepted 7 new graduate nurses through their 12-week orientation") — “Precept 7 new graduate nurses through their 12-week orientation.”
+- `07-data-analyst` skills.added: claim starts lowercase or with "(" — “dashboards”
+- `07-data-analyst` skills.added: claim starts lowercase or with "(" — “scheduled”
+- `09-sdr-sales` rewrites.to: stray single letter: "Keep e" — “Keep e touch logged in Salesforce; research accounts in ZoomInfo and review calls in Gong.”
+- `10-admin-assistant` skills.added: claim starts lowercase or with "(" — “accuracy”
+- `11-accountant` rewrite: a completed, dated result rewritten in the present tense (was: "Supported the 2023 external audit: built 60+ PBC schedules and answered auditor questions") — “Support the 2023 external audit: built 60+ PBC schedules and answer auditor questions.”
+- `12-hvac-technician` rewrite: a completed, dated result rewritten in the present tense (was: "Sold $180K in maintenance agreements and replacement leads in 2023, #2 of 11 techs") — “Sell $180K in maintenance agreements and replacement leads in 2023, #2 of 11 techs.”
+- `13-line-cook` rewrites.to: stray single letter: "pass e" — “Prep and break down my station, label and date everything, and pass e health inspection since I started.”
+- `14-teacher` rewrites.to: stray single letter: "with e" — “Hold two family conferences a year with e family; 100% attendance in 2023–24 by offering evening and phone slots.”
+- `15-no-requirements` rewrites.to: stray single letter: "$1 e" — “Balance my drawer to within $1 e shift for 10 months.”
+
+### meaning_changed · humanproof — 14 finding(s) [broken_text]
+Root cause: lib/humanizer/humanizeBullet.js:57 tidy() strips clause-final "for"; :89-93 strips the "2" of the job title's "2nd" (defect #5).  
+Fix: See defect #5.
+
+- `01-retail-manager` rewrite: dropped "for" from: I'm applying for the Store Manager position at Harborline Outfitters and believe my background is a strong match. My experience with sales, loss prevention, and — “I'm applying for the Store Manager position at Harborline Outfitters and believe my background is a strong match. My experience with sales, loss prevention, and training lines up directly with what the role calls. I'd welcome the chance to discuss how I can co”
+- `02-warehouse-lead` rewrite: dropped "2nd", "for" from: I'm applying for the Warehouse Shift Lead – 2nd Shift position at Northgate Distribution and believe my background is a strong match. My experience with order p — “I'm applying for the Warehouse Shift Lead – nd Shift position at Northgate Distribution and believe my background is a strong match. My experience with order picking, warehouse management system, and training lines up directly with what the role calls. I also ”
+- `03-cashier-entry` rewrite: dropped "for" from: I'm applying for the Front End Cashier (Part-Time) position at Piedmont Fresh Market and believe my background is a strong match. My experience with point of sa — “I'm applying for the Front End Cashier (Part-Time) position at Piedmont Fresh Market and believe my background is a strong match. My experience with point of sale, cash handling, and replenishment lines up directly with what the role calls. I'd welcome the cha”
+- `04-customer-service` rewrite: dropped "for" from: I'm applying for the Customer Support Specialist (Remote) position at Lumen Ridge Software and believe my background is a strong match. My experience with ticke — “I'm applying for the Customer Support Specialist (Remote) position at Lumen Ridge Software and believe my background is a strong match. My experience with ticketing systems, zendesk, and typing speed lines up directly with what the role calls. I'd welcome the ”
+- `05-registered-nurse` rewrite: dropped "for" from: I'm applying for the Registered Nurse – Telemetry (Nights) position at Summit Ridge Hospital and believe my background is a strong match. My experience with tel — “I'm applying for the Registered Nurse – Telemetry (Nights) position at Summit Ridge Hospital and believe my background is a strong match. My experience with telemetry, medication administration, and acute care lines up directly with what the role calls. I'd we”
+- `06-backend-engineer` rewrite: dropped "for" from: I'm applying for the Backend Engineer, Payments Platform position at Tallgrass Financial and believe my background is a strong match. My experience with payment — “I'm applying for the Backend Engineer, Payments Platform position at Tallgrass Financial and believe my background is a strong match. My experience with payments, go, and python lines up directly with what the role calls. I also bring transferable experience i”
+- `07-data-analyst` rewrite: dropped "for" from: I'm applying for the Data Analyst, Operations position at Riverbend Health Partners and believe my background is a strong match. My experience with dashboards,  — “I'm applying for the Data Analyst, Operations position at Riverbend Health Partners and believe my background is a strong match. My experience with dashboards, sql, and tableau lines up directly with what the role calls. I'd welcome the chance to discuss how I”
+- `08-marketing-coordinator` rewrite: dropped "for" from: I'm applying for the Marketing Coordinator position at Mission Valley Medical Group and believe my background is a strong match. My experience with instagram, s — “I'm applying for the Marketing Coordinator position at Mission Valley Medical Group and believe my background is a strong match. My experience with instagram, social media, and email marketing lines up directly with what the role calls. I also bring transferab”
+- `09-sdr-sales` rewrite: dropped "for" from: I'm applying for the Sales Development Representative position at Kestrel Security and believe my background is a strong match. My experience with sales, outbou — “I'm applying for the Sales Development Representative position at Kestrel Security and believe my background is a strong match. My experience with sales, outbound prospecting, and lead qualification lines up directly with what the role calls. I also bring tran”
+- `10-admin-assistant` rewrite: dropped "for" from: I'm applying for the Executive Administrative Assistant position at Delta Bay Engineering and believe my background is a strong match. My experience with calend — “I'm applying for the Executive Administrative Assistant position at Delta Bay Engineering and believe my background is a strong match. My experience with calendar management, expense reports, and microsoft office lines up directly with what the role calls. I a”
+- `11-accountant` rewrite: dropped "for" from: I'm applying for the Senior Accountant position at Lone Star Energy Partners and believe my background is a strong match. My experience with audit support, mont — “I'm applying for the Senior Accountant position at Lone Star Energy Partners and believe my background is a strong match. My experience with audit support, month-end close, and journal entries lines up directly with what the role calls. I also bring transferab”
+- `12-hvac-technician` rewrite: dropped "for" from: I'm applying for the Commercial HVAC Service Technician position at Sonoran Mechanical and believe my background is a strong match. My experience with hvac, ref — “I'm applying for the Commercial HVAC Service Technician position at Sonoran Mechanical and believe my background is a strong match. My experience with hvac, refrigeration, and hand tools lines up directly with what the role calls. I also bring transferable exp”
+- `13-line-cook` rewrite: dropped "for" from: I'm applying for the Line Cook position at The Copper Pelican and believe my background is a strong match. My experience with food safety and knife skills lines — “I'm applying for the Line Cook position at The Copper Pelican and believe my background is a strong match. My experience with food safety and knife skills lines up directly with what the role calls. I'd welcome the chance to discuss how I can contribute, and I”
+- `14-teacher` rewrite: dropped "5th", "for" from: I'm applying for the 5th Grade Teacher position at Triangle Ridge Charter Academy and believe my background is a strong match. My experience with data-driven in — “I'm applying for the th Grade Teacher position at Triangle Ridge Charter Academy and believe my background is a strong match. My experience with data-driven instruction, differentiated instruction, and upper elementary lines up directly with what the role call”
+
+### broken_text · optimize — 2 finding(s) [broken_text]
+Root cause: Same rewrite engine as tailor; lib/optimizer/constraints.js:78 "Your an …" (defects #4, #17).  
+Fix: See defects.
+
+- `02-warehouse-lead` rewrite_plan.to: stray single letter: "rate e" — “Picked and packed 140+ orders an hour during peak and hit rate e week of the season.”
+- `06-backend-engineer` reorder.why: unbalanced parentheses — “For this posting, "Designed the Kafka topic layout for carrier webhooks (40+ ca…" is your strongest line at Software Engineer II, Fieldline — move it to the top of that role.”
+
+### broken_text · interview_prep_fallback — 2 finding(s) [broken_text]
+Root cause: lib/server/interviewPrep.js:199 "How would you handle handling…"; storyBullets accepts role headers (defects #17, #21).  
+Fix: See defects.
+
+- `05-registered-nurse` answers.resume_fact: a "story" built on a role header line, not an accomplishment — “Registered Nurse, Medical-Surgical Unit — St. Aurelia Medical Center, Denver, CO — Aug 2020 to Present”
+- `08-marketing-coordinator` answers.resume_fact: a "story" built on a role header line, not an accomplishment — “Social Media Assistant (part-time) — SDSU Associated Students (Sep 2022 – May 2024)”
+
+### parse_employer_missing · parse — 12 finding(s) [parse]
+Root cause: lib/resume/parse experience header split: "Title, Company — City" one-liners keep the employer in the title (defect #13).  
+Fix: Split on the comma when the right side is not a city.
+
+- `02-warehouse-lead` experience.company: employer "Midwest Parcel Logistics" not parsed as a company (it is inside the title) — “warehouse lead, midwest parcel logistics \| \|\| material handler / forklift operator, midwest parcel logistics \| \|\| picker/packer , brightcart fulfillment \| \|\| line cook, buckeye diner \|”
+- `02-warehouse-lead` experience.company: employer "BrightCart Fulfillment" not parsed as a company (it is inside the title) — “warehouse lead, midwest parcel logistics \| \|\| material handler / forklift operator, midwest parcel logistics \| \|\| picker/packer , brightcart fulfillment \| \|\| line cook, buckeye diner \|”
+- `02-warehouse-lead` experience.company: employer "Buckeye Diner" not parsed as a company (it is inside the title) — “warehouse lead, midwest parcel logistics \| \|\| material handler / forklift operator, midwest parcel logistics \| \|\| picker/packer , brightcart fulfillment \| \|\| line cook, buckeye diner \|”
+- `03-cashier-entry` experience.company: employer "Hope Street Food Pantry" not parsed as a company (it is inside the title) — “cashier \| quickfuel market \|\| crew member \| burger barn \|\| hope street food pantry \|”
+- `06-backend-engineer` experience.company: employer "Fieldline" not parsed as a company (it is inside the title) — “software engineer ii, fieldline \| \|\| software engineer, cobalt payments \| \|\| software engineering intern, texas grid analytics \|”
+- `06-backend-engineer` experience.company: employer "Cobalt Payments" not parsed as a company (it is inside the title) — “software engineer ii, fieldline \| \|\| software engineer, cobalt payments \| \|\| software engineering intern, texas grid analytics \|”
+- `06-backend-engineer` experience.company: employer "Texas Grid Analytics" not parsed as a company (it is inside the title) — “software engineer ii, fieldline \| \|\| software engineer, cobalt payments \| \|\| software engineering intern, texas grid analytics \|”
+- `11-accountant` experience.company: employer "Gulf Coast Marine Services" not parsed as a company (it is inside the title) — “staff accountant \| bayou industrial supply \|\| gulf coast marine services \| \|\| accounts payable specialist \| \|\| bookkeeper \| tran family nail salon”
+- `14-teacher` experience.company: employer "Oak Grove Elementary School" not parsed as a company (it is inside the title) — “4th grade teacher, oak grove elementary school (wake county public schools) \| \|\| long-term substitute (2nd grade), cedar fork elementary \| \|\| student teacher (3rd grade), lacy elementary \|”
+- `14-teacher` experience.company: employer "Cedar Fork Elementary" not parsed as a company (it is inside the title) — “4th grade teacher, oak grove elementary school (wake county public schools) \| \|\| long-term substitute (2nd grade), cedar fork elementary \| \|\| student teacher (3rd grade), lacy elementary \|”
+- `14-teacher` experience.company: employer "Lacy Elementary" not parsed as a company (it is inside the title) — “4th grade teacher, oak grove elementary school (wake county public schools) \| \|\| long-term substitute (2nd grade), cedar fork elementary \| \|\| student teacher (3rd grade), lacy elementary \|”
+- `15-no-requirements` experience.company: employer "Hope Street Food Pantry" not parsed as a company (it is inside the title) — “cashier \| quickfuel market \|\| crew member \| burger barn \|\| hope street food pantry \|”
+
+### parse_employer_missing · parse_pdf — 3 finding(s) [parse]
+Root cause: lib/resume/parse experience header split: "Title, Company — City" one-liners keep the employer in the title (defect #13).  
+Fix: Split on the comma when the right side is not a city.
+
+- `02-warehouse-lead` experience.company: employer "Midwest Parcel Logistics" not parsed as a company (it is inside the title) — “warehouse lead, midwest parcel logistics \| \|\| material handler / forklift operator, midwest parcel logistics \| columbus, oh (mar 2019 \|\| picker/packer , brightcart fulfillment \| \|\| line cook, buckeye diner \|”
+- `02-warehouse-lead` experience.company: employer "BrightCart Fulfillment" not parsed as a company (it is inside the title) — “warehouse lead, midwest parcel logistics \| \|\| material handler / forklift operator, midwest parcel logistics \| columbus, oh (mar 2019 \|\| picker/packer , brightcart fulfillment \| \|\| line cook, buckeye diner \|”
+- `02-warehouse-lead` experience.company: employer "Buckeye Diner" not parsed as a company (it is inside the title) — “warehouse lead, midwest parcel logistics \| \|\| material handler / forklift operator, midwest parcel logistics \| columbus, oh (mar 2019 \|\| picker/packer , brightcart fulfillment \| \|\| line cook, buckeye diner \|”
+
+### parse_title_fragment · parse — 3 finding(s) [parse]
+Root cause: lib/resume/parse: a company-only line (or a volunteer org) becomes a role title (defect #13).  
+Fix: Merge company line + "Title, dates" line.
+
+- `03-cashier-entry` experience.title: parsed title is not one of the résumé's job titles — “Hope Street Food Pantry \| ”
+- `11-accountant` experience.title: parsed title is not one of the résumé's job titles — “Gulf Coast Marine Services \| ”
+- `15-no-requirements` experience.title: parsed title is not one of the résumé's job titles — “Hope Street Food Pantry \| ”
+
+### parse_bullet_fragment · parse_pdf — 1 finding(s) [parse]
+Root cause: lib/resume/parse mergeWrappedLines does not rejoin a header broken inside a date range (PDF) (defect #13).  
+Fix: Rejoin a header line ending in an open "(" / dangling dash.
+
+- `02-warehouse-lead` experience.bullets: a wrapped fragment parsed as its own bullet — “Dec 2021)”
+
+### parse_fake_role · parse — 1 finding(s) [parse]
+Root cause: Same (defect #13).  
+Fix: Same.
+
+- `11-accountant` experience: 4 roles parsed; the résumé has 3 — “staff accountant \| bayou industrial supply \|\| gulf coast marine services \| \|\| accounts payable specialist \| \|\| bookkeeper \| tran family nail salon”
+
+## Expert grades
+
+| Fixture | parse | fit | optimize | humanproof | scanner | advantage | insights | tailor | ats_check | export | interview_prep_fallback | interview_prep | tailor_polish | parse_pdf |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 01-retail-manager | 5 | 3⚠ | 2⚠ | 1 | 2⚠ | 1⚠ | 2⚠ | 2⚠ | 4 | 4 | 2 | deferred | deferred |  |
+| 02-warehouse-lead | 2 | 3⚠ | 2⚠ | 1⚠ | 2⚠ | 2⚠ | 2⚠ | 1⚠ | 4 | 4 | 2 | deferred | deferred | 1 |
+| 03-cashier-entry | 3 | 4 | 2 | 1 | 2 | 2⚠ | 3⚠ | 1⚠ | 4 | 4 | 2 | deferred | deferred |  |
+| 04-customer-service | 5 | 1⚠ | 2⚠ | 1⚠ | 2⚠ | 2⚠ | 2⚠ | 2⚠ | 4 | 4 | 3 | deferred | deferred |  |
+| 05-registered-nurse | 5 | 1⚠ | 1⚠ | 1⚠ | 1⚠ | 2⚠ | 2⚠ | 1⚠ | 4 | 4⚠ | 2⚠ | deferred | deferred | 5 |
+| 06-backend-engineer | 2 | 3⚠ | 2⚠ | 1⚠ | 2⚠ | 2⚠ | 2⚠ | 2⚠ | 4 | 4 | 2 | deferred | deferred |  |
+| 07-data-analyst | 5 | 2⚠ | 2⚠ | 1⚠ | 1⚠ | 2⚠ | 3⚠ | 2⚠ | 4 | 4 | 3 | deferred | deferred |  |
+| 08-marketing-coordinator | 5 | 1⚠ | 1⚠ | 1⚠ | 1⚠ | 2⚠ | 2⚠ | 2⚠ | 4 | 4 | 2 | deferred | deferred | 3 |
+| 09-sdr-sales | 5 | 3⚠ | 2⚠ | 1⚠ | 2⚠ | 2⚠ | 2⚠ | 1⚠ | 4 | 4 | 3 | deferred | deferred |  |
+| 10-admin-assistant | 5 | 3⚠ | 2⚠ | 1⚠ | 2⚠ | 2⚠ | 2⚠ | 2 | 4 | 4 | 2 | deferred | deferred |  |
+| 11-accountant | 1 | 1⚠ | 1⚠ | 1⚠ | 1⚠ | 2⚠ | 3⚠ | 1⚠ | 4 | 4 | 2 | deferred | deferred |  |
+| 12-hvac-technician | 5 | 2⚠ | 1⚠ | — | 1⚠ | 2⚠ | 3⚠ | 1⚠ | 4 | 4 | 3 | deferred | deferred |  |
+| 13-line-cook | 5 | 3⚠ | 2⚠ | 1⚠ | 1⚠ | 2⚠ | 2⚠ | 1⚠ | 4 | 4 | 3 | deferred | deferred |  |
+| 14-teacher | 2 | 1⚠ | 1⚠ | — | 1⚠ | 2⚠ | 2⚠ | 1 | 4 | 4 | 3 | deferred | deferred |  |
+| 15-no-requirements | 3 | 5 | 5 | — | 1⚠ | 1⚠ | 1⚠ | 1 |  |  |  |  |  |  |
+
+Grade notes (1 = harmful · 3 = usable, no better than free ChatGPT · 5 = worth paying for alone):
+
+- `01-retail-manager` · parse — **5**: Clean: 4 roles, employers, dates, bullets.
+- `01-retail-manager` · fit — **3**: 100/100 "Strong fit" for an Assistant Store Manager applying to Store Manager with no P&L evidence — P&L is never read as a requirement. Constraint text is ungrammatical: "Your an Associate's degree meets the education requirement."
+- `01-retail-manager` · optimize — **2**: One credit buys 2 reorder tips, cashier-level questions ("How many transactions did you ring up per shift?") for a Store Manager applicant, and a summary claiming "12+ years of experience" when her own summary says 9. Application message is a generic template.
+- `01-retail-manager` · humanproof — **1**: Breaks the message: "lines up directly with what the role calls for." → "what the role calls." Score 71→71: changed nothing else.
+- `01-retail-manager` · scanner — **2**: score 98 vs summary "100"; the only fix is "(New bullet to add) Describe real work where you used retail" — useless.
+- `01-retail-manager` · advantage — **1**: Names "Machine Learning" (company blurb) as a posting priority and builds the plan on it: "Take ownership of work centred on machine learning and assistant", "Deliver a result tied to machine learning". Associate-level day-30 ("Hit your daily target and master the open/close") and gym vocabulary ("membership sign-ups") for a Store Manager; the "proof" is her summary sentence.
+- `01-retail-manager` · insights — **2**: Top want is "Payroll"; leads with Bilingual and Bachelor's (both preferred); misses P&L, retail management and open availability; tip says mirror "Payroll, Bilingual (Spanish)".
+- `01-retail-manager` · tailor — **2**: Breaks a bullet ("balanced the drawer every shift" → "balanced the drawer e shift"), rewrites a 2023 result into present tense ("Grow store sales 9% … in 2023"), summary "12+ years" vs her "9 years", adds a generic flagged bullet to Cashier.
+- `01-retail-manager` · ats_check — **4**: Accurate pass; nothing to fix.
+- `01-retail-manager` · export — **4**: PDF/DOCX round-trip 100%, Pro unbranded, free branded.
+- `01-retail-manager` · interview_prep_fallback — **2**: Generic cashier-level questions for a Store Manager ("accuracy at the register"); broken "How would you handle handling a busy register line…". Stories are real bullets.
+- `01-retail-manager` · interview_prep — **4**: Strong, role-specific questions built on her real numbers; answers usable. Defects: intro says "the last three and a half [years] as an Assistant Store Manager" (dates say 5.5); answers add practices not in the résumé ("I also pair them with supervisors…").
+- `01-retail-manager` · tailor_polish — **3**: 2 trivial edits ("Lead a team of 18" → "Lead 18"; "the most in the district" → "leading the district"); 8 of 10 rejected by the firewall. No better than free ChatGPT.
+- `02-warehouse-lead` · parse — **2**: "Title, Company — City (dates)" format: every employer stays inside the title, company empty ("Warehouse Lead, Midwest Parcel Logistics"); "Picker/Packer , BrightCart" stray space; certification "Parcel, renewed" garbage.
+- `02-warehouse-lead` · parse_pdf — **1**: Hanging-indent PDF: the wrapped role header became company "Columbus, OH (Mar 2019" with no dates and a fake bullet "Dec 2021)".
+- `02-warehouse-lead` · fit — **3**: Score sensible (94) but asks "Do you have Forklift certification?" when the résumé lists "Forklift / Reach Truck certification"; WMS (he is a Manhattan power user) never read; "Your a high school diploma" grammar.
+- `02-warehouse-lead` · optimize — **2**: The one rewrite breaks the bullet ("hit rate every week" → "hit rate e week"); summary "10+ years" vs his "6 years" and names the same employer twice; picker-level questions for a lead.
+- `02-warehouse-lead` · humanproof — **1**: "Warehouse Shift Lead – 2nd Shift" → "– nd Shift" and "calls for." → "calls."
+- `02-warehouse-lead` · scanner — **2**: Says "receiving" is "not stated" in the résumé (he "Received and put away inbound freight"); no real fix.
+- `02-warehouse-lead` · advantage — **2**: Priorities "associates, equipment, plan"; coaches him on "non-climate-controlled" as a gap; "Bring a point of view on plan"; proof is his summary line.
+- `02-warehouse-lead` · insights — **2**: Wants: "Excel" first, "CDL" (sister company's driver posting — trap), Forklift twice; misses WMS and lead experience.
+- `02-warehouse-lead` · tailor — **1**: Tells him a CDL is a REQUIRED, "fatal" gap (it belongs to a different company's posting); gaps "similar" and "email"; "e week" broken bullet; present tense on a dated result.
+- `02-warehouse-lead` · ats_check — **4**: Correctly flags that its own parse misread title/company.
+- `02-warehouse-lead` · export — **4**: Round-trip 100%.
+- `02-warehouse-lead` · interview_prep_fallback — **2**: "Give me an example of when you showed safety." First story is his summary line, not an accomplishment.
+- `02-warehouse-lead` · interview_prep — **4**: Excellent lead-level questions (safety huddle, shorts reconciliation). Intro invents a promotion path: "worked my way up from Material Handler to Forklift Operator" (one combined role).
+- `02-warehouse-lead` · tailor_polish — **3**: Drops the ATS keyword the posting names ("Manhattan WMS" → "WMS") and the shift hours; mixes tense in the current role ("Assigned").
+- `03-cashier-entry` · parse — **3**: Volunteer role parsed with the organisation as the title ("Hope Street Food Pantry", no employer).
+- `03-cashier-entry` · fit — **4**: Right call (89), sensible asks (18+, 25 lbs).
+- `03-cashier-entry` · optimize — **2**: Summary: "4+ years of experience, including Cashier at QuickFuel Market and Hope Street Food Pantry" (a volunteer pantry as a job) and then pastes her objective after it. Questions are fine for a cashier.
+- `03-cashier-entry` · humanproof — **1**: "calls for." → "calls."
+- `03-cashier-entry` · scanner — **2**: Generic "Describe real work where you used cash handling".
+- `03-cashier-entry` · advantage — **2**: Pitches "my hands-on experience with customer service and hours"; "membership sign-ups"; proof "Crew Member of the Month (Aug 2023) — Lead with that number".
+- `03-cashier-entry` · insights — **3**: Reasonable list (cash, availability, customer service) but leads with the bonus item (Bilingual).
+- `03-cashier-entry` · tailor — **1**: Breaks her best bullet: "Balanced my drawer to within $1 every shift" → "Balance my drawer to within $1 e shift"; gaps "volunteer all count", "Must be 18+".
+- `03-cashier-entry` · ats_check — **4**: Accurate.
+- `03-cashier-entry` · export — **4**: Round-trip 100%.
+- `03-cashier-entry` · interview_prep_fallback — **2**: "How would you handle handling a busy register line…" broken; otherwise generic.
+- `03-cashier-entry` · interview_prep — **4**: Natural, entry-level questions and answers. Defects: "since June of this year" (June 2024), "What drew you back to grocery retail?" (she never worked grocery).
+- `03-cashier-entry` · tailor_polish — **3**: One edit, which turns a past result into present tense ("Balance cash drawer…").
+- `04-customer-service` · parse — **5**: Clean.
+- `04-customer-service` · fit — **1**: False hard gate: "Requires a high school diploma; your résumé lists no degree" — she has a B.A. Also "missing: scheduling, attention to detail" (scheduling is the product) and Zendesk is not matched to the ticketing requirement.
+- `04-customer-service` · optimize — **2**: Reorder + questions she already answers (CSAT 94% is on the résumé); summary "10+ years" vs her "5+ years" and repeats her own summary sentence after it.
+- `04-customer-service` · humanproof — **1**: "calls for." → "calls."
+- `04-customer-service` · scanner — **2**: No real fix.
+- `04-customer-service` · advantage — **2**: "experience with phone and questions"; says the posting "leans on scheduling and ticketing, which your résumé doesn't yet show" (Zendesk, Five9 are on it).
+- `04-customer-service` · insights — **2**: Salesforce (nice-to-have) first; HS diploma twice; "Monday Through Friday" as a skill; misses 2+ years support and 45 WPM.
+- `04-customer-service` · tailor — **2**: Gaps: Freshdesk and ServiceNow as REQUIRED (the posting lists them as alternatives to Zendesk, which she has); summary 10+ years.
+- `04-customer-service` · ats_check — **4**: Accurate.
+- `04-customer-service` · export — **4**: Round-trip 100%.
+- `04-customer-service` · interview_prep_fallback — **3**: Generic but correct for the field.
+- `04-customer-service` · interview_prep — **4**: Very good, specific to her numbers. Numbers are written as words ("sixty to seventy", "ninety-four percent"), which escapes the digit-only guard.
+- `04-customer-service` · tailor_polish — **3**: 2 light edits; fine but trivial.
+- `05-registered-nurse` · parse — **5**: Clean.
+- `05-registered-nurse` · parse_pdf — **5**: Clean from the hanging-indent PDF.
+- `05-registered-nurse` · fit — **1**: Harmful: "35 — Requires an RN license; your résumé does not list one" for a BSN, RN with "Registered Nurse, Colorado (multistate compact)" under Licenses. ACLS not read.
+- `05-registered-nurse` · optimize — **1**: Same false RN-license gate (35, Weak fit); summary calls an RN a "healthcare support candidate"; message "I'm confident my background equips me…" is filler.
+- `05-registered-nurse` · humanproof — **1**: "calls for." → "calls."
+- `05-registered-nurse` · scanner — **1**: Lists no requirements at all for an RN posting.
+- `05-registered-nurse` · advantage — **2**: Clinical vocabulary is right now (charge nurses, EHR) but the gap coaching says the posting "leans on cardiac and transitioning"; "Take ownership of work centred on cardiac and patients".
+- `05-registered-nurse` · insights — **2**: Lists PALS — the posting explicitly says this role does NOT need PALS.
+- `05-registered-nurse` · tailor — **1**: Harmful: gaps "RN license (REQUIRED, fatal)" and "PALS (REQUIRED, fatal)" for a licensed RN; "within 6 months hire" as a requirement; present tense on "Precepted 7 new graduate nurses".
+- `05-registered-nurse` · ats_check — **4**: Accurate.
+- `05-registered-nurse` · export — **4**: Round-trip 100%.
+- `05-registered-nurse` · interview_prep_fallback — **2**: Family "general": generic questions for a telemetry RN; two "stories" are her license line and a role header.
+- `05-registered-nurse` · interview_prep — **3**: Questions are genuinely clinical and good (rhythm changes, nights, charge priorities). Intro states "almost four years of experience at St. Aurelia" (dates: 6.2); charge-nurse answer garbles "assignments for five to six patients per nurse". Family field still "general".
+- `05-registered-nurse` · tailor_polish — **3**: "Care for 5–6 patients" → "Monitored" (changes the duty, past tense on a current role); "Started IVs" dropped.
+- `06-backend-engineer` · parse — **2**: Every role "Title, Company" kept as title; company empty for all three.
+- `06-backend-engineer` · fit — **3**: 89 is reasonable; but lists "compliance" (a responsibility) as a missing REQUIRED skill and does not read message queues (he has Kafka/SQS).
+- `06-backend-engineer` · optimize — **2**: One tense rewrite ("Built the … service" → "Build"), guidance for "compliance", summary "8+ years" (7), message lowercases "python, go, and sql".
+- `06-backend-engineer` · humanproof — **1**: "calls for." → "calls."
+- `06-backend-engineer` · scanner — **2**: Thin; Go/Python listed as separate musts.
+- `06-backend-engineer` · advantage — **2**: "Machine Learning" (company blurb) as a priority and gap; "Take ownership of work centred on services and machine learning"; "existing strength in on-call".
+- `06-backend-engineer` · insights — **2**: Misses Go/Java/Python entirely (the core requirement); Terraform (nice-to-have) first; "Reconciliation" from a responsibility; Kafka alone though Kafka/RabbitMQ/SQS is a choice.
+- `06-backend-engineer` · tailor — **2**: Present tense on three completed projects; adds "Resolved day-to-day problems on the spot and escalated only when needed" to the intern role; "Backend Development (REQUIRED, risky)" for a backend engineer; RabbitMQ/Java/Machine Learning as missing; skills reordered Python before Go for a mostly-Go team.
+- `06-backend-engineer` · ats_check — **4**: Flags its own misparse correctly.
+- `06-backend-engineer` · export — **4**: Round-trip 100%.
+- `06-backend-engineer` · interview_prep_fallback — **2**: "Give me an example of when you showed shipping."
+- `06-backend-engineer` · interview_prep — **4**: Strong payments-relevant questions grounded in his bullets. Intro "four years of experience" (7); answers embellish ("I analyzed the queries…").
+- `06-backend-engineer` · tailor_polish — **3**: Cuts specifics (Django, "at peak", "event service") — makes bullets slightly weaker.
+- `07-data-analyst` · parse — **5**: Clean.
+- `07-data-analyst` · fit — **2**: Says "the posting also asks for Excel, which your résumé doesn't show" — Excel (Power Query, pivot tables) is in her skills and bullets; "scheduling" as a requirement.
+- `07-data-analyst` · optimize — **2**: Charged a credit for 2 reorder tips and a template message ("sql, tableau, and python"); no summary, no rewrites.
+- `07-data-analyst` · humanproof — **1**: "calls for." → "calls."
+- `07-data-analyst` · scanner — **1**: Nonsense fix: "Sql work that produced 4 years — confirm this figure applies here before using."
+- `07-data-analyst` · advantage — **2**: Priorities "clinics, staffing, findings"; "Take ownership of work centred on clinics and staffing" for an analyst; proof = summary.
+- `07-data-analyst` · insights — **3**: Python (preferred, and one of "Python or R") listed first as a hard want; "Forecasting" from a responsibility; otherwise SQL, Excel, Tableau/Power BI right.
+- `07-data-analyst` · tailor — **2**: Gap "power bi (REQUIRED)" though Tableau satisfies it; "healthcare claims", "qualifications" as keywords; adds "scheduled", "dashboards" as skills.
+- `07-data-analyst` · ats_check — **4**: Accurate.
+- `07-data-analyst` · export — **4**: Round-trip 100%.
+- `07-data-analyst` · interview_prep_fallback — **3**: Generic but stories are her strongest bullets.
+- `07-data-analyst` · interview_prep — **3**: Very good questions on her real projects; but an answer moves the Monday-report automation to the wrong employer ("At Twin Lakes, I was generating this Monday sales report…" — it was North Loop).
+- `07-data-analyst` · tailor_polish — **3**: Two acceptable tightenings; "(pandas)" dropped.
+- `08-marketing-coordinator` · parse — **5**: Wrapped "(1,800 subscribers)." line correctly joined.
+- `08-marketing-coordinator` · parse_pdf — **3**: Roles fine; education loses the school and field ("B.A. \| 2024-05").
+- `08-marketing-coordinator` · fit — **1**: Harmful: "35 — Requires a Bachelor's degree; your résumé lists no degree" (B.A., Communication, SDSU 2024). Social media, email marketing and Canva are never read as requirements; only "bilingual spanish" matched.
+- `08-marketing-coordinator` · optimize — **1**: Message: "My experience with bilingual spanish lines up directly with what the role calls for." Summary "3+ years of experience" for a new grad (internship + part-time). Same false degree gate.
+- `08-marketing-coordinator` · humanproof — **1**: "calls for." → "calls."
+- `08-marketing-coordinator` · scanner — **1**: Only "bilingual spanish"; false degree gate.
+- `08-marketing-coordinator` · advantage — **2**: No longer a nurse plan, but still centres the employer's industry words: priorities "clinics, patients, Social Media"; "Take ownership of work centred on clinics and patients"; "the posting leans on clinics and patients, which your résumé doesn't yet show".
+- `08-marketing-coordinator` · insights — **2**: Bilingual (nice-to-have) first; "Adobe Creative Suite" as a hard want (the posting says Canva OR Adobe — she has Canva); email marketing missing; "Managing Social Media" and "Social Media Accounts" duplicates.
+- `08-marketing-coordinator` · tailor — **2**: "2+ years experience (REQUIRED)" — the posting says 0–2 years; HubSpot and "similar" as required gaps; "clinics", "patients" as missing keywords.
+- `08-marketing-coordinator` · ats_check — **4**: Accurate.
+- `08-marketing-coordinator` · export — **4**: Round-trip 100%.
+- `08-marketing-coordinator` · interview_prep_fallback — **2**: A "story" is a role header ("Social Media Assistant (part-time) — SDSU … (Sep 2022 – May 2024)"); "showed channel fluency".
+- `08-marketing-coordinator` · interview_prep — **3**: Good questions; intro overclaims: "I've spent the last couple years working in marketing at Coastal Coffee Roasters, where I managed their social media" (a 10-week internship); answers add practices not on the résumé.
+- `08-marketing-coordinator` · tailor_polish — **3**: Tightens three bullets; loses "email" and "how we roast" — fine, but nothing ChatGPT would not do.
+- `09-sdr-sales` · parse — **5**: Clean.
+- `09-sdr-sales` · fit — **3**: Right verdict (91) but reads only "sales, crm, salesforce"; Outreach/sequencing and outbound volume never read.
+- `09-sdr-sales` · optimize — **2**: Asks "What was your quota attainment (%)?" when "112% of quota" is on the résumé; summary "7+ years" and "Strengths in sales, marketing and crm".
+- `09-sdr-sales` · humanproof — **1**: "calls for." → "calls."
+- `09-sdr-sales` · scanner — **2**: "crm" both strong and missing.
+- `09-sdr-sales` · advantage — **2**: "hands-on experience with account and prospect"; "the posting also leans on start and crm, which your résumé doesn't yet show" (Salesforce is on it).
+- `09-sdr-sales` · insights — **2**: "Salesforce \| 1+ years experience \| Relevant experience" — misses outbound, 60 calls/day, sequencing tool.
+- `09-sdr-sales` · tailor — **1**: Breaks a bullet ("Keep every touch logged" → "Keep e touch logged"); present tense on "Built a 6-step sequence…".
+- `09-sdr-sales` · ats_check — **4**: Accurate.
+- `09-sdr-sales` · export — **4**: Round-trip 100%.
+- `09-sdr-sales` · interview_prep_fallback — **3**: Reasonable sales questions.
+- `09-sdr-sales` · interview_prep — **4**: Sharp SDR questions (volume vs personalisation, inbound vs outbound). Answers embellish method ("I know my conversion rate from call to meeting…").
+- `09-sdr-sales` · tailor_polish — **3**: Turns the current role into past tense ("Booked", "Logged") and drops "straight" from "5 straight quarters".
+- `10-admin-assistant` · parse — **5**: Clean.
+- `10-admin-assistant` · fit — **3**: PowerPoint gap is right; misses travel/expense coordination (she books travel and files expense reports).
+- `10-admin-assistant` · optimize — **2**: Strongest line picked from the dental job ("Confirmed next-day appointments"); no summary; template message "excel, microsoft office, and attention to detail".
+- `10-admin-assistant` · humanproof — **1**: "calls for." → "calls."
+- `10-admin-assistant` · scanner — **2**: Generic fix.
+- `10-admin-assistant` · advantage — **2**: "your real experience in prepare"; "the posting also leans on confidential and information, which your résumé doesn't yet show".
+- `10-admin-assistant` · insights — **2**: "Excel \| Microsoft Office \| Advanced Microsoft Office" duplicates; misses executive support and travel/expenses.
+- `10-admin-assistant` · tailor — **2**: Ranks a 2015 temp data-entry job as the top "core" role; adds a generic office-administration bullet to it.
+- `10-admin-assistant` · ats_check — **4**: Accurate.
+- `10-admin-assistant` · export — **4**: Round-trip 100%.
+- `10-admin-assistant` · interview_prep_fallback — **2**: "How would you handle accuracy, tools used, and handling confidential records?" broken.
+- `10-admin-assistant` · interview_prep — **3**: Only three role questions and none on supporting three executives, travel or board meetings; intro dropped; an answer claims "I've never had a double-booking… I color-code" (not on the résumé).
+- `10-admin-assistant` · tailor_polish — **3**: Past tense on the current role; polishes the tailor-invented bullet ("Ran day-to-day office administration" → "Managed office administration").
+- `11-accountant` · parse — **1**: "Company — City / Title, dates" format: Gulf Coast Marine Services became a 4th role with no title; AP Specialist lost its employer; "Bill.com" read as his website in the header.
+- `11-accountant` · fit — **1**: Harmful: "35 — Requires a Bachelor's degree; your résumé lists no degree" (B.B.A., Accounting) and "asks for SAP and Excel, which your résumé doesn't show" (NetSuite satisfies the ERP choice; Excel is in his skills).
+- `11-accountant` · optimize — **1**: Credit spent for a summary only ("10+ years" vs his own 6; "Accounts Payable Specialist" with no employer) and a one-skill template message.
+- `11-accountant` · humanproof — **1**: "calls for." → "calls."
+- `11-accountant` · scanner — **1**: Only "accounting"; SAP as missing.
+- `11-accountant` · advantage — **2**: "the posting also leans on documentation and management, which your résumé doesn't yet show"; proof = his summary line.
+- `11-accountant` · insights — **3**: GAAP, Excel, 4+ years right; CPA (preferred) listed as a want; misses ERP and degree.
+- `11-accountant` · tailor — **1**: Harmful: "CPA license (REQUIRED, fatal)" — the posting says CPA preferred. The tailored summary replaces his own, deleting "Passed FAR and AUD sections of the CPA exam". Mixed tense "Support … built … answer".
+- `11-accountant` · ats_check — **4**: Accurate.
+- `11-accountant` · export — **4**: Round-trip 100% (renders the misparsed header "Bill.com").
+- `11-accountant` · interview_prep_fallback — **2**: "How would you handle reconciliation, accuracy, and any system you list?"; first story is the summary.
+- `11-accountant` · interview_prep — **4**: Strong, honest about the CPA exam; senior-level questions on close, flux, audit and REG timing.
+- `11-accountant` · tailor_polish — **3**: Three trivial edits.
+- `12-hvac-technician` · parse — **5**: Clean.
+- `12-hvac-technician` · fit — **2**: "No score: only 2 requirements could be read" on a posting with clear requirements (4+ years, EPA 608 Universal, license, roofs/75 lbs, own tools).
+- `12-hvac-technician` · optimize — **1**: Refused (422 no_requirements) on a fully specified posting — the paid tool is unusable here. No credit spent.
+- `12-hvac-technician` · scanner — **1**: Charged a credit for a null score.
+- `12-hvac-technician` · advantage — **2**: Priorities "buildings, certification, electrical"; "leans on buildings and electrical"; proof is his certification line ("Lead with that number").
+- `12-hvac-technician` · insights — **3**: Reasonable: HVAC, Electrical, license, record, EPA 608; misses 4+ years and commercial RTU/chiller experience.
+- `12-hvac-technician` · tailor — **1**: Harmful: "EPA 608 certification (REQUIRED, fatal)" — he holds EPA Section 608 Universal. Present tense on "Sold $180K … in 2023".
+- `12-hvac-technician` · ats_check — **4**: Accurate.
+- `12-hvac-technician` · export — **4**: Round-trip 100%.
+- `12-hvac-technician` · interview_prep_fallback — **3**: Field-correct, generic.
+- `12-hvac-technician` · interview_prep — **3**: Good residential→commercial questions, but the guard dropped 2 of 4 answers and the intro, so the pack is thin.
+- `12-hvac-technician` · tailor_polish — **3**: Two trivial edits; "parts" dropped.
+- `13-line-cook` · parse — **5**: Clean.
+- `13-line-cook` · fit — **3**: Verdict fine (88) but asks "Do you have a Food Handler card?" when the résumé says "ServSafe Food Handler (2024)"; knife skills not read.
+- `13-line-cook` · optimize — **2**: One reorder, one question, a template message — for a credit.
+- `13-line-cook` · humanproof — **1**: "calls for." → "calls."
+- `13-line-cook` · scanner — **1**: Nonsense fix: "Food safety work that produced 600 guests — confirm this figure".
+- `13-line-cook` · advantage — **2**: "the posting leans on seafood and weekends, which your résumé doesn't yet show" (he works Friday/Saturday service); proof is his dishwasher bullet.
+- `13-line-cook` · insights — **2**: ServSafe three times in different words; misses knife skills.
+- `13-line-cook` · tailor — **1**: Breaks a bullet ("pass every health inspection" → "pass e health inspection"); "1+ years experience (REQUIRED, risky)" for a cook with 4 years.
+- `13-line-cook` · ats_check — **4**: Accurate.
+- `13-line-cook` · export — **4**: Round-trip 100%.
+- `13-line-cook` · interview_prep_fallback — **3**: Field-correct, generic.
+- `13-line-cook` · interview_prep — **4**: Natural kitchen questions and answers grounded in his numbers.
+- `13-line-cook` · tailor_polish — **2**: "Trained 3 new line cooks" → "Train 3 new line cooks"; "pass every health inspection since I started" → "pass all health inspections".
+- `14-teacher` · parse — **2**: Titles carry the school ("4th Grade Teacher, Oak Grove Elementary School (Wake County Public Schools)"), companies empty.
+- `14-teacher` · fit — **1**: Harmful: "No score", "Requires a Bachelor's degree; your résumé lists no degree" (B.A. Elementary Education), and "upselling" as a requirement for a teacher.
+- `14-teacher` · optimize — **1**: Refused (no_requirements) on a posting with five stated requirements.
+- `14-teacher` · scanner — **1**: Charged a credit; "missing: upselling".
+- `14-teacher` · advantage — **2**: Splits "social studies": "the posting also leans on studies and social"; "Bring a point of view on teaching".
+- `14-teacher` · insights — **2**: "Master's degree" (preferred, she lacks it) first; the license appears as three fragments ("Carolina Teaching License", "North Carolina Teaching", "Valid North Carolina").
+- `14-teacher` · tailor — **1**: Breaks a bullet ("with every family" → "with e family"); present tense on a dated result; two invented generic bullets for the student-teacher role ("Trained new teammates on procedures and standards").
+- `14-teacher` · ats_check — **4**: Flags its own misparse correctly.
+- `14-teacher` · export — **4**: Round-trip 100%.
+- `14-teacher` · interview_prep_fallback — **3**: Field-correct, generic.
+- `14-teacher` · interview_prep — **4**: Excellent: data-driven reading, IEPs, PLC, 4th→5th transition; answers stay on her facts.
+- `14-teacher` · tailor_polish — **2**: applied: 0 — the Pro polish returned nothing.
+- `15-no-requirements` · parse — **3**: Same volunteer misparse as fixture 03.
+- `15-no-requirements` · fit — **5**: Correct: "No score: this listing does not state its requirements".
+- `15-no-requirements` · optimize — **5**: Correct: 422 no_requirements, probe and run, nothing charged.
+- `15-no-requirements` · scanner — **1**: Charged a credit for "No score".
+- `15-no-requirements` · advantage — **1**: Charged a credit; "priorities: pay, membership, university"; pitches "my hands-on experience with pay and charlotte".
+- `15-no-requirements` · insights — **1**: Charged a credit for an empty want-list and boilerplate tips.
+- `15-no-requirements` · tailor — **1**: Charged a credit; breaks "every shift" → "e shift".
+
+## Deferred live calls
+
+- 01-retail-manager · interview_prep: not run (pass --prod)
+- 01-retail-manager · tailor_polish: not run (pass --prod)
+- 02-warehouse-lead · interview_prep: not run (pass --prod)
+- 02-warehouse-lead · tailor_polish: not run (pass --prod)
+- 03-cashier-entry · interview_prep: not run (pass --prod)
+- 03-cashier-entry · tailor_polish: not run (pass --prod)
+- 04-customer-service · interview_prep: not run (pass --prod)
+- 04-customer-service · tailor_polish: not run (pass --prod)
+- 05-registered-nurse · interview_prep: not run (pass --prod)
+- 05-registered-nurse · tailor_polish: not run (pass --prod)
+- 06-backend-engineer · interview_prep: not run (pass --prod)
+- 06-backend-engineer · tailor_polish: not run (pass --prod)
+- 07-data-analyst · interview_prep: not run (pass --prod)
+- 07-data-analyst · tailor_polish: not run (pass --prod)
+- 08-marketing-coordinator · interview_prep: not run (pass --prod)
+- 08-marketing-coordinator · tailor_polish: not run (pass --prod)
+- 09-sdr-sales · interview_prep: not run (pass --prod)
+- 09-sdr-sales · tailor_polish: not run (pass --prod)
+- 10-admin-assistant · interview_prep: not run (pass --prod)
+- 10-admin-assistant · tailor_polish: not run (pass --prod)
+- 11-accountant · interview_prep: not run (pass --prod)
+- 11-accountant · tailor_polish: not run (pass --prod)
+- 12-hvac-technician · interview_prep: not run (pass --prod)
+- 12-hvac-technician · tailor_polish: not run (pass --prod)
+- 13-line-cook · interview_prep: not run (pass --prod)
+- 13-line-cook · tailor_polish: not run (pass --prod)
+- 14-teacher · interview_prep: not run (pass --prod)
+- 14-teacher · tailor_polish: not run (pass --prod)
