@@ -486,6 +486,13 @@ function ResumePageInner() {
     fetchIntel(co)
   }
 
+  // When Seen first saw the picked saved listing (its snapshot's posted_at), or null.
+  function savedPostedAt(): string | null {
+    if (!savedId) return null
+    const s = savedJobs.find(j => String(j.job_id) === savedId)
+    return (s?.snapshot as { posted_at?: string | null } | undefined)?.posted_at || null
+  }
+
   // Stable jobId for optimizer/job-insights caching (saved id if present, else a manual key).
   function jobIdFor(): string {
     if (savedId) return savedId
@@ -638,9 +645,12 @@ function ResumePageInner() {
     try {
       const res = await fetch('/api/resume', {
         method: 'POST', headers: await aiHeaders(),
-        body: JSON.stringify({ tool: 'advantage', resume: resumeText, job: jobTitle, company: jobCompany, jobDescription: jobJD, background, companyIntel }),
+        // postedAt: when Seen first saw a saved listing, so the timing advice uses its real age
+        body: JSON.stringify({ tool: 'advantage', resume: resumeText, job: jobTitle, company: jobCompany, jobDescription: jobJD, background, companyIntel, jobId: jobIdFor(), postedAt: savedPostedAt() }),
       })
-      const data = await res.json().catch(() => ({})) as { credits_required?: boolean } & CombinedResult
+      const data = await res.json().catch(() => ({})) as { credits_required?: boolean; error?: string; message?: string } & CombinedResult
+      // a posting that states no requirements: nothing to build on, nothing charged
+      if (res.status === 422 && data.error === 'no_requirements') { setError(data.message || "This listing doesn't state what it requires — no credit used."); setAdvState('idle'); return }
       if (data.credits_required) {
         if (isLoggedIn) { setUpgradeReason('credits'); setUpgradeFeature(undefined); setShowUpgrade(true); setAdvState('idle') }
         else { setGuestGate('your application strategy'); setAdvState('idle') }
