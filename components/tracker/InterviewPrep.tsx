@@ -40,7 +40,7 @@ type Pack = {
 // One read per company + role per page view, shared by every card that names it.
 const recordCache = new Map<string, Promise<{ record: InterviewRecord; pay: Pay | null; follow_up: FollowUp } | null>>()
 function loadRecord(company: string, role: string, interviewAt: string) {
-  const key = `${company.toLowerCase()}|${role.toLowerCase()}`
+  const key = `${company.toLowerCase()}|${role.toLowerCase()}|${interviewAt}`
   if (!recordCache.has(key)) {
     recordCache.set(key, fetch('/api/interview-prep', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -79,15 +79,20 @@ function CopyBtn({ text, label = 'Copy' }: { text: string; label?: string }) {
   )
 }
 
-export default function InterviewPrep({ appId, company, role, interviewAt, isPro, autoBuild }: {
+export default function InterviewPrep({ appId, company, role, interviewAt, isPro, autoBuild, jobId, stage, onSchedule }: {
   appId: string
   company: string
   role: string
-  /** When the card reached the interview stage (ISO). Drives the follow-up dates. */
+  /** The interview date the person entered (ISO), or '' — follow-up days are only shown once it is known. */
   interviewAt: string
   isPro: boolean
   /** Set when the person just came back from buying Interview Prep for this card. */
   autoBuild?: boolean
+  /** The card's own listing, so the prep is built from the real posting. */
+  jobId?: string
+  stage: string
+  /** Saves the interview date on the application (an interview_scheduled event). */
+  onSchedule: (iso: string) => void
 }) {
   const [data, setData] = useState<{ record: InterviewRecord; pay: Pay | null; follow_up: FollowUp } | null>(null)
   const [open, setOpen] = useState(true)
@@ -103,6 +108,16 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
     return () => { live = false }
   }, [company, role, interviewAt])
 
+  // A prep this person already has (bought, or built with Pro) shows on every device and after Pro ends.
+  useEffect(() => {
+    let live = true
+    aiHeaders().then(h => {
+      if (!h.Authorization) return null
+      return fetch('/api/interview-prep', { method: 'POST', headers: h, body: JSON.stringify({ action: 'mine', company, role }) }).then(r => (r.ok ? r.json() : null))
+    }).then(d => { if (live && d?.pack) setPack(d.pack) }).catch(() => {})
+    return () => { live = false }
+  }, [company, role])
+
   // Count the offer once per card per browser session (the funnel's "offer shown" step).
   useEffect(() => {
     if (shown.current || isPro) return
@@ -116,7 +131,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
     setState('building'); setErr('')
     try {
       const h = await aiHeaders()
-      const r = await fetch('/api/interview-prep', { method: 'POST', headers: h, body: JSON.stringify({ action: 'build', company, role, application_id: appId, interview_at: interviewAt }) })
+      const r = await fetch('/api/interview-prep', { method: 'POST', headers: h, body: JSON.stringify({ action: 'build', company, role, application_id: appId, interview_at: interviewAt, job_id: jobId || '', stage }) })
       const d = await r.json().catch(() => ({}))
       if (r.status === 409 && d.need_resume) { setState('need_resume'); return }
       if (r.status === 402) { setState('idle'); setErr('This needs Interview Prep or Pro.'); return }
@@ -147,7 +162,19 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
   }
 
   const rec = data?.record
-  const fu = pack?.follow_up || data?.follow_up
+  // Dated advice only for a dated interview (round 2: "send a thank-you by Mon" before a Thursday screen).
+  const fu = interviewAt ? data?.follow_up : null
+  const pickDay = (
+    <label className={s.dateRow}>
+      <span>When is your interview?</span>
+      <input type="date" className={s.date} value={interviewAt ? interviewAt.slice(0, 10) : ''}
+        onChange={e => { if (e.target.value) onSchedule(new Date(`${e.target.value}T19:00:00Z`).toISOString()) }} />
+    </label>
+  )
+  // One real question for free, so the offer is not a blind buy (round 2: "nothing to preview").
+  const sample = data?.pay
+    ? { q: 'What are your pay expectations?', why: `${company}'s similar listings on Seen pay about ${money(data.pay)}. Give a range you would accept.` }
+    : { q: `What do you know about ${company}?`, why: 'Name what they sell, who their customers are, and one recent thing you read about them.' }
 
   return (
     <section className={s.box} onClick={e => e.stopPropagation()} aria-label={`Interview prep for ${company}`}>
@@ -175,8 +202,11 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
             {data?.pay && (
               <p className={s.fact}>Pay on {company}&apos;s {data.pay.scope === 'role' ? 'similar ' : ''}listings: <b>{money(data.pay)}</b> <span className={s.dim}>({data.pay.listings} listings)</span></p>
             )}
-            {fu && (
+            {pickDay}
+            {fu ? (
               <p className={s.fact}>Send a thank-you by <b>{day(fu.thankYouBy)}</b>. No word? Follow up <b>{day(fu.followUpOn)}</b>, and once more <b>{day(fu.lastCheckOn)}</b>.</p>
+            ) : (
+              <p className={s.factDim}>Add the date and Seen times your thank-you and follow-ups.</p>
             )}
             {!!rec?.quotes?.length && (
               <details className={s.quotes}>
@@ -193,10 +223,15 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
 
           {/* PAID — the prep pack */}
           {pack ? (
-            <PackView pack={pack} company={company} />
+            <PackView pack={pack} company={company} fu={fu} />
           ) : (
             <div className={s.offer}>
               <div className={s.offerTitle}>Walk in ready for {company}</div>
+              <div className={s.sample}>
+                <div className={s.label}>A question from your prep</div>
+                <b>{sample.q}</b>
+                <span className={s.why}>{sample.why}</span>
+              </div>
               <ul className={s.list}>
                 <li>Likely questions for {role ? `${article(role)} ${role}` : 'this role'}, and what each one checks</li>
                 <li>Answers built from <b>your</b> résumé — no invented jobs or numbers</li>
@@ -226,7 +261,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
   )
 }
 
-function PackView({ pack, company }: { pack: Pack; company: string }) {
+function PackView({ pack, company, fu }: { pack: Pack; company: string; fu: FollowUp | null | undefined }) {
   const intro = pack.intro
   return (
     <div className={s.pack}>
@@ -248,7 +283,7 @@ function PackView({ pack, company }: { pack: Pack; company: string }) {
       </div>
       <div className={s.block}>
         <div className={s.label}>Answers from your résumé</div>
-        <p className={s.dim} style={{ margin: '0 0 .45rem' }}>Practice them out loud and make them yours — change any detail that isn&apos;t exactly what happened.</p>
+        <p className={s.dim} style={{ margin: '0 0 .45rem' }}>Fill in anything in [brackets], practise them out loud, and change any detail that isn&apos;t exactly what happened.</p>
         {pack.answers.map((a, i) => (
           <details key={i} className={s.answer} open={i === 0}>
             <summary>{a.q}</summary>
@@ -260,13 +295,13 @@ function PackView({ pack, company }: { pack: Pack; company: string }) {
       <div className={s.block}>
         <div className={s.label}>Emails</div>
         <details className={s.answer}>
-          <summary>Thank-you · send by {day(pack.follow_up.thankYouBy)}</summary>
+          <summary>Thank-you · {fu ? `send by ${day(fu.thankYouBy)}` : 'send within a day of the interview'}</summary>
           <p className={s.mono}>Subject: {pack.emails.thankYou.subject}</p>
           <pre className={s.email}>{pack.emails.thankYou.body}</pre>
           <CopyBtn text={`Subject: ${pack.emails.thankYou.subject}\n\n${pack.emails.thankYou.body}`} />
         </details>
         <details className={s.answer}>
-          <summary>Follow-up · send {day(pack.follow_up.followUpOn)} if you have not heard back</summary>
+          <summary>Follow-up · {fu ? `send ${day(fu.followUpOn)}` : 'send 5 working days after'} if you have not heard back</summary>
           <p className={s.mono}>Subject: {pack.emails.followUp.subject}</p>
           <pre className={s.email}>{pack.emails.followUp.body}</pre>
           <CopyBtn text={`Subject: ${pack.emails.followUp.subject}\n\n${pack.emails.followUp.body}`} />

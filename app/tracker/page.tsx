@@ -85,14 +85,15 @@ const raise = (app: Application, stage: string): Partial<Application> => (STAGE_
 
 // Interview Prep shows from the moment a card reaches an interview stage (lib/server/interviewPrep.js).
 const PREP_STAGES = ['Phone Screen', 'Interview', 'Final Round']
-/** When the card reached an interview: the interview event's date, else the last update. */
+/** The interview date the person entered on the card (an interview_scheduled event), or ''. */
 function interviewAt(app: Application): string {
-  const ev = [...(app.events || [])].reverse().find(e => e.type === 'interview_received' || e.type === 'response_received')
-  const ms = ev?.date || app.updatedAt || Date.now()
-  return new Date(ms).toISOString()
+  const ev = [...(app.events || [])].reverse().find(e => e.type === 'interview_scheduled' && typeof e.data?.at === 'string')
+  return ev ? String(ev.data!.at) : ''
 }
 
-function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onShare, onReload, intel, check, onAnswer, onSnooze, sync, onRetry, isPro, autoPrep }: {
+function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onShare, onReload, intel, check, onAnswer, onSnooze, sync, onRetry, isPro, autoPrep, onSchedule }: {
+  /** Saves the interview date the person picked on the prep panel. */
+  onSchedule: (id: string, iso: string) => void
   app: Application
   /** The account has Pro access (subscription, comp, or an Interview Prep window). */
   isPro: boolean
@@ -207,7 +208,8 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
       )}
 
       {isActive && PREP_STAGES.includes(app.stage) && (
-        <InterviewPrep appId={app.id} company={app.company} role={app.role} interviewAt={interviewAt(app)} isPro={isPro} autoBuild={autoPrep} />
+        <InterviewPrep appId={app.id} company={app.company} role={app.role} interviewAt={interviewAt(app)} isPro={isPro} autoBuild={autoPrep}
+          jobId={app.jobId} stage={app.stage} onSchedule={iso => onSchedule(app.id, iso)} />
       )}
 
       {/* Check-in: asked on the application it is about, not in a separate stack above the list. */}
@@ -626,6 +628,12 @@ function TrackerPage() {
       }
     }
     return r
+  }
+
+  // The interview date from the prep panel: an interview_scheduled event on the application (synced with it).
+  const handleSchedule = async (id: string, iso: string) => {
+    const ev = { id: `ev_${Date.now()}`, type: 'interview_scheduled', date: Date.now(), source: 'user' as const, confidence: 'high' as const, data: { at: iso } }
+    await handleUpdate(id, {}, { markers: [ev] })
   }
 
   const handleRetry = async (id: string) => {
@@ -1141,7 +1149,7 @@ function TrackerPage() {
           <div id="trackerList" style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
             {pageApps.map(app => (
               <div key={app.id} style={highlightId === app.id ? { borderRadius: 12, boxShadow: '0 0 0 2px var(--green), 0 0 30px rgba(16,185,129,0.3)', transition: 'box-shadow 2.5s ease' } : undefined}>
-                <AppCard app={app} expanded={expandedId === app.id} setExpanded={open => setExpandedId(open ? app.id : '')} onUpdate={handleUpdate} onEdit={a => { setEditNotice(''); setEditing(a) }} onRemove={handleRemove} onShare={handleShare} onReload={loadApps} intel={companyScores[app.company.toLowerCase().trim()]} check={checkByApp.get(app.id)} onAnswer={handleCheckAnswer} onSnooze={handleSnooze} sync={syncOf(app)} onRetry={handleRetry} isPro={isPro} autoPrep={prepReturn === app.id && isPro} />
+                <AppCard app={app} expanded={expandedId === app.id} setExpanded={open => setExpandedId(open ? app.id : '')} onUpdate={handleUpdate} onEdit={a => { setEditNotice(''); setEditing(a) }} onRemove={handleRemove} onShare={handleShare} onReload={loadApps} intel={companyScores[app.company.toLowerCase().trim()]} check={checkByApp.get(app.id)} onAnswer={handleCheckAnswer} onSnooze={handleSnooze} sync={syncOf(app)} onRetry={handleRetry} isPro={isPro} autoPrep={prepReturn === app.id && isPro} onSchedule={handleSchedule} />
               </div>
             ))}
           </div>

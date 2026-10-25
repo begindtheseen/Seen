@@ -30,3 +30,6 @@
 .mono { margin: 0 0 .3rem; font-family: var(--mono); font-size: .78rem; color: var(--sub); overflow-wrap: anywhere; }
 .email { margin: 0 0 .4rem; white-space: pre-wrap; font-family: var(--body); font-size: .84rem; line-height: 1.55; color: var(--white); background: #0e111c; border: 1px solid var(--line); border-radius: 6px; padding: .6rem .7rem; overflow-wrap: anywhere; }
 .copy { min-height: 44px; min-width: 88px; border: 1px solid var(--line); background: #0e111c; color: var(--white); border-radius: 8px; font-family: var(--mono); font-size: .78rem; cursor: pointer; padding: 0 .8rem; }
+.dateRow { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; font-size: .84rem; color: var(--sub); }
+.date { min-height: 44px; background: #0e111c; color: var(--white); border: 1px solid var(--line); border-radius: 8px; padding: 0 .6rem; font-size: .9rem; }
+.sample { border: 1px dashed rgba(16, 185, 129, .35); border-radius: 8px; padding: .55rem .7rem; margin: 0 0 .7rem; font-size: .86rem; color: var(--white); display: flex; flex-direction: column; gap: .2rem; }

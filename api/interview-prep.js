@@ -19,7 +19,7 @@ import { SCORABLE_REPORTS_FILTER } from '../lib/server/reportCounts.js';
 import { detectRoleFamily } from '../lib/application-intelligence/roleOntology.js';
 import { ONE_TIME_SKUS } from '../lib/server/creditRules.js';
 import {
-  interviewRecord, payRange, followUpPlan, prepPrompt, guardPack, fallbackPack, prepEmails, prepKey, signOffName,
+  interviewRecord, payRange, followUpPlan, prepPrompt, guardPack, prepEmails, prepKey, signOffName,
 } from '../lib/server/interviewPrep.js';
 
 export const FUNNEL_EVENTS = ['prep_offer_shown', 'prep_offer_clicked', 'prep_built', 'guest_email_shown', 'guest_email_given'];
@@ -56,6 +56,14 @@ export async function readRecord({ supabaseUrl, serviceKey, company, role }) {
 }
 
 async function readJson(r) { try { return await r.json(); } catch { return null; } }
+
+/** The signed-in user's id from the Bearer token, or null — for reads that need no Pro gate. */
+async function uidFromToken(req, supabaseUrl, serviceKey) {
+  const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
+  if (!token) return null;
+  const u = await fetch(`${supabaseUrl}/auth/v1/user`, { headers: { apikey: serviceKey, Authorization: `Bearer ${token}` } }).catch(() => null);
+  return u && u.ok ? (await readJson(u))?.id || null : null;
+}
 
 export default async function handler(req, res) {
   const _o = req.headers.origin || '';
@@ -109,9 +117,30 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: !!(r && r.ok) });
   }
 
+  // A prep pack someone already has is theirs on every device and after their Pro days end (round 2: the
+  // pack vanished on another device, and the gate ran before the cache, so a bought prep would lock).
+  const readCached = async (uid) => {
+    const c = await db(`interview_preps?user_id=eq.${encodeURIComponent(uid)}&prep_key=eq.${encodeURIComponent(prepKey(company, role))}&select=pack,updated_at&limit=1`).catch(() => null);
+    const rows = c && c.ok ? await readJson(c) : null;
+    return Array.isArray(rows) && rows[0]?.pack ? rows[0].pack : null;
+  };
+
+  if (action === 'mine') {
+    if (await applyRateLimit(req, res, 'interview-record')) return;
+    if (!company) return res.status(400).json({ error: 'company required' });
+    const uid = await uidFromToken(req, SUPABASE_URL, SERVICE_KEY);
+    if (!uid) return res.status(200).json({ ok: true, pack: null });
+    return res.status(200).json({ ok: true, pack: await readCached(uid) });
+  }
+
   if (action === 'build') {
     if (await applyRateLimit(req, res, 'interview-prep')) return;
     if (!company) return res.status(400).json({ error: 'company required' });
+    if (!body.refresh) {
+      const owner = await uidFromToken(req, SUPABASE_URL, SERVICE_KEY);
+      const cached = owner ? await readCached(owner) : null;
+      if (cached) return res.status(200).json({ ok: true, cached: true, pack: cached });
+    }
     // Signed in + Pro access. gateAI logs the use and never charges a credit to a Pro user.
     const gate = await gateAI(req, 'interview_prep', { proOnly: true });
     if (!gate.ok) {
@@ -119,13 +148,6 @@ export default async function handler(req, res) {
     }
     const uid = gate.uid;
     const key = prepKey(company, role);
-
-    // Cached pack (same person, company and role) — unless they asked for a fresh one.
-    if (!body.refresh) {
-      const c = await db(`interview_preps?user_id=eq.${encodeURIComponent(uid)}&prep_key=eq.${encodeURIComponent(key)}&select=pack,updated_at&limit=1`).catch(() => null);
-      const rows = c && c.ok ? await readJson(c) : null;
-      if (Array.isArray(rows) && rows[0]?.pack) return res.status(200).json({ ok: true, cached: true, pack: rows[0].pack });
-    }
 
     const [profRes, recOut] = await Promise.all([
       db(`profiles?id=eq.${encodeURIComponent(uid)}&select=resume_text,name&limit=1`).catch(() => null),
@@ -137,19 +159,29 @@ export default async function handler(req, res) {
       return res.status(409).json({ error: 'Add your résumé first — your answers are built from it.', need_resume: true });
     }
 
-    const jobText = clean(body.job_text, 6000);
+    // The posting: the card's own listing when it has one (round 2: the model was told "JOB POSTING: not
+    // provided" while Seen held the exact listing), else what the client sent.
+    let jobText = clean(body.job_text, 6000);
+    const jobId = String(body.job_id || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
+    if (!jobText && jobId) {
+      const jr = await db(`jobs?id=eq.${encodeURIComponent(jobId)}&select=title,company,description&limit=1`).catch(() => null);
+      const job = jr && jr.ok ? (await readJson(jr))?.[0] : null;
+      if (job?.description) jobText = clean(`${job.title || ''} at ${job.company || ''}\n${job.description}`, 6000);
+    }
+    const stage = ['Phone Screen', 'Interview', 'Final Round'].includes(body.stage) ? body.stage : '';
+    const pay = recOut?.pay || null;
     let pack;
     if (llmAvailable()) {
       try {
-        const { system, user } = prepPrompt({ company, role, jobText, resumeText });
-        const raw = await chat({ system, user, maxTokens: 2200, timeoutMs: 45000, json: true });
-        pack = guardPack(raw, { company, role, resumeText });
+        const { system, user } = prepPrompt({ company, role, jobText, resumeText, stage });
+        const raw = await chat({ system, user, maxTokens: 2400, timeoutMs: 45000, json: true });
+        pack = guardPack(raw, { company, role, resumeText, pay, stage });
       } catch (e) {
         if (!(e instanceof LLMUnavailableError)) console.error('[interview-prep] model failed, using the coached pack:', String(e?.message || e).slice(0, 160));
-        pack = fallbackPack({ company, role, resumeText });
+        pack = guardPack({}, { company, role, resumeText, pay, stage });
       }
     } else {
-      pack = fallbackPack({ company, role, resumeText });
+      pack = guardPack({}, { company, role, resumeText, pay, stage });
     }
 
     const name = signOffName(resumeText, clean(prof?.name, 80));

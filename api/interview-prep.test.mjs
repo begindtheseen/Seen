@@ -122,3 +122,31 @@ test('event accepts only the allow-listed funnel names', async () => {
   assert.equal(ev.length, 1);
   assert.equal(JSON.parse(ev[0].body).user_id, null);
 });
+
+test('a prep someone has is returned on any device and after Pro ends — before the Pro gate (round 2)', async () => {
+  const calls = installFetch({ pro: false, cached: { company: 'Ross Stores', questions: [{ q: 'Cached?' }] } });
+  const mine = await call({ action: 'mine', company: 'Ross Stores', role: 'Assistant Store Manager' });
+  assert.equal(mine.code, 200);
+  assert.equal(mine.body.pack.company, 'Ross Stores');
+  const built = await call({ action: 'build', company: 'Ross Stores', role: 'Assistant Store Manager' });
+  assert.equal(built.code, 200, 'no 402 for a pack already owned');
+  assert.equal(built.body.cached, true);
+  assert.ok(!calls.some((c) => c.path === '/rest/v1/ai_credits'), 'the Pro gate is not even consulted');
+});
+
+test('mine without sign-in is an empty answer, never an error', async () => {
+  installFetch();
+  const r = await call({ action: 'mine', company: 'Ross Stores', role: 'Assistant Store Manager' }, { auth: false });
+  assert.equal(r.code, 200);
+  assert.equal(r.body.pack, null);
+});
+
+test('build reads the card\'s own listing when given its job id, and orders a phone screen\'s staples first', async () => {
+  const calls = installFetch({ pro: true });
+  const r = await call({ action: 'build', company: 'Ross Stores', role: 'Assistant Store Manager', job_id: 'job_123', stage: 'Phone Screen' });
+  assert.equal(r.code, 200);
+  assert.ok(calls.some((c) => c.path === '/rest/v1/jobs' && /id=eq\.job_123/.test(c.search)), 'listing read by id');
+  const qs = r.body.pack.questions.map((q) => q.q);
+  assert.ok(qs.findIndex((q) => /pay expectations/.test(q)) < 7, 'pay question early on a phone screen');
+  assert.ok(r.body.pack.intro, 'an intro is always there (résumé-built when no model)');
+});
