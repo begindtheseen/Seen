@@ -4,6 +4,7 @@
 // ATS round-trip check (render → extract → parse → compare) that tells the candidate what a parser
 // will actually read from the file they are about to upload.
 
+import { downloadName } from '@/lib/downloadName'
 import { useMemo, useState } from 'react'
 import s from './studio.module.css'
 import { aiHeaders } from '@/lib/aiHeaders'
@@ -38,9 +39,8 @@ export default function ExportPanel({ doc, pro, isLoggedIn, onNeedPro, role }: P
       const res = await fetch('/api/resume', { method: 'POST', headers: await aiHeaders(), body: JSON.stringify({ action: 'export', doc, format, template, paper, fontScale: Number(scale), role: role || undefined }) })
       if (!res.ok) { const d = (await res.json().catch(() => ({}))) as { error?: string }; setError(d.error || 'Could not build the file. Try again.'); setBusy(null); return }
       const blob = await res.blob()
-      const cd = res.headers.get('Content-Disposition') || ''
-      const m = cd.match(/filename\*=UTF-8''([^;]+)/)
-      const name = m ? decodeURIComponent(m[1]) : `${doc.basics.name || 'Resume'}.${format}`
+      // always a name with its extension (an export once landed as "download")
+      const name = downloadName(res.headers.get('Content-Disposition') || '', { ext: FORMATS.find((f) => f.id === format)?.extension || format, fallback: `${doc.basics.name || 'Resume'} Resume` })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove()
       setTimeout(() => URL.revokeObjectURL(url), 10000)
