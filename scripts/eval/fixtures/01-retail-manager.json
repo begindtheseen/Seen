@@ -1,0 +1,165 @@
+{
+  "id": "01-retail-manager",
+  "field": "Retail management",
+  "resume": [
+    "Danielle Brooks",
+    "Tucson, AZ 85710 | (520) 555-0193 | danielle.brooks.retail@gmail.com",
+    "",
+    "SUMMARY",
+    "Retail leader with 9 years on the sales floor and in store leadership. Strong in scheduling, shrink control and coaching new supervisors. Bilingual English/Spanish.",
+    "",
+    "EXPERIENCE",
+    "Assistant Store Manager — Desert Sun Apparel, Tucson, AZ    Apr 2021 – Present",
+    "• Lead a team of 18 associates and 3 department supervisors across apparel, shoes and home",
+    "• Cut shrink from 2.4% to 1.1% in 12 months by tightening the fitting-room and back-door process",
+    "• Grew store sales 9% year over year in 2023 on $4.2M annual volume",
+    "• Build weekly schedules in Kronos for 900+ labor hours and run the cash office twice a week",
+    "• Hired and trained 22 associates in 2023; 15 were still on staff a year later",
+    "",
+    "Department Supervisor — Valley Home Goods, Tucson, AZ    Jun 2018 – Mar 2021",
+    "• Supervised the home and seasonal departments (6 associates) and opened/closed as key holder",
+    "• Reset 40+ planograms per quarter and kept the floor 98% in stock on audit days",
+    "• Trained new hires on the POS, returns and the store's loss-prevention basics",
+    "",
+    "Sales Associate — Valley Home Goods, Tucson, AZ    Aug 2016 – May 2018",
+    "• Helped customers on a high-volume floor and ran the register on weekend rushes",
+    "• Opened 35 store credit cards in one quarter, the most in the district",
+    "",
+    "Cashier — Saguaro Grocers, Tucson, AZ    2014 – 2016",
+    "• Handled cash, checks and EBT on a busy front end; balanced the drawer every shift",
+    "",
+    "EDUCATION",
+    "Associate of Applied Science, Business Management — Pima Community College, 2016",
+    "",
+    "SKILLS",
+    "Scheduling (Kronos) · Cash office · Loss prevention · Visual merchandising · POS · Microsoft Excel · Hiring and onboarding · Bilingual (Spanish)"
+  ],
+  "job": {
+    "title": "Store Manager",
+    "company": "Harborline Outfitters",
+    "location": "Tucson, AZ",
+    "description": [
+      "About Harborline Outfitters",
+      "Harborline is a 140-store outdoor and lifestyle retailer. Our omnichannel team uses machine learning to forecast demand, so the right gear is on your shelves before the season starts.",
+      "",
+      "The role",
+      "As Store Manager you own the store: sales, people, operations and the customer experience. You will lead a team of 25–40 associates and two assistant managers.",
+      "",
+      "What you'll do",
+      "- Drive sales and profitability; own the store P&L, payroll budget and shrink results",
+      "- Recruit, hire, train and coach associates and assistant managers",
+      "- Build schedules that match traffic and keep the store within its labor budget",
+      "- Keep the store visually merchandised to company standards and execute floor sets",
+      "- Partner with the District Manager on performance and growth plans",
+      "",
+      "Requirements",
+      "- 3+ years of retail management experience in a high-volume store",
+      "- Experience owning or contributing to a store P&L",
+      "- Proven record hiring and developing a team",
+      "- Open availability, including nights, weekends and holidays",
+      "- Ability to lift 40 lbs and stand for a full shift",
+      "- High school diploma or GED required; bachelor's degree preferred",
+      "",
+      "Nice to have",
+      "- Experience with Workday scheduling",
+      "- Bilingual in Spanish",
+      "",
+      "Pay and benefits",
+      "$62,000 – $72,000 per year plus a quarterly bonus. Medical, dental, 401(k) with match, 30% employee discount."
+    ]
+  },
+  "gold": {
+    "family": [
+      "retail",
+      "operations"
+    ],
+    "must_skills": [
+      {
+        "label": "retail management",
+        "match": "retail management|management experience|store management"
+      },
+      {
+        "label": "P&L",
+        "match": "p&l|profit"
+      },
+      {
+        "label": "open availability",
+        "match": "availability|nights|weekends|holidays"
+      }
+    ],
+    "alternatives": [],
+    "years_min": 3,
+    "traps": [
+      {
+        "term": "Machine learning",
+        "match": "machine learning",
+        "scope": "any",
+        "why": "only in the company blurb"
+      },
+      {
+        "term": "Workday",
+        "match": "workday",
+        "scope": "candidate",
+        "why": "the résumé uses Kronos, not Workday"
+      },
+      {
+        "term": "Bachelor's degree",
+        "match": "bachelor'?s|b\\.a\\.|b\\.s\\.",
+        "scope": "candidate",
+        "why": "she has an associate degree"
+      },
+      {
+        "term": "P&L ownership",
+        "match": "p&l|profit (?:and|&) loss",
+        "scope": "candidate",
+        "why": "the résumé never shows P&L ownership"
+      },
+      {
+        "term": "Store Manager title",
+        "match": "(?<!assistant )\\bstore manager at desert sun|\\bas (?:a |the )?store manager\\b|\\bstore manager with\\b",
+        "scope": "candidate",
+        "why": "she is an Assistant Store Manager"
+      }
+    ],
+    "resume_employers": [
+      "Desert Sun Apparel",
+      "Valley Home Goods",
+      "Saguaro Grocers"
+    ],
+    "resume_titles": [
+      "Assistant Store Manager",
+      "Department Supervisor",
+      "Sales Associate",
+      "Cashier"
+    ],
+    "resume_degrees": [
+      "Associate of Applied Science"
+    ],
+    "resume_numbers": [
+      "85710",
+      "520",
+      "555",
+      "0193",
+      "9",
+      "2021",
+      "18",
+      "3",
+      "2.4%",
+      "1.1%",
+      "12",
+      "9%",
+      "2023",
+      "4.2",
+      "900",
+      "22",
+      "15",
+      "2018",
+      "6",
+      "40",
+      "98%",
+      "2016",
+      "35",
+      "2014"
+    ]
+  }
+}

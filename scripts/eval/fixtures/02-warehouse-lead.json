@@ -1,0 +1,156 @@
+{
+  "id": "02-warehouse-lead",
+  "field": "Warehouse lead",
+  "pdf": true,
+  "resume": [
+    "Marcus Bell",
+    "Grove City, OH · 614-555-0127 · marcusbell.ops@yahoo.com",
+    "",
+    "Warehouse lead with 6 years in parcel and e-commerce distribution. Forklift and reach-truck certified, OSHA 10, Manhattan WMS power user.",
+    "",
+    "WORK EXPERIENCE",
+    "Warehouse Lead, Midwest Parcel Logistics — Columbus, OH (Jan 2022 – Present)",
+    "• Lead a 2nd-shift crew of 14 associates (2:30 PM – 11 PM) across inbound, putaway and outbound docks",
+    "• Raised pick accuracy from 97.2% to 99.6% in 9 months by re-slotting the 200 fastest-moving SKUs and auditing scans daily",
+    "• Run the start-of-shift safety huddle; the crew went 26 months with zero recordable injuries",
+    "• Assign pick waves and labor in Manhattan WMS and reconcile shorts with inventory control before close",
+    "",
+    "Material Handler / Forklift Operator, Midwest Parcel Logistics — Columbus, OH (Mar 2019 – Dec 2021)",
+    "• Operated sit-down and stand-up forklifts and reach trucks; loaded 18–22 trailers per shift",
+    "• Received and put away inbound freight with an RF scanner at a 99.1% putaway accuracy rate",
+    "• Trained 9 new hires on equipment checks and the dock safety walk",
+    "",
+    "Picker/Packer (seasonal), BrightCart Fulfillment — Etna, OH (Oct 2018 – Jan 2019)",
+    "• Picked and packed 140+ orders an hour during peak and hit rate every week of the season",
+    "",
+    "Line Cook, Buckeye Diner — Columbus, OH (2016 – 2018)",
+    "• Worked the flat-top and fryer on weekend breakfast rushes",
+    "",
+    "CERTIFICATIONS",
+    "OSHA 10-Hour General Industry (2021) · Forklift / Reach Truck certification (Midwest Parcel, renewed 2024)",
+    "",
+    "SKILLS",
+    "Manhattan WMS, RF scanners, cycle counts, forklift, reach truck, pallet jack, Microsoft Excel, safety training",
+    "",
+    "EDUCATION",
+    "Grove City High School — Diploma, 2016"
+  ],
+  "job": {
+    "title": "Warehouse Shift Lead – 2nd Shift",
+    "company": "Northgate Distribution",
+    "location": "Obetz, OH",
+    "description": [
+      "Northgate Distribution runs a 600,000 sq ft regional DC serving grocery and home-improvement retailers. Our sister company, Northgate Freight, is also hiring CDL-A drivers — see their separate postings.",
+      "",
+      "Position summary",
+      "The 2nd Shift Lead runs the floor for a crew of 15–25 associates: assigning work, keeping the shift safe and on plan, and solving problems before they reach the manager.",
+      "",
+      "Responsibilities",
+      "• Assign associates to receiving, putaway, picking and loading based on the shift plan",
+      "• Monitor productivity and accuracy in the WMS and correct issues in real time",
+      "• Lead the pre-shift safety meeting and enforce PPE and equipment rules",
+      "• Train new associates on equipment and standard work",
+      "• Report shift results, shorts and incidents to the Operations Supervisor",
+      "",
+      "Requirements",
+      "• 2+ years of warehouse or distribution center experience, including at least 1 year as a lead or trainer",
+      "• Forklift certification, or the ability to get certified within 30 days of hire",
+      "• Experience with a warehouse management system (Manhattan, Blue Yonder, or similar)",
+      "• Able to lift up to 50 lbs repeatedly and work in a non-climate-controlled building",
+      "• Basic computer skills (email, Excel)",
+      "• High school diploma or GED preferred",
+      "",
+      "Schedule",
+      "2nd shift, Monday – Friday, 3:00 PM – 11:30 PM. Overtime as needed during peak (Oct–Dec).",
+      "",
+      "Pay",
+      "$22.50 – $25.00 per hour, plus a $1.00/hr shift differential. Benefits start day one."
+    ]
+  },
+  "gold": {
+    "family": [
+      "warehouse",
+      "operations",
+      "delivery_logistics"
+    ],
+    "must_skills": [
+      {
+        "label": "warehouse experience",
+        "match": "warehouse|distribution"
+      },
+      {
+        "label": "forklift",
+        "match": "forklift"
+      },
+      {
+        "label": "WMS",
+        "match": "\\bwms\\b|warehouse management|manhattan|blue yonder"
+      }
+    ],
+    "alternatives": [
+      [
+        "Manhattan",
+        "Blue Yonder"
+      ]
+    ],
+    "years_min": 2,
+    "traps": [
+      {
+        "term": "CDL",
+        "match": "\\bcdl\\b",
+        "scope": "any",
+        "why": "CDL is for the sister company's driver postings"
+      },
+      {
+        "term": "Blue Yonder",
+        "match": "blue yonder",
+        "scope": "candidate",
+        "why": "he uses Manhattan, not Blue Yonder"
+      },
+      {
+        "term": "Supervisor/manager title",
+        "match": "operations supervisor at|as (?:an? )?(?:operations )?(?:supervisor|manager) at midwest",
+        "scope": "candidate",
+        "why": "he is a lead, not a supervisor"
+      }
+    ],
+    "resume_employers": [
+      "Midwest Parcel Logistics",
+      "BrightCart Fulfillment",
+      "Buckeye Diner"
+    ],
+    "resume_titles": [
+      "Warehouse Lead",
+      "Material Handler / Forklift Operator",
+      "Picker/Packer",
+      "Line Cook"
+    ],
+    "resume_degrees": [],
+    "resume_numbers": [
+      "614",
+      "555",
+      "0127",
+      "6",
+      "10",
+      "2022",
+      "2",
+      "14",
+      "30",
+      "11",
+      "97.2%",
+      "99.6%",
+      "9",
+      "200",
+      "26",
+      "2019",
+      "2021",
+      "18",
+      "22",
+      "99.1%",
+      "2018",
+      "140",
+      "2016",
+      "2024"
+    ]
+  }
+}
