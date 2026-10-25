@@ -150,3 +150,53 @@ test('build reads the card\'s own listing when given its job id, and orders a ph
   assert.ok(qs.findIndex((q) => /pay expectations/.test(q)) < 7, 'pay question early on a phone screen');
   assert.ok(r.body.pack.intro, 'an intro is always there (résumé-built when no model)');
 });
+
+// The paid build: draft → fact-check → guard, both model calls on the quality model.
+function installModel(calls, { verifyStatus = 200 } = {}) {
+  const base = globalThis.fetch;
+  const modelCalls = [];
+  globalThis.fetch = async (url, opts = {}) => {
+    if (new URL(String(url)).hostname === 'api.anthropic.com') {
+      const body = JSON.parse(opts.body);
+      modelCalls.push(body);
+      const draft = {
+        questions: [{ q: 'How do you handle an upset guest?', why: 'They check you stay calm.' }],
+        answers: [{ q: 'How do you handle an upset guest?', bullet: 'J1.1', situation: 'At Target guests came to the desk upset.', action: 'I resolved guest complaints without a manager 95% of the time across 40 shifts a month. I always offer a 20% coupon first.', result: 'Most left happy.' }],
+        intro: "I'm a team lead at Target.",
+      };
+      if (modelCalls.length === 1) return mockResponse({ content: [{ type: 'text', text: JSON.stringify(draft) }] });
+      if (verifyStatus !== 200) return mockResponse({ error: 'bad' }, { ok: false, status: verifyStatus });
+      const checked = { ...draft, answers: [{ ...draft.answers[0], action: 'I resolved guest complaints without a manager 95% of the time across 40 shifts a month.', result: '[How did the guest leave?]' }] };
+      return mockResponse({ content: [{ type: 'text', text: JSON.stringify(checked) }] });
+    }
+    return base(url, opts);
+  };
+  return modelCalls;
+}
+
+test('build: draft then fact-check on the quality model; an invented practice never reaches the pack', async () => {
+  process.env.ANTHROPIC_KEY = 'k'; process.env.ANTHROPIC_QUALITY_MODEL = 'quality-model-x';
+  try {
+    const calls = installFetch({ pro: true });
+    const modelCalls = installModel(calls);
+    const res = await call({ action: 'build', company: 'Ross Stores', role: 'Assistant Store Manager', refresh: true });
+    assert.equal(res.code, 200, JSON.stringify(res.body));
+    assert.equal(modelCalls.length, 2);
+    assert.ok(modelCalls.every((c) => c.model === 'quality-model-x'));
+    assert.match(modelCalls[1].messages[0].content, /DRAFT PACK/);
+    const a = res.body.pack.answers.find((x) => !x.coached);
+    assert.ok(a && /95% of the time/.test(a.answer), JSON.stringify(res.body.pack.answers));
+    assert.ok(!res.body.pack.answers.some((x) => /coupon/.test(x.answer)));
+  } finally { delete process.env.ANTHROPIC_KEY; delete process.env.ANTHROPIC_QUALITY_MODEL; }
+});
+
+test('build: when the fact-check call fails, the guard still cuts the draft\'s invented sentence', async () => {
+  process.env.ANTHROPIC_KEY = 'k'; process.env.ANTHROPIC_QUALITY_MODEL = 'quality-model-x';
+  try {
+    const calls = installFetch({ pro: true });
+    installModel(calls, { verifyStatus: 400 });
+    const res = await call({ action: 'build', company: 'Ross Stores', role: 'Assistant Store Manager', refresh: true });
+    assert.equal(res.code, 200);
+    assert.ok(!res.body.pack.answers.some((x) => /20% coupon/.test(x.answer)), JSON.stringify(res.body.pack.answers));
+  } finally { delete process.env.ANTHROPIC_KEY; delete process.env.ANTHROPIC_QUALITY_MODEL; }
+});

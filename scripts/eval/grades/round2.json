@@ -1,0 +1,1026 @@
+{
+  "generated": "2026-10-25",
+  "reviewer": "independent expert review, round 2",
+  "grades": {
+    "01-retail-manager|parse": {
+      "grade": 5,
+      "note": "Clean: 4 roles, employers, dates, bullets.",
+      "hash": "2df5e4cb9987"
+    },
+    "01-retail-manager|fit": {
+      "grade": 3,
+      "note": "100/100 \"Strong fit\" for an Assistant Store Manager applying to Store Manager with no P&L evidence — P&L is never read as a requirement. Constraint text is ungrammatical: \"Your an Associate's degree meets the education requirement.\"",
+      "hash": "c7ec241fd2a8"
+    },
+    "01-retail-manager|optimize": {
+      "grade": 2,
+      "note": "One credit buys 2 reorder tips, cashier-level questions (\"How many transactions did you ring up per shift?\") for a Store Manager applicant, and a summary claiming \"12+ years of experience\" when her own summary says 9. Application message is a generic template.",
+      "hash": "7357f0af24f3"
+    },
+    "01-retail-manager|humanproof": {
+      "grade": 1,
+      "note": "Breaks the message: \"lines up directly with what the role calls for.\" → \"what the role calls.\" Score 71→71: changed nothing else.",
+      "hash": "f9a561af5aac"
+    },
+    "01-retail-manager|scanner": {
+      "grade": 2,
+      "note": "score 98 vs summary \"100\"; the only fix is \"(New bullet to add) Describe real work where you used retail\" — useless.",
+      "hash": "0a94d0748b3a"
+    },
+    "01-retail-manager|advantage": {
+      "grade": 1,
+      "note": "Names \"Machine Learning\" (company blurb) as a posting priority and builds the plan on it: \"Take ownership of work centred on machine learning and assistant\", \"Deliver a result tied to machine learning\". Associate-level day-30 (\"Hit your daily target and master the open/close\") and gym vocabulary (\"membership sign-ups\") for a Store Manager; the \"proof\" is her summary sentence.",
+      "hash": "7cc166be4ea2"
+    },
+    "01-retail-manager|insights": {
+      "grade": 2,
+      "note": "Top want is \"Payroll\"; leads with Bilingual and Bachelor's (both preferred); misses P&L, retail management and open availability; tip says mirror \"Payroll, Bilingual (Spanish)\".",
+      "hash": "cbd22dc7146d"
+    },
+    "01-retail-manager|tailor": {
+      "grade": 2,
+      "note": "Breaks a bullet (\"balanced the drawer every shift\" → \"balanced the drawer e shift\"), rewrites a 2023 result into present tense (\"Grow store sales 9% … in 2023\"), summary \"12+ years\" vs her \"9 years\", adds a generic flagged bullet to Cashier.",
+      "hash": "0be00c27a8f7"
+    },
+    "01-retail-manager|ats_check": {
+      "grade": 4,
+      "note": "Accurate pass; nothing to fix.",
+      "hash": "1767390c4e50"
+    },
+    "01-retail-manager|export": {
+      "grade": 4,
+      "note": "PDF/DOCX round-trip 100%, Pro unbranded, free branded.",
+      "hash": "2ce25d809b0b"
+    },
+    "01-retail-manager|interview_prep_fallback": {
+      "grade": 3,
+      "note": "Honest and store-leader level now (payroll cut, sales down, shrink). Stories are real bullets but weak picks: \"led people\" uses the 6-associate Valley Home Goods bullet instead of her 18-associate team; \"result you are proud of\" is a 2016–18 credit-card bullet. Template intro. No better than free ChatGPT.",
+      "hash": "6db13bd879d2"
+    },
+    "01-retail-manager|interview_prep": {
+      "grade": 3,
+      "note": "Store-manager questions on her real numbers (shrink, Kronos labour, hiring misses, outfitter ramp-up) and the 5.5-year tenure is right. Docked: the only written answer invents a purpose for a duty — \"I also run the cash office twice a week to track how we're performing against plan\" — and brackets its own question (\"[Tell me how you handle weeks when you come in over or under target…]\"); 3 of 4 answers dropped, the rest are \"Tell it in about a minute\" templates. Duplicates: Q4 vs Q9 (labour budget), Q3 vs Q11 (shrink story). Intro is the template and ends \"[the one thing that drew you to this job]\".",
+      "hash": "c648a7c00a24"
+    },
+    "01-retail-manager|tailor_polish": {
+      "grade": 3,
+      "note": "2 trivial edits (\"Lead a team of 18\" → \"Lead 18\"; \"the most in the district\" → \"leading the district\"); 8 of 10 rejected by the firewall. No better than free ChatGPT.",
+      "hash": "85262d5cfcfc"
+    },
+    "02-warehouse-lead|parse": {
+      "grade": 2,
+      "note": "\"Title, Company — City (dates)\" format: every employer stays inside the title, company empty (\"Warehouse Lead, Midwest Parcel Logistics\"); \"Picker/Packer , BrightCart\" stray space; certification \"Parcel, renewed\" garbage.",
+      "hash": "1ab67c5c846c"
+    },
+    "02-warehouse-lead|parse_pdf": {
+      "grade": 1,
+      "note": "Hanging-indent PDF: the wrapped role header became company \"Columbus, OH (Mar 2019\" with no dates and a fake bullet \"Dec 2021)\".",
+      "hash": "b1c508ca686c"
+    },
+    "02-warehouse-lead|fit": {
+      "grade": 3,
+      "note": "Score sensible (94) but asks \"Do you have Forklift certification?\" when the résumé lists \"Forklift / Reach Truck certification\"; WMS (he is a Manhattan power user) never read; \"Your a high school diploma\" grammar.",
+      "hash": "b015a411bcfd"
+    },
+    "02-warehouse-lead|optimize": {
+      "grade": 2,
+      "note": "The one rewrite breaks the bullet (\"hit rate every week\" → \"hit rate e week\"); summary \"10+ years\" vs his \"6 years\" and names the same employer twice; picker-level questions for a lead.",
+      "hash": "1dc6d8f697ed"
+    },
+    "02-warehouse-lead|humanproof": {
+      "grade": 1,
+      "note": "\"Warehouse Shift Lead – 2nd Shift\" → \"– nd Shift\" and \"calls for.\" → \"calls.\"",
+      "hash": "ad4280386163"
+    },
+    "02-warehouse-lead|scanner": {
+      "grade": 2,
+      "note": "Says \"receiving\" is \"not stated\" in the résumé (he \"Received and put away inbound freight\"); no real fix.",
+      "hash": "afc25b7e2f4a"
+    },
+    "02-warehouse-lead|advantage": {
+      "grade": 2,
+      "note": "Priorities \"associates, equipment, plan\"; coaches him on \"non-climate-controlled\" as a gap; \"Bring a point of view on plan\"; proof is his summary line.",
+      "hash": "ef9fa41a37c4"
+    },
+    "02-warehouse-lead|insights": {
+      "grade": 2,
+      "note": "Wants: \"Excel\" first, \"CDL\" (sister company's driver posting — trap), Forklift twice; misses WMS and lead experience.",
+      "hash": "3d61a4fea86f"
+    },
+    "02-warehouse-lead|tailor": {
+      "grade": 1,
+      "note": "Tells him a CDL is a REQUIRED, \"fatal\" gap (it belongs to a different company's posting); gaps \"similar\" and \"email\"; \"e week\" broken bullet; present tense on a dated result.",
+      "hash": "43d611846c07"
+    },
+    "02-warehouse-lead|ats_check": {
+      "grade": 4,
+      "note": "Correctly flags that its own parse misread title/company.",
+      "hash": "e19370b0e671"
+    },
+    "02-warehouse-lead|export": {
+      "grade": 4,
+      "note": "Round-trip 100%.",
+      "hash": "32ffb9b7a9c7"
+    },
+    "02-warehouse-lead|interview_prep_fallback": {
+      "grade": 3,
+      "note": "Lead-level, field-correct questions; stories are real bullets. Intro reads as a résumé line, not speech: \"My most recent role is Warehouse Lead, Midwest Parcel Logistics, where…\", \"Before that I worked as Material Handler / Forklift Operator, Midwest Parcel Logistics.\"",
+      "hash": "6421b2602b34"
+    },
+    "02-warehouse-lead|interview_prep": {
+      "grade": 3,
+      "note": "Good intro (accurate, lead-level, ends with why) and real lead questions (behind plan, crew missing rate). But all 4 model answers were dropped — every answer is \"Tell it in about a minute\" coaching — and the list is padded with duplicates: Q2 \"Why do you want to work at Northgate\" vs Q7 \"Why are you interested in this role at Northgate\"; Q3 vs Q10 (improved a metric/result); Q6 vs Q13 (typical shift/day). Q6 rationale is the mismatched filler \"Answer with one real example from your résumé\". \"Typical busy day\" story is his old forklift role, not the lead role.",
+      "hash": "d60b30c92a2e"
+    },
+    "02-warehouse-lead|tailor_polish": {
+      "grade": 3,
+      "note": "Drops the ATS keyword the posting names (\"Manhattan WMS\" → \"WMS\") and the shift hours; mixes tense in the current role (\"Assigned\").",
+      "hash": "0fd848bfa365"
+    },
+    "03-cashier-entry|parse": {
+      "grade": 3,
+      "note": "Volunteer role parsed with the organisation as the title (\"Hope Street Food Pantry\", no employer).",
+      "hash": "211eee8cad7f"
+    },
+    "03-cashier-entry|fit": {
+      "grade": 4,
+      "note": "Right call (89), sensible asks (18+, 25 lbs).",
+      "hash": "aea3e2af0686"
+    },
+    "03-cashier-entry|optimize": {
+      "grade": 2,
+      "note": "Summary: \"4+ years of experience, including Cashier at QuickFuel Market and Hope Street Food Pantry\" (a volunteer pantry as a job) and then pastes her objective after it. Questions are fine for a cashier.",
+      "hash": "34492d172c34"
+    },
+    "03-cashier-entry|humanproof": {
+      "grade": 1,
+      "note": "\"calls for.\" → \"calls.\"",
+      "hash": "0e1c509ed3ce"
+    },
+    "03-cashier-entry|scanner": {
+      "grade": 2,
+      "note": "Generic \"Describe real work where you used cash handling\".",
+      "hash": "3eb1c1504c60"
+    },
+    "03-cashier-entry|advantage": {
+      "grade": 2,
+      "note": "Pitches \"my hands-on experience with customer service and hours\"; \"membership sign-ups\"; proof \"Crew Member of the Month (Aug 2023) — Lead with that number\".",
+      "hash": "283d45db3ab4"
+    },
+    "03-cashier-entry|insights": {
+      "grade": 3,
+      "note": "Reasonable list (cash, availability, customer service) but leads with the bonus item (Bilingual).",
+      "hash": "1605e390f8ec"
+    },
+    "03-cashier-entry|tailor": {
+      "grade": 1,
+      "note": "Breaks her best bullet: \"Balanced my drawer to within $1 every shift\" → \"Balance my drawer to within $1 e shift\"; gaps \"volunteer all count\", \"Must be 18+\".",
+      "hash": "b43c97877ad9"
+    },
+    "03-cashier-entry|ats_check": {
+      "grade": 4,
+      "note": "Accurate.",
+      "hash": "1767390c4e50"
+    },
+    "03-cashier-entry|export": {
+      "grade": 4,
+      "note": "Round-trip 100%.",
+      "hash": "de989b92f1cd"
+    },
+    "03-cashier-entry|interview_prep_fallback": {
+      "grade": 3,
+      "note": "Correct entry-level questions plus a good integrity question; real stories. Q5 \"customer who is just browsing… friendly selling\" is a floor-sales question, not a cashier one; \"helped someone through a problem\" uses the food-pantry sorting bullet. Template intro.",
+      "hash": "cd57ea79d93b"
+    },
+    "03-cashier-entry|interview_prep": {
+      "grade": 2,
+      "note": "Broken grammar in a headline question: \"You've ring up 200+ transactions a shift at QuickFuel.\" Q5/Q6/Q7 carry the mismatched rationale \"Answer with one real example from your résumé\" (on a POS-systems question). Q7 repeats Q2 (why Piedmont) by reading her objective back to her. Both written answers fail their question: \"I'm handling [various] types of transactions\" then restates the bullet, plus a bracket that is a note not a sentence (\"[How this accuracy and speed has impacted customer satisfaction…]\"); \"[a manager or I notice] the cooler…\". Template intro.",
+      "hash": "0ba6ff468483"
+    },
+    "03-cashier-entry|tailor_polish": {
+      "grade": 3,
+      "note": "One edit, which turns a past result into present tense (\"Balance cash drawer…\").",
+      "hash": "3c22cf558ebf"
+    },
+    "04-customer-service|parse": {
+      "grade": 5,
+      "note": "Clean.",
+      "hash": "065e9af196c3"
+    },
+    "04-customer-service|fit": {
+      "grade": 1,
+      "note": "False hard gate: \"Requires a high school diploma; your résumé lists no degree\" — she has a B.A. Also \"missing: scheduling, attention to detail\" (scheduling is the product) and Zendesk is not matched to the ticketing requirement.",
+      "hash": "fb2c232ea446"
+    },
+    "04-customer-service|optimize": {
+      "grade": 2,
+      "note": "Reorder + questions she already answers (CSAT 94% is on the résumé); summary \"10+ years\" vs her \"5+ years\" and repeats her own summary sentence after it.",
+      "hash": "4530ca0e9e5e"
+    },
+    "04-customer-service|humanproof": {
+      "grade": 1,
+      "note": "\"calls for.\" → \"calls.\"",
+      "hash": "8d967e79ec1a"
+    },
+    "04-customer-service|scanner": {
+      "grade": 2,
+      "note": "No real fix.",
+      "hash": "2874181b4ba0"
+    },
+    "04-customer-service|advantage": {
+      "grade": 2,
+      "note": "\"experience with phone and questions\"; says the posting \"leans on scheduling and ticketing, which your résumé doesn't yet show\" (Zendesk, Five9 are on it).",
+      "hash": "126dcd00f0a2"
+    },
+    "04-customer-service|insights": {
+      "grade": 2,
+      "note": "Salesforce (nice-to-have) first; HS diploma twice; \"Monday Through Friday\" as a skill; misses 2+ years support and 45 WPM.",
+      "hash": "562ebe5fdf43"
+    },
+    "04-customer-service|tailor": {
+      "grade": 2,
+      "note": "Gaps: Freshdesk and ServiceNow as REQUIRED (the posting lists them as alternatives to Zendesk, which she has); summary 10+ years.",
+      "hash": "bb473c2e2cf8"
+    },
+    "04-customer-service|ats_check": {
+      "grade": 4,
+      "note": "Accurate.",
+      "hash": "1767390c4e50"
+    },
+    "04-customer-service|export": {
+      "grade": 4,
+      "note": "Round-trip 100%.",
+      "hash": "44a5e56c0491"
+    },
+    "04-customer-service|interview_prep_fallback": {
+      "grade": 3,
+      "note": "Generic but correct for a contact-center role. Same wrong story pick: \"trained or coached someone\" → Harbor Grill server line, ignoring \"Mentor 5 new reps\".",
+      "hash": "85db2f2652a9"
+    },
+    "04-customer-service|interview_prep": {
+      "grade": 3,
+      "note": "Strong specific questions (AHT 6:10 vs 7:30, channels, documentation). But all 4 model answers dropped to templates, and the template picks the wrong story: \"trained or coached someone\" uses her 2016–19 Harbor Grill server bullet instead of \"Mentor 5 new reps… review their call notes weekly\" (asked separately in Q4, unanswered). Intro garbled: \"I've also worked in retention and retention offers\". Duplicates Q7/Q9 (hard customer), Q4/Q11 (mentoring).",
+      "hash": "252d34af7206"
+    },
+    "04-customer-service|tailor_polish": {
+      "grade": 3,
+      "note": "2 light edits; fine but trivial.",
+      "hash": "def16fca807f"
+    },
+    "05-registered-nurse|parse": {
+      "grade": 5,
+      "note": "Clean.",
+      "hash": "6ec6c62a0bb0"
+    },
+    "05-registered-nurse|parse_pdf": {
+      "grade": 5,
+      "note": "Clean from the hanging-indent PDF.",
+      "hash": "5f641d318e3a"
+    },
+    "05-registered-nurse|fit": {
+      "grade": 1,
+      "note": "Harmful: \"35 — Requires an RN license; your résumé does not list one\" for a BSN, RN with \"Registered Nurse, Colorado (multistate compact)\" under Licenses. ACLS not read.",
+      "hash": "e2e361b24c2d"
+    },
+    "05-registered-nurse|optimize": {
+      "grade": 1,
+      "note": "Same false RN-license gate (35, Weak fit); summary calls an RN a \"healthcare support candidate\"; message \"I'm confident my background equips me…\" is filler.",
+      "hash": "2f5d6ddf076a"
+    },
+    "05-registered-nurse|advantage": {
+      "grade": 2,
+      "note": "Clinical vocabulary is right now (charge nurses, EHR) but the gap coaching says the posting \"leans on cardiac and transitioning\"; \"Take ownership of work centred on cardiac and patients\".",
+      "hash": "31a0f0c078d6"
+    },
+    "05-registered-nurse|insights": {
+      "grade": 2,
+      "note": "Lists PALS — the posting explicitly says this role does NOT need PALS.",
+      "hash": "85ca25ebe217"
+    },
+    "05-registered-nurse|tailor": {
+      "grade": 1,
+      "note": "Harmful: gaps \"RN license (REQUIRED, fatal)\" and \"PALS (REQUIRED, fatal)\" for a licensed RN; \"within 6 months hire\" as a requirement; present tense on \"Precepted 7 new graduate nurses\".",
+      "hash": "b7554dc18fd5"
+    },
+    "05-registered-nurse|humanproof": {
+      "grade": 1,
+      "note": "\"calls for.\" → \"calls.\"",
+      "hash": "38861d8fe2df"
+    },
+    "05-registered-nurse|scanner": {
+      "grade": 1,
+      "note": "Lists no requirements at all for an RN posting.",
+      "hash": "803c14d235a3"
+    },
+    "05-registered-nurse|ats_check": {
+      "grade": 4,
+      "note": "Accurate.",
+      "hash": "1767390c4e50"
+    },
+    "05-registered-nurse|export": {
+      "grade": 4,
+      "note": "Round-trip 100%.",
+      "hash": "0f9ba0bba781"
+    },
+    "05-registered-nurse|interview_prep_fallback": {
+      "grade": 3,
+      "note": "Good bedside-nursing questions (early deterioration, handoff, disagreeing with a provider); real stories, though one is her CNA line and one the float-pool header-like line. Nothing telemetry-specific. Template intro.",
+      "hash": "b04dfb32215a"
+    },
+    "05-registered-nurse|interview_prep": {
+      "grade": 2,
+      "note": "False premise about her: Q3 \"You've worked med-surg days at St. Aurelia for about 6 years. What draws you to nights\" — the résumé never says day shift. Q4 rationale invents employer facts (\"Telemetry units run lean at night… without a full charge structure\"). Q7 is a spliced question (\"As charge nurse, you manage admissions… Tell me about a time you spotted a safety gap\"). Misses the real risk: her ACLS expired in 2025. \"Helped someone through a problem\" uses her CNA bullet. Template intro.",
+      "hash": "4b4591604099"
+    },
+    "05-registered-nurse|tailor_polish": {
+      "grade": 3,
+      "note": "\"Care for 5–6 patients\" → \"Monitored\" (changes the duty, past tense on a current role); \"Started IVs\" dropped.",
+      "hash": "fe02e6042427"
+    },
+    "06-backend-engineer|parse": {
+      "grade": 2,
+      "note": "Every role \"Title, Company\" kept as title; company empty for all three.",
+      "hash": "8aa4e8f708d1"
+    },
+    "06-backend-engineer|fit": {
+      "grade": 3,
+      "note": "89 is reasonable; but lists \"compliance\" (a responsibility) as a missing REQUIRED skill and does not read message queues (he has Kafka/SQS).",
+      "hash": "ad2b4226b3e5"
+    },
+    "06-backend-engineer|optimize": {
+      "grade": 2,
+      "note": "One tense rewrite (\"Built the … service\" → \"Build\"), guidance for \"compliance\", summary \"8+ years\" (7), message lowercases \"python, go, and sql\".",
+      "hash": "bb5363011dcc"
+    },
+    "06-backend-engineer|humanproof": {
+      "grade": 1,
+      "note": "\"calls for.\" → \"calls.\"",
+      "hash": "b01e195abc7e"
+    },
+    "06-backend-engineer|scanner": {
+      "grade": 2,
+      "note": "Thin; Go/Python listed as separate musts.",
+      "hash": "1f6aba0ba3c0"
+    },
+    "06-backend-engineer|advantage": {
+      "grade": 2,
+      "note": "\"Machine Learning\" (company blurb) as a priority and gap; \"Take ownership of work centred on services and machine learning\"; \"existing strength in on-call\".",
+      "hash": "136e9e677746"
+    },
+    "06-backend-engineer|insights": {
+      "grade": 2,
+      "note": "Misses Go/Java/Python entirely (the core requirement); Terraform (nice-to-have) first; \"Reconciliation\" from a responsibility; Kafka alone though Kafka/RabbitMQ/SQS is a choice.",
+      "hash": "a483966e9d3f"
+    },
+    "06-backend-engineer|tailor": {
+      "grade": 2,
+      "note": "Present tense on three completed projects; adds \"Resolved day-to-day problems on the spot and escalated only when needed\" to the intern role; \"Backend Development (REQUIRED, risky)\" for a backend engineer; RabbitMQ/Java/Machine Learning as missing; skills reordered Python before Go for a mostly-Go team.",
+      "hash": "1671735e50a9"
+    },
+    "06-backend-engineer|ats_check": {
+      "grade": 4,
+      "note": "Flags its own misparse correctly.",
+      "hash": "73d14741f96d"
+    },
+    "06-backend-engineer|export": {
+      "grade": 4,
+      "note": "Round-trip 100%.",
+      "hash": "8f82deaa3148"
+    },
+    "06-backend-engineer|interview_prep_fallback": {
+      "grade": 3,
+      "note": "Sound engineering questions (incident, safe shipping, double-charge design); real stories, though \"a problem you solved by building something\" picks the 2018 intern script bullet. Template intro.",
+      "hash": "1fdc5823dc0c"
+    },
+    "06-backend-engineer|interview_prep": {
+      "grade": 3,
+      "note": "Very good payments-relevant questions on his own work (p99 cut, idempotency layer, Kafka layout, double-charge design). Answers are thin: the Kafka answer invents context (\"each sending data in their own format and cadence\") and never answers \"why that design matters for a payments platform\"; the mentoring answer opens with a bracketed question and is mostly blanks. Only 2 written answers. Intro is the template: \"My most recent role is Software Engineer II, Fieldline, where…\".",
+      "hash": "8d5d30c20d1f"
+    },
+    "06-backend-engineer|tailor_polish": {
+      "grade": 3,
+      "note": "Cuts specifics (Django, \"at peak\", \"event service\") — makes bullets slightly weaker.",
+      "hash": "38e90ab3a0ff"
+    },
+    "07-data-analyst|parse": {
+      "grade": 5,
+      "note": "Clean.",
+      "hash": "5a9ef9b59a46"
+    },
+    "07-data-analyst|fit": {
+      "grade": 2,
+      "note": "Says \"the posting also asks for Excel, which your résumé doesn't show\" — Excel (Power Query, pivot tables) is in her skills and bullets; \"scheduling\" as a requirement.",
+      "hash": "a83795d59070"
+    },
+    "07-data-analyst|optimize": {
+      "grade": 2,
+      "note": "Charged a credit for 2 reorder tips and a template message (\"sql, tableau, and python\"); no summary, no rewrites.",
+      "hash": "52692eb1073d"
+    },
+    "07-data-analyst|humanproof": {
+      "grade": 1,
+      "note": "\"calls for.\" → \"calls.\"",
+      "hash": "f3d6c63ffe29"
+    },
+    "07-data-analyst|scanner": {
+      "grade": 1,
+      "note": "Nonsense fix: \"Sql work that produced 4 years — confirm this figure applies here before using.\"",
+      "hash": "6ff9710d6c42"
+    },
+    "07-data-analyst|advantage": {
+      "grade": 2,
+      "note": "Priorities \"clinics, staffing, findings\"; \"Take ownership of work centred on clinics and staffing\" for an analyst; proof = summary.",
+      "hash": "de8e5fa7e8c5"
+    },
+    "07-data-analyst|insights": {
+      "grade": 3,
+      "note": "Python (preferred, and one of \"Python or R\") listed first as a hard want; \"Forecasting\" from a responsibility; otherwise SQL, Excel, Tableau/Power BI right.",
+      "hash": "f9a7364b78e8"
+    },
+    "07-data-analyst|tailor": {
+      "grade": 2,
+      "note": "Gap \"power bi (REQUIRED)\" though Tableau satisfies it; \"healthcare claims\", \"qualifications\" as keywords; adds \"scheduled\", \"dashboards\" as skills.",
+      "hash": "66c9c1884af4"
+    },
+    "07-data-analyst|ats_check": {
+      "grade": 4,
+      "note": "Accurate.",
+      "hash": "1767390c4e50"
+    },
+    "07-data-analyst|export": {
+      "grade": 4,
+      "note": "Round-trip 100%.",
+      "hash": "ac3398f45ee0"
+    },
+    "07-data-analyst|interview_prep_fallback": {
+      "grade": 3,
+      "note": "Generic analyst questions, honest. Same weak picks: taproom-sales intern line for \"helped someone\"; the $310K finding is never used. Template intro.",
+      "hash": "1be3df43109c"
+    },
+    "08-marketing-coordinator|parse": {
+      "grade": 5,
+      "note": "Wrapped \"(1,800 subscribers).\" line correctly joined.",
+      "hash": "8e434c743649"
+    },
+    "08-marketing-coordinator|parse_pdf": {
+      "grade": 3,
+      "note": "Roles fine; education loses the school and field (\"B.A. | 2024-05\").",
+      "hash": "5a532c3fb0c1"
+    },
+    "08-marketing-coordinator|fit": {
+      "grade": 1,
+      "note": "Harmful: \"35 — Requires a Bachelor's degree; your résumé lists no degree\" (B.A., Communication, SDSU 2024). Social media, email marketing and Canva are never read as requirements; only \"bilingual spanish\" matched.",
+      "hash": "b2cb0f698ed4"
+    },
+    "08-marketing-coordinator|optimize": {
+      "grade": 1,
+      "note": "Message: \"My experience with bilingual spanish lines up directly with what the role calls for.\" Summary \"3+ years of experience\" for a new grad (internship + part-time). Same false degree gate.",
+      "hash": "992d3f9a08de"
+    },
+    "08-marketing-coordinator|humanproof": {
+      "grade": 1,
+      "note": "\"calls for.\" → \"calls.\"",
+      "hash": "626cf2adcaba"
+    },
+    "08-marketing-coordinator|scanner": {
+      "grade": 1,
+      "note": "Only \"bilingual spanish\"; false degree gate.",
+      "hash": "863b191b21cb"
+    },
+    "08-marketing-coordinator|advantage": {
+      "grade": 2,
+      "note": "No longer a nurse plan, but still centres the employer's industry words: priorities \"clinics, patients, Social Media\"; \"Take ownership of work centred on clinics and patients\"; \"the posting leans on clinics and patients, which your résumé doesn't yet show\".",
+      "hash": "3c0806c8b39d"
+    },
+    "08-marketing-coordinator|insights": {
+      "grade": 2,
+      "note": "Bilingual (nice-to-have) first; \"Adobe Creative Suite\" as a hard want (the posting says Canva OR Adobe — she has Canva); email marketing missing; \"Managing Social Media\" and \"Social Media Accounts\" duplicates.",
+      "hash": "70ff366a4a6c"
+    },
+    "08-marketing-coordinator|tailor": {
+      "grade": 2,
+      "note": "\"2+ years experience (REQUIRED)\" — the posting says 0–2 years; HubSpot and \"similar\" as required gaps; \"clinics\", \"patients\" as missing keywords.",
+      "hash": "8079856f0630"
+    },
+    "08-marketing-coordinator|ats_check": {
+      "grade": 4,
+      "note": "Accurate.",
+      "hash": "1767390c4e50"
+    },
+    "08-marketing-coordinator|export": {
+      "grade": 4,
+      "note": "Round-trip 100%.",
+      "hash": "ac3398f45ee0"
+    },
+    "08-marketing-coordinator|interview_prep_fallback": {
+      "grade": 3,
+      "note": "Generic marketing questions, honest stories. \"Something you built that others used\" → the 12 newsletters, while the coffee-club newsletter she actually LAUNCHED is unused; \"problem you solved by building something\" → Canva posters. Template intro.",
+      "hash": "115ecc83ab8c"
+    },
+    "09-sdr-sales|parse": {
+      "grade": 5,
+      "note": "Clean.",
+      "hash": "a0f8f4c7038d"
+    },
+    "09-sdr-sales|fit": {
+      "grade": 3,
+      "note": "Right verdict (91) but reads only \"sales, crm, salesforce\"; Outreach/sequencing and outbound volume never read.",
+      "hash": "e9ba5eb3c835"
+    },
+    "09-sdr-sales|optimize": {
+      "grade": 2,
+      "note": "Asks \"What was your quota attainment (%)?\" when \"112% of quota\" is on the résumé; summary \"7+ years\" and \"Strengths in sales, marketing and crm\".",
+      "hash": "13d43a6fbf24"
+    },
+    "09-sdr-sales|humanproof": {
+      "grade": 1,
+      "note": "\"calls for.\" → \"calls.\"",
+      "hash": "c51a759b0579"
+    },
+    "09-sdr-sales|scanner": {
+      "grade": 2,
+      "note": "\"crm\" both strong and missing.",
+      "hash": "14ef172ddc30"
+    },
+    "09-sdr-sales|advantage": {
+      "grade": 2,
+      "note": "\"hands-on experience with account and prospect\"; \"the posting also leans on start and crm, which your résumé doesn't yet show\" (Salesforce is on it).",
+      "hash": "d3e394a5c5d9"
+    },
+    "09-sdr-sales|insights": {
+      "grade": 2,
+      "note": "\"Salesforce | 1+ years experience | Relevant experience\" — misses outbound, 60 calls/day, sequencing tool.",
+      "hash": "6d77241a1929"
+    },
+    "09-sdr-sales|tailor": {
+      "grade": 1,
+      "note": "Breaks a bullet (\"Keep every touch logged\" → \"Keep e touch logged\"); present tense on \"Built a 6-step sequence…\".",
+      "hash": "e179974a392d"
+    },
+    "09-sdr-sales|ats_check": {
+      "grade": 4,
+      "note": "Accurate.",
+      "hash": "1767390c4e50"
+    },
+    "09-sdr-sales|export": {
+      "grade": 4,
+      "note": "Round-trip 100%.",
+      "hash": "ac3398f45ee0"
+    },
+    "09-sdr-sales|interview_prep_fallback": {
+      "grade": 3,
+      "note": "Solid generic SDR questions (cold-call opener, \"not right now\"); real stories incl. $410K. Template intro with a pasted semicolon fragment (\"…for 4 account executives; 112% of quota…\").",
+      "hash": "c2200c625c25"
+    },
+    "10-admin-assistant|parse": {
+      "grade": 5,
+      "note": "Clean.",
+      "hash": "a5292c889db2"
+    },
+    "10-admin-assistant|fit": {
+      "grade": 3,
+      "note": "PowerPoint gap is right; misses travel/expense coordination (she books travel and files expense reports).",
+      "hash": "6103e60806c3"
+    },
+    "10-admin-assistant|optimize": {
+      "grade": 2,
+      "note": "Strongest line picked from the dental job (\"Confirmed next-day appointments\"); no summary; template message \"excel, microsoft office, and attention to detail\".",
+      "hash": "eb33dc62febf"
+    },
+    "10-admin-assistant|humanproof": {
+      "grade": 1,
+      "note": "\"calls for.\" → \"calls.\"",
+      "hash": "5589bf10495c"
+    },
+    "10-admin-assistant|scanner": {
+      "grade": 2,
+      "note": "Generic fix.",
+      "hash": "6c38583b4e36"
+    },
+    "10-admin-assistant|advantage": {
+      "grade": 2,
+      "note": "\"your real experience in prepare\"; \"the posting also leans on confidential and information, which your résumé doesn't yet show\".",
+      "hash": "15bde2acebdd"
+    },
+    "10-admin-assistant|insights": {
+      "grade": 2,
+      "note": "\"Excel | Microsoft Office | Advanced Microsoft Office\" duplicates; misses executive support and travel/expenses.",
+      "hash": "d0be3405d608"
+    },
+    "10-admin-assistant|tailor": {
+      "grade": 2,
+      "note": "Ranks a 2015 temp data-entry job as the top \"core\" role; adds a generic office-administration bullet to it.",
+      "hash": "c4c2ca949b7b"
+    },
+    "10-admin-assistant|ats_check": {
+      "grade": 4,
+      "note": "Accurate.",
+      "hash": "1767390c4e50"
+    },
+    "10-admin-assistant|export": {
+      "grade": 4,
+      "note": "Round-trip 100%.",
+      "hash": "0f9ba0bba781"
+    },
+    "10-admin-assistant|interview_prep_fallback": {
+      "grade": 3,
+      "note": "Good executive-assistant questions (two executives, competing meetings). Broken template question \"Walk me through how you do that part of the job.\" Template intro.",
+      "hash": "3f0cc6a61eb4"
+    },
+    "11-accountant|parse": {
+      "grade": 1,
+      "note": "\"Company — City / Title, dates\" format: Gulf Coast Marine Services became a 4th role with no title; AP Specialist lost its employer; \"Bill.com\" read as his website in the header.",
+      "hash": "52b3c281f3af"
+    },
+    "11-accountant|fit": {
+      "grade": 1,
+      "note": "Harmful: \"35 — Requires a Bachelor's degree; your résumé lists no degree\" (B.B.A., Accounting) and \"asks for SAP and Excel, which your résumé doesn't show\" (NetSuite satisfies the ERP choice; Excel is in his skills).",
+      "hash": "19d3b27e41af"
+    },
+    "11-accountant|optimize": {
+      "grade": 1,
+      "note": "Credit spent for a summary only (\"10+ years\" vs his own 6; \"Accounts Payable Specialist\" with no employer) and a one-skill template message.",
+      "hash": "2df2a60b7ce3"
+    },
+    "11-accountant|humanproof": {
+      "grade": 1,
+      "note": "\"calls for.\" → \"calls.\"",
+      "hash": "c09db938f4f6"
+    },
+    "11-accountant|scanner": {
+      "grade": 1,
+      "note": "Only \"accounting\"; SAP as missing.",
+      "hash": "0ebe55a3d872"
+    },
+    "11-accountant|advantage": {
+      "grade": 2,
+      "note": "\"the posting also leans on documentation and management, which your résumé doesn't yet show\"; proof = his summary line.",
+      "hash": "b80f25698b8f"
+    },
+    "11-accountant|insights": {
+      "grade": 3,
+      "note": "GAAP, Excel, 4+ years right; CPA (preferred) listed as a want; misses ERP and degree.",
+      "hash": "c7a2d996e593"
+    },
+    "11-accountant|tailor": {
+      "grade": 1,
+      "note": "Harmful: \"CPA license (REQUIRED, fatal)\" — the posting says CPA preferred. The tailored summary replaces his own, deleting \"Passed FAR and AUD sections of the CPA exam\". Mixed tense \"Support … built … answer\".",
+      "hash": "cb682e9125d1"
+    },
+    "11-accountant|ats_check": {
+      "grade": 4,
+      "note": "Accurate.",
+      "hash": "1767390c4e50"
+    },
+    "11-accountant|export": {
+      "grade": 4,
+      "note": "Round-trip 100% (renders the misparsed header \"Bill.com\").",
+      "hash": "2345282d251d"
+    },
+    "11-accountant|interview_prep_fallback": {
+      "grade": 2,
+      "note": "Intro is broken: \"Before that I worked as Gulf Coast Marine Services.\" and splices a bullet with a semicolon (\"…for 3 entities; cut the close from 8 to 5…\"). \"Typical busy day\" story is the nail-salon bookkeeping job. Questions are correct but generic.",
+      "hash": "619d809aa3c2"
+    },
+    "12-hvac-technician|parse": {
+      "grade": 5,
+      "note": "Clean.",
+      "hash": "cf9dcaceac70"
+    },
+    "12-hvac-technician|fit": {
+      "grade": 2,
+      "note": "\"No score: only 2 requirements could be read\" on a posting with clear requirements (4+ years, EPA 608 Universal, license, roofs/75 lbs, own tools).",
+      "hash": "e733a587b4f7"
+    },
+    "12-hvac-technician|optimize": {
+      "grade": 1,
+      "note": "Refused (422 no_requirements) on a fully specified posting — the paid tool is unusable here. No credit spent.",
+      "hash": "8f140066a048"
+    },
+    "12-hvac-technician|scanner": {
+      "grade": 1,
+      "note": "Charged a credit for a null score.",
+      "hash": "e21cfba7d572"
+    },
+    "12-hvac-technician|advantage": {
+      "grade": 2,
+      "note": "Priorities \"buildings, certification, electrical\"; \"leans on buildings and electrical\"; proof is his certification line (\"Lead with that number\").",
+      "hash": "058febd15c75"
+    },
+    "12-hvac-technician|insights": {
+      "grade": 3,
+      "note": "Reasonable: HVAC, Electrical, license, record, EPA 608; misses 4+ years and commercial RTU/chiller experience.",
+      "hash": "eb2e3cefdde0"
+    },
+    "12-hvac-technician|tailor": {
+      "grade": 1,
+      "note": "Harmful: \"EPA 608 certification (REQUIRED, fatal)\" — he holds EPA Section 608 Universal. Present tense on \"Sold $180K … in 2023\".",
+      "hash": "86ee826daaa2"
+    },
+    "12-hvac-technician|ats_check": {
+      "grade": 4,
+      "note": "Accurate.",
+      "hash": "1767390c4e50"
+    },
+    "12-hvac-technician|export": {
+      "grade": 4,
+      "note": "Round-trip 100%.",
+      "hash": "ac3398f45ee0"
+    },
+    "12-hvac-technician|interview_prep_fallback": {
+      "grade": 3,
+      "note": "Field-correct and honest about the commercial gap; real stories. Broken \"Walk me through how you do that part of the job.\" Template intro.",
+      "hash": "df7784e07cbd"
+    },
+    "13-line-cook|parse": {
+      "grade": 5,
+      "note": "Clean.",
+      "hash": "d8e492138ec8"
+    },
+    "13-line-cook|fit": {
+      "grade": 3,
+      "note": "Verdict fine (88) but asks \"Do you have a Food Handler card?\" when the résumé says \"ServSafe Food Handler (2024)\"; knife skills not read.",
+      "hash": "79cbd99f222f"
+    },
+    "13-line-cook|optimize": {
+      "grade": 2,
+      "note": "One reorder, one question, a template message — for a credit.",
+      "hash": "ac5930b3060a"
+    },
+    "13-line-cook|humanproof": {
+      "grade": 1,
+      "note": "\"calls for.\" → \"calls.\"",
+      "hash": "ea4dd5cea8c1"
+    },
+    "13-line-cook|scanner": {
+      "grade": 1,
+      "note": "Nonsense fix: \"Food safety work that produced 600 guests — confirm this figure\".",
+      "hash": "2ef6b0b803f8"
+    },
+    "13-line-cook|advantage": {
+      "grade": 2,
+      "note": "\"the posting leans on seafood and weekends, which your résumé doesn't yet show\" (he works Friday/Saturday service); proof is his dishwasher bullet.",
+      "hash": "566643befb21"
+    },
+    "13-line-cook|insights": {
+      "grade": 2,
+      "note": "ServSafe three times in different words; misses knife skills.",
+      "hash": "a509c4adf919"
+    },
+    "13-line-cook|tailor": {
+      "grade": 1,
+      "note": "Breaks a bullet (\"pass every health inspection\" → \"pass e health inspection\"); \"1+ years experience (REQUIRED, risky)\" for a cook with 4 years.",
+      "hash": "2ce3844b712b"
+    },
+    "13-line-cook|ats_check": {
+      "grade": 4,
+      "note": "Accurate.",
+      "hash": "1767390c4e50"
+    },
+    "13-line-cook|export": {
+      "grade": 4,
+      "note": "Round-trip 100%.",
+      "hash": "ac3398f45ee0"
+    },
+    "13-line-cook|interview_prep_fallback": {
+      "grade": 3,
+      "note": "Field-correct kitchen questions; real stories. Template intro.",
+      "hash": "34447202de02"
+    },
+    "14-teacher|parse": {
+      "grade": 2,
+      "note": "Titles carry the school (\"4th Grade Teacher, Oak Grove Elementary School (Wake County Public Schools)\"), companies empty.",
+      "hash": "b931add89a86"
+    },
+    "14-teacher|fit": {
+      "grade": 1,
+      "note": "Harmful: \"No score\", \"Requires a Bachelor's degree; your résumé lists no degree\" (B.A. Elementary Education), and \"upselling\" as a requirement for a teacher.",
+      "hash": "02afabe17a46"
+    },
+    "14-teacher|optimize": {
+      "grade": 1,
+      "note": "Refused (no_requirements) on a posting with five stated requirements.",
+      "hash": "8f140066a048"
+    },
+    "14-teacher|scanner": {
+      "grade": 1,
+      "note": "Charged a credit; \"missing: upselling\".",
+      "hash": "76695507ef5f"
+    },
+    "14-teacher|advantage": {
+      "grade": 2,
+      "note": "Splits \"social studies\": \"the posting also leans on studies and social\"; \"Bring a point of view on teaching\".",
+      "hash": "11b75f256856"
+    },
+    "14-teacher|insights": {
+      "grade": 2,
+      "note": "\"Master's degree\" (preferred, she lacks it) first; the license appears as three fragments (\"Carolina Teaching License\", \"North Carolina Teaching\", \"Valid North Carolina\").",
+      "hash": "9c9f20c496b8"
+    },
+    "14-teacher|tailor": {
+      "grade": 1,
+      "note": "Breaks a bullet (\"with every family\" → \"with e family\"); present tense on a dated result; two invented generic bullets for the student-teacher role (\"Trained new teammates on procedures and standards\").",
+      "hash": "628123cf9b68"
+    },
+    "14-teacher|ats_check": {
+      "grade": 4,
+      "note": "Flags its own misparse correctly.",
+      "hash": "3c03f9592b9b"
+    },
+    "14-teacher|export": {
+      "grade": 4,
+      "note": "Round-trip 100%.",
+      "hash": "700d9dcf722e"
+    },
+    "14-teacher|interview_prep_fallback": {
+      "grade": 3,
+      "note": "Field-correct teacher questions; real stories. Template intro.",
+      "hash": "9452275ea4c9"
+    },
+    "15-no-requirements|parse": {
+      "grade": 3,
+      "note": "Same volunteer misparse as fixture 03.",
+      "hash": "211eee8cad7f"
+    },
+    "15-no-requirements|fit": {
+      "grade": 5,
+      "note": "Correct: \"No score: this listing does not state its requirements\".",
+      "hash": "bf42e1d43317"
+    },
+    "15-no-requirements|optimize": {
+      "grade": 5,
+      "note": "Correct: 422 no_requirements, probe and run, nothing charged.",
+      "hash": "d5bcd85f373c"
+    },
+    "15-no-requirements|scanner": {
+      "grade": 1,
+      "note": "Charged a credit for \"No score\".",
+      "hash": "7cc05f63bdb2"
+    },
+    "15-no-requirements|advantage": {
+      "grade": 1,
+      "note": "Charged a credit; \"priorities: pay, membership, university\"; pitches \"my hands-on experience with pay and charlotte\".",
+      "hash": "f08fc06b1692"
+    },
+    "15-no-requirements|insights": {
+      "grade": 1,
+      "note": "Charged a credit for an empty want-list and boilerplate tips.",
+      "hash": "92dae576652c"
+    },
+    "15-no-requirements|tailor": {
+      "grade": 1,
+      "note": "Charged a credit; breaks \"every shift\" → \"e shift\".",
+      "hash": "1f6cd364b9ef"
+    },
+    "07-data-analyst|interview_prep": {
+      "grade": 3,
+      "note": "Questions are excellent and grounded (the $310K Tuesday finding, 25-view layer, Power Query, healthcare transfer); intro accurate and ends with a real why. But the answers put the model's invented narrative inside brackets as if it were hers — \"[I worked with the store managers and ops leadership to understand their biggest pain points…]\", \"[I flagged it for the scheduling team and showed them the comparison.]\", \"[The dashboards are now part of their weekly routine…]\" — and outside brackets: \"I was digging into the labor data in Snowflake one week and noticed something odd\", \"the team kept asking for the same things over and over\". Brackets are guesses, not blanks.",
+      "hash": "924d23d4393e"
+    },
+    "07-data-analyst|tailor_polish": {
+      "grade": 3,
+      "note": "Two acceptable tightenings; \"(pandas)\" dropped.",
+      "hash": "09c3aae82e76"
+    },
+    "08-marketing-coordinator|interview_prep": {
+      "grade": 3,
+      "note": "Reasonable coordinator questions; intro accurate. Answers are thin and partly broken: nested brackets \"[with content focused on [topics/offers/company updates you chose]]\" and \"[The owner used these reports to [understand performance/make decisions/track progress]]\"; invented motive \"the owner wanted to build the Instagram following\"; the 41% question (\"what did the 41% open rate tell you?\") is not answered. Template intro.",
+      "hash": "f213e41e9074"
+    },
+    "08-marketing-coordinator|tailor_polish": {
+      "grade": 3,
+      "note": "Tightens three bullets; loses \"email\" and \"how we roast\" — fine, but nothing ChatGPT would not do.",
+      "hash": "f0d239e033ee"
+    },
+    "09-sdr-sales|interview_prep": {
+      "grade": 2,
+      "note": "Intro invents a promotion: \"setting consultations from inbound and purchased leads, and then moved into a hybrid inside/closing role\" (résumé: one role, \"as a hybrid inside/closing rep\"). Answers do not answer: the personalisation answer hands the question back (\"[You tell me: how do you keep them personalized…]\"); the inbound-vs-purchased answer just restates the bullet twice (\"I called inbound and purchased leads. I set 25+ in-home consultations a month.\"). Q4 and Q8 are the same question.",
+      "hash": "c74f89b4bcbf"
+    },
+    "09-sdr-sales|tailor_polish": {
+      "grade": 3,
+      "note": "Turns the current role into past tense (\"Booked\", \"Logged\") and drops \"straight\" from \"5 straight quarters\".",
+      "hash": "dc7898ce405c"
+    },
+    "10-admin-assistant|interview_prep": {
+      "grade": 2,
+      "note": "Answer invents practices and outcomes: \"I also flag court dates and filing deadlines well ahead of time so nothing slips… all court dates are met on time\", \"4 attorneys who have overlapping court dates, client meetings and depositions\". Q3/Q4/Q5 carry the mismatched rationale \"Answer with one real example from your résumé\"; Q4 and Q6 duplicate (travel changes); \"Walk me through how you do that part of the job.\" refers to nothing. Intro is accurate (7.5 yrs).",
+      "hash": "5dabf57f58ae"
+    },
+    "10-admin-assistant|tailor_polish": {
+      "grade": 3,
+      "note": "Past tense on the current role; polishes the tailor-invented bullet (\"Ran day-to-day office administration\" → \"Managed office administration\").",
+      "hash": "f6964c5c04c7"
+    },
+    "11-accountant|interview_prep": {
+      "grade": 3,
+      "note": "Senior-level questions on his own work (14 recs, $38K duplicates, PBC, mentoring). But it repeats a stale date as future: intro \"I'm sitting for REG in 2025\" and Q6 \"You're sitting for REG in 2025—how are you balancing…\" (today is Oct 2026). Answers mostly restate bullets and skip the question's point (the $38K answer never says how he found them or what prevents recurrence: \"I cleaned up the duplicate vendors and recovered the duplicate payments. We recovered $38K.\"). \"handle all the reconciliations\" overclaims.",
+      "hash": "9fd44be7b234"
+    },
+    "11-accountant|tailor_polish": {
+      "grade": 3,
+      "note": "Three trivial edits.",
+      "hash": "1fc35b1e6e7c"
+    },
+    "12-hvac-technician|interview_prep": {
+      "grade": 2,
+      "note": "Intro overstates tenure against his own résumé: \"an HVAC technician with about 11 years in the Phoenix market\" (résumé: 9 years; 2015–17 was warehouse). Q7 \"What's your experience working on commercial HVAC systems…\" carries the rationale \"Answer with one real example from your résumé\" — he has no commercial work, so it steers him to invent one; Q7 duplicates Q8. Q6 same mismatched rationale. \"Walk me through how you do that part of the job.\" is broken. All 4 answers dropped to templates.",
+      "hash": "af02f457d76f"
+    },
+    "12-hvac-technician|tailor_polish": {
+      "grade": 3,
+      "note": "Two trivial edits; \"parts\" dropped.",
+      "hash": "940ae7c01d79"
+    },
+    "13-line-cook|interview_prep": {
+      "grade": 3,
+      "note": "Excellent kitchen questions on his real facts (250 covers, 14-minute tickets, inspections, Creole vs Cajun). Answers do not sound like a person: each restates its result twice (\"I keep ticket times under 14 minutes by […]… I stay under 14 minutes on my stations during the dinner rush.\"; \"cut weekly produce waste by about a third. We cut produce waste by about a third per week.\"), and an editor's note leaks into an answer (\"[The service runs smoothly… —see the next answer about keeping ticket times under 14 minutes.]\"). Template intro.",
+      "hash": "564a094d286b"
+    },
+    "13-line-cook|tailor_polish": {
+      "grade": 2,
+      "note": "\"Trained 3 new line cooks\" → \"Train 3 new line cooks\"; \"pass every health inspection since I started\" → \"pass all health inspections\".",
+      "hash": "cadcf63a2ca7"
+    },
+    "14-teacher|interview_prep": {
+      "grade": 4,
+      "note": "Best output in the run: questions a principal would ask, all on her facts (PLC data meetings, 5–7 IEP/504 students, 100% conference attendance, mid-year takeover, how her toolkit fits together). Written answers stay on her lines and use brackets honestly for what only she knows. Docked for 2 dropped answers and the template intro read aloud: \"My most recent role is 4th Grade Teacher, Oak Grove Elementary School (Wake County Public Schools), where…\".",
+      "hash": "21d036ece38b"
+    },
+    "14-teacher|tailor_polish": {
+      "grade": 2,
+      "note": "applied: 0 — the Pro polish returned nothing.",
+      "hash": "90efc96992a5"
+    },
+    "01-retail-manager|interview_prep_jobtext": {
+      "grade": 2,
+      "note": "False fact about the employer: Q4 rationale says \"Kronos is their system\" — Kronos is HER system; the posting names Workday. Sales answer upgrades her: \"I was managing a store with $4.2M in annual volume\" (she is the Assistant SM). Shrink answer invents timing (\"When I stepped into the Assistant Store Manager role… shrink was running at 2.4%\"). Sales/schedule answers are mostly coaching inside brackets (\"[I would need you to walk through the specific levers…]\"). No P&L-gap or \"lead two assistant managers\" question; Q7 repeats Q4. Template intro.",
+      "hash": "473c322fbcca"
+    },
+    "02-warehouse-lead|interview_prep_jobtext": {
+      "grade": 3,
+      "note": "Accurate, natural intro; posting-aware safety-meeting and Blue Yonder questions (no false claim). But only 2 model questions survive and all 4 answers were dropped to templates; nothing on the posting's WMS real-time monitoring, shift reports/shorts, or going from 14 to a 15–25 crew. Fixed-list questions (\"behind plan\", \"missing rate\") carry it.",
+      "hash": "8de850d37207"
+    },
+    "03-cashier-entry|interview_prep_jobtext": {
+      "grade": 2,
+      "note": "Intro inflates and drops qualifiers: \"a cashier at QuickFuel Market for the past two and a half years\" (June 2024 → 2 yrs 4 mo) and \"I've balanced my drawer to within $1 every shift\" (résumé: \"every shift for 10 months\"). Answer invents an outcome: \"nothing runs out during the shift\". EBT answer is mostly blanks (\"[I explain what I do step by step from start to finish]\"). Questions themselves are good (front-end upkeep, Spanish, weekends).",
+      "hash": "cf67fdbbe455"
+    },
+    "04-customer-service|interview_prep_jobtext": {
+      "grade": 3,
+      "note": "Best question set in the run for the field: escalation of bugs, the \"same question three times → help-center article\" duty, ticketing depth. Intro good and ends with a real why. But zero written answers (4 dropped), the coaching story for \"trained or coached\" is again the Harbor Grill server line, and \"Salesforce Service Cloud, Zendesk and other ticketing systems\" is a vague overclaim (Five9 is a dialer).",
+      "hash": "a35550bd30ec"
+    },
+    "05-registered-nurse|interview_prep_jobtext": {
+      "grade": 3,
+      "note": "Posting-aware (4–5 tele patients, Cerner→Epic, nights) and honest Epic framing. But the cardiac-drip answer is almost all blanks (\"I was floated to [which unit—med-surg, ortho…] … [monitoring for what you looked for…] … [Describe how the patient responded…]\") and never says plainly she has no cardiac-drip/tele-unit experience. No rhythm-interpretation question (the posting's core duty) and no flag that her ACLS (exp. 2025) is lapsed while the posting requires it. Q5 assumes prior nights (\"How have you handled the night shift schedule in your current or previous roles\"). Template intro.",
+      "hash": "d58834d8b470"
+    },
+    "06-backend-engineer|interview_prep_jobtext": {
+      "grade": 2,
+      "note": "Answers misattribute his facts: \"I designed and built the service in Go… and created the runbooks the on-call rotation uses to operate it\" — the runbooks were for the 3 cron jobs moved to Kubernetes, not the tracking service; \"the onboarding service had a critical issue: payout webhooks were firing multiple times… I wrote a retry and idempotency layer in the onboarding API\" fuses two separate bullets. The Postgres-vs-Go answer never says which he is stronger in. \"I owned the shipment-tracking event service from the ground up\" inflates \"Built\". No on-call question though the posting requires one week in six. Template intro.",
+      "hash": "f7a8c4418296"
+    },
+    "07-data-analyst|interview_prep_jobtext": {
+      "grade": 3,
+      "note": "Paid model run came back model:false with all 4 answers dropped — she gets the fallback stories. Posting-aware questions (validation, non-technical audiences, new warehouse) but Q3 and Q7 carry the mismatched filler rationale \"Answer with one real example from your résumé\". Story picks are weak: \"helped someone through a problem\" → \"Pulled taproom sales by event\" (2019 intern); her best story (11 stores, $310K) appears nowhere. Template intro.",
+      "hash": "f4da84ed3f8a"
+    },
+    "08-marketing-coordinator|interview_prep_jobtext": {
+      "grade": 2,
+      "note": "Invented achievement in the email answer: \"launched a monthly email newsletter for the coffee club members, which grew to 1,800 subscribers\" — the résumé gives the list size, not growth. Also \"I was tasked with growing our Instagram presence\" (not stated). Questions are good and posting-aware (Canva, Spanish copy, vendor/signage coordination) but the vendor question gets no answer and the healthcare gap is not raised. Template intro.",
+      "hash": "f25c2e2563d9"
+    },
+    "09-sdr-sales|interview_prep_jobtext": {
+      "grade": 2,
+      "note": "False premise: Q6 \"In your role at Pipewell, you qualify inbound leads\" — his Pipewell work is outbound. Invented method: \"I built a 6-step sequence… and tested it against what we were running before\"; invented timing \"After a few months of running standard sequences\". The same sequence story answers two different questions (Q4 \"stay competitive\" and Q5). Q3 and Q11 are the same question twice. Intro is good (accurate, real why).",
+      "hash": "41439ce928c7"
+    },
+    "10-admin-assistant|interview_prep_jobtext": {
+      "grade": 3,
+      "note": "Paid run came back model:false with all 4 answers dropped. Questions are posting-aware and honest (Concur preferred, confidentiality, attorneys vs three executives, 7½ years correct). No PowerPoint or board-minutes question. Broken template question \"Walk me through how you do that part of the job.\" Template intro.",
+      "hash": "e16d163940bd"
+    },
+    "11-accountant|interview_prep_jobtext": {
+      "grade": 2,
+      "note": "All 4 answers dropped to templates, with bad picks for a Senior Accountant: \"typical busy day\" → the 2016–18 part-time nail-salon bookkeeping; \"something you built that others used\" → PBC schedules instead of the close checklist/templates. No mentoring question though the posting says \"Mentor staff accountants\"; no CPA/SOX gap question. Intro repeats \"I'm sitting for REG in 2025\" in Oct 2026. Energy-ramp question is good.",
+      "hash": "1c05f4106f19"
+    },
+    "12-hvac-technician|interview_prep_jobtext": {
+      "grade": 3,
+      "note": "Paid run came back model:false with all answers dropped. Two posting-aware questions (commercial PM from residential agreements; on-call + roofs) and an honest residential→commercial gap question, but nothing on RTUs, chillers or BAS. Broken \"Walk me through how you do that part of the job.\" Template intro ends \"…in 2023, #2 of 11 techs.\"",
+      "hash": "6c99c285ff24"
+    },
+    "13-line-cook|interview_prep_jobtext": {
+      "grade": 3,
+      "note": "Good posting-aware questions (seafood gap, station standards). Answers are bullet restatements with filler and one invented outcome: \"Every health inspection since I started has passed. We've maintained a clean record and passed every inspection.\"; \"the expo and front of house know they can count on my timing\"; \"They learned the station fundamentals\". Template intro.",
+      "hash": "b668d7331e43"
+    },
+    "14-teacher|interview_prep_jobtext": {
+      "grade": 3,
+      "note": "Intro is accurate, natural and ends with the school's own mission. But only 2 model questions survive and all 4 answers were dropped to templates; nothing on ELA/social-studies planning, the 4th→5th move, weekly family communication or the start date (\"starting August 2025\" has passed).",
+      "hash": "93286425fcd7"
+    }
+  }
+}
