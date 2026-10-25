@@ -18,6 +18,10 @@ import { renderPdf } from '../lib/resume/render/pdf.js';
 import { parseResume } from '../lib/resume/parse/index.js';
 import { normalizeDoc, docIsEmpty } from '../lib/resume/model.js';
 import { llmAvailable } from '../lib/server/llm.js';
+import { loadSkillTaxonomy } from '../lib/server/skillTaxonomy.js';
+import { canonicalResumeText } from '../lib/resume/canonical.js';
+import { serializeToText } from '../lib/resume/model.js';
+import { docFromBody } from '../lib/server/resumeStudio.js';
 
 // One-line "Seen data" block from read-only company intel (ghost/response from our
 // scores), or '' when we have no data on the company. This is the differentiator —
@@ -131,7 +135,15 @@ export default async function handler(req, res) {
   // optimize: checks, cache and probe all happen BEFORE the credit gate (handleOptimizeTool).
   if (tool === 'optimize') return handleOptimizeTool(req, res, body);
 
-  // Credit gate — 1 credit per call; Pro users get Stealth Mode baked into optimize at no extra cost
+  // The scanner measures a résumé against a posting's requirements: a posting that states none is
+  // refused free, before the credit gate (it used to charge and answer match_score null — harness
+  // 2026-10-25, the same rule Optimize follows).
+  if (tool === 'scanner' && body.resume && String(body.jobDescription || '').trim()) {
+    const unopt = unoptimizableListing({ resume: canonicalResumeText(body.resume), jobDescription: body.jobDescription, job: body.job, company: body.company, taxonomy: await loadSkillTaxonomy() });
+    if (unopt) return res.status(422).json({ error: 'no_requirements', ...unopt, cost: 0, charged: false });
+  }
+
+  // Credit gate — 1 credit per call; Pro users are never charged (consume_credit answers pro:true)
   const gate = await gateAI(req, `resume_${tool || 'tool'}`);
   if (!gate.ok) return res.status(gate.status).json({ error: gate.error, credits_required: gate.credits_required, balance: gate.balance ?? 0 });
 
@@ -193,7 +205,8 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Unknown tool: ' + tool });
     }
 
-    return res.status(200).json(parsed);
+    // what the gate did, so the UI never prints "1 credit used" for a Pro user
+    return res.status(200).json({ ...parsed, charged: !gate.pro, pro: !!gate.pro });
 
   } catch(err) {
     const ref = logError('resume', err, { method: req.method, tool: body?.tool, action: body?.action });
@@ -556,27 +569,34 @@ async function handleOptimizeTool(req, res, body) {
   try {
     const authed = await resolveAuthedUser(req);
     if (!authed?.uid) return res.status(401).json({ error: 'Sign in to use AI features', credits_required: true });
-    const { job, company, resume, jobDescription, jobId } = body;
-    if (!resume) return res.status(400).json({ error: 'Resume required' });
-    if (!isReadableResume(resume)) return res.status(400).json({ error: 'RESUME_CORRUPTED' });
+    const { job, company, jobDescription, jobId } = body;
+    if (!body.resume) return res.status(400).json({ error: 'Resume required' });
+    if (!isReadableResume(body.resume)) return res.status(400).json({ error: 'RESUME_CORRUPTED' });
     const preview = previewOnlyError(body);
     if (preview) return res.status(preview.status).json({ ...preview.body, charged: false });
+    // The canonical text and the shared taxonomy — the same inputs the free fit check and the Studio
+    // score, so the three screens print one number (lib/resume/canonical.js, skillTaxonomy.js).
+    const resume = canonicalResumeText(body.resume);
+    const taxonomy = await loadSkillTaxonomy();
 
+    // The cache key carries the parser + optimizer versions (optimizeCache.js): a result built by an
+    // older engine is never served (Tasha got a pre-fix "(1,800 subscribers)." summary, 2026-10-25).
+    // `fresh: true` (the "Re-run" button) skips the cache.
     const key = optimizeCacheKey({ uid: authed.uid, jobId, jobDescription, resume });
-    const hit = await readCachedOptimize(authed.uid, key);
+    const hit = body.fresh ? null : await readCachedOptimize(authed.uid, key);
     if (hit) return res.status(200).json({ ...hit.output, cached: true, cached_at: hit.created_at, charged: false });
     // A posting with no measurable requirements has nothing to optimize against: refused free,
     // probe or not, before the credit gate (the modal said "No score" and then charged a credit).
-    const unoptimizable = unoptimizableListing({ resume, jobDescription, job, company });
+    const unoptimizable = unoptimizableListing({ resume, jobDescription, job, company, taxonomy });
     if (unoptimizable) return res.status(422).json({ error: 'no_requirements', ...unoptimizable, cost: 0, charged: false });
     if (body.probe) return res.status(200).json({ cached: false, price: RESUME_OPTIMIZE_COST, charged: false });
 
     const gate = await gateAI(req, 'resume_optimize');
     if (!gate.ok) return res.status(gate.status).json({ error: gate.error, credits_required: gate.credits_required, pro_required: gate.pro_required, balance: gate.balance ?? 0 });
-    // Pro users get "Human Voice" (stealth field) baked in — same call, no extra credit or cost.
-    const result = buildPaidOptimize({ resume, jobDescription, job, company, pro: gate.pro, jobId });
+    const result = buildPaidOptimize({ resume, jobDescription, job, company, pro: gate.pro, jobId, taxonomy });
     const stored = await writeCachedOptimize(authed.uid, key, result);
-    return res.status(200).json({ ...result, cached: false, cache_saved: stored, charged: true, balance: gate.balance });
+    // charged is what the gate did: a Pro user is never charged (consume_credit answers pro:true)
+    return res.status(200).json({ ...result, cached: false, cache_saved: stored, charged: !gate.pro, pro: !!gate.pro, balance: gate.balance });
   } catch (err) {
     const ref = logError('resume', err, { method: req.method, tool: 'optimize' });
     return res.status(500).json({ error: err.message, ref });
@@ -619,10 +639,17 @@ async function handleStudio(req, res, body) {
           const preview = previewOnlyError(body);
           if (preview) return res.status(preview.status).json({ ...preview.body, charged: false });
         }
+        const taxonomy = await loadSkillTaxonomy();
+        // A posting that states no requirements has nothing to tailor against: refused free, before
+        // the credit gate (harness 2026-10-25: charged 1 and returned an unscored plan).
+        if (String(body.jobDescription || '').trim()) {
+          const unopt = unoptimizableListing({ resume: serializeToText(docFromBody(body)), jobDescription: body.jobDescription, job: body.jobTitle, company: body.company, taxonomy });
+          if (unopt) return res.status(422).json({ error: 'no_requirements', ...unopt, cost: 0, charged: false });
+        }
         const gate = await gateAI(req, 'resume_tailor');
         if (!gate.ok) return res.status(gate.status).json({ error: gate.error, credits_required: gate.credits_required, pro_required: gate.pro_required, balance: gate.balance ?? 0 });
-        const out = await tailorAction(body, { pro: !!gate.pro, allowPolish: llmAvailable() });
-        return res.status(200).json({ ...out, balance: gate.balance, pro: !!gate.pro });
+        const out = await tailorAction(body, { pro: !!gate.pro, allowPolish: llmAvailable(), taxonomy });
+        return res.status(200).json({ ...out, balance: gate.balance, pro: !!gate.pro, charged: !gate.pro });
       }
       default: return res.status(400).json({ error: `Unknown action: ${body.action}` });
     }

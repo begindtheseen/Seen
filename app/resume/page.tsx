@@ -20,7 +20,7 @@ import dynamic from 'next/dynamic'
 import { VerdictCard, WhyYouMatch, MissingList, Checklist, PaidPlanView, type Verdict, type ConstraintRow, type PaidPlan } from '@/components/optimizer/Verdict'
 import CreditConfirmDialog from '@/components/CreditConfirmDialog'
 import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
-import { RESUME_OPTIMIZE_COST, creditCostLabel } from '@/lib/creditRules'
+import { RESUME_OPTIMIZE_COST, creditCostLabel, priceLabel } from '@/lib/creditRules'
 import { markQuiet } from '@/lib/quietWindow'
 import { MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
 import PageHeader from '@/components/shell/PageHeader'
@@ -225,12 +225,12 @@ function FitView({ out, intel, jobCompany, insights }: { out: OptimizerOutput; i
 }
 
 // ═══ REWRITE TAB — the PAID deliverables (plan, moves, questions, availability, summary, bullets) ═══
-function RewriteView({ out, copy, copied }: { out: PaidOptimize; copy: (t: string, k: string) => void; copied: string | null }) {
+function RewriteView({ out, copy, copied, onRerun, pro }: { out: PaidOptimize; copy: (t: string, k: string) => void; copied: string | null; onRerun?: () => void; pro?: boolean | null }) {
   const real = realBulletsOf(out)
   const guidance = (out.optimized_bullets || []).filter(b => isGuidance(b.original) || isGuidance(b.optimized))
   return (
     <div style={{ animation: 'fadeUp .3s ease both' }} className="ai-stack">
-      {out.cached && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', color: 'var(--green)' }}>No credit used — you built this plan for this job and résumé in the last 7 days.</div>}
+      {out.cached && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', color: 'var(--green)' }}>No credit used — you built this plan for this job and résumé in the last 7 days.{onRerun && <> <button type="button" data-testid="resume-rerun" onClick={onRerun} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--green)', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit' }}>Re-run with the latest engine{pro === true ? '' : ` · ${OPTIMIZE_PRICE}`} →</button></>}</div>}
       <PaidPlanView plan={out} />
 
       {real.length > 0 && (
@@ -573,13 +573,13 @@ function ResumePageInner() {
   // PAID: only on a press of the price-tagged button; the first paid action is confirmed once.
   function pressPaid() {
     if (!isLoggedIn) { setGuestGate('your rewrite plan'); return }
-    if (hasConfirmedCreditUse(user?.id)) runPaid()
+    if (pro === true || hasConfirmedCreditUse(user?.id)) runPaid()
     else setConfirmPaid(true)
   }
-  async function runPaid() {
+  async function runPaid(fresh = false) {
     setConfirmPaid(false); setPaidState('loading'); setError('')
     try {
-      const res = await fetch('/api/resume', { method: 'POST', headers: await aiHeaders(), body: JSON.stringify({ tool: 'optimize', resume: resumeText, job: jobTitle, company: jobCompany, ...postingBody() }) })
+      const res = await fetch('/api/resume', { method: 'POST', headers: await aiHeaders(), body: JSON.stringify({ tool: 'optimize', resume: resumeText, job: jobTitle, company: jobCompany, ...postingBody(), ...(fresh ? { fresh: true } : {}) }) })
       const data = await res.json().catch(() => ({})) as PaidOptimize & { error?: string; message?: string; credits_required?: boolean; pro_required?: boolean }
       if (res.status === 402 || data.credits_required) { setUpgradeReason('credits'); setUpgradeFeature(undefined); setShowUpgrade(true); setPaidState('idle'); return }
       if (data.error === 'preview_only') { setPaidState('preview'); return }
@@ -894,7 +894,7 @@ function ResumePageInner() {
                   : paidState === 'preview' || fitState === 'preview' ? <ResultEmpty icon="📄" text={'This listing only has a summary. Paste the full posting to optimize for it — no credit is used for a preview.'} />
                   : paidState === 'no_requirements' ? <ResultEmpty icon="📄" text={paidNote || NO_REQUIREMENTS_NOTE} />
                   : paidState === 'loading' ? <ResultEmpty icon="✍️" text={'Building your rewrite plan…'} />
-                  : paidState === 'done' && paid ? <RewriteView out={paid} copy={copy} copied={copied} />
+                  : paidState === 'done' && paid ? <RewriteView out={paid} copy={copy} copied={copied} pro={pro} onRerun={() => { void runPaid(true) }} />
                   : fitOut ? (
                     <Card>
                       <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '.95rem', marginBottom: '.3rem' }}>Your rewrite plan for this job</div>
@@ -902,7 +902,7 @@ function ResumePageInner() {
                         Which bullet should lead each job, number questions that write a bullet from your answer, an availability line from this posting&apos;s schedule, a summary built only from your own facts, and wording proposals you accept one by one. Kept for 7 days — reopening it is free.
                       </p>
                       {paidState === 'error' && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--red)', marginBottom: '.6rem' }}>Could not build the plan — no credit was used if it failed. Try again.</div>}
-                      <button style={btnPrimary} data-testid="resume-paid-btn" onClick={pressPaid}>Build my rewrite plan →<span style={{ marginLeft: '.5rem', fontSize: 'var(--fs-55)', opacity: .65, fontFamily: 'var(--mono)', fontWeight: 400 }}>· {OPTIMIZE_PRICE}</span></button>
+                      <button style={btnPrimary} data-testid="resume-paid-btn" onClick={pressPaid}>Build my rewrite plan →<span style={{ marginLeft: '.5rem', fontSize: 'var(--fs-55)', opacity: .65, fontFamily: 'var(--mono)', fontWeight: 400 }}>· {priceLabel(RESUME_OPTIMIZE_COST, pro)}</span></button>
                     </Card>
                   ) : <ResultEmpty icon="✍️" text={'Run the analysis first — then build the rewrite plan for this job.'} />
                 )}
@@ -1010,7 +1010,7 @@ function ResumePageInner() {
                       <Card>
                         <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '.95rem', marginBottom: '.3rem' }}>Advantage playbook + 30/60/90 plan</div>
                         <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-65)', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.9rem' }}>Hiring-manager outreach, timing, referral tactics and a 30/60/90-day plan, tuned with Seen&apos;s company data.</p>
-                        <button style={btnPrimary} onClick={runAdvantage}>Build my advantage →<span style={{ marginLeft: '.5rem', fontSize: 'var(--fs-55)', opacity: .65, fontFamily: 'var(--mono)', fontWeight: 400 }}>· 1 credit</span></button>
+                        <button style={btnPrimary} onClick={runAdvantage}>Build my advantage →<span style={{ marginLeft: '.5rem', fontSize: 'var(--fs-55)', opacity: .65, fontFamily: 'var(--mono)', fontWeight: 400 }}>· {priceLabel(RESUME_OPTIMIZE_COST, pro)}</span></button>
                       </Card>
                     )}
                     {advState === 'loading' && <ResultEmpty icon="🧠" text={'Building your advantage…'} />}

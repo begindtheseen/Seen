@@ -26,6 +26,8 @@ import { buildHumanProofPackage, normalizeBulletList } from '../lib/server/human
 import { scoreConfidence } from './_utils/companyScore.js';
 import { firstPartyReportCount, webClaimCount, isGradeable } from '../lib/server/reportCounts.js';
 import { mentionSel } from '../lib/server/scoreColumns.js';
+import { loadSkillTaxonomy } from '../lib/server/skillTaxonomy.js';
+import { canonicalResumeText } from '../lib/resume/canonical.js';
 
 // ── auth: derive the user id from the Supabase JWT (same pattern as api/apply.js) ──
 function verifyJWT(token, secret) {
@@ -144,28 +146,9 @@ async function loadPhraseRules(db) {
   return rules;
 }
 
-// ── taxonomy loader: merge DB skill_aliases / skill_relationships over built-ins ──
-let _taxCache = { ts: 0, tax: null };
-async function loadTaxonomy(db) {
-  if (Date.now() - _taxCache.ts < 5 * 60_000 && _taxCache.tax) return _taxCache.tax;
-  const tax = { aliases: {}, relationships: {} };
-  try {
-    const [aRes, rRes] = await Promise.all([
-      db(`skill_aliases?select=skill,alias&limit=2000`),
-      db(`skill_relationships?select=from_skill,to_skill,weight&limit=2000`),
-    ]);
-    if (aRes.ok) for (const row of await aRes.json()) {
-      if (row.alias && row.skill) tax.aliases[String(row.alias).toLowerCase()] = String(row.skill).toLowerCase();
-    }
-    if (rRes.ok) for (const row of await rRes.json()) {
-      const from = String(row.from_skill || '').toLowerCase();
-      if (!from || !row.to_skill) continue;
-      (tax.relationships[from] ||= []).push({ to: String(row.to_skill).toLowerCase(), weight: Number(row.weight) || 0.5 });
-    }
-  } catch { /* fall back to built-in taxonomy */ }
-  _taxCache = { ts: Date.now(), tax };
-  return tax;
-}
+// ── taxonomy: the shared loader (lib/server/skillTaxonomy.js) — the paid Optimize and the Studio
+//    read the same overlay, so one résumé + one posting scores one number everywhere ──
+async function loadTaxonomy() { return loadSkillTaxonomy(); }
 
 // ── company process score from the existing company_scores table (by name) ──
 async function getCompanyProcess(db, company) {
@@ -505,7 +488,7 @@ export default async function handler(req, res) {
 
     // Taxonomy + company process score (parallel).
     const [taxonomy, companyProc] = await Promise.all([
-      haveDb ? loadTaxonomy(db) : Promise.resolve(null),
+      haveDb ? loadTaxonomy() : Promise.resolve(null),
       haveDb ? getCompanyProcess(db, company) : Promise.resolve({ score: null, confidence: null }),
     ]);
 
@@ -520,13 +503,14 @@ export default async function handler(req, res) {
       if (jobFacts) factsSource = 'cache';
     }
     if (!jobFacts) {
-      jobFacts = extractJobFacts(jobDescription || '', { jobTitle, taxonomy: taxonomy ? { aliases: { ...taxonomy.aliases }, relationships: { ...taxonomy.relationships } } : undefined });
+      jobFacts = extractJobFacts(jobDescription || '', { jobTitle, taxonomy: taxonomy || undefined });
       if (haveDb && jobId && jobFacts.length) cacheJobFacts(db, jobId, jobFacts).catch(() => {});
     }
 
     const output = runOptimizer(
       {
-        resumeText: String(resumeText),
+        // the canonical text every scoring path reads (lib/resume/canonical.js)
+        resumeText: canonicalResumeText(String(resumeText)),
         jobId: jobId || null,
         jobTitle,
         company,

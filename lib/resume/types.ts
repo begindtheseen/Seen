@@ -57,11 +57,11 @@ export interface TailorDecision {
   reasons: string[]; overridable: boolean
 }
 export interface TailorPrompt { id: string; itemId: string; roleTitle: string; company: string; kind: 'dates' | 'metric'; question: string; unit: string | null; why: string }
-export interface TailorAdded { kind: 'transferable_bullet'; itemId: string; bulletId: string; text: string; competency: string; basis: string; confirm: boolean; reason: string }
+export interface TailorAdded { kind: 'transferable_bullet' | 'transferable_suggestion'; itemId: string; key?: string; bulletId: string | null; text: string; competency: string; basis: string; confirm: boolean; confirmed?: boolean; reason: string }
 export interface TailorObjective { total: number; match: number; keywordCoverage: number; health: number; relevanceDensity: number; lengthFit: number; completeness: number; lines: number; penalty: number }
 export interface TailorRewrite { bulletId: string; itemId: string; from: string; to: string; rules: string[]; tense?: 'past' | 'present' }
 /** rewrites: true = accept every wording proposal, string[] = accepted bulletIds, absent = plan.applyRewrites (false). */
-export interface TailorOverrides { decisions?: Record<string, TailorDecision['decision']>; transferable?: boolean; excludeAdded?: string[]; summary?: boolean; skills?: boolean; terminology?: boolean; rewrites?: boolean | string[]; layout?: 'chronological' | 'relevance'; prompts?: TailorPrompt[]; answers?: Record<string, string> }
+export interface TailorOverrides { decisions?: Record<string, TailorDecision['decision']>; transferable?: boolean; excludeAdded?: string[]; includeAdded?: string[]; summary?: boolean; skills?: boolean; terminology?: boolean; rewrites?: boolean | string[]; layout?: 'chronological' | 'relevance'; prompts?: TailorPrompt[]; answers?: Record<string, string> }
 export interface TailorPlan {
   version: string
   optimizer?: string

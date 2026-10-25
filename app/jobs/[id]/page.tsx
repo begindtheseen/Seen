@@ -23,7 +23,8 @@ import SeenApplyModal from '@/components/jobs/SeenApplyModal'
 import { takesSeenApply } from '@/lib/seenApplyMode'
 import CreditConfirmDialog from '@/components/CreditConfirmDialog'
 import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
-import { JOB_INSIGHTS_COST, RESUME_OPTIMIZE_COST, creditCostLabel, dailyResetLabel } from '@/lib/creditRules'
+import { JOB_INSIGHTS_COST, RESUME_OPTIMIZE_COST, creditCostLabel, priceLabel, usageLine } from '@/lib/creditRules'
+import { useProStatus } from '@/lib/hooks/useProStatus'
 import { displayCompanyName } from '@/lib/companyDisplay'
 import { displayPay, payLabel } from '@/lib/jobs/pay.js'
 import { paragraphs, isDescriptionPreview, stripDanglingEllipsis, endsCutOff } from '@/lib/jobs/descriptionText.js'
@@ -65,6 +66,7 @@ interface InsightsResponse extends Partial<Insights> {
   price?: number
   cost?: number
   charged?: boolean
+  pro?: boolean
   balance?: number
   credits_required?: boolean
   error?: string
@@ -88,6 +90,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const { id } = use(params)
   const router = useRouter()
   const { isLoggedIn, user } = useAuth()
+  const pro = useProStatus()
 
   const [job, setJob] = useState<Job | null>(null)
   const [resolved, setResolved] = useState(false)
@@ -284,9 +287,10 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       if (d.credits_required || res.status === 401 || res.status === 402) {
         setInsightNote(d.error || 'Out of AI credits.'); setInsightsState('credits'); return
       }
-      if (d.charged) {
+      // the ledger line says what the server did — a Pro account is never charged (d.pro)
+      if (d.charged || d.pro) {
         window.dispatchEvent(new Event('seen:credits-updated'))
-        setInsightNote(`${creditCostLabel(d.cost ?? JOB_INSIGHTS_COST)} used${typeof d.balance === 'number' && d.balance < 900 ? ` · ${d.balance} left` : ''} · ${dailyResetLabel()}`)
+        setInsightNote(usageLine({ cost: d.cost ?? JOB_INSIGHTS_COST, charged: !!d.charged && !d.pro, pro: !!d.pro, balance: typeof d.balance === 'number' ? d.balance : null }))
       }
       if (d.what_they_want?.length) {
         try { localStorage.setItem('ji_' + job.id, JSON.stringify({ ts: Date.now(), v: JOB_INSIGHTS_VERSION, data: d })) } catch { /* ignore */ }
@@ -297,7 +301,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
   function revealInsights() {
     if (!isLoggedIn) { setInsightNote(''); setInsightsState('credits'); return }
-    if (hasConfirmedCreditUse(user?.id)) generateInsights()
+    if (pro === true || hasConfirmedCreditUse(user?.id)) generateInsights()
     else setConfirmOpen(true)
   }
 
@@ -486,7 +490,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               <div style={{ fontSize: '.75rem', color: 'var(--sub)', lineHeight: 1.6 }}>Nobody has generated the insight for this listing yet. Once generated it is free for everyone for 7 days.</div>
               <button type="button" onClick={revealInsights} data-testid="reveal-insights"
                 style={{ alignSelf: 'flex-start', background: 'var(--green)', color: 'var(--ink)', border: 'none', borderRadius: 8, padding: '.55rem .95rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.8rem', cursor: 'pointer' }}>
-                Reveal AI insights · {creditCostLabel(insightPrice)}
+                Reveal AI insights · {priceLabel(insightPrice, pro)}
               </button>
             </div>
           )}
@@ -640,9 +644,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                       type="button"
                       data-testid="detail-optimize-btn"
                       onClick={() => setShowApplyModal(true)}
-                      title={`Optimize your résumé for this job · ${OPTIMIZE_PRICE}`}
+                      title={`Optimize your résumé for this job · ${priceLabel(RESUME_OPTIMIZE_COST, pro)}`}
                       style={{ flex: 1, minWidth: 0, textAlign: 'center', background: 'rgba(99,102,241,.08)', color: '#a5b4fc', borderRadius: 8, padding: '.5rem .5rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.78rem', lineHeight: 1.15, border: '1px solid rgba(99,102,241,.35)', cursor: 'pointer' }}
-                    >Optimize · {OPTIMIZE_PRICE.replace(' ', '\u00a0')}</button>
+                    >Optimize · {priceLabel(RESUME_OPTIMIZE_COST, pro).replace(' ', '\u00a0')}</button>
                   )}
                 </>
               : !takesSeenApply(job) && <button disabled style={{ flex: 1, background: 'var(--muted)', color: 'var(--ink)', border: 'none', borderRadius: 8, padding: '.65rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', opacity: .65 }}>No apply link</button>
