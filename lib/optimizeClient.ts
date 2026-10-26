@@ -21,7 +21,7 @@ export interface OptimizeRequirement {
   strength: 'strong' | 'weak' | 'stated' | 'implied' | 'none'
   note?: string
 }
-export interface OptimizeBulletPlan { id: string; level: number; action: 'keep' | 'rewrite' | 'cut' | 'move_up'; why: string }
+export interface OptimizeBulletPlan { id: string; level: number; action: 'keep' | 'rewrite' | 'cut' | 'move_up'; why: string; text: string }
 export interface OptimizeGap { label: string; advice: string }
 export interface OptimizeDiagnosis {
   target: string
