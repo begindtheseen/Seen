@@ -412,8 +412,10 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
 
   // Deep link: /company/<slug>#reports opens that section on load.
   useEffect(() => {
-    const h = (window.location.hash || '').replace('#', '') as SectionKey
-    if (h && h in open) setOpen(prev => ({ ...prev, [h]: true }))
+    // the section name comes from the page's own list, never from the URL itself
+    const h = (window.location.hash || '').replace('#', '')
+    const key = (Object.keys(open) as SectionKey[]).find(k => k === h)
+    if (key) setOpen(prev => ({ ...prev, [key]: true }))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load matching tracker entry for this company
