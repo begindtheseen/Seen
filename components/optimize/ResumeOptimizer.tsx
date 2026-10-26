@@ -261,7 +261,7 @@ export default function ResumeOptimizer(props: ResumeOptimizerProps) {
               <ul className={s.plain}>
                 {result.order.length > 0 && <li>Move these up — they matter most for this job: {result.order.map((id) => lineOf(diag, result, id)).filter(Boolean).map((t) => `“${short(t)}”`).join(', ')}</li>}
                 {result.cut.map((c) => <li key={c.id}>Consider cutting “{short(lineOf(diag, result, c.id))}” — {c.why}</li>)}
-                {result.skills.length > 0 && <li>Skills to list (all on your résumé or in your answers): {result.skills.join(', ')}</li>}
+                {result.skills.length > 0 && <li>Add to your skills line (each one is shown on your résumé or in your answers): {result.skills.join(', ')}</li>}
               </ul>
             </section>
           )}

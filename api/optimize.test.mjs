@@ -30,8 +30,8 @@ globalThis.fetch = async (url, opts = {}) => {
     let out;
     if (/diagnose a résumé/.test(body.system)) {
       out = { target: 'Assistant store manager', bullets: [{ id: 'J1.1', level: 2, action: 'rewrite', why: 'scope' }], requirements: [{ label: 'sales', evidence: ['J1.3'], strength: 'strong' }], questions: [{ bullet: 'J1.1', ask: 'About how many hours of payroll did you schedule each week?', why: 'payroll is in the posting', kind: 'scope' }], gaps: [{ label: 'p&l', advice: 'Say in the cover letter which parts of the P&L you have owned.' }] };
-    } else if (/rewrite résumé bullets/.test(body.system)) {
-      const ids = [...prompt.matchAll(/^\s*(J\d+\.\d+): (.+)$/gm)].map((m) => [m[1], m[2]]);
+    } else if (/best human résumé writer/.test(body.system)) {
+      const ids = [...prompt.matchAll(/^\s*(J\d+\.\d+) \[[^\]]*\]: (.+)$/gm)].map((m) => [m[1], m[2]]);
       const shrinkId = ids.find(([, t]) => /shrink/i.test(t))[0];
       const salesId = ids.find(([, t]) => /store sales/i.test(t))[0];
       out = { rewrites: [
@@ -39,8 +39,8 @@ globalThis.fetch = async (url, opts = {}) => {
         { id: shrinkId, text: 'Cut shrink from 2.4% to 1.1% within 12 months by tightening the fitting-room and back-door process', uses: [shrinkId], why: 'a one-word swap' },
         { id: shrinkId, text: 'Cut shrink from 2.4% to 1.1% in 12 months by tightening the fitting-room and back-door process; trained the team on the new process', uses: [shrinkId], why: 'borrows a fact from another line' },
         { id: salesId, text: 'Grew store sales 9% year over year in 2023 on $4.2M annual volume, ranking 1st of 40 stores', uses: [salesId], why: 'invented rank' },
-      ], summary: { text: 'Assistant Store Manager at Desert Sun Apparel who cut shrink from 2.4% to 1.1% and grew store sales 9% in 2023.', uses: [] }, skills: [{ skill: 'Kronos' }] };
-    } else if (/fix résumé bullets that Seen/.test(body.system)) {
+      ], summary: { text: 'Assistant Store Manager at Desert Sun Apparel who cut shrink from 2.4% to 1.1% and grew store sales 9% in 2023.', uses: [] }, skills: [{ skill: 'Kronos' }, { skill: 'Shrink control' }, { skill: 'Workday' }] };
+    } else if (/fix résumé lines that Seen/.test(body.system)) {
       state.repairs = (state.repairs || 0) + 1;
       const ids = [...prompt.matchAll(/^- (J\d+\.\d+) — original: "([^"]+)"/gm)].map((m) => [m[1], m[2]]);
       const sales = ids.find(([, t]) => /store sales/i.test(t));
@@ -101,7 +101,7 @@ test('rewrite: needs a diagnosis; charges once; only lines that pass the gates s
   assert.equal(state.charges, before + 1);
   assert.equal(r.body.charged, true);
   const texts = r.body.proposals.map((p) => p.after);
-  assert.ok(texts.some((t) => /^Tightened the fitting-room and back-door process, cutting shrink/.test(t)), JSON.stringify(texts));
+  assert.ok(texts.some((t) => /^Tightened the fitting-room and back-door process, cutting shrink/.test(t)), JSON.stringify(r.body.refused));
   assert.ok(!texts.some((t) => /within 12 months/.test(t)), 'a one-word swap never ships');
   assert.ok(!texts.some((t) => /1st of 40/.test(t)), 'an invented rank never ships');
   assert.equal(state.repairs, 1, 'refused lines go back to the writer once');
@@ -109,7 +109,7 @@ test('rewrite: needs a diagnosis; charges once; only lines that pass the gates s
   assert.ok(!texts.some((t) => /trained the team/.test(t)), 'a fact borrowed from another bullet never ships');
   assert.equal(r.body.rejected_count >= 1, true);
   assert.ok(r.body.summary && /cut shrink/.test(r.body.summary.text));
-  assert.deepEqual(r.body.skills, ['Kronos']);
+  assert.deepEqual(r.body.skills, ['Shrink control'], 'only skills the résumé shows and its skills line does not list yet');
   const reopen = await call({ action: 'rewrite', ...base, answers: [{ id: qid, answer: 'about 900 hours' }] });
   assert.equal(reopen.body.cached, true);
   assert.equal(state.charges, before + 1, 'a reopen is free');

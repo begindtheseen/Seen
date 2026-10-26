@@ -152,17 +152,28 @@ export default async function handler(req, res) {
         }
       }
       const gated = draft ? guardRewrites(ctx, diagnosis, draft, review, answers) : { proposals: [], summary: null, skills: [], rejected: [] };
-      // One repair pass: each refused line goes back with the reason Seen refused it, then through the
-      // same gates. What still fails is dropped.
+      // One repair pass: each refused line goes back with the reason Seen refused it, and every answer
+      // that added a fact but went unused goes with it; the result passes the same checks.
       let repaired = 0;
-      if (repairable(gated.rejected).length) {
+      if (draft && (repairable(gated.rejected).length || gated.unused.length)) {
         try {
-          const rp = repairPrompt(ctx, gated.rejected, answers);
-          const fix = await chat({ system: rp.system, user: rp.user, maxTokens: 2000, timeoutMs: 35000, json: true, tier: 'quality' });
-          const again = guardRewrites(ctx, diagnosis, fix, null, answers, { only: new Set(rp.ids.filter((id) => !gated.proposals.some((p) => p.id === id || (p.merges || []).includes(id)))) });
+          const rp = repairPrompt(ctx, gated.rejected, answers, gated.unused);
+          const fix = await chat({ system: rp.system, user: rp.user, maxTokens: 2400, timeoutMs: 40000, json: true, tier: 'quality' });
+          let review2 = null;
+          try {
+            const v2 = reviewPrompt(ctx, fix, answers);
+            review2 = await chat({ system: v2.system, user: v2.user, maxTokens: 2400, timeoutMs: 35000, json: true, tier: 'quality' });
+          } catch { /* the deterministic checks still run */ }
+          const taken = new Set(gated.proposals.flatMap((p) => [p.id, ...(p.merges || [])]));
+          const again = guardRewrites(ctx, diagnosis, { rewrites: (fix?.rewrites || []).filter((r) => !taken.has(String(r?.id))), additions: fix?.additions || [] }, review2, answers);
+          const perJob = new Map();
+          for (const p of gated.proposals) if (p.add) perJob.set(p.job, (perJob.get(p.job) || 0) + 1);
           for (const p of again.proposals) {
-            if (gated.proposals.some((x) => x.id === p.id || (x.merges || []).includes(p.id) || (p.merges || []).some((m) => x.id === m))) continue;
-            gated.proposals.push({ ...p, repaired: true });
+            if (taken.has(p.id) || (p.merges || []).some((m) => taken.has(m)) || gated.proposals.some((x) => x.after.toLowerCase() === p.after.toLowerCase())) continue;
+            const q = p.add ? { ...p, id: `${p.job}.new${(perJob.get(p.job) || 0) + 1}` } : p;
+            if (p.add) perJob.set(p.job, (perJob.get(p.job) || 0) + 1);
+            gated.proposals.push({ ...q, repaired: true });
+            taken.add(q.id);
             repaired += 1;
           }
           gated.rejected = gated.rejected.filter((r) => !again.proposals.some((p) => p.id === r.id)).concat(again.rejected.map((r) => ({ ...r, pass: 'repair' })));
