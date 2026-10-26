@@ -12,38 +12,41 @@ import { useAuth } from '@/lib/auth'
 import { AppStore } from '@/lib/stores/AppStore'
 import { useFocusTrap } from '@/lib/hooks/useFocusTrap'
 import styles from './CommandPalette.module.css'
+import Icon from '@/components/ui/Icon'
+import { ICONS, type IconName } from '@/components/ui/icons'
 
+// icon: a name from the shared set (components/ui/icons.ts) or a single letter (an application / company initial).
 type Item = { id: string; label: string; hint?: string; group: string; href: string; keys?: string; icon: string; kw?: string }
 
 const companySlug = (name: string) => encodeURIComponent(name.trim().toLowerCase().replace(/\s+/g, '-'))
 
 const SEEKER_PAGES: Item[] = [
-  { id: 'dash', label: 'Dashboard', hint: 'Your command center', group: 'Go to', href: '/dashboard', keys: 'g d', icon: '▦', kw: 'home overview' },
-  { id: 'jobs', label: 'Jobs', hint: 'Transparency-first job search', group: 'Go to', href: '/jobs', keys: 'g j', icon: '💼', kw: 'search openings' },
-  { id: 'track', label: 'Application tracker', hint: 'Every application, check-ins, outcomes', group: 'Go to', href: '/tracker', keys: 'g t', icon: '✓', kw: 'applications pipeline' },
-  { id: 'cos', label: 'Company intel', hint: 'Ghost rates and grades', group: 'Go to', href: '/companies', keys: 'g c', icon: '🏢', kw: 'companies scoreboard' },
-  { id: 'resume', label: 'Résumé', hint: 'Fit score and rewrites for one job', group: 'Go to', href: '/resume', keys: 'g r', icon: '🧠', kw: 'resume optimize' },
-  { id: 'saved', label: 'Saved jobs', group: 'Go to', href: '/saved', keys: 'g s', icon: '♥', kw: 'bookmarks' },
-  { id: 'agencies', label: 'Agency ghost index', group: 'Explore', href: '/agencies', icon: '👻', kw: 'staffing recruiters' },
-  { id: 'demand', label: 'Hiring demand', group: 'Explore', href: '/demand', icon: '📊', kw: 'markets cities' },
-  { id: 'feed', label: 'Live feed', group: 'Explore', href: '/feed', icon: '📡', kw: 'reports community' },
-  { id: 'pricing', label: 'Pricing & plans', group: 'Account', href: '/pricing', icon: '◈', kw: 'pro upgrade credits' },
-  { id: 'profile', label: 'Profile & settings', group: 'Account', href: '/profile', icon: '⚙', kw: 'account' },
+  { id: 'dash', label: 'Dashboard', hint: 'Your command center', group: 'Go to', href: '/dashboard', keys: 'g d', icon: 'layout-dashboard', kw: 'home overview' },
+  { id: 'jobs', label: 'Jobs', hint: 'Transparency-first job search', group: 'Go to', href: '/jobs', keys: 'g j', icon: 'briefcase', kw: 'search openings' },
+  { id: 'track', label: 'Application tracker', hint: 'Every application, check-ins, outcomes', group: 'Go to', href: '/tracker', keys: 'g t', icon: 'list-checks', kw: 'applications pipeline' },
+  { id: 'cos', label: 'Company intel', hint: 'Ghost rates and grades', group: 'Go to', href: '/companies', keys: 'g c', icon: 'building-2', kw: 'companies scoreboard' },
+  { id: 'resume', label: 'Résumé', hint: 'Fit score and rewrites for one job', group: 'Go to', href: '/resume', keys: 'g r', icon: 'file-text', kw: 'resume optimize' },
+  { id: 'saved', label: 'Saved jobs', group: 'Go to', href: '/saved', keys: 'g s', icon: 'bookmark', kw: 'bookmarks' },
+  { id: 'agencies', label: 'Agency ghost index', group: 'Explore', href: '/agencies', icon: 'ghost', kw: 'staffing recruiters' },
+  { id: 'demand', label: 'Hiring demand', group: 'Explore', href: '/demand', icon: 'chart-column', kw: 'markets cities' },
+  { id: 'feed', label: 'Live feed', group: 'Explore', href: '/feed', icon: 'radio', kw: 'reports community' },
+  { id: 'pricing', label: 'Pricing & plans', group: 'Account', href: '/pricing', icon: 'circle-dollar-sign', kw: 'pro upgrade credits' },
+  { id: 'profile', label: 'Profile & settings', group: 'Account', href: '/profile', icon: 'settings', kw: 'account' },
 ]
 const SEEKER_ACTIONS: Item[] = [
-  { id: 'add', label: 'Track a new application', hint: 'Opens the add form', group: 'Actions', href: '/tracker?add=1', icon: '+', kw: 'new log applied' },
-  { id: 'report', label: 'Report an outcome', hint: 'Warn the next applicant', group: 'Actions', href: '/report', icon: '📣', kw: 'ghosted rejected hired share' },
+  { id: 'add', label: 'Track a new application', hint: 'Opens the add form', group: 'Actions', href: '/tracker?add=1', icon: 'plus', kw: 'new log applied' },
+  { id: 'report', label: 'Report an outcome', hint: 'Warn the next applicant', group: 'Actions', href: '/report', icon: 'megaphone', kw: 'ghosted rejected hired share' },
 ]
 const GUEST_PAGES: Item[] = [
-  { id: 'home', label: 'Home', group: 'Go to', href: '/', keys: 'g h', icon: '⌂' },
-  { id: 'jobs', label: 'Jobs', group: 'Go to', href: '/jobs', keys: 'g j', icon: '💼', kw: 'search openings' },
-  { id: 'cos', label: 'Company intel', hint: 'Ghost rates and grades', group: 'Go to', href: '/companies', keys: 'g c', icon: '🏢', kw: 'companies scoreboard' },
-  { id: 'agencies', label: 'Agency ghost index', group: 'Explore', href: '/agencies', icon: '👻', kw: 'staffing recruiters' },
-  { id: 'demand', label: 'Hiring demand', group: 'Explore', href: '/demand', icon: '📊' },
-  { id: 'feed', label: 'Live feed', group: 'Explore', href: '/feed', icon: '📡' },
-  { id: 'pricing', label: 'Pricing', group: 'Account', href: '/pricing', icon: '◈', kw: 'pro' },
-  { id: 'employers', label: 'For employers', group: 'Account', href: '/employers', icon: '🤝' },
-  { id: 'login', label: 'Sign in', group: 'Account', href: '/login', icon: '→', kw: 'log in sign up register' },
+  { id: 'home', label: 'Home', group: 'Go to', href: '/', keys: 'g h', icon: 'house' },
+  { id: 'jobs', label: 'Jobs', group: 'Go to', href: '/jobs', keys: 'g j', icon: 'briefcase', kw: 'search openings' },
+  { id: 'cos', label: 'Company intel', hint: 'Ghost rates and grades', group: 'Go to', href: '/companies', keys: 'g c', icon: 'building-2', kw: 'companies scoreboard' },
+  { id: 'agencies', label: 'Agency ghost index', group: 'Explore', href: '/agencies', icon: 'ghost', kw: 'staffing recruiters' },
+  { id: 'demand', label: 'Hiring demand', group: 'Explore', href: '/demand', icon: 'chart-column' },
+  { id: 'feed', label: 'Live feed', group: 'Explore', href: '/feed', icon: 'radio' },
+  { id: 'pricing', label: 'Pricing', group: 'Account', href: '/pricing', icon: 'circle-dollar-sign', kw: 'pro' },
+  { id: 'employers', label: 'For employers', group: 'Account', href: '/employers', icon: 'handshake' },
+  { id: 'login', label: 'Sign in', group: 'Account', href: '/login', icon: 'arrow-right', kw: 'log in sign up register' },
 ]
 const GO_KEYS: Record<string, string> = { d: '/dashboard', j: '/jobs', t: '/tracker', c: '/companies', r: '/resume', s: '/saved', h: '/' }
 
@@ -124,8 +127,8 @@ export default function CommandPalette() {
     const query = q.trim().toLowerCase()
     const dynamic: Item[] = []
     if (query) {
-      dynamic.push({ id: 'q_co', label: `Check “${q.trim()}”`, hint: 'Ghost rate, grade and reports for any company', group: 'Search', href: `/company/${companySlug(q)}`, icon: '🏢' })
-      dynamic.push({ id: 'q_jobs', label: `Find “${q.trim()}” jobs`, hint: 'Search open listings', group: 'Search', href: `/jobs?q=${encodeURIComponent(q.trim())}`, icon: '💼' })
+      dynamic.push({ id: 'q_co', label: `Check “${q.trim()}”`, hint: 'Ghost rate, grade and reports for any company', group: 'Search', href: `/company/${companySlug(q)}`, icon: 'building-2' })
+      dynamic.push({ id: 'q_jobs', label: `Find “${q.trim()}” jobs`, hint: 'Search open listings', group: 'Search', href: `/jobs?q=${encodeURIComponent(q.trim())}`, icon: 'briefcase' })
     }
     const pool = [...mine, ...base]
     if (!query) return [...mine.slice(0, 4), ...base]
@@ -184,7 +187,7 @@ export default function CommandPalette() {
                   onMouseEnter={() => setIdx(i)}
                   onClick={() => go(it.href)}
                 >
-                  <span className={styles.ico} aria-hidden>{it.icon}</span>
+                  <span className={styles.ico} aria-hidden>{it.icon in ICONS ? <Icon name={it.icon as IconName} size={16} /> : it.icon}</span>
                   <span className={styles.text}>
                     <b>{it.label}</b>
                     {it.hint && <small>{it.hint}</small>}

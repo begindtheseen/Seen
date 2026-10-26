@@ -34,7 +34,7 @@
 .bottom {
   max-width: 1120px; margin: 2rem auto 0; padding-top: 1rem; border-top: 1px solid var(--line);
   display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
-  font-family: var(--mono); font-size: var(--fs-meta); color: var(--sub);
+  font-family: var(--body); font-size: var(--fs-meta); color: var(--text-3);
 }
 .dim { color: var(--dim); }
 

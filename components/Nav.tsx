@@ -13,6 +13,7 @@ import NotificationsBell from './NotificationsBell'
 import CreditsPopover from './CreditsPopover'
 import { dailyResetLabel } from '@/lib/creditRules'
 import { useFocusTrap } from '@/lib/hooks/useFocusTrap'
+import Icon from '@/components/ui/Icon'
 import styles from './Nav.module.css'
 
 // The earn-credits flow: the résumé survey (asks about the user's past employers).
@@ -219,7 +220,7 @@ export default function Nav() {
       <nav id="mainNav" className={scrolled ? 'nav-scrolled' : ''}>
         {/* First focusable element on every page: jumps keyboard users past the nav to <main id="main">. */}
         <a href="#main" className="skip-link">Skip to content</a>
-        <button className="side-menu-toggle" onClick={() => setMenuOpen(true)} aria-label="Menu" title="Menu" aria-expanded={menuOpen} aria-controls="side-menu" aria-haspopup="dialog">☰</button>
+        <button className="side-menu-toggle" onClick={() => setMenuOpen(true)} aria-label="Menu" title="Menu" aria-expanded={menuOpen} aria-controls="side-menu" aria-haspopup="dialog"><Icon name="menu" size={20} /></button>
         {/* Signed-in seekers: the wordmark is "home" = the dashboard, like every signed-in product. */}
         <Link href={isSeeker ? '/dashboard' : '/'} className="logo" aria-label="Seen — home">
           <span className="logo-pulse" />
@@ -287,11 +288,11 @@ export default function Nav() {
           {/* Credits — subtle monospace chip (Pro shows an unlimited badge). */}
           {isSeeker && isPro && (
             <Link href="/pricing" className={styles.pro} title="You have Seen Pro access — see what is included">
-              <span className={`${styles.pill} ${styles.proPill}`}>★ PRO</span>
+              <span className={`${styles.pill} ${styles.proPill}`}><Icon name="star" size={12} /> PRO</span>
             </Link>
           )}
           {isSeeker && !isPro && creditBalance !== null && (
-            <span style={{ position: 'relative', display: 'inline-flex' }}>
+            <span className={styles.chipWrap}>
               <button
                 className={`${styles.chip}${creditBalance === 0 ? ' ' + styles.chipZero : ''}`}
                 data-credits-chip
@@ -361,7 +362,7 @@ export default function Nav() {
                 <button className={styles.menuItem} role="menuitem" onClick={handlePasswordReset}>Change password</button>
               )}
               {resetSent && (
-                <div className={styles.menuNote}>✓ Reset link sent — check your email to set a new password.</div>
+                <div className={styles.menuNote}><Icon name="check" size={14} /> Reset link sent — check your email to set a new password.</div>
               )}
               <div className={styles.menuDivider} />
               <button className={`${styles.menuItem} ${styles.menuDanger}`} role="menuitem" onClick={handleSignOut}>Sign out</button>
@@ -397,70 +398,52 @@ export default function Nav() {
       >
         <div className="side-menu-logo">
           <span className="logo-pulse" />
-          <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-h3)', color: 'var(--white)', letterSpacing: '-.02em' }}>Seen</span>
+          <span className={styles.drawerWord} data-wordmark>Seen</span>
           <button ref={drawerCloseRef} type="button" className={styles.drawerClose} onClick={() => setMenuOpen(false)} aria-label="Close menu">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
         </div>
         {/* Credit balance — always visible at the top of the mobile drawer for signed-in seekers */}
         {isSeeker && isPro && (
-          <Link
-            href="/pricing"
-            onClick={() => setMenuOpen(false)}
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.5rem',
-              margin: '.25rem 1rem .6rem', padding: '.7rem .9rem', textDecoration: 'none',
-              background: 'linear-gradient(135deg,rgba(16,185,129,.16),rgba(99,102,241,.16))',
-              border: '1px solid rgba(16,185,129,.4)', borderRadius: 12,
-            }}
-          >
-            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, color: 'var(--green)', letterSpacing: '.03em' }}>★ Seen Pro</span>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, color: 'var(--green)' }}>What&apos;s included →</span>
+          <Link href="/pricing" onClick={() => setMenuOpen(false)} className={`${styles.drawerCredit} ${styles.drawerCreditPro}`}>
+            <span><Icon name="star" size={14} /> Seen Pro</span>
+            <span>What&apos;s included</span>
           </Link>
         )}
         {isSeeker && !isPro && creditBalance !== null && (
           <button
+            type="button"
             onClick={() => { setMenuOpen(false); creditBalance === 0 ? setShowUpgrade(true) : setShowSurvey(true) }}
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.5rem', width: 'calc(100% - 2rem)',
-              margin: '.25rem 1rem .6rem', padding: '.7rem .9rem', cursor: 'pointer', textAlign: 'left',
-              background: creditBalance === 0 ? 'rgba(239,68,68,.14)' : 'linear-gradient(135deg,rgba(59,130,246,.18),rgba(99,102,241,.18))',
-              border: creditBalance === 0 ? '1px solid rgba(239,68,68,.4)' : '1px solid rgba(99,102,241,.4)',
-              borderRadius: 12,
-            }}
+            className={`${styles.drawerCredit}${creditBalance === 0 ? ' ' + styles.drawerCreditEmpty : ''}`}
           >
-            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, color: creditBalance === 0 ? 'var(--red)' : 'var(--white)' }}>
-              {creditBalance === 0 ? 'No AI credits left today' : `🪙 ${creditBalance} AI credit${creditBalance === 1 ? '' : 's'} left`}
-            </span>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, color: creditBalance === 0 ? 'var(--red)' : 'var(--blue)' }}>
-              {creditBalance === 0 ? 'Options →' : 'Earn more →'}
-            </span>
+            <span>{creditBalance === 0 ? 'No AI credits left today' : `${creditBalance} AI credit${creditBalance === 1 ? '' : 's'} left`}</span>
+            <span>{creditBalance === 0 ? 'Options' : 'Earn more'}</span>
           </button>
         )}
         {/* Grouped so the drawer reads as sections, not a flat wall of links. */}
         {isSeeker && <div className="side-menu-label">Your job search</div>}
-        {isSeeker && <Link href="/dashboard" className={`side-menu-item${isActive('/dashboard') ? ' active' : ''}`}><span className="side-menu-icon">▦</span>Dashboard</Link>}
-        {isSeeker && <Link href="/jobs" className={`side-menu-item${isActive('/jobs') ? ' active' : ''}`}><span className="side-menu-icon">💼</span>Jobs</Link>}
-        {isSeeker && <Link href="/companies" className={`side-menu-item${isActive('/companies') ? ' active' : ''}`}><span className="side-menu-icon">🏢</span>Companies</Link>}
-        {isSeeker && <Link href="/tracker" className={`side-menu-item${isActive('/tracker') ? ' active' : ''}`}><span className="side-menu-icon">✓</span>Track</Link>}
-        {isSeeker && <Link href="/resume" className={`side-menu-item${isActive('/resume') ? ' active' : ''}`}><span className="side-menu-icon">📄</span>Résumé</Link>}
-        {isSeeker && <Link href="/saved" className={`side-menu-item${isActive('/saved') ? ' active' : ''}`}><span className="side-menu-icon">♥</span>Saved jobs</Link>}
+        {isSeeker && <Link href="/dashboard" className={`side-menu-item${isActive('/dashboard') ? ' active' : ''}`}><span className="side-menu-icon"><Icon name="layout-dashboard" size={18} /></span>Dashboard</Link>}
+        {isSeeker && <Link href="/jobs" className={`side-menu-item${isActive('/jobs') ? ' active' : ''}`}><span className="side-menu-icon"><Icon name="briefcase" size={18} /></span>Jobs</Link>}
+        {isSeeker && <Link href="/companies" className={`side-menu-item${isActive('/companies') ? ' active' : ''}`}><span className="side-menu-icon"><Icon name="building-2" size={18} /></span>Companies</Link>}
+        {isSeeker && <Link href="/tracker" className={`side-menu-item${isActive('/tracker') ? ' active' : ''}`}><span className="side-menu-icon"><Icon name="list-checks" size={18} /></span>Track</Link>}
+        {isSeeker && <Link href="/resume" className={`side-menu-item${isActive('/resume') ? ' active' : ''}`}><span className="side-menu-icon"><Icon name="file-text" size={18} /></span>Résumé</Link>}
+        {isSeeker && <Link href="/saved" className={`side-menu-item${isActive('/saved') ? ' active' : ''}`}><span className="side-menu-icon"><Icon name="bookmark" size={18} /></span>Saved jobs</Link>}
 
         <div className="side-menu-label">Explore</div>
-        {!isSeeker && <Link href="/jobs" className={`side-menu-item${isActive('/jobs') ? ' active' : ''}`}><span className="side-menu-icon">💼</span>Jobs</Link>}
-        {!isSeeker && <Link href="/companies" className={`side-menu-item${isActive('/companies') ? ' active' : ''}`}><span className="side-menu-icon">🏢</span>Companies</Link>}
-        <Link href="/agencies" className={`side-menu-item${isActive('/agencies') ? ' active' : ''}`}><span className="side-menu-icon">👻</span>Agency ghost index</Link>
-        <Link href="/demand" className={`side-menu-item${isActive('/demand') ? ' active' : ''}`}><span className="side-menu-icon">📊</span>Hiring demand</Link>
-        <Link href="/feed" className={`side-menu-item${isActive('/feed') ? ' active' : ''}`}><span className="side-menu-icon">📡</span>Live feed</Link>
+        {!isSeeker && <Link href="/jobs" className={`side-menu-item${isActive('/jobs') ? ' active' : ''}`}><span className="side-menu-icon"><Icon name="briefcase" size={18} /></span>Jobs</Link>}
+        {!isSeeker && <Link href="/companies" className={`side-menu-item${isActive('/companies') ? ' active' : ''}`}><span className="side-menu-icon"><Icon name="building-2" size={18} /></span>Companies</Link>}
+        <Link href="/agencies" className={`side-menu-item${isActive('/agencies') ? ' active' : ''}`}><span className="side-menu-icon"><Icon name="ghost" size={18} /></span>Agency ghost index</Link>
+        <Link href="/demand" className={`side-menu-item${isActive('/demand') ? ' active' : ''}`}><span className="side-menu-icon"><Icon name="chart-column" size={18} /></span>Hiring demand</Link>
+        <Link href="/feed" className={`side-menu-item${isActive('/feed') ? ' active' : ''}`}><span className="side-menu-icon"><Icon name="radio" size={18} /></span>Live feed</Link>
         {/* Public employer portal — reachable for everyone (logged-out and logged-in). */}
-        <Link href="/employers" className={`side-menu-item${isActive('/employers') ? ' active' : ''}`}><span className="side-menu-icon">🤝</span>For employers</Link>
+        <Link href="/employers" className={`side-menu-item${isActive('/employers') ? ' active' : ''}`}><span className="side-menu-icon"><Icon name="handshake" size={18} /></span>For employers</Link>
 
         <div className="side-menu-label">Plans</div>
-        <Link href="/pricing" className={`side-menu-item${isActive('/pricing') ? ' active' : ''}`}><span className="side-menu-icon">◈</span>Pricing</Link>
-        <div style={{ marginTop: 'auto', padding: '1rem 1.25rem 1.25rem', borderTop: '1px solid var(--line)', display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+        <Link href="/pricing" className={`side-menu-item${isActive('/pricing') ? ' active' : ''}`}><span className="side-menu-icon"><Icon name="circle-dollar-sign" size={18} /></span>Pricing</Link>
+        <div className={styles.drawerFoot}>
           {isSeeker ? (
             <>
-              <Link href="/profile" onClick={() => setMenuOpen(false)} className={styles.drawerGhost}>⚙ Profile &amp; settings</Link>
+              <Link href="/profile" onClick={() => setMenuOpen(false)} className={styles.drawerGhost}><Icon name="settings" size={16} /> Profile &amp; settings</Link>
               <button type="button" onClick={() => { handleSignOut(); setMenuOpen(false) }} className={styles.drawerDanger}>Sign out</button>
             </>
           ) : isLoggedIn ? (

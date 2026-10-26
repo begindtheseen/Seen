@@ -18,6 +18,8 @@ import { isStaffingAgency } from '@/lib/agencies'
 // OG card. Audit 2026-10-24 (L-1): the description said 62 / 73% / 81 while the H1 said 48 / 87% / 91.
 import { companyMetaFacts, companyRobots } from '@/lib/companyMeta'
 import { CompanySeedProvider, type CompanySeedScore } from '@/components/CompanySeed'
+import Icon from '@/components/ui/Icon'
+import seo from './seo.module.css'
 
 const titleCase = (slug: string) => slugToName(slug).replace(/\b\w/g, c => c.toUpperCase())
 // Slug-mangled fallback only when no score row exists — the stored name keeps real punctuation
@@ -215,12 +217,12 @@ export default async function CompanySlugLayout(
   const dataPoints = reportCount > 0 ? facts.basis : 'estimated data'
   const summaryDate = summary ? summaryMonth(summary.generated_at) : null
   const summaryBlock = summary ? (
-    <div style={{ marginTop: hasFacts ? '.85rem' : 0, paddingTop: hasFacts ? '.85rem' : 0, borderTop: hasFacts ? '1px solid var(--line)' : 'none' }}>
-      <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-ui)', fontWeight: 700, color: 'var(--white)', margin: '0 0 .4rem' }}>
+    <div className={hasFacts ? `${seo.part} ${seo.rule}` : seo.part}>
+      <h2 className={seo.h3}>
         What applicants report about {name}
       </h2>
-      <p style={{ fontSize: 'var(--fs-ui)', lineHeight: 1.65, color: 'var(--sub)', margin: 0, fontWeight: 400 }}>{summary.summary}</p>
-      <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', margin: '.45rem 0 0', opacity: 0.85 }}>
+      <p className={seo.p}>{summary.summary}</p>
+      <p className={seo.fine}>
         Based on {summary.data_basis || `${summary.report_count_at_generation} self-reported applicant accounts`}
         {summaryDate ? ` · summary generated ${summaryDate}` : ''} · self-reported claims, not verified facts
       </p>
@@ -239,52 +241,25 @@ export default async function CompanySlugLayout(
               this is the citable prose + FAQ for people and crawlers who want the long form. */}
           <details className="co-seo-details">
             <summary className="co-seo-summary">
-              <span className="co-seo-ico" aria-hidden>📄</span>
+              <span className="co-seo-ico" aria-hidden><Icon name="file-text" size={18} /></span>
               <span className="co-seo-txt">
                 <span className="co-seo-ttl">About {name}&apos;s hiring data</span>
                 <span className="co-seo-sub">{hasFacts && s ? `Seen Grade ${facts.grade} · ${facts.score}/100 in plain English` : 'What applicants report'}{faq.length > 0 ? ` · ${faq.length} frequently asked questions` : ''}</span>
               </span>
               <span className="co-seo-chev" aria-hidden />
             </summary>
-          <div
-            style={{
-              background: 'var(--card)',
-              border: '1px solid var(--line)',
-              borderLeft: `3px solid ${accent}`,
-              borderRadius: 12,
-              padding: '1.1rem 1.25rem',
-              marginTop: '.6rem',
-            }}
-          >
+          <div className={seo.box} style={{ borderLeftColor: accent }}>
             {hasFacts && s && (<>
-            <h2
-              style={{
-                fontFamily: 'var(--display)',
-                fontSize: 'var(--fs-lead)',
-                fontWeight: 700,
-                color: 'var(--white)',
-                letterSpacing: '-.01em',
-                margin: '0 0 .55rem',
-                lineHeight: 1.3,
-              }}
-            >
+            <h2 className={seo.h2}>
               {name} hiring data — Seen Grade {facts.grade} · {facts.score}/100
             </h2>
-            <p
-              style={{
-                fontSize: 'var(--fs-ui)',
-                lineHeight: 1.65,
-                color: 'var(--sub)',
-                margin: 0,
-                fontWeight: 400,
-              }}
-            >
+            <p className={seo.p}>
               {name} has a Seen Grade of{' '}
-              <strong style={{ color: 'var(--white)', fontWeight: 600 }}>{facts.grade} · {facts.score}/100</strong>
+              <strong className={seo.strong}>{facts.grade} · {facts.score}/100</strong>
               {' '}from {dataPoints}.{' '}
               {ghostPct != null && (
                 <>Applicants report a{' '}
-                  <strong style={{ color: accent, fontWeight: 600 }}>{ghostPct}% ghost rate</strong>
+                  <strong className={seo.strong}>{ghostPct}% ghost rate</strong>
                   {respPct != null ? <> and a {respPct}% response rate</> : null}
                   {waitDays != null ? <>, with an average wait of {waitDays} day{waitDays === 1 ? '' : 's'} to hear back</> : null}
                   .{' '}
@@ -302,12 +277,12 @@ export default async function CompanySlugLayout(
             <div
               role="navigation"
               aria-label={`Explore ${name} hiring`}
-              style={{ display: 'flex', flexWrap: 'wrap', gap: '.5rem 1rem', marginTop: '.85rem', paddingTop: '.85rem', borderTop: '1px solid var(--line)' }}
+              className={`${seo.links} ${seo.rule}`}
             >
               {/* The hiring-process and application-status questions are answered in the FAQ below; the
                   old /faq/<x> pages now point their canonical here, so they are not linked. */}
-              <a href="/methods" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none' }}>How grades work</a>
-              <a href={`/compare?a=${encodeURIComponent(name)}`} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none' }}>Compare {name} vs another</a>
+              <a href="/methods" className={seo.link}>How grades work</a>
+              <a href={`/compare?a=${encodeURIComponent(name)}`} className={seo.link}>Compare {name} vs another</a>
             </div>
           </div>
 
@@ -315,16 +290,14 @@ export default async function CompanySlugLayout(
               be present on the page). Server-rendered so AI answer engines cite the real numbers from
               the initial HTML. Real-data-gated — no fabricated rates. */}
           {faq.length > 0 && (
-            <div style={{ marginTop: '1rem' }}>
-              <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-ui)', fontWeight: 700, color: 'var(--white)', margin: '0 0 .7rem' }}>
+            <div className={seo.faq}>
+              <h2 className={seo.h3}>
                 {name} hiring — frequently asked
               </h2>
               {faq.map(f => (
-                <details key={f.question} style={{ borderTop: '1px solid var(--line)', padding: '.65rem 0' }}>
-                  <summary style={{ cursor: 'pointer', fontFamily: 'var(--display)', fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--white)', listStyle: 'none' }}>
-                    {f.question}
-                  </summary>
-                  <p style={{ fontSize: 'var(--fs-sm)', lineHeight: 1.65, color: 'var(--sub)', margin: '.5rem 0 0', fontWeight: 400 }}>{f.answer}</p>
+                <details key={f.question} className={seo.q}>
+                  <summary>{f.question}</summary>
+                  <p className={seo.p}>{f.answer}</p>
                 </details>
               ))}
             </div>

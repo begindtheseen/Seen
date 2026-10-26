@@ -228,6 +228,7 @@ p{text-wrap:pretty}
 nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 1.25rem;background:rgba(6,6,8,0.55);backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);border-bottom:1px solid rgba(255,255,255,0.08);box-shadow:0 1px 0 rgba(255,255,255,0.04),0 4px 24px rgba(0,0,0,0.25);box-sizing:border-box;transition:background .3s ease,border-color .3s ease,box-shadow .3s ease}
 nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate(200%);-webkit-backdrop-filter:blur(60px) saturate(200%);border-bottom-color:rgba(255,255,255,0.11);box-shadow:0 1px 0 rgba(255,255,255,0.06),0 8px 32px rgba(0,0,0,0.4)}
 .logo{font-family:var(--display);font-size:var(--fs-h3);font-weight:800;color:var(--white);text-decoration:none;letter-spacing:-.02em;display:flex;align-items:center;gap:.5rem;flex-shrink:0}
+@media(max-width:768px){.logo{min-height:44px}}
 .logo-pulse{width:8px;height:8px;border-radius:50%;background:var(--blue);box-shadow:0 0 10px rgba(59,130,246,0.6);flex-shrink:0}
 /* Nav tabs — no container, each tab stands alone */
 .nav-pills{position:relative;display:flex;gap:.1rem;background:rgba(255,255,255,.05);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:3px;overflow-x:auto;overflow-y:hidden;flex-shrink:1;min-width:0;scrollbar-width:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 2px 12px rgba(0,0,0,.25)}
@@ -712,9 +713,9 @@ select.fi,select.fs,select.fi-r,select.fs-r{background-image:url("data:image/svg
 .co-sticky-back{width:30px;height:30px;border-radius:8px;background:var(--raised);border:1px solid var(--line2);color:var(--sub);font-family:var(--mono);font-size:var(--fs-body);line-height:1;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s}
 .co-sticky-back:hover{border-color:var(--blue);color:var(--blue)}
 .co-sticky-logo{width:26px;height:26px;border-radius:7px;background:var(--raised);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:var(--fs-meta);font-weight:800;color:var(--sub);flex-shrink:0}
-.co-sticky-name{flex:1;min-width:0;font-family:var(--display);font-size:var(--fs-body);font-weight:700;color:var(--white);letter-spacing:-.01em;text-transform:capitalize;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.co-sticky-name{flex:1;min-width:0;font-family:var(--body);font-size:var(--fs-body);font-weight:600;color:var(--white);letter-spacing:-.01em;text-transform:capitalize;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .co-sticky-grade{display:flex;align-items:baseline;gap:.4rem;flex-shrink:0}
-.co-sticky-letter{font-family:var(--display);font-size:var(--fs-h3);font-weight:800;line-height:1;letter-spacing:-.03em}
+.co-sticky-letter{font-family:var(--body);font-size:var(--fs-h3);font-weight:600;line-height:1;letter-spacing:-.03em}
 .co-sticky-letter.safe{color:var(--green)}.co-sticky-letter.warn{color:var(--amber)}.co-sticky-letter.danger{color:var(--red)}
 .co-sticky-score{font-family:var(--mono);font-size:var(--fs-meta);font-weight:500;color:var(--text)}
 .co-sticky-score span{color:var(--muted);font-size:var(--fs-meta)}
@@ -766,8 +767,8 @@ select.fi,select.fs,select.fi-r,select.fs-r{background-image:url("data:image/svg
 .co-seo-summary::-webkit-details-marker{display:none}
 .co-seo-ico{width:34px;height:34px;border-radius:10px;background:var(--raised);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:var(--fs-body);flex-shrink:0}
 .co-seo-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:.18rem}
-.co-seo-ttl{font-family:var(--display);font-size:var(--fs-body);font-weight:700;letter-spacing:-.01em}
-.co-seo-sub{font-family:var(--mono);font-size:var(--fs-meta);color:var(--dim);line-height:1.45}
+.co-seo-ttl{font-family:var(--body);font-size:var(--fs-body);font-weight:600}
+.co-seo-sub{font-family:var(--body);font-size:var(--fs-sm);color:var(--text-3);line-height:1.45}
 .co-seo-chev{width:26px;height:26px;border-radius:50%;border:1px solid var(--line2);color:var(--sub);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:var(--fs-ui);flex-shrink:0}
 .co-seo-chev::before{content:'+'}
 .co-seo-details[open] .co-seo-chev{border-color:var(--blue);color:var(--blue)}

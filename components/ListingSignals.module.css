@@ -14,7 +14,7 @@
 .thin { border-left-color: var(--red, #f87171); }
 .head { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .kicker { font-family: var(--mono); font-size: var(--fs-meta); text-transform: uppercase; letter-spacing: 0.16em; color: var(--dim); }
-.scope { font-family: var(--mono); font-size: var(--fs-meta); color: var(--sub); border: 1px solid var(--line); border-radius: 999px; padding: 0.1rem 0.5rem; }
+.scope { font-family: var(--body); font-size: var(--fs-meta); color: var(--text-3); border: 1px solid var(--line); border-radius: 999px; padding: 0.1rem 0.5rem; }
 .top { display: flex; align-items: baseline; gap: 0.6rem; margin: 0.45rem 0 0.55rem; flex-wrap: wrap; }
 .score { font-family: var(--mono); font-size: var(--fs-h3); font-weight: 500; }
 .score small { font-size: var(--fs-meta); color: var(--dim); font-weight: 400; }

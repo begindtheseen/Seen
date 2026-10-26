@@ -1,0 +1,18 @@
+/* The server-rendered prose + FAQ under a company page (app/company/[slug]/layout.tsx): the citable long
+   form for people and crawlers. Body type only — Syne stays for the page's real headings. */
+.box { background: var(--surface-1); border: 1px solid var(--border-1); border-left: 3px solid var(--border-2); border-radius: var(--r-card); padding: var(--sp-5); margin-top: var(--sp-3); }
+.h2 { margin: 0 0 var(--sp-2); font-family: var(--display); font-weight: 700; font-size: var(--fs-lead); line-height: var(--lh-snug); letter-spacing: var(--ls-heading); color: var(--text-1); }
+.h3 { margin: 0 0 var(--sp-2); font-family: var(--display); font-weight: 700; font-size: var(--fs-body); line-height: var(--lh-snug); color: var(--text-1); }
+.p { margin: 0; font-size: var(--fs-body); line-height: var(--lh-body); color: var(--text-3); }
+.strong { color: var(--text-1); font-weight: 600; }
+.fine { margin: var(--sp-2) 0 0; font-size: var(--fs-sm); color: var(--text-3); }
+.part { margin: 0; }
+.rule { margin-top: var(--sp-4); padding-top: var(--sp-4); border-top: 1px solid var(--border-1); }
+.links { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-4); }
+.link { display: inline-flex; align-items: center; min-height: 44px; font-size: var(--fs-sm); color: var(--accent); text-decoration: none; }
+.link:hover { color: var(--text-1); }
+.faq { margin-top: var(--sp-5); }
+.q { border-top: 1px solid var(--border-1); }
+.q > summary { cursor: pointer; list-style: none; min-height: 48px; display: flex; align-items: center; font-size: var(--fs-body); font-weight: 600; color: var(--text-1); }
+.q > summary::-webkit-details-marker { display: none; }
+.q > p { padding-bottom: var(--sp-3); }

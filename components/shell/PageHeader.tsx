@@ -45,7 +45,7 @@ export function Crumbs({ items = [], current, className }: { items?: Crumb[]; cu
     <ol className={`${styles.crumbs}${className ? ' ' + className : ''}`} aria-label="Breadcrumb">
       {trail.map((c, i) => (
         <li key={c.href} className={styles.crumbLi}>
-          <Link href={c.href} className={styles.crumb}>
+          <Link href={c.href} prefetch={false} className={styles.crumb}>
             {i === 0 && (isSeeker ? <GridIcon /> : <HomeIcon />)}
             {c.label}
           </Link>

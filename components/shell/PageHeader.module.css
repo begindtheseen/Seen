@@ -29,15 +29,15 @@
 .text { min-width: 0; flex: 1 1 320px; }
 .eyebrow {
   display: flex; align-items: center; gap: 0.6rem;
-  font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.2em; text-transform: uppercase;
+  font-family: var(--mono); font-size: var(--fs-meta); font-weight: 500; letter-spacing: var(--ls-meta); text-transform: uppercase;
   color: var(--tone, var(--blue)); margin-bottom: 0.6rem;
 }
 .eyebrow::before { content: ''; width: 22px; height: 1px; background: currentColor; opacity: 0.85; flex: none; }
 .title {
   font-family: var(--display); font-weight: 800; letter-spacing: -0.03em; line-height: 1.1;
-  font-size: clamp(1.65rem, 3.2vw, 2rem); color: var(--white); margin: 0; text-wrap: balance;
+  font-size: var(--fs-h2); color: var(--white); margin: 0; text-wrap: balance;
 }
-.lg .title { font-size: clamp(1.9rem, 5.5vw, 2.6rem); line-height: 1.06; }
+.lg .title { font-size: clamp(var(--fs-h2), 5vw, var(--fs-fig-m)); line-height: 1.06; }
 .sub { color: var(--sub); font-size: var(--fs-ui); font-weight: 400; line-height: 1.6; margin: 0.45rem 0 0; max-width: 64ch; }
 .lg .sub { font-size: var(--fs-body); line-height: 1.7; max-width: 70ch; }
 .sub a { color: var(--blue); text-decoration: none; }
@@ -57,7 +57,7 @@
 /* Phone floor (audit 2026-10-23): breadcrumbs and the eyebrow read at 12px; a crumb is a 44px target. */
 @media (max-width: 768px) {
   .crumbs, .eyebrow { font-size: var(--fs-meta); }
-  .eyebrow { letter-spacing: 0.14em; }
+
   .crumb { min-height: 44px; }
   .cur { display: inline-flex; align-items: center; min-height: 44px; }
 }

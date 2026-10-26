@@ -304,7 +304,10 @@
 .cmdk:hover { color: var(--sub); border-color: var(--line2); background: rgba(255, 255, 255, 0.05); }
 .cmdk svg { width: 15px; height: 15px; flex: none; }
 .cmdkLabel { white-space: nowrap; }
+/* Fixed width: the label flips "⌘K" → "CtrlK" after the platform check, and a width change there
+   shifted the whole right cluster (CLS 0.19 on desktop, audit #11). */
 .cmdkKey {
+  display: inline-block; min-width: 3.5em; text-align: center;
   font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.04em; color: var(--sub);
   border: 1px solid var(--line2); border-bottom-width: 2px; border-radius: 4px; padding: 0.08rem 0.32rem;
 }
@@ -414,3 +417,22 @@ div.drawer.drawerOpen { transform: translateX(0); }
 }
 div.drawer :global(.side-menu-item) { min-height: 44px; }
 
+
+/* ── Drawer pieces (were inline styles) ── */
+.chipWrap { position: relative; display: inline-flex; }
+.drawerWord { font-family: var(--display); font-weight: 800; font-size: var(--fs-lead); color: var(--text-1); letter-spacing: -0.02em; }
+.drawerCredit {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2);
+  width: calc(100% - 2rem); margin: 0.25rem 1rem 0.6rem; padding: 0 var(--sp-4); min-height: 48px;
+  border-radius: var(--r-control); border: 1px solid var(--accent-line); background: var(--accent-tint);
+  color: var(--text-1); font-family: var(--body); font-size: var(--fs-sm); font-weight: 600; text-align: left; text-decoration: none; cursor: pointer;
+}
+.drawerCredit > span:last-child { color: var(--accent); }
+.drawerCredit > span { display: inline-flex; align-items: center; gap: 6px; }
+.drawerCreditPro { border-color: var(--good-line); background: var(--good-tint); }
+.drawerCreditPro > span:last-child { color: var(--good-text); }
+.drawerCreditEmpty { border-color: var(--bad-line); background: var(--bad-tint); }
+.drawerCreditEmpty > span { color: var(--bad-text); }
+.drawerCreditEmpty > span:last-child { color: var(--bad-text); }
+.drawerFoot { margin-top: auto; padding: 1rem 1.25rem 1.25rem; border-top: 1px solid var(--border-1); display: flex; flex-direction: column; gap: var(--sp-2); }
+.drawerGhost { display: inline-flex; align-items: center; gap: var(--sp-2); }
