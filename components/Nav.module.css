@@ -383,7 +383,10 @@ div.drawer {
   box-shadow: -20px 0 60px rgba(0, 0, 0, 0.5);
   padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
 }
-div.drawer.drawerOpen { transform: translateX(0); }
+/* Closed = not painted at all (it was only translated off-canvas, so its CTA still counted as a
+   second primary in the first view); visibility flips after the slide-out finishes. */
+div.drawer { visibility: hidden; transition: transform .25s ease, visibility 0s linear .25s; }
+div.drawer.drawerOpen { transform: translateX(0); visibility: visible; transition: transform .25s ease, visibility 0s; }
 .drawerClose {
   margin-left: auto;
   width: 44px;
