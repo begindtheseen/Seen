@@ -6,6 +6,7 @@
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import styles from './openData.module.css'
+import { gradeTone } from '@/lib/ui/tone.js'
 
 export type TableRow = {
   /** company (display) */ c: string
@@ -30,7 +31,8 @@ const COLS: { key: Key; label: string; num: boolean; first: 'asc' | 'desc' }[] =
   { key: 'u', label: 'Last updated', num: true, first: 'desc' },
 ]
 
-const gradeClass = (s: number) => (s >= 70 ? styles.gGood : s >= 40 ? styles.gMid : styles.gBad)
+// The letter's own tone (lib/gradeScale gradeRisk via lib/ui/tone.js) — one map with every other surface.
+const gradeClass = (s: number) => { const t = gradeTone(s); return t === 'good' ? styles.gGood : t === 'caution' ? styles.gMid : styles.gBad }
 
 function cmp(a: TableRow, b: TableRow, key: Key): number {
   const va = a[key], vb = b[key]
@@ -104,7 +106,7 @@ export default function DataTable({ rows }: { rows: TableRow[] }) {
             {shown.map((r) => (
               <tr key={r.p}>
                 <td className={styles.colCo}>
-                  <Link href={r.p} className={styles.coLink}>{r.c}</Link>
+                  <Link href={r.p} prefetch={false} className={styles.coLink}>{r.c}</Link>
                   {r.a && <span className={styles.tag}>agency</span>}
                 </td>
                 <td className={styles.num}><span className={`${styles.grade} ${gradeClass(r.s)}`}>{r.g}</span> <span className={styles.dash}>{r.s}</span></td>
@@ -119,7 +121,7 @@ export default function DataTable({ rows }: { rows: TableRow[] }) {
             ))}
           </tbody>
         </table>
-        {shown.length === 0 && <p className={styles.p} style={{ padding: '1rem' }}>No graded company matches “{q}”. Its page may still have reports: <Link href={`/companies`}>search all companies</Link>.</p>}
+        {shown.length === 0 && <p className={styles.p} style={{ padding: '1rem' }}>No graded company matches “{q}”. Its page may still have reports: <Link href={`/companies`} prefetch={false}>search all companies</Link>.</p>}
       </div>
     </div>
   )

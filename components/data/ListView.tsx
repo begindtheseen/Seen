@@ -31,7 +31,7 @@ function Table({ l, section, ranked }: { l: RankedList; section: ListSection; ra
               <tr key={r.path}>
                 {ranked && <td className={styles.rank}>{section.startRank + i}</td>}
                 <td className={styles.colCo}>
-                  <Link href={r.path} className={styles.coLink}>{r.company}</Link>
+                  <Link href={r.path} prefetch={false} className={styles.coLink}>{r.company}</Link>
                   <span className={styles.say}>{l.rowSay(r)}</span>
                 </td>
                 <td className={styles.num}>{r.responsePct}%</td>
@@ -64,8 +64,8 @@ export default function ListView({ l, attribution }: { l: RankedList; attributio
         <div className={styles.meta}>
           <span>Updated {l.month}</span>
           <span>Cutoff: {l.cutoff} applicant accounts</span>
-          <Link className={styles.metaLink} href={METHODS_PATH}>How Seen measures</Link>
-          <Link className={styles.metaLink} href={DATA_PATH}>Full dataset</Link>
+          <Link className={styles.metaLink} href={METHODS_PATH} prefetch={false}>How Seen measures</Link>
+          <Link className={styles.metaLink} href={DATA_PATH} prefetch={false}>Full dataset</Link>
         </div>
 
         {l.thin && <p className={styles.note}>{l.thinNote}</p>}
@@ -87,7 +87,7 @@ export default function ListView({ l, attribution }: { l: RankedList; attributio
           <p className={styles.p}>
             “Hear back” is the share of applicants who got a reply from a person (a screen, an interview, a rejection or an offer); “never hear back” is the share who reported silence. Automated rejections count as neither, so the two can add up to less than 100%. Applicant accounts are outcomes submitted to Seen or first-hand accounts found in public posts such as Reddit threads and review sites, which count at reduced weight; online mentions count half. They are self-reported claims, not verified facts. Each name links to its page, where every report behind the number is listed.
           </p>
-          <p className={styles.small}>{attribution}. Reuse under CC BY 4.0: <Link href={DATA_PATH}>download the data</Link>.</p>
+          <p className={styles.small}>{attribution}. Reuse under CC BY 4.0: <Link href={DATA_PATH} prefetch={false}>download the data</Link>.</p>
         </section>
       </div>
     </div>

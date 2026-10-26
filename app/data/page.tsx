@@ -81,7 +81,7 @@ export default async function DataPage() {
       <div className="page-full">
         <div className={styles.wrap}>
           <PageHeader eyebrow={`Open data · ${LICENSE_NAME}`} title={DATASET_NAME} crumbLabel="Open data" />
-          <p className={styles.p}>The dataset could not be read just now, so no numbers are shown. Try again in a few minutes, or browse the <Link href="/companies">company scoreboard</Link>.</p>
+          <p className={styles.p}>The dataset could not be read just now, so no numbers are shown. Try again in a few minutes, or browse the <Link href="/companies" prefetch={false}>company scoreboard</Link>.</p>
         </div>
       </div>
     )
@@ -128,7 +128,7 @@ export default async function DataPage() {
             {` Online mentions (${t.mentions.toLocaleString('en-US')} here) count half a report each. Estimates from web research are never counted as reports.`}
           </p>
           <p className={styles.p}>
-            Percentages appear only for companies with at least {MIN_REPORTS_FOR_RATES} applicant accounts ({plural(t.withRates, 'company', 'companies')} here); the others show a grade only. Reports are self-reported claims, not verified facts. How grades are built: <Link href={METHODS_PATH}>methods</Link>. Rankings built from this table: <Link href="/lists">monthly lists</Link>.
+            Percentages appear only for companies with at least {MIN_REPORTS_FOR_RATES} applicant accounts ({plural(t.withRates, 'company', 'companies')} here); the others show a grade only. Reports are self-reported claims, not verified facts. How grades are built: <Link href={METHODS_PATH} prefetch={false}>methods</Link>. Rankings built from this table: <Link href="/lists" prefetch={false}>monthly lists</Link>.
           </p>
         </section>
 
