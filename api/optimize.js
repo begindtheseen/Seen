@@ -27,7 +27,7 @@ import { unoptimizableListing } from '../lib/server/optimizePackage.js';
 import { chat, llmAvailable, LLMUnavailableError } from '../lib/server/llm.js';
 import { textHash } from '../lib/server/optimizeCache.js';
 import {
-  OPTIMIZER_V3, buildContext, diagnosePrompt, guardDiagnosis, rewritePrompt, reviewPrompt, guardRewrites,
+  OPTIMIZER_V3, buildContext, diagnosePrompt, guardDiagnosis, rewritePrompt, reviewPrompt, guardRewrites, repairPrompt, repairable,
 } from '../lib/resume/optimize/engine.js';
 
 const sha = (s) => createHash('sha256').update(s).digest('hex');
@@ -152,6 +152,24 @@ export default async function handler(req, res) {
         }
       }
       const gated = draft ? guardRewrites(ctx, diagnosis, draft, review, answers) : { proposals: [], summary: null, skills: [], rejected: [] };
+      // One repair pass: each refused line goes back with the reason Seen refused it, then through the
+      // same gates. What still fails is dropped.
+      let repaired = 0;
+      if (repairable(gated.rejected).length) {
+        try {
+          const rp = repairPrompt(ctx, gated.rejected, answers);
+          const fix = await chat({ system: rp.system, user: rp.user, maxTokens: 2000, timeoutMs: 35000, json: true, tier: 'quality' });
+          const again = guardRewrites(ctx, diagnosis, fix, null, answers, { only: new Set(rp.ids.filter((id) => !gated.proposals.some((p) => p.id === id || (p.merges || []).includes(id)))) });
+          for (const p of again.proposals) {
+            if (gated.proposals.some((x) => x.id === p.id || (x.merges || []).includes(p.id) || (p.merges || []).some((m) => x.id === m))) continue;
+            gated.proposals.push({ ...p, repaired: true });
+            repaired += 1;
+          }
+          gated.rejected = gated.rejected.filter((r) => !again.proposals.some((p) => p.id === r.id)).concat(again.rejected.map((r) => ({ ...r, pass: 'repair' })));
+        } catch (e) {
+          console.error('[optimize] repair pass failed:', String(e?.message || e).slice(0, 160));
+        }
+      }
       const result = {
         version: OPTIMIZER_V3,
         proposals: gated.proposals,
@@ -163,6 +181,9 @@ export default async function handler(req, res) {
         requirements: diagnosis.requirements,
         answered: answers.map((a) => a.id),
         rejected_count: gated.rejected.length,
+        repaired,
+        // What Seen considered and refused, and why — shown so the person can see nothing was slipped in.
+        refused: gated.rejected.filter((r) => r.text).slice(0, 20).map((r) => ({ id: r.id, text: r.text, reason: clean(r.reason, 200) })),
         model: !!draft,
       };
       await writeRun(inp.uid, rkey, { version: OPTIMIZER_V3, job: inp.job, company: inp.company, answers, result, rejected: gated.rejected });

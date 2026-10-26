@@ -40,6 +40,11 @@ globalThis.fetch = async (url, opts = {}) => {
         { id: shrinkId, text: 'Cut shrink from 2.4% to 1.1% in 12 months by tightening the fitting-room and back-door process; trained the team on the new process', uses: [shrinkId], why: 'borrows a fact from another line' },
         { id: salesId, text: 'Grew store sales 9% year over year in 2023 on $4.2M annual volume, ranking 1st of 40 stores', uses: [salesId], why: 'invented rank' },
       ], summary: { text: 'Assistant Store Manager at Desert Sun Apparel who cut shrink from 2.4% to 1.1% and grew store sales 9% in 2023.', uses: [] }, skills: [{ skill: 'Kronos' }] };
+    } else if (/fix résumé bullets that Seen/.test(body.system)) {
+      state.repairs = (state.repairs || 0) + 1;
+      const ids = [...prompt.matchAll(/^- (J\d+\.\d+) — original: "([^"]+)"/gm)].map((m) => [m[1], m[2]]);
+      const sales = ids.find(([, t]) => /store sales/i.test(t));
+      out = { rewrites: sales ? [{ id: sales[0], text: 'Grew store sales 9% year over year in 2023 on $4.2M annual volume across apparel, shoes and home', uses: [sales[0], ids.length ? sales[0] : sales[0]], why: 'the departments it covered' }] : [] };
     } else {
       out = { rewrites: [], summary: null };
     }
@@ -99,6 +104,8 @@ test('rewrite: needs a diagnosis; charges once; only lines that pass the gates s
   assert.ok(texts.some((t) => /^Tightened the fitting-room and back-door process, cutting shrink/.test(t)), JSON.stringify(texts));
   assert.ok(!texts.some((t) => /within 12 months/.test(t)), 'a one-word swap never ships');
   assert.ok(!texts.some((t) => /1st of 40/.test(t)), 'an invented rank never ships');
+  assert.equal(state.repairs, 1, 'refused lines go back to the writer once');
+  assert.ok(r.body.refused.some((x) => /1st of 40/.test(x.text)), 'what was refused is shown with its reason');
   assert.ok(!texts.some((t) => /trained the team/.test(t)), 'a fact borrowed from another bullet never ships');
   assert.equal(r.body.rejected_count >= 1, true);
   assert.ok(r.body.summary && /cut shrink/.test(r.body.summary.text));
