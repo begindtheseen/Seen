@@ -182,7 +182,7 @@ export default function HomeHero() {
               aria-label="City or remote"
             />
           </label>
-          <button className={`${styles.go} btn-shine`} type="submit" disabled={routing}>{routing ? 'Searching…' : 'Search'}</button>
+          <button className={`${styles.go}`} type="submit" disabled={routing}>{routing ? 'Searching…' : 'Search'}</button>
         </form>
 
         {/* One tap to first value — real companies with real scores. */}

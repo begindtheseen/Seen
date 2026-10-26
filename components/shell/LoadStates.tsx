@@ -26,12 +26,12 @@ export function LoadError({ what, detail, onRetry, retrying = false, compact = f
         <div style={{ fontFamily: 'var(--display)', fontSize: compact ? '.86rem' : '.95rem', fontWeight: 700, color: 'var(--white)', marginBottom: detail ? '.2rem' : 0 }}>
           Couldn&apos;t load {what}.
         </div>
-        {detail && <div style={{ fontFamily: 'var(--body)', fontSize: '.78rem', color: 'var(--sub)', lineHeight: 1.55 }}>{detail}</div>}
+        {detail && <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.55 }}>{detail}</div>}
         {children}
       </div>
       {onRetry && (
         <button type="button" onClick={onRetry} disabled={retrying} data-testid="load-retry"
-          style={{ minHeight: 44, padding: '.6rem 1.1rem', background: 'rgba(255,255,255,.06)', border: '1px solid var(--line2)', borderRadius: 10, color: 'var(--white)', fontFamily: 'var(--display)', fontWeight: 700, fontSize: '.82rem', cursor: retrying ? 'default' : 'pointer', opacity: retrying ? .6 : 1 }}>
+          style={{ minHeight: 44, padding: '.6rem 1.1rem', background: 'rgba(255,255,255,.06)', border: '1px solid var(--line2)', borderRadius: 10, color: 'var(--white)', fontFamily: 'var(--display)', fontWeight: 700, fontSize: 'var(--fs-sm)', cursor: retrying ? 'default' : 'pointer', opacity: retrying ? .6 : 1 }}>
           {retrying ? 'Retrying…' : 'Retry'}
         </button>
       )}

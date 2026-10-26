@@ -247,14 +247,14 @@ export function EmployerHub() {
         {/* Persistent header — kicker + scope badges + title */}
         <div className="emp-reveal" style={{ marginBottom: '1.4rem', animationDelay: '0ms' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap', marginBottom: '.55rem' }}>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--blue)' }}>Employer dashboard</span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--blue)' }}>Employer dashboard</span>
             {godview && (
-              <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: '#a78bfa', background: 'rgba(124,58,237,.12)', border: '1px solid rgba(124,58,237,.35)', borderRadius: 7, padding: '.16rem .5rem' }}>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: '#a78bfa', background: 'rgba(124,58,237,.12)', border: '1px solid rgba(124,58,237,.35)', borderRadius: 7, padding: '.16rem .5rem' }}>
                 Admin god-view
               </span>
             )}
             {ready && isEmployer && !godview && (
-              <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--green)', background: 'rgba(16,185,129,.12)', border: '1px solid rgba(16,185,129,.35)', borderRadius: 7, padding: '.16rem .5rem' }}>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', background: 'rgba(16,185,129,.12)', border: '1px solid rgba(16,185,129,.35)', borderRadius: 7, padding: '.16rem .5rem' }}>
                 {scoped ? 'Your company' : `Signed in as ${profile?.name || 'employer'}`}
               </span>
             )}
@@ -263,7 +263,7 @@ export function EmployerHub() {
             Your postings &amp; applicant activity
             {company ? <span style={{ color: 'var(--sub)' }}> — {company}</span> : <span style={{ color: 'var(--sub)' }}>, in one place</span>}
           </h1>
-          <p style={{ color: 'var(--sub)', fontSize: '.82rem', lineHeight: 1.65, margin: 0, maxWidth: 620 }}>
+          <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.65, margin: 0, maxWidth: 620 }}>
             Every live listing, applicant outcome, analytic, and update for your company — one place, four tabs, the same signals candidates see about you before they apply.
           </p>
         </div>
@@ -281,16 +281,16 @@ export function EmployerHub() {
         {/* Scope chip (logged-in) OR public lookup (visitor / god-view) */}
         {scoped ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap', marginBottom: '1.6rem', padding: '.7rem .9rem', background: 'rgba(16,185,129,.05)', border: '1px solid rgba(16,185,129,.25)', borderRadius: 10 }}>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Viewing your company</span>
-            <span style={{ fontFamily: 'var(--display)', fontSize: '.9rem', fontWeight: 700, color: 'var(--white)', textTransform: 'capitalize' }}>{employerCompany}</span>
-            <button className="emp-btn" onClick={() => company && load(company)} disabled={loading} style={{ marginLeft: 'auto', background: 'transparent', border: '1px solid var(--line2)', borderRadius: 8, padding: '.4rem .8rem', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', cursor: loading ? 'default' : 'pointer' }}>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Viewing your company</span>
+            <span style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-ui)', fontWeight: 700, color: 'var(--white)', textTransform: 'capitalize' }}>{employerCompany}</span>
+            <button className="emp-btn" onClick={() => company && load(company)} disabled={loading} style={{ marginLeft: 'auto', background: 'transparent', border: '1px solid var(--line2)', borderRadius: 8, padding: '.4rem .8rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', cursor: loading ? 'default' : 'pointer' }}>
               {loading ? 'Loading…' : '↻ Refresh'}
             </button>
           </div>
         ) : (
           <>
             {godview && (
-              <div style={{ marginBottom: '1rem', padding: '.6rem .9rem', background: 'rgba(124,58,237,.06)', border: '1px solid rgba(124,58,237,.28)', borderRadius: 10, fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', lineHeight: 1.6 }}>
+              <div style={{ marginBottom: '1rem', padding: '.6rem .9rem', background: 'rgba(124,58,237,.06)', border: '1px solid rgba(124,58,237,.28)', borderRadius: 10, fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6 }}>
                 Admin god-view — this is the same public data any visitor sees, scoped to the company in the URL. Change the company below to view another.
               </div>
             )}
@@ -301,22 +301,22 @@ export function EmployerHub() {
                 onKeyDown={e => { if (e.key === 'Enter') lookup() }}
                 placeholder="Your company name"
                 aria-label="Your company name"
-                style={{ flex: 1, minWidth: 220, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.7rem .9rem', fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--white)', outline: 'none' }}
+                style={{ flex: 1, minWidth: 220, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.7rem .9rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', outline: 'none' }}
               />
-              <button onClick={lookup} disabled={loading || !companyInput.trim()} style={{ background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 9, padding: '.7rem 1.4rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.8rem', color: '#fff', cursor: loading ? 'default' : 'pointer', opacity: loading || !companyInput.trim() ? .6 : 1 }}>
+              <button onClick={lookup} disabled={loading || !companyInput.trim()} style={{ background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 9, padding: '.7rem 1.4rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)', color: '#fff', cursor: loading ? 'default' : 'pointer', opacity: loading || !companyInput.trim() ? .6 : 1 }}>
                 {loading ? 'Loading…' : company ? 'Refresh →' : 'View dashboard →'}
               </button>
             </div>
           </>
         )}
-        {err && <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--red)', marginBottom: '1.2rem' }}>{err}</div>}
+        {err && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--red)', marginBottom: '1.2rem' }}>{err}</div>}
 
         {/* Entry state — no company chosen yet */}
         {!company && !loading && (
           <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16, padding: '2.2rem', textAlign: 'center' }}>
-            <div style={{ fontSize: '1.8rem', marginBottom: '.6rem' }}>🏢</div>
-            <div style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.4rem' }}>Enter your company to open your dashboard</div>
-            <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.65, margin: '0 auto', maxWidth: 460 }}>
+            <div style={{ fontSize: 'var(--fs-fig)', marginBottom: '.6rem' }}>🏢</div>
+            <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', marginBottom: '.4rem' }}>Enter your company to open your dashboard</div>
+            <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.65, margin: '0 auto', maxWidth: 460 }}>
               We&apos;ll pull your live listings on Seen and every applicant outcome candidates have reported for you — no account required.
             </p>
           </div>
@@ -325,7 +325,7 @@ export function EmployerHub() {
         {loading && (
           <div role="status" aria-live="polite" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '.8rem', minHeight: '30vh', textAlign: 'center' }}>
             <div className="spinner" />
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.66rem', color: 'var(--sub)', lineHeight: 1.6, maxWidth: 420 }}>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6, maxWidth: 420 }}>
               Loading {company}…{elapsed >= 4 ? ` ${elapsed}s.` : ''}
               {elapsed >= 4 && <><br />The first lookup of a company pulls its live listings from the job boards, which can take up to about 30 seconds; later visits are instant.</>}
             </div>
@@ -335,14 +335,14 @@ export function EmployerHub() {
         {/* The score API could not find this company anywhere — say so, never a "clean slate" hero. */}
         {company && loaded && !loading && scoreState === 'not_found' && (
           <div role="alert" style={{ background: 'var(--card)', border: '1px solid rgba(245,158,11,.35)', borderRadius: 16, padding: '2rem', textAlign: 'center' }}>
-            <div style={{ fontSize: '1.8rem', marginBottom: '.6rem' }}>?</div>
-            <div style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.4rem' }}>We can&apos;t find a company called &ldquo;{company}&rdquo;</div>
-            <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.65, margin: '0 auto 1rem', maxWidth: 480 }}>
+            <div style={{ fontSize: 'var(--fs-fig)', marginBottom: '.6rem' }}>?</div>
+            <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', marginBottom: '.4rem' }}>We can&apos;t find a company called &ldquo;{company}&rdquo;</div>
+            <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.65, margin: '0 auto 1rem', maxWidth: 480 }}>
               Nothing on Seen or online matches that name. Check the spelling, or use the official company name as it appears on your job postings.
             </p>
             <div style={{ display: 'flex', gap: '.6rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-              <button type="button" onClick={() => load(company)} style={{ background: 'transparent', border: '1px solid var(--line2)', borderRadius: 9, padding: '.6rem 1.1rem', fontFamily: 'var(--mono)', fontSize: '.66rem', color: 'var(--white)', cursor: 'pointer' }}>Try again</button>
-              <a href="/contact" style={{ border: '1px solid var(--line2)', borderRadius: 9, padding: '.6rem 1.1rem', fontFamily: 'var(--mono)', fontSize: '.66rem', color: 'var(--sub)', textDecoration: 'none' }}>Contact us</a>
+              <button type="button" onClick={() => load(company)} style={{ background: 'transparent', border: '1px solid var(--line2)', borderRadius: 9, padding: '.6rem 1.1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', cursor: 'pointer' }}>Try again</button>
+              <a href="/contact" style={{ border: '1px solid var(--line2)', borderRadius: 9, padding: '.6rem 1.1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', textDecoration: 'none' }}>Contact us</a>
             </div>
           </div>
         )}
@@ -351,7 +351,7 @@ export function EmployerHub() {
           <>
             {(jobsState !== 'ok' || scoreState === 'failed') && (
               <div role="alert" style={{ display: 'flex', alignItems: 'center', gap: '.9rem', flexWrap: 'wrap', background: 'rgba(239,68,68,.07)', border: '1px solid rgba(239,68,68,.28)', borderRadius: 12, padding: '.8rem 1rem', marginBottom: '1rem' }}>
-                <div style={{ flex: 1, minWidth: 220, fontFamily: 'var(--body)', fontSize: '.8rem', color: 'var(--sub)', lineHeight: 1.55 }}>
+                <div style={{ flex: 1, minWidth: 220, fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.55 }}>
                   <b style={{ color: 'var(--white)', display: 'block', marginBottom: '.15rem' }}>
                     {scoreState === 'failed' ? 'Couldn’t load the reputation data.' : jobsState === 'failed' ? 'Couldn’t load the live postings.' : 'Live postings are unavailable right now.'}
                   </b>
@@ -361,7 +361,7 @@ export function EmployerHub() {
                       ? 'The listings request did not get through, so the postings count below is not your real number.'
                       : 'Seen is out of its live job-board budget for the moment, so the postings count below is not your real number. The hourly refresh fills it in.'}
                 </div>
-                <button type="button" onClick={() => load(company)} style={{ minHeight: 44, padding: '.6rem 1.1rem', background: 'rgba(255,255,255,.06)', border: '1px solid var(--line2)', borderRadius: 10, color: 'var(--white)', fontFamily: 'var(--display)', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer' }}>Retry</button>
+                <button type="button" onClick={() => load(company)} style={{ minHeight: 44, padding: '.6rem 1.1rem', background: 'rgba(255,255,255,.06)', border: '1px solid var(--line2)', borderRadius: 10, color: 'var(--white)', fontFamily: 'var(--display)', fontWeight: 700, fontSize: 'var(--fs-sm)', cursor: 'pointer' }}>Retry</button>
               </div>
             )}
             {/* ── Reputation hero (always visible above the tabs) ──────────────── */}
@@ -375,7 +375,7 @@ export function EmployerHub() {
                   <CountStat value={reply} suffix="%" label="response rate" color="var(--green)" />
                 </div>
               </div>
-              <p style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', lineHeight: 1.6, margin: '1.1rem 0 0' }}>
+              <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.6, margin: '1.1rem 0 0' }}>
                 {hasRep && fpReports > 0
                   ? 'Grade, ghost rate and response rate are your public Seen reputation — what candidates see before applying.'
                   : fpReports > 0
@@ -421,7 +421,7 @@ export function EmployerHub() {
                       flex: '1 1 auto', minWidth: 96, textAlign: 'center',
                       background: 'transparent',
                       border: 'none', borderRadius: 9, padding: '.55rem 1rem',
-                      fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.78rem',
+                      fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-meta)',
                       color: active ? '#fff' : 'var(--sub)', cursor: active ? 'default' : 'pointer',
                       transition: 'color .2s ease',
                     }}
@@ -476,13 +476,13 @@ function OverviewTab({ company, recent, canRespond, onManage }: { company: strin
 
       <section style={{ marginBottom: '1.6rem' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '.5rem', marginBottom: '.7rem' }}>
-          <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: 0 }}>Recent applicant interactions</h2>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>candidate-reported</span>
+          <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: 0 }}>Recent applicant interactions</h2>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>candidate-reported</span>
         </div>
         {recent.length === 0 ? (
           <div className="emp-card" style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 14, padding: '1.6rem', textAlign: 'center' }}>
-            <div style={{ fontFamily: 'var(--display)', fontSize: '.9rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.3rem' }}>No applicant outcomes reported yet</div>
-            <p style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', lineHeight: 1.6, margin: 0 }}>
+            <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-ui)', fontWeight: 700, color: 'var(--white)', marginBottom: '.3rem' }}>No applicant outcomes reported yet</div>
+            <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.6, margin: 0 }}>
               When candidates report what happened after applying to {company}, it shows up here.
             </p>
           </div>
@@ -490,12 +490,12 @@ function OverviewTab({ company, recent, canRespond, onManage }: { company: strin
           <div className="emp-card" style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 14, overflow: 'hidden' }}>
             {recent.map((r, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '.7rem', padding: '.7rem .95rem', borderBottom: i < recent.length - 1 ? '1px solid var(--line)' : 'none' }}>
-                <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', fontWeight: 700, color: toneColor(r.tone), background: 'var(--raised)', border: `1px solid ${toneColor(r.tone)}`, borderRadius: 6, padding: '.16rem .45rem', flexShrink: 0, whiteSpace: 'nowrap' }}>{r.label}</span>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, color: toneColor(r.tone), background: 'var(--raised)', border: `1px solid ${toneColor(r.tone)}`, borderRadius: 6, padding: '.16rem .45rem', flexShrink: 0, whiteSpace: 'nowrap' }}>{r.label}</span>
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontFamily: 'var(--display)', fontSize: '.78rem', fontWeight: 600, color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.role}</div>
-                  {r.experienceLevel && <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--muted)' }}>{r.experienceLevel}</div>}
+                  <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-meta)', fontWeight: 700, color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.role}</div>
+                  {r.experienceLevel && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>{r.experienceLevel}</div>}
                 </div>
-                {r.createdAt && <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)', flexShrink: 0 }}>{fmtDate(r.createdAt)}</span>}
+                {r.createdAt && <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', flexShrink: 0 }}>{fmtDate(r.createdAt)}</span>}
               </div>
             ))}
           </div>
@@ -506,7 +506,7 @@ function OverviewTab({ company, recent, canRespond, onManage }: { company: strin
 
       {/* Honest disclosure — what these numbers are and aren't */}
       <div className="emp-card" style={{ background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 12, padding: '1rem 1.2rem' }}>
-        <p style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', lineHeight: 1.7, margin: 0 }}>
+        <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.7, margin: 0 }}>
           Postings are live public listings Seen has indexed for your company. Applicant interactions are outcomes candidates reported on Seen — public, aggregate signal, never private applicant contact data. Seen has no employer login yet for public lookups, so the reputation hero is scoped by company name, exactly like your public reputation; the Listings, Analytics and Updates tabs are scoped to your approved claim.
         </p>
       </div>
@@ -551,15 +551,15 @@ function ListingsSummaryCard({ onManage }: { onManage: () => void }) {
   }, [ready, claimsReady, isLoggedIn, isEmployer, load])
 
   const manageBtn = (
-    <button className="emp-btn" onClick={onManage} style={{ background: 'transparent', border: '1px solid var(--line2)', borderRadius: 8, padding: '.45rem .9rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.72rem', color: 'var(--white)', cursor: 'pointer' }}>
+    <button className="emp-btn" onClick={onManage} style={{ background: 'transparent', border: '1px solid var(--line2)', borderRadius: 8, padding: '.45rem .9rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-meta)', color: 'var(--white)', cursor: 'pointer' }}>
       Manage listings →
     </button>
   )
 
   const header = (
     <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '.6rem', flexWrap: 'wrap', marginBottom: '.9rem' }}>
-      <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: 0 }}>Your listings</h2>
-      {company ? <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', textTransform: 'capitalize' }}>{company}</span> : null}
+      <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: 0 }}>Your listings</h2>
+      {company ? <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', textTransform: 'capitalize' }}>{company}</span> : null}
     </div>
   )
 
@@ -569,7 +569,7 @@ function ListingsSummaryCard({ onManage }: { onManage: () => void }) {
       {loading ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
           <div className="spinner" />
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)' }}>Loading your listings…</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>Loading your listings…</span>
         </div>
       ) : summary ? (
         <>
@@ -584,7 +584,7 @@ function ListingsSummaryCard({ onManage }: { onManage: () => void }) {
         </>
       ) : (
         <>
-          <p style={{ color: 'var(--sub)', fontSize: '.78rem', lineHeight: 1.65, margin: '0 0 1rem', maxWidth: 520 }}>
+          <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-meta)', lineHeight: 1.65, margin: '0 0 1rem', maxWidth: 520 }}>
             {pending
               ? 'Your company claim is pending admin approval. Once approved, your listings summary shows here and you can post, edit, and dispute listings.'
               : 'Sign in with an approved company claim to manage the listings Seen has indexed for you — post your own roles, and dispute anything inaccurate.'}
@@ -601,8 +601,8 @@ function UpdatesTab() {
   return (
     <>
       <div style={{ marginBottom: '1.2rem' }}>
-        <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.15rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: '0 0 .3rem' }}>Updates to your postings</h2>
-        <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.65, margin: 0, maxWidth: 620 }}>
+        <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: '0 0 .3rem' }}>Updates to your postings</h2>
+        <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.65, margin: 0, maxWidth: 620 }}>
           New applicants, dispute verdicts, and listings going stale or expiring — a merged feed of stored updates (which keep their read state) and live-derived signals, scoped to your approved company.
         </p>
       </div>
@@ -612,7 +612,7 @@ function UpdatesTab() {
       {/* Stable reference card — what the feed surfaces (also the tab's non-empty base when there
           are no updates or you're not signed in with an approved claim). */}
       <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16, padding: '1.5rem' }}>
-        <div style={{ fontFamily: 'var(--display)', fontSize: '.95rem', fontWeight: 700, color: 'var(--white)', marginBottom: '1rem' }}>What you&apos;ll see here</div>
+        <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', marginBottom: '1rem' }}>What you&apos;ll see here</div>
         <div style={{ display: 'grid', gap: '.9rem' }}>
           {[
             { emoji: '👥', t: 'New applicants', d: 'How many candidates reported applying to each of your roles recently.' },
@@ -620,15 +620,15 @@ function UpdatesTab() {
             { emoji: '⏳', t: 'Listings aging off', d: 'Indexed listings drop off Seen when their source stops showing them (stale at 7 days, gone at 14). Still hiring? Post the role yourself to keep it live.' },
           ].map(r => (
             <div key={r.t} style={{ display: 'flex', gap: '.8rem', alignItems: 'flex-start' }}>
-              <span style={{ fontSize: '1.1rem', lineHeight: 1.3 }} aria-hidden>{r.emoji}</span>
+              <span style={{ fontSize: 'var(--fs-lead)', lineHeight: 1.3 }} aria-hidden>{r.emoji}</span>
               <div>
-                <div style={{ fontFamily: 'var(--display)', fontSize: '.85rem', fontWeight: 700, color: 'var(--white)' }}>{r.t}</div>
-                <p style={{ color: 'var(--sub)', fontSize: '.76rem', lineHeight: 1.6, margin: '.15rem 0 0' }}>{r.d}</p>
+                <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-ui)', fontWeight: 700, color: 'var(--white)' }}>{r.t}</div>
+                <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-meta)', lineHeight: 1.6, margin: '.15rem 0 0' }}>{r.d}</p>
               </div>
             </div>
           ))}
         </div>
-        <p style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', lineHeight: 1.7, margin: '1.2rem 0 0' }}>
+        <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.7, margin: '1.2rem 0 0' }}>
           Your live feed appears above when you&apos;re signed in with an approved claim and there&apos;s something to show. Email and push delivery of these updates are coming next.
         </p>
       </div>
@@ -639,8 +639,8 @@ function UpdatesTab() {
 function Stat({ value, label, color }: { value: string; label: string; color: string }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '.2rem' }}>
-      <div style={{ fontFamily: 'var(--display)', fontSize: '1.5rem', fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>{label}</div>
+      <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>{label}</div>
     </div>
   )
 }
@@ -652,8 +652,8 @@ function CountStat({ value, label, color, suffix = '' }: { value: number | null;
   const display = value == null ? '—' : `${Math.round(n).toLocaleString()}${suffix}`
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '.2rem' }}>
-      <div style={{ fontFamily: 'var(--display)', fontSize: '1.5rem', fontWeight: 800, color, lineHeight: 1 }}>{display}</div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>{label}</div>
+      <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color, lineHeight: 1 }}>{display}</div>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>{label}</div>
     </div>
   )
 }
@@ -672,7 +672,7 @@ function GradeRing({ score }: { score: number | null }) {
         <svg width={84} height={84} viewBox="0 0 84 84">
           <circle cx={42} cy={42} r={R} fill="none" stroke="var(--line2)" strokeWidth={6} />
         </svg>
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--muted)' }}>—</div>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--muted)' }}>—</div>
       </div>
     )
   }
@@ -691,8 +691,8 @@ function GradeRing({ score }: { score: number | null }) {
         />
       </svg>
       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ fontFamily: 'var(--display)', fontSize: '1.85rem', fontWeight: 800, color, lineHeight: 1 }}>{gradeOf(score)}</div>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', marginTop: 2 }}>{Math.round(animated)}/100</div>
+        <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-fig)', fontWeight: 800, color, lineHeight: 1 }}>{gradeOf(score)}</div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: 2 }}>{Math.round(animated)}/100</div>
       </div>
     </div>
   )

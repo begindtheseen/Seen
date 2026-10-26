@@ -97,18 +97,18 @@ export async function generateMetadata(
 
 const S = {
   wrap: { maxWidth: 760, margin: '0 auto', padding: '3.5rem 1.25rem 5rem', width: '100%', boxSizing: 'border-box' as const },
-  eyebrow: { fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase' as const, letterSpacing: '.2em', color: 'var(--blue)', marginBottom: '.7rem', display: 'flex', alignItems: 'center', gap: 10 },
+  eyebrow: { fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase' as const, letterSpacing: '.2em', color: 'var(--blue)', marginBottom: '.7rem', display: 'flex', alignItems: 'center', gap: 10 },
   h1: { fontFamily: 'var(--display)', fontSize: 'clamp(1.6rem,5vw,2.3rem)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', lineHeight: 1.1, margin: '0 0 1rem' },
-  lead: { color: 'var(--sub)', fontSize: '.95rem', lineHeight: 1.7, fontWeight: 300, margin: '0 0 2rem' },
-  h2: { fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 700, color: 'var(--white)', margin: '2.2rem 0 .8rem', letterSpacing: '-.01em' },
-  p: { color: 'var(--sub)', fontSize: '.88rem', lineHeight: 1.75, margin: '0 0 1rem', fontWeight: 300 },
+  lead: { color: 'var(--sub)', fontSize: 'var(--fs-body)', lineHeight: 1.7, fontWeight: 300, margin: '0 0 2rem' },
+  h2: { fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', margin: '2.2rem 0 .8rem', letterSpacing: '-.01em' },
+  p: { color: 'var(--sub)', fontSize: 'var(--fs-ui)', lineHeight: 1.75, margin: '0 0 1rem', fontWeight: 300 },
 }
 
 function MetricCard({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div style={{ flex: '1 1 120px', minWidth: 0, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '.9rem 1rem' }}>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '1.4rem', fontWeight: 500, color, lineHeight: 1, letterSpacing: '-.02em' }}>{value}</div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', marginTop: '.45rem' }}>{label}</div>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-xl)', fontWeight: 500, color, lineHeight: 1, letterSpacing: '-.02em' }}>{value}</div>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', marginTop: '.45rem' }}>{label}</div>
     </div>
   )
 }
@@ -123,10 +123,10 @@ function DataPanel({ name, s }: { name: string; s: GrowthScore }) {
   return (
     <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderLeft: `3px solid ${accent}`, borderRadius: 12, padding: '1.2rem 1.25rem', margin: '0 0 1.8rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: '1rem' }}>
-        <div style={{ fontFamily: 'var(--display)', fontSize: '2.2rem', fontWeight: 800, color: accent, lineHeight: 1 }}>{grade(s.overall_score)}</div>
+        <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-h2)', fontWeight: 800, color: accent, lineHeight: 1 }}>{grade(s.overall_score)}</div>
         <div>
-          <div style={{ fontFamily: 'var(--display)', fontSize: '1rem', fontWeight: 700, color: 'var(--white)' }}>Seen Grade {s.overall_score}/100</div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', letterSpacing: '.1em', color: accent }}>{riskLabel(s.risk_level)}</div>
+          <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)' }}>Seen Grade {s.overall_score}/100</div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', letterSpacing: '.1em', color: accent }}>{riskLabel(s.risk_level)}</div>
         </div>
       </div>
       <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap' }}>
@@ -134,7 +134,7 @@ function DataPanel({ name, s }: { name: string; s: GrowthScore }) {
         {respPct != null && <MetricCard label="Response rate" value={`${respPct}%`} color="var(--green)" />}
         {wait != null && <MetricCard label="Avg wait" value={`${wait}d`} color="var(--amber)" />}
       </div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', marginTop: '.9rem' }}>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.9rem' }}>
         {`Based on ${fp.toLocaleString()} applicant report${fp === 1 ? '' : 's'}`} · A community signal, not a verified fact
       </div>
     </div>
@@ -262,7 +262,7 @@ export default async function FaqSlugPage({ params }: { params: Promise<{ slug: 
 
         <CTAs name={name} cslug={cslug} />
 
-        <p style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', marginTop: '2.5rem', lineHeight: 1.7 }}>
+        <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '2.5rem', lineHeight: 1.7 }}>
           Seen aggregates real applicant reports into a 0–100 transparency grade. Scores are community signals, not verified facts, and update as new reports come in. Last refreshed hourly.
         </p>
       </div>

@@ -101,18 +101,18 @@ export function EmployerReplyManager({ company }: { company: string }) {
   return (
     <section style={{ marginBottom: '1.6rem' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '.5rem', marginBottom: '.7rem' }}>
-        <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: 0 }}>Respond to what candidates reported</h2>
-        <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>your voice · reviewed before public</span>
+        <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: 0 }}>Respond to what candidates reported</h2>
+        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>your voice · reviewed before public</span>
       </div>
 
       {loading ? (
         <div className="emp-card" style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 14, padding: '1.4rem', display: 'flex', alignItems: 'center', gap: '.6rem' }}>
-          <div className="spinner" /><span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)' }}>Loading reports…</span>
+          <div className="spinner" /><span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>Loading reports…</span>
         </div>
       ) : reports.length === 0 ? (
         <div className="emp-card" style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 14, padding: '1.6rem', textAlign: 'center' }}>
-          <div style={{ fontFamily: 'var(--display)', fontSize: '.9rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.3rem' }}>No reports to respond to yet</div>
-          <p style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', lineHeight: 1.6, margin: 0 }}>When candidates report an outcome after applying to {company}, you can add your side here.</p>
+          <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-ui)', fontWeight: 700, color: 'var(--white)', marginBottom: '.3rem' }}>No reports to respond to yet</div>
+          <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.6, margin: 0 }}>When candidates report an outcome after applying to {company}, you can add your side here.</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
@@ -124,23 +124,23 @@ export function EmployerReplyManager({ company }: { company: string }) {
             return (
               <div key={key} className="emp-card" style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 14, padding: '1rem 1.1rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap', marginBottom: rep.report_text ? '.5rem' : '.2rem' }}>
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', fontWeight: 700, color: tone.c, background: 'var(--raised)', border: `1px solid ${tone.c}`, borderRadius: 6, padding: '.16rem .45rem', whiteSpace: 'nowrap' }}>{tone.label}</span>
-                  <span style={{ fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 600, color: 'var(--white)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rep.role || 'Role unspecified'}</span>
-                  {rep.created_at && <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)', marginLeft: 'auto' }}>{fmtDate(rep.created_at)}</span>}
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, color: tone.c, background: 'var(--raised)', border: `1px solid ${tone.c}`, borderRadius: 6, padding: '.16rem .45rem', whiteSpace: 'nowrap' }}>{tone.label}</span>
+                  <span style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--white)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rep.role || 'Role unspecified'}</span>
+                  {rep.created_at && <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginLeft: 'auto' }}>{fmtDate(rep.created_at)}</span>}
                 </div>
                 {rep.report_text && (
-                  <p style={{ color: 'var(--sub)', fontSize: '.76rem', lineHeight: 1.6, margin: '0 0 .6rem', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>&ldquo;{rep.report_text}&rdquo;</p>
+                  <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-meta)', lineHeight: 1.6, margin: '0 0 .6rem', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>&ldquo;{rep.report_text}&rdquo;</p>
                 )}
 
                 {existing ? (
                   <div style={{ borderTop: '1px solid var(--line)', paddingTop: '.6rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.35rem' }}>
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', fontWeight: 700, color: statusChip[existing.status].c, background: statusChip[existing.status].bg, borderRadius: 6, padding: '.14rem .45rem' }}>{statusChip[existing.status].label}</span>
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)' }}>your reply</span>
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, color: statusChip[existing.status].c, background: statusChip[existing.status].bg, borderRadius: 6, padding: '.14rem .45rem' }}>{statusChip[existing.status].label}</span>
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>your reply</span>
                     </div>
-                    <p style={{ color: 'var(--sub)', fontSize: '.76rem', lineHeight: 1.6, margin: 0 }}>{existing.body}</p>
+                    <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-meta)', lineHeight: 1.6, margin: 0 }}>{existing.body}</p>
                     {existing.status === 'rejected' && (
-                      <button onClick={() => { setOpenId(rep.id); setDraft(existing.body) }} style={{ marginTop: '.5rem', background: 'transparent', border: '1px solid var(--line2)', borderRadius: 7, padding: '.35rem .8rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--white)', cursor: 'pointer' }}>Revise &amp; resubmit</button>
+                      <button onClick={() => { setOpenId(rep.id); setDraft(existing.body) }} style={{ marginTop: '.5rem', background: 'transparent', border: '1px solid var(--line2)', borderRadius: 7, padding: '.35rem .8rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', cursor: 'pointer' }}>Revise &amp; resubmit</button>
                     )}
                   </div>
                 ) : isOpen ? (
@@ -148,21 +148,21 @@ export function EmployerReplyManager({ company }: { company: string }) {
                     <textarea autoComplete="off"
                       value={draft} onChange={e => setDraft(e.target.value)} rows={3} autoFocus
                       placeholder="Add your side — what actually happened, or what you're changing. Shown publicly after review; never affects your score."
-                      style={{ width: '100%', boxSizing: 'border-box', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 8, padding: '.6rem .7rem', fontFamily: 'var(--sans, inherit)', fontSize: '.78rem', color: 'var(--white)', outline: 'none', resize: 'vertical' }}
+                      style={{ width: '100%', boxSizing: 'border-box', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 8, padding: '.6rem .7rem', fontFamily: 'var(--sans, inherit)', fontSize: 'var(--fs-meta)', color: 'var(--white)', outline: 'none', resize: 'vertical' }}
                     />
-                    {err && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--red)' }}>{err}</div>}
+                    {err && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--red)' }}>{err}</div>}
                     <div style={{ display: 'flex', gap: '.5rem' }}>
-                      <button onClick={() => rep.id && submit(rep.id)} disabled={busy || !draft.trim()} style={{ background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.72rem', color: '#fff', cursor: 'pointer', opacity: busy || !draft.trim() ? .6 : 1 }}>{busy ? 'Submitting…' : 'Submit for review'}</button>
-                      <button onClick={() => { setOpenId(null); setDraft(''); setErr('') }} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem .9rem', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)', cursor: 'pointer' }}>Cancel</button>
+                      <button onClick={() => rep.id && submit(rep.id)} disabled={busy || !draft.trim()} style={{ background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-meta)', color: '#fff', cursor: 'pointer', opacity: busy || !draft.trim() ? .6 : 1 }}>{busy ? 'Submitting…' : 'Submit for review'}</button>
+                      <button onClick={() => { setOpenId(null); setDraft(''); setErr('') }} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem .9rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', cursor: 'pointer' }}>Cancel</button>
                     </div>
                   </div>
                 ) : (
-                  <button onClick={() => { setOpenId(rep.id); setDraft(''); setErr('') }} disabled={!rep.id} style={{ background: 'transparent', border: '1px solid var(--line2)', borderRadius: 7, padding: '.4rem .9rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.7rem', color: 'var(--white)', cursor: rep.id ? 'pointer' : 'default', opacity: rep.id ? 1 : .5 }}>Respond →</button>
+                  <button onClick={() => { setOpenId(rep.id); setDraft(''); setErr('') }} disabled={!rep.id} style={{ background: 'transparent', border: '1px solid var(--line2)', borderRadius: 7, padding: '.4rem .9rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-meta)', color: 'var(--white)', cursor: rep.id ? 'pointer' : 'default', opacity: rep.id ? 1 : .5 }}>Respond →</button>
                 )}
               </div>
             )
           })}
-          <p style={{ fontFamily: 'var(--mono)', fontSize: '.53rem', color: 'var(--muted)', lineHeight: 1.7, margin: '.3rem 0 0' }}>
+          <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.7, margin: '.3rem 0 0' }}>
             Replies are the employer&apos;s statement, shown next to the report on your public company page after review — clearly labeled as your response, never verified fact. They never change your ghost rate, response rate, or score.
           </p>
         </div>

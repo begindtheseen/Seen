@@ -71,9 +71,9 @@ type Loaded = {
 
 const mono = (size: string, color: string): React.CSSProperties => ({ fontFamily: 'var(--mono)', fontSize: size, color })
 const card: React.CSSProperties = { background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16, padding: '1.6rem 1.7rem', marginBottom: '1.4rem' }
-const kicker: React.CSSProperties = { fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.16em', color: 'var(--blue)', marginBottom: '.55rem' }
-const h2: React.CSSProperties = { fontFamily: 'var(--display)', fontSize: '1.15rem', fontWeight: 800, color: 'var(--white)', margin: '0 0 .2rem', letterSpacing: '-.02em' }
-const sub: React.CSSProperties = { color: 'var(--sub)', fontSize: '.78rem', lineHeight: 1.6, margin: '.15rem 0 1.1rem' }
+const kicker: React.CSSProperties = { fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.16em', color: 'var(--blue)', marginBottom: '.55rem' }
+const h2: React.CSSProperties = { fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', margin: '0 0 .2rem', letterSpacing: '-.02em' }
+const sub: React.CSSProperties = { color: 'var(--sub)', fontSize: 'var(--fs-meta)', lineHeight: 1.6, margin: '.15rem 0 1.1rem' }
 
 const fmtPct = (v: number | null | undefined) => (v == null ? '—' : `${Number.isInteger(v) ? v : v.toFixed(1)}%`)
 const gradeColor = (letter: string | null) => { const g = letter ? letter.charAt(0) : null; return g === 'A' || g === 'B' ? 'var(--green)' : g === 'C' ? 'var(--amber)' : 'var(--red)' }
@@ -102,9 +102,9 @@ function BreakdownTable({ rows, color = 'var(--blue)' }: { rows: { key: string; 
     <div style={{ display: 'grid', gap: '.6rem' }}>
       {rows.map(r => (
         <div key={r.key} style={{ display: 'grid', gridTemplateColumns: 'minmax(120px,1.4fr) 2fr auto', gap: '.8rem', alignItems: 'center' }}>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.key}</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.key}</span>
           <Bar pct={(r.count / max) * 100} color={color} />
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '.66rem', color: 'var(--dim)', whiteSpace: 'nowrap' }}>{r.count.toLocaleString()} · {fmtPct(r.pct)}</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', whiteSpace: 'nowrap' }}>{r.count.toLocaleString()} · {fmtPct(r.pct)}</span>
         </div>
       ))}
     </div>
@@ -117,9 +117,9 @@ function StatTile({ value, label, color = 'var(--white)', note, revealDelay }: {
       className={revealDelay != null ? 'emp-reveal' : undefined}
       style={{ display: 'flex', flexDirection: 'column', gap: '.25rem', minWidth: 90, animationDelay: revealDelay != null ? `${revealDelay}ms` : undefined }}
     >
-      <div style={{ fontFamily: 'var(--display)', fontSize: '1.7rem', fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.08em' }}>{label}</div>
-      {note ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>{note}</div> : null}
+      <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-fig)', fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.08em' }}>{label}</div>
+      {note ? <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>{note}</div> : null}
     </div>
   )
 }
@@ -134,9 +134,9 @@ function CountTile({ target, render, label, color = 'var(--white)', note, reveal
       className={revealDelay != null ? 'emp-reveal' : undefined}
       style={{ display: 'flex', flexDirection: 'column', gap: '.25rem', minWidth: 90, animationDelay: revealDelay != null ? `${revealDelay}ms` : undefined }}
     >
-      <div style={{ fontFamily: 'var(--display)', fontSize: '1.7rem', fontWeight: 800, color, lineHeight: 1 }}>{render(n, n >= target)}</div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.08em' }}>{label}</div>
-      {note ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>{note}</div> : null}
+      <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-fig)', fontWeight: 800, color, lineHeight: 1 }}>{render(n, n >= target)}</div>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.08em' }}>{label}</div>
+      {note ? <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>{note}</div> : null}
     </div>
   )
 }
@@ -165,9 +165,9 @@ function ActivityCard({ activity }: { activity: ActivityShape | null | undefined
         <div style={{ display: 'grid', gap: '.6rem' }}>
           {byRole.map((r, i) => (
             <div key={r.role} style={{ display: 'grid', gridTemplateColumns: 'minmax(120px,1.4fr) 2fr auto', gap: '.8rem', alignItems: 'center' }}>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.role}</span>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.role}</span>
               <Bar pct={(r.count / maxRole) * 100} color="var(--blue)" grow delay={i * 60} />
-              <span style={{ fontFamily: 'var(--mono)', fontSize: '.66rem', color: 'var(--dim)', whiteSpace: 'nowrap' }}>{r.count.toLocaleString()}{r.count7 > 0 ? ` · ${r.count7} new` : ''}</span>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', whiteSpace: 'nowrap' }}>{r.count.toLocaleString()}{r.count7 > 0 ? ` · ${r.count7} new` : ''}</span>
             </div>
           ))}
         </div>
@@ -180,8 +180,8 @@ function ActivityCard({ activity }: { activity: ActivityShape | null | undefined
 function StateCard({ title, children, cta }: { title: string; children: React.ReactNode; cta?: React.ReactNode }) {
   return (
     <div style={card}>
-      <div style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.4rem' }}>{title}</div>
-      <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.7, maxWidth: 540, margin: cta ? '0 0 1rem' : 0 }}>{children}</p>
+      <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', marginBottom: '.4rem' }}>{title}</div>
+      <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.7, maxWidth: 540, margin: cta ? '0 0 1rem' : 0 }}>{children}</p>
       {cta}
     </div>
   )
@@ -338,7 +338,7 @@ export function EmployerAnalyticsView() {
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.5rem', marginBottom: '1.2rem' }}>
           <div>
             <div style={kicker}>Reporting on</div>
-            <div style={{ fontFamily: 'var(--display)', fontSize: '1.35rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', textTransform: 'capitalize' }}>
+            <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-h3)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', textTransform: 'capitalize' }}>
               {resolvedCompany}
               {verified ? <span style={{ ...mono('.55rem', 'var(--green)'), marginLeft: '.6rem', textTransform: 'uppercase', letterSpacing: '.1em' }}>✓ Verified</span> : null}
             </div>
@@ -347,7 +347,7 @@ export function EmployerAnalyticsView() {
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: 78, height: 78, borderRadius: 999, border: `4px solid ${gradeColor(h.grade)}`, flexShrink: 0 }}>
             {h.grade ? (
               <>
-                <div style={{ fontFamily: 'var(--display)', fontSize: '2rem', fontWeight: 800, color: gradeColor(h.grade), lineHeight: 1 }}>{h.grade}</div>
+                <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-h2)', fontWeight: 800, color: gradeColor(h.grade), lineHeight: 1 }}>{h.grade}</div>
                 <div style={mono('.5rem', 'var(--dim)')}>{h.overallScore}/100</div>
               </>
             ) : (
@@ -447,7 +447,7 @@ export function EmployerAnalyticsView() {
           </div>
           {analytics.roles.map(r => (
             <div key={r.role} style={{ display: 'grid', gridTemplateColumns: 'minmax(120px,2fr) 1fr 1fr 1fr', minWidth: 360, gap: '.6rem', alignItems: 'center' }}>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.role}</span>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.role}</span>
               <span style={{ ...mono('.66rem', 'var(--sub)'), textAlign: 'right', whiteSpace: 'nowrap' }}>{r.count.toLocaleString()}</span>
               <span style={{ ...mono('.66rem', 'var(--green)'), textAlign: 'right', whiteSpace: 'nowrap' }}>{r.responded} · {fmtPct(r.respondedPct)}</span>
               <span style={{ ...mono('.66rem', 'var(--red)'), textAlign: 'right', whiteSpace: 'nowrap' }}>{r.ghosted} · {fmtPct(r.ghostedPct)}</span>
@@ -470,5 +470,5 @@ export function EmployerAnalyticsView() {
 
 const ctaStyle: React.CSSProperties = {
   display: 'inline-block', background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 8,
-  padding: '.55rem 1.1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.78rem', color: '#fff', textDecoration: 'none',
+  padding: '.55rem 1.1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-meta)', color: '#fff', textDecoration: 'none',
 }

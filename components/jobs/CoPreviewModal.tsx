@@ -87,28 +87,28 @@ export default function CoPreviewModal({ company, onClose }: { company: string; 
       >
         {/* Header */}
         <div style={{ padding: '1rem 1.15rem .75rem', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontFamily: 'var(--display)', fontSize: '1rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em' }}>{displayCompanyName(company)}</div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontSize: '1rem', padding: '.2rem .3rem', lineHeight: 1 }}>✕</button>
+          <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em' }}>{displayCompanyName(company)}</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontSize: 'var(--fs-lead)', padding: '.2rem .3rem', lineHeight: 1 }}>✕</button>
         </div>
 
         {/* Body */}
         <div style={{ padding: '1.15rem' }}>
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '1.5rem 0', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--muted)' }}>
-              <div style={{ fontSize: '1.25rem', marginBottom: '.5rem', animation: 'spin 1s linear infinite' }}>🔍</div>
+            <div style={{ textAlign: 'center', padding: '1.5rem 0', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>
+              <div style={{ fontSize: 'var(--fs-h3)', marginBottom: '.5rem', animation: 'spin 1s linear infinite' }}>🔍</div>
               Checking hiring data...
             </div>
           ) : graded ? (
             <>
               {/* Grade + score */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '.85rem', marginBottom: '.75rem' }}>
-                <div style={{ fontFamily: 'var(--display)', fontSize: '3rem', fontWeight: 800, color: gradeColor, lineHeight: 1, letterSpacing: '-.04em' }}>{coGrade(graded.overall_score)}</div>
+                <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-fig-l)', fontWeight: 800, color: gradeColor, lineHeight: 1, letterSpacing: '-.04em' }}>{coGrade(graded.overall_score)}</div>
                 <div>
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--muted)' }}>Seen Score</div>
-                  <div style={{ fontFamily: 'var(--display)', fontSize: '1.6rem', fontWeight: 800, color: 'var(--white)', lineHeight: 1, letterSpacing: '-.03em' }}>{graded.overall_score}<span style={{ fontSize: '.9rem', color: 'var(--muted)' }}>/100</span></div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--muted)' }}>Seen Score</div>
+                  <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--white)', lineHeight: 1, letterSpacing: '-.03em' }}>{graded.overall_score}<span style={{ fontSize: 'var(--fs-ui)', color: 'var(--muted)' }}>/100</span></div>
                   {(() => {
                     const fp = firstPartyReportCount(graded)
-                    return <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', marginTop: '.15rem' }}>{fp > 0 ? `${fp} applicant report${fp === 1 ? '' : 's'}` : 'Estimated from public web data'}</div>
+                    return <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.15rem' }}>{fp > 0 ? `${fp} applicant report${fp === 1 ? '' : 's'}` : 'Estimated from public web data'}</div>
                   })()}
                 </div>
               </div>
@@ -128,15 +128,15 @@ export default function CoPreviewModal({ company, onClose }: { company: string; 
                   { label: 'Avg wait', value: `${graded.avg_wait_days || '—'}d`                   },
                 ].map(({ label, value }) => (
                   <div key={label} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.55rem .6rem', textAlign: 'center' }}>
-                    <div style={{ fontFamily: 'var(--mono)', fontSize: '.95rem', fontWeight: 500, color: 'var(--white)', lineHeight: 1, marginBottom: '.18rem' }}>{value}</div>
-                    <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.06em' }}>{label}</div>
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-body)', fontWeight: 500, color: 'var(--white)', lineHeight: 1, marginBottom: '.18rem' }}>{value}</div>
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.06em' }}>{label}</div>
                   </div>
                 ))}
               </div>
 
               <a
                 href={`/company/${slug}`}
-                style={{ display: 'block', width: '100%', textAlign: 'center', background: 'linear-gradient(135deg,#3b82f6,#8b5cf6)', color: '#fff', border: 'none', borderRadius: 9, padding: '.7rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.88rem', cursor: 'pointer', textDecoration: 'none', boxShadow: '0 0 20px rgba(59,130,246,0.3)' }}
+                style={{ display: 'block', width: '100%', textAlign: 'center', background: 'linear-gradient(135deg,#3b82f6,#8b5cf6)', color: '#fff', border: 'none', borderRadius: 9, padding: '.7rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)', cursor: 'pointer', textDecoration: 'none', boxShadow: '0 0 20px rgba(59,130,246,0.3)' }}
               >
                 View full company →
               </a>
@@ -144,18 +144,18 @@ export default function CoPreviewModal({ company, onClose }: { company: string; 
           ) : sc ? (
             <>
               {/* Grade gate: real reports exist but fewer than the bar — no verdict, just the facts. */}
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--muted)', marginBottom: '.35rem' }}>Seen Score</div>
-              <div style={{ fontFamily: 'var(--display)', fontSize: '1rem', fontWeight: 700, color: 'var(--white)', lineHeight: 1.3, marginBottom: '.35rem' }}>{notEnoughReviewsLabel(sc)}</div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', marginBottom: '1rem' }}>We only grade a company once enough real applicants have reported. Read the reviews we have on the company page.</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--muted)', marginBottom: '.35rem' }}>Seen Score</div>
+              <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', lineHeight: 1.3, marginBottom: '.35rem' }}>{notEnoughReviewsLabel(sc)}</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginBottom: '1rem' }}>We only grade a company once enough real applicants have reported. Read the reviews we have on the company page.</div>
               <a
                 href={`/company/${slug}`}
-                style={{ display: 'block', width: '100%', textAlign: 'center', background: 'linear-gradient(135deg,#3b82f6,#8b5cf6)', color: '#fff', border: 'none', borderRadius: 9, padding: '.7rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.88rem', cursor: 'pointer', textDecoration: 'none', boxShadow: '0 0 20px rgba(59,130,246,0.3)' }}
+                style={{ display: 'block', width: '100%', textAlign: 'center', background: 'linear-gradient(135deg,#3b82f6,#8b5cf6)', color: '#fff', border: 'none', borderRadius: 9, padding: '.7rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)', cursor: 'pointer', textDecoration: 'none', boxShadow: '0 0 20px rgba(59,130,246,0.3)' }}
               >
                 View full company →
               </a>
             </>
           ) : (
-            <div style={{ textAlign: 'center', padding: '1.5rem 0', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--muted)' }}>
+            <div style={{ textAlign: 'center', padding: '1.5rem 0', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>
               No data found for this company yet.<br />
               <a href={`/company/${slug}`} style={{ color: 'var(--blue)', textDecoration: 'none', marginTop: '.5rem', display: 'inline-block' }}>View company page →</a>
             </div>

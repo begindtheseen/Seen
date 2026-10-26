@@ -136,7 +136,7 @@ export default function CompaniesPage() {
       onClick={() => setSort(key)}
       className="btn btn-ghost"
       style={{
-        fontSize: 'var(--fs-72)',
+        fontSize: 'var(--fs-meta)',
         padding: '.45rem .85rem',
         ...(sort === key ? { background: 'var(--bdim)', borderColor: 'var(--blue)' } : {}),
       }}
@@ -184,7 +184,7 @@ export default function CompaniesPage() {
                 padding: '.65rem 1rem',
                 color: 'var(--white)',
                 fontFamily: 'var(--mono)',
-                fontSize: '.78rem',
+                fontSize: 'var(--fs-meta)',
                 outline: 'none',
                 caretColor: 'var(--blue)',
                 boxShadow: '0 0 24px rgba(99,102,241,.08)',
@@ -200,8 +200,8 @@ export default function CompaniesPage() {
                 borderRadius: 10,
                 padding: '.65rem 1.25rem',
                 fontFamily: 'var(--mono)',
-                fontSize: '.75rem',
-                fontWeight: 700,
+                fontSize: 'var(--fs-meta)',
+                fontWeight: 500,
                 color: 'var(--blue)',
                 cursor: lookup.trim() ? 'pointer' : 'not-allowed',
                 opacity: lookup.trim() ? 1 : 0.5,
@@ -215,7 +215,7 @@ export default function CompaniesPage() {
           <div
             style={{
               fontFamily: 'var(--mono)',
-              fontSize: 'var(--fs-58)',
+              fontSize: 'var(--fs-meta)',
               color: 'var(--dim)',
             }}
           >
@@ -252,7 +252,7 @@ export default function CompaniesPage() {
               padding: '.55rem 1rem',
               color: 'var(--white)',
               fontFamily: 'var(--mono)',
-              fontSize: '.78rem',
+              fontSize: 'var(--fs-meta)',
               outline: 'none',
               caretColor: 'var(--blue)',
             }}
@@ -269,7 +269,7 @@ export default function CompaniesPage() {
               padding: '3rem',
               color: 'var(--muted)',
               fontFamily: 'var(--mono)',
-              fontSize: 'var(--fs-72)',
+              fontSize: 'var(--fs-meta)',
             }}
           >
             Loading scoreboard...
@@ -286,7 +286,7 @@ export default function CompaniesPage() {
                   style={{
                     color: 'var(--muted)',
                     fontFamily: 'var(--mono)',
-                    fontSize: 'var(--fs-72)',
+                    fontSize: 'var(--fs-meta)',
                     marginBottom: '1.25rem',
                   }}
                 >
@@ -305,8 +305,8 @@ export default function CompaniesPage() {
                     borderRadius: 9,
                     padding: '.7rem 1.4rem',
                     fontFamily: 'var(--mono)',
-                    fontSize: 'var(--fs-72)',
-                    fontWeight: 600,
+                    fontSize: 'var(--fs-meta)',
+                    fontWeight: 500,
                     color: 'var(--blue)',
                     textDecoration: 'none',
                     boxShadow: '0 0 24px rgba(99,102,241,0.1)',
@@ -318,7 +318,7 @@ export default function CompaniesPage() {
                   style={{
                     marginTop: '.75rem',
                     fontFamily: 'var(--mono)',
-                    fontSize: 'var(--fs-58)',
+                    fontSize: 'var(--fs-meta)',
                     color: 'var(--dim)',
                   }}
                 >
@@ -330,7 +330,7 @@ export default function CompaniesPage() {
                 style={{
                   color: 'var(--muted)',
                   fontFamily: 'var(--mono)',
-                  fontSize: 'var(--fs-72)',
+                  fontSize: 'var(--fs-meta)',
                 }}
               >
                 No company data yet. Use the search above to look up any company.
@@ -343,7 +343,7 @@ export default function CompaniesPage() {
               const risk = (gradeRisk(co.score.overall_score) ?? 'unrated') as ReturnType<typeof Score.risk>
               const g = grade(co.score.overall_score)
               const divider = thinStart >= 0 && i === thinStart ? (
-                <div key="thin-divider" style={{ gridColumn: '1 / -1', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', letterSpacing: '.08em', textTransform: 'uppercase', padding: '.9rem .2rem .3rem', borderTop: '1px solid var(--line)' }}>
+                <div key="thin-divider" style={{ gridColumn: '1 / -1', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', letterSpacing: '.08em', textTransform: 'uppercase', padding: '.9rem .2rem .3rem', borderTop: '1px solid var(--line)' }}>
                   Early grades · fewer than {WELL_EVIDENCED_REPORTS} applicant reports{thinStart >= TOP_SLOTS ? '' : ` · the top ${TOP_SLOTS} need ${WELL_EVIDENCED_REPORTS}+`}
                 </div>
               ) : null
@@ -374,7 +374,7 @@ export default function CompaniesPage() {
                   }}
                 >
                   <div
-                    className="ldr-item spot"
+                    className="ldr-item"
                     style={{
                       boxShadow:
                         risk === 'safe'
@@ -393,21 +393,21 @@ export default function CompaniesPage() {
                           style={{
                             marginLeft: '.3rem',
                             color: 'var(--green)',
-                            fontSize: 'var(--fs-55)',
+                            fontSize: 'var(--fs-meta)',
                           }}
                         >
                           ✓
                         </span>
                       )}
                       {appliedCos.has(co.name.toLowerCase().trim()) && (
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-48)', background: 'rgba(99,102,241,.12)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 4, padding: '.06rem .28rem', color: 'var(--indigo)', marginLeft: '.35rem', verticalAlign: 'middle', flexShrink: 0 }}>Applied</span>
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', background: 'rgba(99,102,241,.12)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 4, padding: '.06rem .28rem', color: 'var(--indigo)', marginLeft: '.35rem', verticalAlign: 'middle', flexShrink: 0 }}>Applied</span>
                       )}
                     </div>
                     {co.industry && (
                       <div
                         style={{
                           fontFamily: 'var(--mono)',
-                          fontSize: 'var(--fs-52)',
+                          fontSize: 'var(--fs-meta)',
                           color: 'var(--dim)',
                           marginTop: '.15rem',
                           letterSpacing: '.03em',
@@ -429,7 +429,7 @@ export default function CompaniesPage() {
                         <span
                           style={{
                             fontFamily: 'var(--mono)',
-                            fontSize: 'var(--fs-50)',
+                            fontSize: 'var(--fs-meta)',
                             background:
                               co.score.ghost_rate > 0.5
                                 ? 'rgba(239,68,68,0.12)'
@@ -454,7 +454,7 @@ export default function CompaniesPage() {
                         <span
                           style={{
                             fontFamily: 'var(--mono)',
-                            fontSize: 'var(--fs-50)',
+                            fontSize: 'var(--fs-meta)',
                             background: 'rgba(16,185,129,0.08)',
                             color: 'var(--green)',
                             border: '1px solid rgba(16,185,129,0.2)',

@@ -21,7 +21,7 @@ export default function PriceLine() {
     return () => io.disconnect()
   }, [])
   return (
-    <p ref={ref} className="lp2-section-sub" data-testid="home-price-line" style={{ marginTop: '1.4rem', fontSize: '.85rem', maxWidth: '46ch', marginLeft: 'auto', marginRight: 'auto' }}>
+    <p ref={ref} className="lp2-section-sub" data-testid="home-price-line" style={{ marginTop: '1.4rem', fontSize: 'var(--fs-ui)', maxWidth: '46ch', marginLeft: 'auto', marginRight: 'auto' }}>
       Company grades, the tracker, job search and résumé match are free forever. When they call you in, {PREP.name} is {PREP_PRICE} for that interview, or the {PASS.name} is {PASS_PRICE} for {PASS.pro_days} days. Nothing renews.{' '}
       <Link href="/pricing" onClick={() => funnelEvent('offer_clicked', { surface: 'homepage' })} style={{ color: 'var(--green)', whiteSpace: 'nowrap' }}>See pricing →</Link>
     </p>

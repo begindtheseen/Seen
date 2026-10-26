@@ -51,7 +51,7 @@
   background: var(--raised);
   color: var(--sub);
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: var(--fs-ui);
   line-height: 1;
   transition: color 0.15s ease, border-color 0.15s ease;
 }
@@ -72,27 +72,27 @@
   color: #fff;
   font-family: var(--display);
   font-weight: 800;
-  font-size: 1.2rem;
+  font-size: var(--fs-h3);
 }
-.name { font-family: var(--display); font-weight: 800; font-size: 1.1rem; color: var(--white); letter-spacing: -0.02em; line-height: 1.15; text-transform: capitalize; }
-.ind { font-family: var(--mono); font-size: 0.56rem; color: var(--dim); margin-top: 0.15rem; }
-.verified { font-family: var(--mono); font-size: 0.5rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--blue); background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 999px; padding: 0.12rem 0.45rem; margin-left: 0.4rem; white-space: nowrap; }
+.name { font-family: var(--display); font-weight: 800; font-size: var(--fs-lead); color: var(--white); letter-spacing: -0.02em; line-height: 1.15; text-transform: capitalize; }
+.ind { font-family: var(--mono); font-size: var(--fs-meta); color: var(--dim); margin-top: 0.15rem; }
+.verified { font-family: var(--mono); font-size: var(--fs-meta); font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; color: var(--blue); background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 999px; padding: 0.12rem 0.45rem; margin-left: 0.4rem; white-space: nowrap; }
 
 /* Grade block — ring + label. */
 .gradeRow { display: flex; align-items: center; gap: 1.1rem; margin-bottom: 1.1rem; }
 .ring { position: relative; width: 92px; height: 92px; flex-shrink: 0; }
 .ringNum { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.ringGrade { font-family: var(--display); font-weight: 800; font-size: 2.1rem; line-height: 1; }
-.ringScore { font-family: var(--mono); font-size: 0.52rem; color: var(--dim); margin-top: 2px; }
+.ringGrade { font-family: var(--display); font-weight: 800; font-size: var(--fs-h2); line-height: 1; }
+.ringScore { font-family: var(--mono); font-size: var(--fs-meta); color: var(--dim); margin-top: 2px; }
 .gradeMeta { min-width: 0; }
-.gradeVerdict { font-family: var(--display); font-weight: 700; font-size: 0.92rem; color: var(--white); letter-spacing: -0.01em; margin-bottom: 0.28rem; }
-.dq { font-family: var(--mono); font-size: 0.54rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.3rem; }
+.gradeVerdict { font-family: var(--display); font-weight: 700; font-size: var(--fs-body); color: var(--white); letter-spacing: -0.01em; margin-bottom: 0.28rem; }
+.dq { font-family: var(--mono); font-size: var(--fs-meta); font-weight: 500; display: inline-flex; align-items: center; gap: 0.3rem; }
 
 /* Metric chips row. */
 .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-bottom: 1.1rem; }
 .metric { background: var(--raised); border: 1px solid var(--line); border-radius: 10px; padding: 0.6rem 0.5rem; text-align: center; }
-.metricN { font-family: var(--display); font-weight: 800; font-size: 1.05rem; line-height: 1; }
-.metricL { font-family: var(--mono); font-size: 0.48rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-top: 0.3rem; }
+.metricN { font-family: var(--display); font-weight: 800; font-size: var(--fs-lead); line-height: 1; }
+.metricL { font-family: var(--mono); font-size: var(--fs-meta); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-top: 0.3rem; }
 
 .benchWrap { margin-bottom: 1.1rem; }
 
@@ -102,7 +102,7 @@
   display: flex; align-items: center; justify-content: center;
   padding: 0.6rem 1rem; border-radius: 10px;
   border: 1px solid var(--line2); background: transparent;
-  font-family: var(--mono); font-size: 0.72rem; color: var(--sub); text-decoration: none;
+  font-family: var(--mono); font-size: var(--fs-meta); color: var(--sub); text-decoration: none;
   transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
 .full:hover { color: var(--white); border-color: var(--line2); background: var(--raised); }
@@ -119,11 +119,7 @@
 
 /* Phone floor (audit 2026-10-23): 12px labels; the in-ring score label is 11px (it sits inside the ring). */
 @media (max-width: 768px) {
-  .ind, .verified, .dq, .metricL, .full { font-size: 0.75rem; }
-  .ringScore { font-size: 0.69rem; }
+  .ind, .verified, .dq, .metricL, .full { font-size: var(--fs-meta); }
+  .ringScore { font-size: var(--fs-meta); }
 }
 
-/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
-@media (max-width: 768px) {
-  .ringScore { font-size: 0.75rem; }
-}

@@ -130,16 +130,16 @@ export default function FAQPage() {
 
         {sections.map(section => (
           <div key={section.heading} style={{ marginBottom: '2.5rem' }}>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--blue)', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--line)' }}>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--blue)', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--line)' }}>
               {section.heading}
             </div>
             {section.items.map(item => (
               <details key={item.q} style={{ marginBottom: '.65rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10 }}>
-                <summary style={{ padding: '1rem 1.25rem', fontFamily: 'var(--display)', fontSize: '.9rem', fontWeight: 700, color: 'var(--white)', cursor: 'pointer', listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <summary style={{ padding: '1rem 1.25rem', fontFamily: 'var(--display)', fontSize: 'var(--fs-ui)', fontWeight: 700, color: 'var(--white)', cursor: 'pointer', listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   {item.q}
-                  <span className="dt-chev" style={{ color: 'var(--dim)', fontWeight: 400, fontSize: '.7rem', flexShrink: 0, marginLeft: '.5rem' }}>▾</span>
+                  <span className="dt-chev" style={{ color: 'var(--dim)', fontWeight: 400, fontSize: 'var(--fs-meta)', flexShrink: 0, marginLeft: '.5rem' }}>▾</span>
                 </summary>
-                <div style={{ padding: '0 1.25rem 1rem', fontFamily: 'var(--body)', fontSize: '.82rem', color: 'var(--sub)', lineHeight: 1.75 }}>
+                <div style={{ padding: '0 1.25rem 1rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.75 }}>
                   {item.a}
                 </div>
               </details>

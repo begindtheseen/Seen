@@ -349,7 +349,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   }
 
   const backBtn = (
-    <button onClick={goBack} style={{ background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)', cursor: 'pointer', padding: '.25rem 0', marginBottom: '1.5rem', display: 'inline-flex', alignItems: 'center', gap: '.35rem' }}>← Back to jobs</button>
+    <button onClick={goBack} style={{ background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', cursor: 'pointer', padding: '.25rem 0', marginBottom: '1.5rem', display: 'inline-flex', alignItems: 'center', gap: '.35rem' }}>← Back to jobs</button>
   )
 
   // Direct-link / refresh fallback — job not in this session's cache
@@ -359,9 +359,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         <div style={{ maxWidth: 720, margin: '0 auto', padding: '1.25rem 1rem 7rem', width: '100%', boxSizing: 'border-box' }}>
           {backBtn}
           <div style={{ background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 12, padding: '1.5rem', textAlign: 'center' }}>
-            <div style={{ fontFamily: 'var(--display)', fontSize: '1rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.4rem' }}>This listing isn&apos;t loaded</div>
-            <div style={{ fontSize: '.8rem', color: 'var(--sub)', fontWeight: 300, marginBottom: '1rem', lineHeight: 1.6 }}>Job details are loaded from your search session. Run a search and open the listing from the results.</div>
-            <button onClick={() => router.push('/jobs')} style={{ background: 'var(--green)', color: 'var(--ink)', border: 'none', borderRadius: 8, padding: '.6rem 1.25rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.82rem', cursor: 'pointer' }}>Search jobs →</button>
+            <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', marginBottom: '.4rem' }}>This listing isn&apos;t loaded</div>
+            <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--sub)', fontWeight: 400, marginBottom: '1rem', lineHeight: 1.6 }}>Job details are loaded from your search session. Run a search and open the listing from the results.</div>
+            <button onClick={() => router.push('/jobs')} style={{ background: 'var(--green)', color: 'var(--ink)', border: 'none', borderRadius: 8, padding: '.6rem 1.25rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)', cursor: 'pointer' }}>Search jobs →</button>
           </div>
         </div>
       </div>
@@ -395,12 +395,12 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         {/* Header card — glassmorphism glass panel */}
         <div className="hero-terminal" style={{ display: 'block', marginBottom: '1.5rem', padding: '1.25rem' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', marginBottom: chips.length > 0 ? '.85rem' : 0 }}>
-            <div style={{ width: 52, height: 52, borderRadius: 10, background: 'var(--raised)', border: '1px solid var(--line2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.3rem', color: 'var(--white)', flexShrink: 0 }}>
+            <div style={{ width: 52, height: 52, borderRadius: 10, background: 'var(--raised)', border: '1px solid var(--line2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-h3)', color: 'var(--white)', flexShrink: 0 }}>
               {(companyName || '?')[0].toUpperCase()}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.25rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', lineHeight: 1.2, marginBottom: '.3rem' }}>{job.title}</h1>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)' }}>{companyName}{job.location ? ` · 📍 ${job.location}` : ''}</div>
+              <h1 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-h3)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', lineHeight: 1.2, marginBottom: '.3rem' }}>{job.title}</h1>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>{companyName}{job.location ? ` · 📍 ${job.location}` : ''}</div>
               {employerScore != null && <div style={{ marginTop: '.45rem' }}><EmployerGradeChip company={job.company} score={employerScore} /></div>}
             </div>
             <ListingScoreRing score={job.score} size={44} />
@@ -408,7 +408,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           {chips.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.4rem' }}>
               {chips.map((c, i) => (
-                <span key={i} style={{ background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 5, padding: '.2rem .55rem', fontSize: '.65rem', fontFamily: 'var(--mono)', color: 'var(--sub)' }}>{c}</span>
+                <span key={i} style={{ background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 5, padding: '.2rem .55rem', fontSize: 'var(--fs-meta)', fontFamily: 'var(--mono)', color: 'var(--sub)' }}>{c}</span>
               ))}
             </div>
           )}
@@ -418,17 +418,17 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         <div className="jd-grid">
           <div className="jd-stat"><span className="jd-sn">{job.score ?? '–'}</span><span className="jd-sl">Listing score</span></div>
           <div className="jd-stat"><span className="jd-sn" style={{ color: job.waste == null ? 'var(--dim)' : job.waste > 55 ? 'var(--red)' : job.waste > 35 ? 'var(--amber)' : 'var(--green)' }}>{job.waste == null ? '–' : `${job.waste}%`}</span><span className="jd-sl">Waste risk</span></div>
-          <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.75rem' }}>{job.type || 'Full-time'}</span><span className="jd-sl">Type</span></div>
-          <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.75rem' }}>{job.level || '—'}</span><span className="jd-sl">Level</span></div>
-          <div className="jd-stat"><span className="jd-sn" style={{ color: 'var(--green)', fontSize: '.78rem' }}>{pay || '—'}</span><span className="jd-sl">{pay ? payLabel(pay) : 'Salary'}</span></div>
-          <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.68rem', color: 'var(--blue)' }}>{job.source || 'Job board'}</span><span className="jd-sl">Source</span></div>
+          <div className="jd-stat"><span className="jd-sn" style={{ fontSize: 'var(--fs-meta)' }}>{job.type || 'Full-time'}</span><span className="jd-sl">Type</span></div>
+          <div className="jd-stat"><span className="jd-sn" style={{ fontSize: 'var(--fs-meta)' }}>{job.level || '—'}</span><span className="jd-sl">Level</span></div>
+          <div className="jd-stat"><span className="jd-sn" style={{ color: 'var(--green)', fontSize: 'var(--fs-meta)' }}>{pay || '—'}</span><span className="jd-sl">{pay ? payLabel(pay) : 'Salary'}</span></div>
+          <div className="jd-stat"><span className="jd-sn" style={{ fontSize: 'var(--fs-meta)', color: 'var(--blue)' }}>{job.source || 'Job board'}</span><span className="jd-sl">Source</span></div>
         </div>
 
         {/* Waste score panel — shown when company has high waste risk */}
         {job.waste != null && job.waste > 40 && (
           <div className="waste-panel" style={{ animation: 'fadeUp .4s .1s ease both' }}>
             <span className="wp-label">⚠ {job.waste}% Waste risk</span>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)' }}>High chance of no response</span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>High chance of no response</span>
           </div>
         )}
 
@@ -436,19 +436,19 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             number is explained; nothing is a black box. */}
         {scoreWhy && Array.isArray(scoreWhy.score_factors) && scoreWhy.score_factors.length > 0 && (
           <details style={{ marginBottom: '.85rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.15rem .2rem' }}>
-            <summary style={{ cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', padding: '.5rem .7rem', listStyle: 'none' }}>
+            <summary style={{ cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', padding: '.5rem .7rem', listStyle: 'none' }}>
               ▸ Why this listing scores {job.score ?? 'unrated'}{job.score != null ? '/100' : ''} — see the exact factors
             </summary>
             <div style={{ padding: '.2rem .7rem .6rem' }}>
               {scoreWhy.score_factors.map((f, i) => (
                 <div key={i} style={{ display: 'flex', gap: '.5rem', alignItems: 'baseline', padding: '.22rem 0', borderTop: i ? '1px solid var(--line2)' : 'none' }}>
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', fontWeight: 700, minWidth: 34, textAlign: 'right', color: f.points > 0 ? 'var(--green)' : f.points < 0 ? 'var(--red)' : 'var(--muted)' }}>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, minWidth: 34, textAlign: 'right', color: f.points > 0 ? 'var(--green)' : f.points < 0 ? 'var(--red)' : 'var(--muted)' }}>
                     {f.points > 0 ? `+${f.points}` : f.points}
                   </span>
-                  <span style={{ fontFamily: 'var(--body)', fontSize: '.66rem', color: 'var(--sub)', lineHeight: 1.5 }}>{f.reason}</span>
+                  <span style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5 }}>{f.reason}</span>
                 </div>
               ))}
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', color: 'var(--muted)', marginTop: '.5rem', lineHeight: 1.55 }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.5rem', lineHeight: 1.55 }}>
                 Scores run 18–95 on a 100-point scale. This grades the listing&apos;s transparency (salary disclosure, source, description quality) — not the company. It is not a verified fact about the employer.
               </div>
             </div>
@@ -457,32 +457,32 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
         {/* Status indicator — pulsing blue if listing was recently seen */}
         {avail === 'active' && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '.45rem', marginBottom: '.85rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--blue)', animation: 'fadeUp .4s .08s ease both' }}>
-            <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--blue)', display: 'inline-block', animation: 'pulse 2s infinite', flexShrink: 0 }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '.45rem', marginBottom: '.85rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', animation: 'fadeUp .4s .08s ease both' }}>
+            <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--blue)', display: 'inline-block', flexShrink: 0 }} />
             Active listing — seen recently
           </div>
         )}
 
         {/* Availability warning — only when the field exists (no invented data) */}
         {avail === 'stale' && (
-          <div style={{ marginTop: '.85rem', padding: '.55rem .8rem', background: 'rgba(245,158,11,.07)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--amber)', lineHeight: 1.55 }}>⚠ This listing hasn&apos;t been seen in 7+ days and may be closed. Verify before applying.</div>
+          <div style={{ marginTop: '.85rem', padding: '.55rem .8rem', background: 'rgba(245,158,11,.07)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--amber)', lineHeight: 1.55 }}>⚠ This listing hasn&apos;t been seen in 7+ days and may be closed. Verify before applying.</div>
         )}
         {job.filled && (
-          <div style={{ marginTop: '.85rem', padding: '.55rem .8rem', background: 'rgba(16,185,129,.07)', border: '1px solid rgba(16,185,129,.25)', borderRadius: 8, fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--green)', lineHeight: 1.55 }}>✓ This position has been filled — the employer closed it on Seen.</div>
+          <div style={{ marginTop: '.85rem', padding: '.55rem .8rem', background: 'rgba(16,185,129,.07)', border: '1px solid rgba(16,185,129,.25)', borderRadius: 8, fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', lineHeight: 1.55 }}>✓ This position has been filled — the employer closed it on Seen.</div>
         )}
         {avail === 'expired' && !job.filled && (
-          <div style={{ marginTop: '.85rem', padding: '.55rem .8rem', background: 'rgba(239,68,68,.07)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 8, fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--red)', lineHeight: 1.55 }}>✕ This listing is likely closed — it hasn&apos;t been seen in 14+ days. Check the company&apos;s careers page directly.</div>
+          <div style={{ marginTop: '.85rem', padding: '.55rem .8rem', background: 'rgba(239,68,68,.07)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 8, fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--red)', lineHeight: 1.55 }}>✕ This listing is likely closed — it hasn&apos;t been seen in 14+ days. Check the company&apos;s careers page directly.</div>
         )}
 
         {/* Factual freshness — literally-true observations of OUR data (never an employer verdict);
             the evidence behind the availability note above. */}
         {job.freshness?.label && (
-          <div style={{ marginTop: '.6rem', fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--dim)', lineHeight: 1.55 }}>
+          <div style={{ marginTop: '.6rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', lineHeight: 1.55 }}>
             {job.freshness.label}
           </div>
         )}
         {job.edited_at && (
-          <div style={{ marginTop: '.3rem', fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--amber)', lineHeight: 1.55 }}>
+          <div style={{ marginTop: '.3rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--amber)', lineHeight: 1.55 }}>
             ✎ Edited by the employer {new Date(job.edited_at).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric', year: 'numeric' })}
           </div>
         )}
@@ -493,63 +493,63 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             <button
               onClick={reportInactive}
               disabled={reportingInactive}
-              style={{ background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', cursor: 'pointer', padding: '.1rem 0', opacity: .55, transition: 'opacity .15s' }}
+              style={{ background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', cursor: 'pointer', padding: '.1rem 0', opacity: .55, transition: 'opacity .15s' }}
               onMouseOver={e => (e.currentTarget.style.opacity = '1')}
               onMouseOut={e => (e.currentTarget.style.opacity = '.55')}
             >
               {reportingInactive ? 'Reporting…' : '⚑ Not active? Report it'}
             </button>
           ) : (
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--amber)' }}>✓ Reported — thanks</span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--amber)' }}>✓ Reported — thanks</span>
           )}
         </div>
 
         {/* AI insights */}
         <div style={{ marginTop: '1.5rem', background: 'var(--gdim)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.25rem', animation: 'fadeUp .4s .15s ease both' }}>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)', marginBottom: '.85rem' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)', marginBottom: '.85rem' }}>
             WHAT {(companyName || 'THIS COMPANY').toUpperCase()} IS HIRING FOR
           </div>
           {(insightsState === 'loading' || insightsState === 'generating') && <Skeleton widths={[80, 65, 72, 58, 68]} h={10} />}
-          {insightsState === 'no_desc' && <div style={{ fontSize: '.75rem', color: 'var(--muted)' }}>No description available for AI analysis.</div>}
-          {insightsState === 'unavailable' && <div style={{ fontSize: '.75rem', color: 'var(--muted)' }}>AI insights unavailable for this listing.</div>}
+          {insightsState === 'no_desc' && <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>No description available for AI analysis.</div>}
+          {insightsState === 'unavailable' && <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>AI insights unavailable for this listing.</div>}
           {insightsState === 'preview' && (
-            <div style={{ fontSize: '.75rem', color: 'var(--muted)', lineHeight: 1.6 }}>
+            <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.6 }}>
               This source gives Seen only a preview of the posting, so there is nothing to analyze yet.{' '}
               {postingHref ? <a href={postingHref} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--green)' }}>Open the full posting ↗</a> : 'The full posting is on the employer\'s site.'}
               <PastePosting onAnalyze={analyzePasted} />
             </div>
           )}
           {insightsState === 'unread' && (
-            <div style={{ fontSize: '.75rem', color: 'var(--muted)', lineHeight: 1.6 }} data-testid="insights-unread">
+            <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.6 }} data-testid="insights-unread">
               {insightNote || "This listing doesn't state what it requires, so there is nothing to analyze — no credit used."}
               <PastePosting onAnalyze={analyzePasted} />
             </div>
           )}
           {insightsState === 'uncached' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
-              <div style={{ fontSize: '.75rem', color: 'var(--sub)', lineHeight: 1.6 }}>Nobody has generated the insight for this listing yet. Once generated it is free for everyone for 7 days.</div>
+              <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6 }}>Nobody has generated the insight for this listing yet. Once generated it is free for everyone for 7 days.</div>
               <button type="button" onClick={revealInsights} data-testid="reveal-insights"
-                style={{ alignSelf: 'flex-start', background: 'var(--green)', color: 'var(--ink)', border: 'none', borderRadius: 8, padding: '.55rem .95rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.8rem', cursor: 'pointer' }}>
+                style={{ alignSelf: 'flex-start', background: 'var(--green)', color: 'var(--ink)', border: 'none', borderRadius: 8, padding: '.55rem .95rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)', cursor: 'pointer' }}>
                 Reveal AI insights · {priceLabel(insightPrice, pro)}
               </button>
             </div>
           )}
           {insightsState === 'credits' && (
-            <div style={{ fontSize: '.75rem', color: 'var(--muted)', lineHeight: 1.6 }}>
+            <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.6 }}>
               {isLoggedIn
                 ? (insightNote || "You're out of AI credits for now — insights will be available again soon.")
                 : <>Sign in to generate AI insights ({creditCostLabel(insightPrice)}; free once cached). <a href="/login" style={{ color: 'var(--green)' }}>Sign in →</a></>}
             </div>
           )}
           {insightsState === 'done' && insightNote && (
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', marginBottom: '.6rem' }}>{insightNote}</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginBottom: '.6rem' }}>{insightNote}</div>
           )}
           {insightsState === 'done' && insights && (
             <>
               <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
                 {insights.what_they_want.map((item, i) => (
-                  <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '.55rem', fontSize: '.8rem', color: 'var(--sub)', lineHeight: 1.5 }}>
-                    <span style={{ color: 'var(--green)', fontSize: '.6rem', marginTop: '.22rem', flexShrink: 0 }}>▶</span>{item}
+                  <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '.55rem', fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.5 }}>
+                    <span style={{ color: 'var(--green)', fontSize: 'var(--fs-meta)', marginTop: '.22rem', flexShrink: 0 }}>▶</span>{item}
                   </li>
                 ))}
               </ul>
@@ -557,18 +557,18 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                 <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--line)' }}>
                   {insights.hidden_requirements?.length > 0 && (
                     <>
-                      <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)', marginBottom: '.55rem' }}>Unstated Expectations</div>
+                      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)', marginBottom: '.55rem' }}>Unstated Expectations</div>
                       <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 .85rem', display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
                         {insights.hidden_requirements.map((r, i) => (
-                          <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '.5rem', fontSize: '.75rem', color: 'var(--muted)', lineHeight: 1.5 }}>
-                            <span style={{ color: 'var(--red)', fontSize: '.55rem', marginTop: '.2rem', flexShrink: 0 }}>◆</span>{r}
+                          <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '.5rem', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.5 }}>
+                            <span style={{ color: 'var(--red)', fontSize: 'var(--fs-meta)', marginTop: '.2rem', flexShrink: 0 }}>◆</span>{r}
                           </li>
                         ))}
                       </ul>
                     </>
                   )}
                   {insights.insider_tip && (
-                    <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 7, padding: '.65rem .9rem', fontSize: '.75rem', color: 'var(--sub)', lineHeight: 1.6 }}>
+                    <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 7, padding: '.65rem .9rem', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6 }}>
                       <span style={{ color: 'var(--green)', fontWeight: 700 }}>Tip: </span>{insights.insider_tip}
                     </div>
                   )}
@@ -580,30 +580,30 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
         {/* Description */}
         <div style={{ marginTop: '1.5rem', animation: 'fadeUp .4s .25s ease both' }}>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)', marginBottom: '.75rem' }}>ABOUT THIS ROLE</div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)', marginBottom: '.75rem' }}>ABOUT THIS ROLE</div>
           {insightsState === 'loading' || insightsState === 'generating'
             ? <Skeleton widths={[95, 82, 90, 70, 86, 75, 92, 65, 80, 88]} h={9} />
             : descParas.length > 0
               ? <>
-                  {descParas.map((p, i) => <p key={i} style={{ fontSize: '.84rem', color: 'var(--sub)', lineHeight: 1.8, margin: '0 0 .85rem' }}>{p}</p>)}
+                  {descParas.map((p, i) => <p key={i} style={{ fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.8, margin: '0 0 .85rem' }}>{p}</p>)}
                   {foldToFull && (
                     <button type="button" onClick={() => setShowFullDesc(true)} data-testid="read-full-posting"
-                      style={{ background: 'none', border: 'none', padding: '.5rem 0', color: 'var(--green)', fontFamily: 'var(--mono)', fontSize: '.75rem', cursor: 'pointer', minHeight: 44 }}>
+                      style={{ background: 'none', border: 'none', padding: '.5rem 0', color: 'var(--green)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', cursor: 'pointer', minHeight: 44 }}>
                       Read the full posting ({(job.description || '').length.toLocaleString()} characters) ↓
                     </button>
                   )}
                   {preview && (
-                    <div style={{ margin: '0 0 .85rem', padding: '.55rem .8rem', background: 'rgba(245,158,11,.07)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--amber)', lineHeight: 1.55 }}>
+                    <div style={{ margin: '0 0 .85rem', padding: '.55rem .8rem', background: 'rgba(245,158,11,.07)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--amber)', lineHeight: 1.55 }}>
                       ✂ Preview from {job.source || 'this source'}. The full posting is on the employer&apos;s site{postingHref ? <> — <a href={postingHref} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--amber)' }}>open it ↗</a></> : '.'}
                     </div>
                   )}
                   {cutOff && !foldToFull && (
-                    <div style={{ margin: '0 0 .85rem', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)', lineHeight: 1.55 }}>
+                    <div style={{ margin: '0 0 .85rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', lineHeight: 1.55 }}>
                       Continues on the employer&apos;s site{postingHref ? <> — <a href={postingHref} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--green)' }}>open it ↗</a></> : '.'}
                     </div>
                   )}
                 </>
-              : <p style={{ fontSize: '.84rem', color: 'var(--muted)', fontWeight: 300 }}>No description available.</p>
+              : <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--muted)', fontWeight: 400 }}>No description available.</p>
           }
         </div>
 
@@ -615,32 +615,32 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
         {/* Report Your Experience — T1-15 */}
         <div style={{ marginTop: '1.5rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.25rem' }}>
-          <div style={{ fontFamily: 'var(--display)', fontSize: '.9rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.3rem' }}>Report your experience</div>
-          <p style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--sub)', marginBottom: '1rem', lineHeight: 1.6 }}>
+          <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-ui)', fontWeight: 700, color: 'var(--white)', marginBottom: '.3rem' }}>Report your experience</div>
+          <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '1rem', lineHeight: 1.6 }}>
             Applied here? Share how it went — takes 60 seconds and warns the next applicant.
           </p>
           <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
             <a
               href={`/report?from=company&company=${encodeURIComponent(job?.company || '')}&role=${encodeURIComponent(job?.title || '')}&outcome=ghosted`}
-              style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--red)', borderRadius: 7, padding: '.4rem .85rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', minHeight: 44 }}
+              style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--red)', borderRadius: 7, padding: '.4rem .85rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', minHeight: 44 }}
             >
               👻 Got ghosted
             </a>
             <a
               href={`/report?from=company&company=${encodeURIComponent(job?.company || '')}&role=${encodeURIComponent(job?.title || '')}&outcome=rejected`}
-              style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', color: 'var(--blue)', borderRadius: 7, padding: '.4rem .85rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', minHeight: 44 }}
+              style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', color: 'var(--blue)', borderRadius: 7, padding: '.4rem .85rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', minHeight: 44 }}
             >
               🤝 Rejected
             </a>
             <a
               href={`/report?from=company&company=${encodeURIComponent(job?.company || '')}&role=${encodeURIComponent(job?.title || '')}&outcome=interviewing`}
-              style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', color: 'var(--green)', borderRadius: 7, padding: '.4rem .85rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', minHeight: 44 }}
+              style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', color: 'var(--green)', borderRadius: 7, padding: '.4rem .85rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', minHeight: 44 }}
             >
               📅 Got an interview
             </a>
             <a
               href={`/report?from=company&company=${encodeURIComponent(job?.company || '')}&role=${encodeURIComponent(job?.title || '')}&outcome=hired`}
-              style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', color: 'var(--green)', borderRadius: 7, padding: '.4rem .85rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', minHeight: 44 }}
+              style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', color: 'var(--green)', borderRadius: 7, padding: '.4rem .85rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', minHeight: 44 }}
             >
               ✅ Got an offer
             </a>
@@ -651,19 +651,19 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       {/* Sticky footer */}
       <div style={{ position: 'sticky', bottom: 0, background: 'var(--ink)', borderTop: '1px solid var(--line2)', padding: '.9rem 1rem', paddingBottom: 'calc(.9rem + env(safe-area-inset-bottom))', zIndex: 10 }}>
         <div style={{ maxWidth: 720, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '.5rem', width: '100%', boxSizing: 'border-box' }}>
-          <a href={`/company/${companySlug(job.company)}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 44, width: '100%', textAlign: 'center', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--amber)', textDecoration: 'none', opacity: .85 }}>
+          <a href={`/company/${companySlug(job.company)}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 44, width: '100%', textAlign: 'center', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--amber)', textDecoration: 'none', opacity: .85 }}>
             🏢 Check {companyName || 'company'} →
           </a>
           <div style={{ display: 'flex', gap: '.75rem' }}>
-            <button onClick={toggleSave} aria-label={saved ? 'Unsave' : 'Save'} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.65rem 1rem', fontSize: '1.1rem', cursor: 'pointer', color: saved ? 'var(--green)' : 'var(--muted)', flexShrink: 0 }}>{saved ? '♥' : '♡'}</button>
-            <button onClick={() => setShowShareCard(true)} aria-label="Share listing" title="Share this listing" style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.65rem 1rem', fontSize: '1.05rem', cursor: 'pointer', color: 'var(--muted)', flexShrink: 0 }}>🖼</button>
+            <button onClick={toggleSave} aria-label={saved ? 'Unsave' : 'Save'} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.65rem 1rem', fontSize: 'var(--fs-lead)', cursor: 'pointer', color: saved ? 'var(--green)' : 'var(--muted)', flexShrink: 0 }}>{saved ? '♥' : '♡'}</button>
+            <button onClick={() => setShowShareCard(true)} aria-label="Share listing" title="Share this listing" style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.65rem 1rem', fontSize: 'var(--fs-lead)', cursor: 'pointer', color: 'var(--muted)', flexShrink: 0 }}>🖼</button>
             {job.filled ? (
-              <button disabled style={{ flex: 1, background: 'var(--raised)', color: 'var(--muted)', border: '1px solid var(--line2)', borderRadius: 8, padding: '.65rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem' }}>Position filled</button>
+              <button disabled style={{ flex: 1, background: 'var(--raised)', color: 'var(--muted)', border: '1px solid var(--line2)', borderRadius: 8, padding: '.65rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)' }}>Position filled</button>
             ) : <>
             {takesSeenApply(job) && (
               <button
                 onClick={() => setShowSeenApply(true)}
-                style={{ flex: 1, textAlign: 'center', background: 'var(--green)', color: 'var(--ink)', borderRadius: 8, padding: '.65rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', border: 'none', cursor: 'pointer' }}
+                style={{ flex: 1, textAlign: 'center', background: 'var(--green)', color: 'var(--ink)', borderRadius: 8, padding: '.65rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)', border: 'none', cursor: 'pointer' }}
               >
                 Apply on Seen →
               </button>
@@ -680,8 +680,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                     data-testid="detail-apply-link"
                     onClick={() => { trackApplyClick(job); setCheckpointAuto(false); setShowCheckpoint(true) }}
                     style={takesSeenApply(job)
-                      ? { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', background: 'none', color: 'var(--sub)', borderRadius: 8, padding: '.65rem .8rem', fontFamily: 'var(--display)', fontWeight: 700, fontSize: '.78rem', border: '1px solid var(--line2)', textDecoration: 'none', minWidth: 0 }
-                      : { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', background: 'var(--green)', color: 'var(--ink)', borderRadius: 8, padding: '.65rem .8rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', textDecoration: 'none', minWidth: 0 }}
+                      ? { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', background: 'none', color: 'var(--sub)', borderRadius: 8, padding: '.65rem .8rem', fontFamily: 'var(--display)', fontWeight: 700, fontSize: 'var(--fs-meta)', border: '1px solid var(--line2)', textDecoration: 'none', minWidth: 0 }
+                      : { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', background: 'var(--green)', color: 'var(--ink)', borderRadius: 8, padding: '.65rem .8rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)', textDecoration: 'none', minWidth: 0 }}
                   >
                     {takesSeenApply(job) ? 'Apply on their site ↗' : preview ? 'Open the full posting ↗' : 'Apply ↗'}
                   </a>
@@ -691,11 +691,11 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                       data-testid="detail-optimize-btn"
                       onClick={() => setShowApplyModal(true)}
                       title={`Optimize your résumé for this job · ${priceLabel(RESUME_OPTIMIZE_COST, pro)}`}
-                      style={{ flex: 1, minWidth: 0, textAlign: 'center', background: 'rgba(99,102,241,.08)', color: '#a5b4fc', borderRadius: 8, padding: '.5rem .5rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.78rem', lineHeight: 1.15, border: '1px solid rgba(99,102,241,.35)', cursor: 'pointer' }}
+                      style={{ flex: 1, minWidth: 0, textAlign: 'center', background: 'rgba(99,102,241,.08)', color: '#a5b4fc', borderRadius: 8, padding: '.5rem .5rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-meta)', lineHeight: 1.15, border: '1px solid rgba(99,102,241,.35)', cursor: 'pointer' }}
                     >Optimize · {priceLabel(RESUME_OPTIMIZE_COST, pro).replace(' ', '\u00a0')}</button>
                   )}
                 </>
-              : !takesSeenApply(job) && <button disabled style={{ flex: 1, background: 'var(--muted)', color: 'var(--ink)', border: 'none', borderRadius: 8, padding: '.65rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', opacity: .65 }}>No apply link</button>
+              : !takesSeenApply(job) && <button disabled style={{ flex: 1, background: 'var(--muted)', color: 'var(--ink)', border: 'none', borderRadius: 8, padding: '.65rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)', opacity: .65 }}>No apply link</button>
             }
             </>}
           </div>

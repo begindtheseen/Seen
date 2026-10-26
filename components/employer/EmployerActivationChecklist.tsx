@@ -23,7 +23,7 @@ function Row({ n, state, title, desc, cta }: { n: number; state: StepState; titl
         aria-hidden
         style={{
           flexShrink: 0, width: 26, height: 26, borderRadius: 999, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontFamily: 'var(--mono)', fontSize: '.7rem', fontWeight: 700,
+          fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500,
           background: done ? 'rgba(16,185,129,.15)' : locked ? 'var(--raised)' : 'linear-gradient(135deg,#1d4ed8,#7c3aed)',
           color: done ? 'var(--green)' : '#fff',
           border: done ? '1px solid rgba(16,185,129,.4)' : locked ? '1px solid var(--line2)' : 'none',
@@ -32,8 +32,8 @@ function Row({ n, state, title, desc, cta }: { n: number; state: StepState; titl
         {done ? '✓' : locked ? '🔒' : n}
       </span>
       <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ fontFamily: 'var(--display)', fontSize: '.9rem', fontWeight: 700, color: 'var(--white)' }}>{title}</div>
-        <p style={{ color: 'var(--sub)', fontSize: '.74rem', lineHeight: 1.6, margin: '.15rem 0 0' }}>{desc}</p>
+        <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-ui)', fontWeight: 700, color: 'var(--white)' }}>{title}</div>
+        <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-meta)', lineHeight: 1.6, margin: '.15rem 0 0' }}>{desc}</p>
         {state === 'current' && cta ? <div style={{ marginTop: '.6rem' }}>{cta}</div> : null}
       </div>
     </div>
@@ -42,11 +42,11 @@ function Row({ n, state, title, desc, cta }: { n: number; state: StepState; titl
 
 const primaryLink: React.CSSProperties = {
   display: 'inline-block', background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 8,
-  padding: '.55rem 1.1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.76rem', color: '#fff', textDecoration: 'none',
+  padding: '.55rem 1.1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-meta)', color: '#fff', textDecoration: 'none',
 }
 const ghostLink: React.CSSProperties = {
   display: 'inline-block', border: '1px solid var(--line2)', borderRadius: 8, padding: '.55rem 1rem',
-  fontFamily: 'var(--mono)', fontSize: '.66rem', color: 'var(--white)', textDecoration: 'none',
+  fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', textDecoration: 'none',
 }
 
 export default function EmployerActivationChecklist() {
@@ -61,7 +61,7 @@ export default function EmployerActivationChecklist() {
   const gatedState: StepState = approved ? 'current' : 'locked'
 
   const claimCta = pending ? (
-    <span style={{ fontFamily: 'var(--mono)', fontSize: '.66rem', color: 'var(--amber)' }}>
+    <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--amber)' }}>
       In review — we&apos;ll email you the moment it&apos;s approved.
     </span>
   ) : (
@@ -70,11 +70,11 @@ export default function EmployerActivationChecklist() {
 
   return (
     <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16, padding: '1.6rem', marginBottom: '1.6rem' }}>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.16em', color: 'var(--blue)', marginBottom: '.4rem' }}>Get set up</div>
-      <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.15rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: '0 0 .3rem' }}>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.16em', color: 'var(--blue)', marginBottom: '.4rem' }}>Get set up</div>
+      <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: '0 0 .3rem' }}>
         {pending ? 'Your claim is in review' : 'Two minutes to your dashboard'}
       </h2>
-      <p style={{ color: 'var(--sub)', fontSize: '.78rem', lineHeight: 1.6, margin: '0 0 .6rem', maxWidth: 560 }}>
+      <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-meta)', lineHeight: 1.6, margin: '0 0 .6rem', maxWidth: 560 }}>
         {pending
           ? 'Once approved, your listings, analytics, and applicant updates unlock below — all scoped to your company.'
           : 'Claim your company to unlock your listings, analytics, and the outcomes candidates reported about you. If you sign up with your work email, approval is instant.'}

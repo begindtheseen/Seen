@@ -141,7 +141,7 @@ export default function GuestTracker() {
               {apps.map(a => (
                 <li key={a.id} className={`${s.card} ${s.quiet}`} style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '.75rem', flexWrap: 'wrap' }}>
                   <div style={{ flex: '1 1 14rem', minWidth: 0 }}>
-                    <p className={s.title} style={{ fontSize: '1rem', margin: 0 }}>{a.company}</p>
+                    <p className={s.title} style={{ fontSize: 'var(--fs-lead)', margin: 0 }}>{a.company}</p>
                     <p className={s.small} style={{ margin: '.15rem 0 0', color: 'var(--sub)' }}>
                       {a.role} · Day {daysSince(a.appliedAt)} · applied {shortDay(a.appliedAt)}{a.status !== 'active' ? ` · ${a.status}` : ''}
                     </p>

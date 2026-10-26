@@ -169,7 +169,7 @@ export default function ResumeSurveyModal({ onClose, onCreditsEarned, onExhauste
         @keyframes rsPopIn { from { opacity:0; transform:scale(.6) translateY(8px);} to { opacity:1; transform:scale(1) translateY(0);} }
         @keyframes rsPopOut { from { opacity:1; transform:scale(1);} to { opacity:0; transform:scale(.8);} }
         @keyframes rsFade { from { opacity:0; transform:translateY(10px);} to { opacity:1; transform:translateY(0);} }
-        .rs-opt { display:block; width:100%; padding:11px 14px; text-align:left; background:var(--card); border:1px solid var(--line); border-radius:9px; font-family:var(--body); font-size:14px; color:var(--white); cursor:pointer; margin-bottom:8px; transition:border-color .15s, background .15s; line-height:1.4; }
+        .rs-opt { display:block; width:100%; padding:11px 14px; text-align:left; background:var(--card); border:1px solid var(--line); border-radius:9px; font-family:var(--body); font-size:var(--fs-ui); color:var(--white); cursor:pointer; margin-bottom:8px; transition:border-color .15s, background .15s; line-height:1.4; }
         .rs-opt:hover { border-color:rgba(99,102,241,.5); background:rgba(99,102,241,.07); }
         .rs-opt.sel { border-color:var(--indigo); background:rgba(99,102,241,.14); color:#c7d2fe; }
         .rs-anim { animation: rsFade .25s ease forwards; }
@@ -183,8 +183,8 @@ export default function ResumeSurveyModal({ onClose, onCreditsEarned, onExhauste
           {phase === 'credit-pop' && (
             <div style={popOuter}>
               <div style={popInner}>
-                <div style={{ fontSize: 36, marginBottom: 4 }}>✦</div>
-                <div style={{ fontSize: 26, fontFamily: 'var(--display)', fontWeight: 700, color: '#a5b4fc', lineHeight: 1 }}>+{awarded}</div>
+                <div style={{ fontSize: 40, marginBottom: 4 }}>✦</div>
+                <div style={{ fontSize: 28, fontFamily: 'var(--display)', fontWeight: 700, color: '#a5b4fc', lineHeight: 1 }}>+{awarded}</div>
                 <div style={{ fontSize: 13, color: 'var(--sub)', fontFamily: 'var(--mono)', marginTop: 4 }}>credits earned</div>
               </div>
             </div>
@@ -223,8 +223,8 @@ export default function ResumeSurveyModal({ onClose, onCreditsEarned, onExhauste
                   { v: '+2', l: 'credits' },
                 ].map(({ v, l }) => (
                   <div key={l}>
-                    <div style={{ fontSize: 22, fontFamily: 'var(--display)', fontWeight: 700, color: 'var(--indigo)', lineHeight: 1 }}>{v}</div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--muted)', marginTop: 3 }}>{l}</div>
+                    <div style={{ fontSize: 24, fontFamily: 'var(--display)', fontWeight: 700, color: 'var(--indigo)', lineHeight: 1 }}>{v}</div>
+                    <div style={{ fontSize: 12, fontFamily: 'var(--mono)', color: 'var(--muted)', marginTop: 3 }}>{l}</div>
                   </div>
                 ))}
               </div>
@@ -244,7 +244,7 @@ export default function ResumeSurveyModal({ onClose, onCreditsEarned, onExhauste
                 <span style={{ color: 'var(--indigo)' }}>✦ {creditsLeft} left today</span>
               </div>
               <div style={{ fontSize: 12, fontFamily: 'var(--mono)', color: 'var(--indigo)', marginBottom: 10, opacity: .75 }}>{survey.company}</div>
-              <div style={{ fontSize: 18, fontFamily: 'var(--display)', fontWeight: 700, color: 'var(--white)', lineHeight: 1.35, marginBottom: 18 }}>{q.text}</div>
+              <div style={{ fontSize: 17, fontFamily: 'var(--display)', fontWeight: 700, color: 'var(--white)', lineHeight: 1.35, marginBottom: 18 }}>{q.text}</div>
               <div style={{ marginBottom: 4 }}>
                 {q.options.map(opt => (
                   <button key={opt} className={`rs-opt${selected === opt ? ' sel' : ''}`} onClick={() => setSelected(opt)}>{opt}</button>
@@ -262,12 +262,12 @@ export default function ResumeSurveyModal({ onClose, onCreditsEarned, onExhauste
 
           {phase === 'done' && (
             <div style={{ ...pad, textAlign: 'center' }} className="rs-anim">
-              <div style={{ fontSize: 48, marginBottom: 12, lineHeight: 1 }}>✦</div>
-              <div style={{ fontSize: 26, fontFamily: 'var(--display)', fontWeight: 700, color: 'var(--white)', marginBottom: 6 }}>
+              <div style={{ fontSize: 56, marginBottom: 12, lineHeight: 1 }}>✦</div>
+              <div style={{ fontSize: 28, fontFamily: 'var(--display)', fontWeight: 700, color: 'var(--white)', marginBottom: 6 }}>
                 {awarded > 0 ? `You earned ${awarded} credit${awarded !== 1 ? 's' : ''}!` : 'Intel recorded'}
               </div>
               <div style={{ fontSize: 14, fontFamily: 'var(--mono)', color: 'var(--sub)', marginBottom: 18 }}>Balance: {balance} credits</div>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 20, background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.25)', color: 'var(--green)', fontSize: 13, fontFamily: 'var(--mono)', fontWeight: 600, marginBottom: 20 }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 20, background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.25)', color: 'var(--green)', fontSize: 13, fontFamily: 'var(--mono)', fontWeight: 500, marginBottom: 20 }}>
                 ✓ You're a Seen contributor
               </div>
               <div style={{ fontSize: 13, color: 'var(--sub)', fontFamily: 'var(--body)', lineHeight: 1.55, marginBottom: 22, padding: '0 8px' }}>
@@ -280,32 +280,32 @@ export default function ResumeSurveyModal({ onClose, onCreditsEarned, onExhauste
 
           {phase === 'none' && (
             <div style={{ padding: '2rem 1.5rem', textAlign: 'center' }}>
-              <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>✓</div>
-              <div style={{ fontFamily: 'var(--display)', fontSize: '.95rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.5rem' }}>
+              <div style={{ fontSize: 'var(--fs-h2)', marginBottom: '1rem' }}>✓</div>
+              <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', marginBottom: '.5rem' }}>
                 {(NONE_COPY[noneReason] || NONE_COPY.all_surveyed).title}
               </div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1.5rem' }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1.5rem' }}>
                 {(NONE_COPY[noneReason] || NONE_COPY.all_surveyed).body}
               </div>
               {(noneReason === 'no_resume' || noneReason === 'no_employment') && (
                 <button
                   onClick={() => { onClose(); router.push('/resume') }}
-                  style={{ display: 'block', width: '100%', background: 'var(--indigo)', border: 'none', color: '#fff', fontFamily: 'var(--body)', fontWeight: 600, fontSize: '.85rem', borderRadius: 10, padding: '.7rem 1.25rem', cursor: 'pointer', marginBottom: '.6rem' }}
+                  style={{ display: 'block', width: '100%', background: 'var(--indigo)', border: 'none', color: '#fff', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-ui)', borderRadius: 10, padding: '.7rem 1.25rem', cursor: 'pointer', marginBottom: '.6rem' }}
                 >
                   Upload your résumé →
                 </button>
               )}
-              <button onClick={onClose} style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: '.72rem', borderRadius: 8, padding: '.6rem 1.25rem', cursor: 'pointer' }}>Close</button>
+              <button onClick={onClose} style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', borderRadius: 8, padding: '.6rem 1.25rem', cursor: 'pointer' }}>Close</button>
             </div>
           )}
 
           {phase === 'error' && (
             <div style={{ padding: '2rem 1.5rem', textAlign: 'center' }}>
-              <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⚠️</div>
-              <div style={{ fontFamily: 'var(--display)', fontSize: '.95rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.5rem' }}>Something went wrong</div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1.5rem' }}>Tap retry to try again.</div>
-              <button onClick={loadSurvey} style={{ background: 'var(--indigo)', border: 'none', color: '#fff', fontFamily: 'var(--body)', fontWeight: 600, fontSize: '.8rem', borderRadius: 8, padding: '.6rem 1.25rem', cursor: 'pointer', marginBottom: '0.5rem', width: '100%' }}>Retry →</button>
-              <button onClick={onClose} style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: '.72rem', borderRadius: 8, padding: '.6rem 1.25rem', cursor: 'pointer', width: '100%' }}>Close</button>
+              <div style={{ fontSize: 'var(--fs-h2)', marginBottom: '1rem' }}>⚠️</div>
+              <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', marginBottom: '.5rem' }}>Something went wrong</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1.5rem' }}>Tap retry to try again.</div>
+              <button onClick={loadSurvey} style={{ background: 'var(--indigo)', border: 'none', color: '#fff', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', borderRadius: 8, padding: '.6rem 1.25rem', cursor: 'pointer', marginBottom: '0.5rem', width: '100%' }}>Retry →</button>
+              <button onClick={onClose} style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', borderRadius: 8, padding: '.6rem 1.25rem', cursor: 'pointer', width: '100%' }}>Close</button>
             </div>
           )}
         </div>

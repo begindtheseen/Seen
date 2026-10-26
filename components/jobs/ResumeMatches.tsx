@@ -23,11 +23,11 @@ export default function ResumeMatches({ jobs, loading, skills, city, citySource,
   const rows = jobs.slice(0, 5)
   return (
     <section aria-label="Matched to your résumé" style={{ marginBottom: '1.35rem', paddingBottom: '1.1rem', borderBottom: '1px solid var(--line)' }}>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--green)', marginBottom: '.6rem', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--green)', marginBottom: '.6rem', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <span style={{ width: 20, height: 1.5, background: 'linear-gradient(90deg, var(--green), #8b5cf6)', display: 'inline-block', flexShrink: 0 }} />
         Matched to your résumé
         {city && (
-          <span style={{ color: 'var(--dim)', letterSpacing: 'normal', textTransform: 'none', fontSize: '.6rem' }}>· near {city}{citySource === 'resume' ? ' (from your résumé)' : ''}, same role family{skills.length ? ` · ${skills.slice(0, 2).join(', ')}` : ''}</span>
+          <span style={{ color: 'var(--dim)', letterSpacing: 'normal', textTransform: 'none', fontSize: 'var(--fs-meta)' }}>· near {city}{citySource === 'resume' ? ' (from your résumé)' : ''}, same role family{skills.length ? ` · ${skills.slice(0, 2).join(', ')}` : ''}</span>
         )}
       </div>
       {loading ? (
@@ -46,10 +46,10 @@ export default function ResumeMatches({ jobs, loading, skills, city, citySource,
               >
                 <ListingScoreRing score={job.score} size={34} caption={false} />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontFamily: 'var(--display)', fontSize: '.84rem', fontWeight: 700, color: 'var(--white)', letterSpacing: '-.015em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{job.title}</div>
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayCompanyName(job.company)}{job.location ? ` · ${job.location}` : ''}{displayPay(job) ? ` · ${displayPay(job)}` : ''}</div>
+                  <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--white)', letterSpacing: '-.015em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{job.title}</div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayCompanyName(job.company)}{job.location ? ` · ${job.location}` : ''}{displayPay(job) ? ` · ${displayPay(job)}` : ''}</div>
                 </div>
-                <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--green)', flexShrink: 0 }}>Open →</span>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', flexShrink: 0 }}>Open →</span>
               </button>
             )
           })}

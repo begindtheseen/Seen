@@ -397,7 +397,7 @@ export default function Nav() {
       >
         <div className="side-menu-logo">
           <span className="logo-pulse" />
-          <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.2rem', color: 'var(--white)', letterSpacing: '-.02em' }}>Seen</span>
+          <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-h3)', color: 'var(--white)', letterSpacing: '-.02em' }}>Seen</span>
           <button ref={drawerCloseRef} type="button" className={styles.drawerClose} onClick={() => setMenuOpen(false)} aria-label="Close menu">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
@@ -414,8 +414,8 @@ export default function Nav() {
               border: '1px solid rgba(16,185,129,.4)', borderRadius: 12,
             }}
           >
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '.66rem', fontWeight: 700, color: 'var(--green)', letterSpacing: '.03em' }}>★ Seen Pro</span>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '.66rem', fontWeight: 700, color: 'var(--green)' }}>What&apos;s included →</span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, color: 'var(--green)', letterSpacing: '.03em' }}>★ Seen Pro</span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, color: 'var(--green)' }}>What&apos;s included →</span>
           </Link>
         )}
         {isSeeker && !isPro && creditBalance !== null && (
@@ -429,10 +429,10 @@ export default function Nav() {
               borderRadius: 12,
             }}
           >
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '.66rem', fontWeight: 700, color: creditBalance === 0 ? 'var(--red)' : 'var(--white)' }}>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, color: creditBalance === 0 ? 'var(--red)' : 'var(--white)' }}>
               {creditBalance === 0 ? 'No AI credits left today' : `🪙 ${creditBalance} AI credit${creditBalance === 1 ? '' : 's'} left`}
             </span>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', fontWeight: 700, color: creditBalance === 0 ? 'var(--red)' : 'var(--blue)' }}>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, color: creditBalance === 0 ? 'var(--red)' : 'var(--blue)' }}>
               {creditBalance === 0 ? 'Options →' : 'Earn more →'}
             </span>
           </button>

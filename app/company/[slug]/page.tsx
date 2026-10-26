@@ -232,11 +232,11 @@ function HiringFunnel({ rows }: { rows: Array<{ label: string; n: number; pct: n
     <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
       {stages.map(s => (
         <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
-          <div style={{ width: 80, fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', flexShrink: 0 }}>{s.label}</div>
+          <div style={{ width: 80, fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', flexShrink: 0 }}>{s.label}</div>
           <div style={{ flex: 1, height: 8, background: 'var(--line2)', borderRadius: 4, overflow: 'hidden' }}>
             <div style={{ width: `${Math.max(0, Math.min(100, s.pct))}%`, height: '100%', background: s.color, borderRadius: 4, transition: 'width .6s ease' }} />
           </div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', width: 48, textAlign: 'right', flexShrink: 0 }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', width: 48, textAlign: 'right', flexShrink: 0 }}>
             {s.pct}%{s.note ? <span style={{ color: 'var(--red)', marginLeft: '.2rem' }}>{s.note}</span> : null}
           </div>
         </div>
@@ -277,16 +277,16 @@ function WebReviewsSection({ reviews, hidden }: { reviews: WebReview[]; hidden: 
             background: 'var(--card)', border: `1px solid ${account ? sentBorder(rv.sentiment) : 'var(--line2)'}`,
             borderRadius: 8, padding: '.85rem 1rem',
           }}>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)', lineHeight: 1.55, marginBottom: '.5rem' }}>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', lineHeight: 1.55, marginBottom: '.5rem' }}>
               &ldquo;{trimToSentence(rv.text, 500)}&rdquo;
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
               {account
-                ? <span style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', fontWeight: 600, color: sentColor(rv.sentiment) }}>{sentLabel(rv.sentiment)}</span>
-                : <span style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', fontWeight: 600, color: 'var(--muted)' }}>{rv.kind === 'employee_review' ? '💼 Employee review' : '💬 Commentary'}</span>}
-              {rv.source && <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>{displayPlatform(rv.source)}</span>}
-              {rv.year && <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>{rv.year}</span>}
-              {href && <a href={href} target="_blank" rel="nofollow ugc noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--blue)', textDecoration: 'none' }}>Source ↗</a>}
+                ? <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, color: sentColor(rv.sentiment) }}>{sentLabel(rv.sentiment)}</span>
+                : <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, color: 'var(--muted)' }}>{rv.kind === 'employee_review' ? '💼 Employee review' : '💬 Commentary'}</span>}
+              {rv.source && <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>{displayPlatform(rv.source)}</span>}
+              {rv.year && <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>{rv.year}</span>}
+              {href && <a href={href} target="_blank" rel="nofollow ugc noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none' }}>Source ↗</a>}
             </div>
           </div>
           )
@@ -294,16 +294,16 @@ function WebReviewsSection({ reviews, hidden }: { reviews: WebReview[]; hidden: 
       </div>
       {summaries.length > 0 && (
         <details className="co-research-note" style={{ marginTop: quotes.length ? '.8rem' : 0, background: 'var(--surface)', border: '1px dashed var(--line2)', borderRadius: 8, padding: '.15rem .9rem' }}>
-          <summary style={{ cursor: 'pointer', listStyle: 'none', padding: '.6rem 0', minHeight: 44, display: 'flex', alignItems: 'center', fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--muted)', lineHeight: 1.5 }}>
+          <summary style={{ cursor: 'pointer', listStyle: 'none', padding: '.6rem 0', minHeight: 44, display: 'flex', alignItems: 'center', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.5 }}>
             {webResearchNote(summaries.length)}
           </summary>
-          <ul style={{ margin: '0 0 .7rem', paddingLeft: '1.1rem', fontFamily: 'var(--body)', fontSize: '.78rem', color: 'var(--muted)', lineHeight: 1.6 }}>
+          <ul style={{ margin: '0 0 .7rem', paddingLeft: '1.1rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.6 }}>
             {summaries.map((rv, i) => <li key={i}>{trimToSentence(rv.text, 300)}</li>)}
           </ul>
         </details>
       )}
       {hidden > 0 && (
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--muted)', marginTop: '.6rem', lineHeight: 1.6 }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.6rem', lineHeight: 1.6 }}>
           {hidden} quote{hidden === 1 ? '' : 's'} not shown: {hidden === 1 ? 'it contains' : 'they contain'} links or moderator-bot text, which is never a first-hand account.
         </div>
       )}
@@ -330,7 +330,7 @@ function OutcomeDistribution({ reports, label }: { reports: Report[]; label: str
 
   return (
     <div style={{ marginBottom: '.8rem' }}>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--muted)', marginBottom: '.3rem' }}>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--muted)', marginBottom: '.3rem' }}>
         {label}
       </div>
       <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: '.18rem' }}>
@@ -340,7 +340,7 @@ function OutcomeDistribution({ reports, label }: { reports: Report[]; label: str
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '.25rem', flexWrap: 'wrap' }}>
         {merged.map((s, i) => (
-          <span key={s.label} style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--dim)' }}>
+          <span key={s.label} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>
             {s.label} {Math.round(s.count / total * 100)}%
             {i < merged.length - 1 && <span style={{ color: 'var(--line2)', margin: '0 .18rem' }}>·</span>}
           </span>
@@ -353,7 +353,7 @@ function OutcomeDistribution({ reports, label }: { reports: Report[]; label: str
 // Truthful "self-filling" status: the company is queued for the public-discussion enrichment cron.
 function EnrichmentNotice({ companyName }: { companyName: string }) {
   return (
-    <div role="status" style={{ marginTop: '.75rem', fontFamily: 'var(--mono)', fontSize: '.66rem', color: 'var(--sub)', lineHeight: 1.6 }}>
+    <div role="status" style={{ marginTop: '.75rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6 }}>
       We&apos;re gathering public hiring discussions about <span style={{ textTransform: 'capitalize' }}>{companyName}</span> — check back shortly.
     </div>
   )
@@ -716,20 +716,20 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
             into <head>. */}
         <meta name="robots" content="noindex" />
         <div style={{ maxWidth: 600, margin: '0 auto', padding: '5rem 2rem', textAlign: 'center', width: '100%', boxSizing: 'border-box' }}>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '2.5rem', marginBottom: '1rem', opacity: .4 }}>?</div>
-          <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.6rem', letterSpacing: '-.02em' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-fig-m)', marginBottom: '1rem', opacity: .4 }}>?</div>
+          <h1 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--white)', marginBottom: '.6rem', letterSpacing: '-.02em' }}>
             Can&apos;t verify &ldquo;{companyName}&rdquo;
           </h1>
-          <p style={{ color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: '.72rem', lineHeight: 1.7, marginBottom: '1.75rem' }}>
+          <p style={{ color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', lineHeight: 1.7, marginBottom: '1.75rem' }}>
             We couldn&apos;t find a company by that name. Looking for a job instead? Search open roles — or use the company&apos;s official name to check how it treats applicants.
           </p>
           {/* A job title typed into a company box lands here (conversion audit 2026-10-24: "barista").
               The primary way on is the job search for the same words (lib/searchRoute.ts). */}
           <div style={{ display: 'flex', gap: '.6rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <a href={jobsSearchHref(companyName)} className="btn-shine" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, gap: '.4rem', background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', border: 'none', borderRadius: 9, padding: '.65rem 1.3rem', fontFamily: 'var(--display)', fontSize: '.85rem', fontWeight: 800, color: '#fff', textDecoration: 'none', maxWidth: '100%', minWidth: 0, overflowWrap: 'anywhere' }}>
+            <a href={jobsSearchHref(companyName)} className="btn-shine" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, gap: '.4rem', background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', border: 'none', borderRadius: 9, padding: '.65rem 1.3rem', fontFamily: 'var(--display)', fontSize: 'var(--fs-ui)', fontWeight: 800, color: '#fff', textDecoration: 'none', maxWidth: '100%', minWidth: 0, overflowWrap: 'anywhere' }}>
               See &ldquo;{companyName}&rdquo; jobs →
             </a>
-            <a href="/companies" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, gap: '.4rem', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 9, padding: '.65rem 1.3rem', fontFamily: 'var(--mono)', fontSize: '.75rem', fontWeight: 600, color: 'var(--blue)', textDecoration: 'none' }}>
+            <a href="/companies" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, gap: '.4rem', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 9, padding: '.65rem 1.3rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, color: 'var(--blue)', textDecoration: 'none' }}>
               Browse company grades
             </a>
           </div>
@@ -757,7 +757,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const hiringRows = [...(hiring.remote > 0 ? [{ label: 'Remote', count: hiring.remote }] : []), ...hiring.places].sort((a, b) => b.count - a.count)
   const maxCount = hiringRows.reduce((m, r) => Math.max(m, r.count), 0)
   const capped = hiring.listings >= 20
-  const sectionNote: CSSProperties = { fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', marginBottom: '1rem', lineHeight: 1.6 }
+  const sectionNote: CSSProperties = { fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginBottom: '1rem', lineHeight: 1.6 }
 
   // Compare cells: an ungraded company shows "Not graded" / "—", never a number standing in for one.
   const cmpScore = (sc: CompanyScore | null) => !sc ? '—' : isGradeableScore(sc) ? String(sc.overall_score) : 'Not graded'
@@ -808,12 +808,12 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
         {myApp && (
           <div className="co-myapp">
             <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--indigo)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Your application</span>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)' }}>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--indigo)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Your application</span>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)' }}>
                 {myApp.role} · Day {myApp.daysSince}
               </span>
               <span style={{
-                fontFamily: 'var(--mono)', fontSize: '.52rem', borderRadius: 4, padding: '.08rem .28rem',
+                fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', borderRadius: 4, padding: '.08rem .28rem',
                 color: myApp.status === 'ghosted' ? 'var(--muted)' : myApp.status === 'hired' ? 'var(--green)' : myApp.status === 'rejected' ? 'var(--red)' : 'var(--amber)',
                 background: myApp.status === 'ghosted' ? 'rgba(156,163,175,.1)' : myApp.status === 'hired' ? 'rgba(16,185,129,.1)' : myApp.status === 'rejected' ? 'rgba(239,68,68,.1)' : 'rgba(245,158,11,.1)',
                 border: `1px solid ${myApp.status === 'ghosted' ? 'rgba(156,163,175,.2)' : myApp.status === 'hired' ? 'rgba(16,185,129,.2)' : myApp.status === 'rejected' ? 'rgba(239,68,68,.2)' : 'rgba(245,158,11,.2)'}`,
@@ -821,7 +821,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                 {myApp.status === 'active' ? myApp.stage : myApp.status}
               </span>
             </div>
-            <a href="/tracker" style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--indigo)', textDecoration: 'none', flexShrink: 0 }}>View in tracker →</a>
+            <a href="/tracker" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--indigo)', textDecoration: 'none', flexShrink: 0 }}>View in tracker →</a>
           </div>
         )}
 
@@ -886,10 +886,10 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
           ) : score && !graded ? (
             /* Below the report bar: no letter, score, rates or vibe tags — just what we actually hold. */
             <div className="co-grade-bar warn" role="status">
-              <div className="co-grade-letter warn" aria-hidden style={{ fontSize: '1.4rem' }}>—</div>
+              <div className="co-grade-letter warn" aria-hidden style={{ fontSize: 'var(--fs-xl)' }}>—</div>
               <div className="co-grade-main">
                 <span className="co-grade-lbl">Seen Grade</span>
-                <span className="co-grade-score" style={{ fontSize: '.95rem' }}>{ungradedLabel}</span>
+                <span className="co-grade-score" style={{ fontSize: 'var(--fs-body)' }}>{ungradedLabel}</span>
                 <p className="co-verdict">
                   {fpReports > 0
                     ? `We have ${gradeBasisLabel(score)} for ${displayName} so far. A grade appears at ${MIN_REPORTS_FOR_GRADE} — each report counts 1, each thing people say online counts ½.`
@@ -952,7 +952,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               })()}
             </>
           ) : (
-            <div style={{ textAlign: 'center', padding: '1.5rem 1rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.72rem' }}>
+            <div style={{ textAlign: 'center', padding: '1.5rem 1rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)' }}>
               No score data found for this company.
               {gatheringPublic && <EnrichmentNotice companyName={companyName} />}
             </div>
@@ -1038,9 +1038,9 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                 summary={`${timing.short} · ${sum.ratesShown ? `${respPct}% hear back` : `too few applicant reports for a rate (${fpReports} of ${MIN_REPORTS_FOR_RATES})`} · your response probability & industry rank`}>
                 <div className="co-card" style={{ marginBottom: '1rem' }}>
                   <div className="co-sec-lbl" style={{ marginBottom: '.45rem' }}>How long until they reply</div>
-                  <p style={{ margin: 0, fontSize: '.9rem', color: 'var(--text)', lineHeight: 1.55 }}>{timing.line}</p>
+                  <p style={{ margin: 0, fontSize: 'var(--fs-ui)', color: 'var(--text)', lineHeight: 1.55 }}>{timing.line}</p>
                   {!timing.known && (
-                    <a href={reportHref} style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--green)', textDecoration: 'none' }}>{REPORT_WHEN_YOU_HEAR} →</a>
+                    <a href={reportHref} style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', textDecoration: 'none' }}>{REPORT_WHEN_YOU_HEAR} →</a>
                   )}
                 </div>
                 <HiringProbability responseRate={score.response_rate} ghostRate={score.ghost_rate} overallScore={score.overall_score} reportCount={fpReports} mentionCount={sum.mentions} context={sum.oddsContext} />
@@ -1064,7 +1064,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                         <BarRow label="Ghost rate" value={ghostPct} color="var(--red)" />
                       </>
                     ) : (
-                      <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', lineHeight: 1.6, marginBottom: '.6rem' }}>
+                      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.6, marginBottom: '.6rem' }}>
                         Response and ghost rates are shown from {MIN_REPORTS_FOR_RATES} applicant reports — this grade stands on {sum.evidenceLine}.
                       </div>
                     )}
@@ -1083,7 +1083,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                   <div className="co-card">
                     <div className="co-sec-lbl" style={{ marginBottom: '.85rem' }}>Where they ghost</div>
                     <HiringFunnel rows={rows} />
-                    <div style={{ marginTop: '.85rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', lineHeight: 1.5 }}>
+                    <div style={{ marginTop: '.85rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', lineHeight: 1.5 }}>
                       Share of the {n} ghosted report{n !== 1 ? 's' : ''} that named the stage where contact stopped.
                     </div>
                   </div>) })()}
@@ -1097,7 +1097,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
             <Section id="reports" icon="🗣" title={employeeN > 0 ? 'Applicant reports & employee reviews' : 'Applicant reports'} count={employeeN > 0 ? null : sum.listed.withOutcome} open={open.reports} onToggle={toggle}
               summary={reports.length === 0 && reportsLoading ? 'Loading reports…' : reportsSectionSummary(sum)}>
               <div className="co-reports-tools">
-                <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', lineHeight: 1.6, flex: 1, minWidth: 180 }}>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.6, flex: 1, minWidth: 180 }}>
                   {reportsProvenanceLine(sum)}
                   {sum.listedNote ? ` ${sum.listedNote}` : ''}
                   {commentaryN > 0 ? ` ${commentaryN} ${commentaryN === 1 ? 'quote is' : 'quotes are'} commentary, not counted.` : ''}
@@ -1113,7 +1113,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                 />
               </div>
               {reportsLoading && reports.length === 0 ? (
-                <p style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--muted)', margin: '8px 0 0' }}>Loading reports…</p>
+                <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', margin: '8px 0 0' }}>Loading reports…</p>
               ) : reports.length > 0 ? (
                 <>
                   {listRows.slice(0, reportsShown).map((r, i) => {
@@ -1158,10 +1158,10 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                         {r.id && employerReplies[r.id] && (
                           <div className="rc-reply">
                             <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', marginBottom: '.3rem', flexWrap: 'wrap' }}>
-                              <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--blue)' }}>Employer response</span>
-                              <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--muted)' }}>· unverified claim, doesn&apos;t affect the score</span>
+                              <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--blue)' }}>Employer response</span>
+                              <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>· unverified claim, doesn&apos;t affect the score</span>
                             </div>
-                            <div style={{ fontSize: '.78rem', color: 'var(--sub)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{employerReplies[r.id]!.body}</div>
+                            <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{employerReplies[r.id]!.body}</div>
                           </div>
                         )}
                         {/* One attribution line: third-party rows show their source badge + link; first-party rows the platform applied on. */}
@@ -1184,7 +1184,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                   )}
                 </>
               ) : (
-                <div style={{ textAlign: 'center', padding: '1.5rem 1rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.7rem', lineHeight: 1.7 }}>
+                <div style={{ textAlign: 'center', padding: '1.5rem 1rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', lineHeight: 1.7 }}>
                   {location
                     ? <>No reports mention &ldquo;{location}&rdquo;. <button type="button" onClick={() => setLocation('')} style={{ background: 'none', border: 'none', color: 'var(--blue)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit', padding: 0 }}>Clear the city filter</button></>
                     : <>No community reports yet — {displayName} gets a grade once {MIN_REPORTS_FOR_GRADE} real reports are in.</>}
@@ -1225,21 +1225,21 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                       // Ungraded companies: per-city percentages from a handful of reports are a verdict too.
                       if (!graded) return (
                         <div key={row.city} className="co-row">
-                          <div style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--white)', minWidth: 110, flex: '1 1 120px', overflowWrap: 'anywhere' }}>{row.city}</div>
+                          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', minWidth: 110, flex: '1 1 120px', overflowWrap: 'anywhere' }}>{row.city}</div>
                           <span className="co-pill">{row.total} report{row.total !== 1 ? 's' : ''}</span>
                         </div>
                       )
                       return (
                         <div key={row.city} className="co-row">
-                          <div style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--white)', minWidth: 110, flex: '1 1 120px', overflowWrap: 'anywhere' }}>{row.city}</div>
+                          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', minWidth: 110, flex: '1 1 120px', overflowWrap: 'anywhere' }}>{row.city}</div>
                           <div style={{ flex: '2 1 120px', minWidth: 80 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.2rem' }}>
                               <div style={{ flex: 1, height: 6, background: 'var(--line2)', borderRadius: 3, overflow: 'hidden' }}>
                                 <div style={{ width: `${ghostPctVal}%`, height: '100%', background: barColor, borderRadius: 3, transition: 'width .4s ease' }} />
                               </div>
-                              <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: barColor, width: 36, textAlign: 'right', flexShrink: 0 }}>{ghostPctVal}%</span>
+                              <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: barColor, width: 36, textAlign: 'right', flexShrink: 0 }}>{ghostPctVal}%</span>
                             </div>
-                            <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>ghost rate · {Math.round(row.responseRate * 100)}% responded</div>
+                            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>ghost rate · {Math.round(row.responseRate * 100)}% responded</div>
                           </div>
                           <span className="co-pill">{row.total} report{row.total !== 1 ? 's' : ''}</span>
                         </div>
@@ -1262,7 +1262,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
                       {hiringRows.map(row => (
                         <div key={row.label} className="co-row">
-                          <div style={{ fontFamily: 'var(--mono)', fontSize: '.66rem', color: 'var(--white)', minWidth: 110, flex: '1 1 140px', overflowWrap: 'anywhere' }}>
+                          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', minWidth: 110, flex: '1 1 140px', overflowWrap: 'anywhere' }}>
                             {row.label === 'Remote' ? '🌐 Remote' : `📍 ${row.label}`}
                           </div>
                           <div style={{ flex: '2 1 80px', height: 6, background: 'var(--line2)', borderRadius: 3, overflow: 'hidden' }}>
@@ -1288,7 +1288,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                 )}
               </div>
               {cityRows.length === 0 && (
-                <div style={{ marginTop: '1.2rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)' }}>
+                <div style={{ marginTop: '1.2rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>
                   No applicant reports with a city yet.{' '}
                   <a href={reportHref} style={{ color: 'var(--green)', textDecoration: 'none' }}>Report your experience →</a>
                 </div>
@@ -1298,12 +1298,12 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
             <Section id="roles" icon="💼" title="Open roles" count={jobsFetched ? companyJobs.length : null} open={open.roles} onToggle={toggle}
               summary={jobsFetched ? (companyJobs.length > 0 ? `${companyJobs.length} current listing${companyJobs.length !== 1 ? 's' : ''} · apply with the ${graded ? 'grade' : 'reports'} in mind` : 'No open roles found right now') : `Current job listings at ${displayName}`}>
               {jobsLoading && (
-                <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.7rem' }}>
+                <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)' }}>
                   Searching for open roles at {displayName}…
                 </div>
               )}
               {!jobsLoading && jobsFetched && companyJobs.length === 0 && (
-                <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.7rem' }}>
+                <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)' }}>
                   No open roles found right now.<br />
                   <a href={`/jobs?q=${encodeURIComponent(companyName)}`} style={{ color: 'var(--blue)', marginTop: '.6rem', display: 'inline-block' }}>Search jobs →</a>
                 </div>
@@ -1313,19 +1313,19 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                   {companyJobs.map((j, i) => (
                     <div key={i} className="jlc" style={{ display: 'flex', flexDirection: 'column', gap: '.35rem', padding: '.85rem 1rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: '10px' }}>
                       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '.5rem', flexWrap: 'wrap' }}>
-                        <span className="jlc-title" style={{ fontSize: '.95rem', fontWeight: 700, color: 'var(--white)', letterSpacing: '-.02em', flex: 1 }}>{j.title}</span>
-                        {displayPay(j) && <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--green)', whiteSpace: 'nowrap' }}>{displayPay(j)}</span>}
+                        <span className="jlc-title" style={{ fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', letterSpacing: '-.02em', flex: 1 }}>{j.title}</span>
+                        {displayPay(j) && <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', whiteSpace: 'nowrap' }}>{displayPay(j)}</span>}
                       </div>
                       <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)' }}>{j.location || 'US'}</span>
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>·</span>
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>{j.type}</span>
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>·</span>
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>{j.level}</span>
-                        {j.source && <><span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>·</span><span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)' }}>{j.source}</span></>}
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>{j.location || 'US'}</span>
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>·</span>
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>{j.type}</span>
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>·</span>
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>{j.level}</span>
+                        {j.source && <><span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>·</span><span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>{j.source}</span></>}
                       </div>
                       {j.url && (
-                        <a href={j.url} target="_blank" rel="noopener noreferrer" className="analyze-btn" style={{ display: 'inline-block', textAlign: 'center', padding: '.45rem 1rem', fontSize: '.7rem', marginTop: '.2rem', width: 'auto', alignSelf: 'flex-start' }}>
+                        <a href={j.url} target="_blank" rel="noopener noreferrer" className="analyze-btn" style={{ display: 'inline-block', textAlign: 'center', padding: '.45rem 1rem', fontSize: 'var(--fs-meta)', marginTop: '.2rem', width: 'auto', alignSelf: 'flex-start' }}>
                           Apply ↗
                         </a>
                       )}
@@ -1365,12 +1365,12 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                 </div>
               </div>
               {compareList.length >= 2 && (
-                <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', marginTop: '.45rem' }}>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.45rem' }}>
                   You can compare up to 2 other companies at once — clear to start over.
                 </div>
               )}
               {compareList.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '1.25rem', marginTop: '.85rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.66rem', background: 'var(--surface, #111)', border: '1px dashed var(--line2)', borderRadius: 10 }}>
+                <div style={{ textAlign: 'center', padding: '1.25rem', marginTop: '.85rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', background: 'var(--surface, #111)', border: '1px dashed var(--line2)', borderRadius: 10 }}>
                   Add a company to see score, ghost rate, response rate and wait time side by side.
                 </div>
               ) : (
@@ -1381,13 +1381,13 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                         <th className="co-cmp-metric-h">Metric</th>
                         <th className="co-cmp-co">
                           <div className="co-cmp-name">{displayName}</div>
-                          <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--blue)', textTransform: 'uppercase', letterSpacing: '.08em' }}>current</div>
+                          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textTransform: 'uppercase', letterSpacing: '.08em' }}>current</div>
                         </th>
                         {compareList.map(c => (
                           <th key={c.name} className="co-cmp-co">
                             <div className="co-cmp-name">{c.name}</div>
-                            {c.loading && <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--muted)' }}>loading…</div>}
-                            {!c.loading && !c.score && <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--red)' }}>no data</div>}
+                            {c.loading && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>loading…</div>}
+                            {!c.loading && !c.score && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--red)' }}>no data</div>}
                           </th>
                         ))}
                       </tr>
@@ -1417,7 +1417,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                     : `Based on ${gradeBasisLabel(score)}${webEst > 0 ? ' + public web research' : ''} · summary & public records`)
                 : 'Public records & data status'}>
               {score?.summary ? (
-                <p style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--sub)', lineHeight: 1.7, margin: '0 0 .9rem' }}>{score.summary}</p>
+                <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.7, margin: '0 0 .9rem' }}>{score.summary}</p>
               ) : null}
               {score && (
                 <div className="co-about-line">

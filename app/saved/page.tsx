@@ -67,10 +67,10 @@ export default function SavedPage() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '40vh' }}><div className="spinner" /></div>
         ) : items.length === 0 ? (
           <div style={{ background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 12, padding: '2rem 1.5rem', textAlign: 'center' }}>
-            <div style={{ fontSize: '1.6rem', marginBottom: '.5rem' }}>♡</div>
-            <div style={{ fontFamily: 'var(--display)', fontSize: '1rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.4rem' }}>No saved jobs yet</div>
-            <div style={{ fontSize: '.8rem', color: 'var(--sub)', fontWeight: 300, marginBottom: '1.25rem', lineHeight: 1.6 }}>Tap ♡ on any listing to save it here. Saved listings always reopen to the exact role you saved.</div>
-            <button onClick={() => router.push('/jobs')} style={{ background: 'var(--green)', color: 'var(--ink)', border: 'none', borderRadius: 8, padding: '.6rem 1.25rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.82rem', cursor: 'pointer' }}>Find jobs →</button>
+            <div style={{ fontSize: 'var(--fs-xl)', marginBottom: '.5rem' }}>♡</div>
+            <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', marginBottom: '.4rem' }}>No saved jobs yet</div>
+            <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--sub)', fontWeight: 400, marginBottom: '1.25rem', lineHeight: 1.6 }}>Tap ♡ on any listing to save it here. Saved listings always reopen to the exact role you saved.</div>
+            <button onClick={() => router.push('/jobs')} style={{ background: 'var(--green)', color: 'var(--ink)', border: 'none', borderRadius: 8, padding: '.6rem 1.25rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)', cursor: 'pointer' }}>Find jobs →</button>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
@@ -90,15 +90,15 @@ export default function SavedPage() {
                   onMouseOut={e => (e.currentTarget.style.borderColor = 'var(--line2)')}
                 >
                   <Link href={href} prefetch={false} onClick={() => prime(s)} data-testid="saved-open" style={{ flex: 1, minWidth: 0, minHeight: 44, padding: '.5rem 0', textDecoration: 'none', color: 'inherit', display: 'block' }}>
-                    <div style={{ fontFamily: 'var(--display)', fontSize: '.9rem', fontWeight: 700, color: 'var(--white)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.role || 'Job'}</div>
-                    <div style={{ fontSize: '.75rem', color: 'var(--sub)', marginTop: '.1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-ui)', fontWeight: 700, color: 'var(--white)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.role || 'Job'}</div>
+                    <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginTop: '.1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {company}{s.location ? ` · ${s.location}` : ''}
                     </div>
-                    <div style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--dim)', marginTop: '.3rem' }}>{savedAgo(s.saved_at)} · <span style={{ color: 'var(--green)' }}>Open in Seen →</span></div>
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.3rem' }}>{savedAgo(s.saved_at)} · <span style={{ color: 'var(--green)' }}>Open in Seen →</span></div>
                   </Link>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', flexShrink: 0 }}>
                     {typeof s.score === 'number' && (
-                      <div style={{ fontFamily: 'var(--mono)', fontSize: '.85rem', fontWeight: 700, color }}>{s.score}</div>
+                      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-ui)', fontWeight: 500, color }}>{s.score}</div>
                     )}
                     {applyHref && (
                       <a
@@ -106,14 +106,14 @@ export default function SavedPage() {
                         target="_blank"
                         rel="noopener noreferrer"
                         title="Open the original posting"
-                        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minHeight: 44, minWidth: 44, fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--sub)', textDecoration: 'none', border: '1px solid var(--line2)', borderRadius: 6, padding: '0 .55rem' }}
+                        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minHeight: 44, minWidth: 44, fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', textDecoration: 'none', border: '1px solid var(--line2)', borderRadius: 6, padding: '0 .55rem' }}
                       >Apply ↗</a>
                     )}
                     <button
                       onClick={e => remove(e, s.job_id)}
                       title="Remove from saved"
                       aria-label={`Remove ${s.role || 'this job'} from saved`}
-                      style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '.85rem', minHeight: 44, minWidth: 44, lineHeight: 1 }}
+                      style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 'var(--fs-ui)', minHeight: 44, minWidth: 44, lineHeight: 1 }}
                     >✕</button>
                   </div>
                 </div>

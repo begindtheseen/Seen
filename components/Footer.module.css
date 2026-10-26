@@ -10,23 +10,23 @@
 .brand { min-width: 0; }
 .logo {
   display: inline-flex; align-items: center; gap: 0.5rem;
-  font-family: var(--display); font-size: 1.05rem; font-weight: 800; color: var(--white); letter-spacing: -0.02em; text-decoration: none;
+  font-family: var(--display); font-size: var(--fs-lead); font-weight: 800; color: var(--white); letter-spacing: -0.02em; text-decoration: none;
 }
 .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--blue); box-shadow: 0 0 10px rgba(59, 130, 246, 0.8); }
-.tag { color: var(--sub); font-size: 0.8rem; line-height: 1.6; margin: 0.7rem 0 0.9rem; max-width: 34ch; font-weight: 300; }
+.tag { color: var(--sub); font-size: var(--fs-sm); line-height: 1.6; margin: 0.7rem 0 0.9rem; max-width: 34ch; font-weight: 400; }
 .cmd {
   display: inline-flex; align-items: center; gap: 0.45rem;
   background: none; border: 1px solid var(--line); border-radius: 8px; padding: 0.35rem 0.6rem;
-  color: var(--dim); font-family: var(--mono); font-size: 0.6rem; cursor: pointer;
+  color: var(--dim); font-family: var(--mono); font-size: var(--fs-meta); cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease;
 }
 .cmd:hover { color: var(--white); border-color: var(--line2); }
-.cmd kbd { font-family: var(--mono); font-size: 0.58rem; color: var(--sub); border: 1px solid var(--line2); border-bottom-width: 2px; border-radius: 4px; padding: 0.08rem 0.32rem; }
+.cmd kbd { font-family: var(--mono); font-size: var(--fs-meta); color: var(--sub); border: 1px solid var(--line2); border-bottom-width: 2px; border-radius: 4px; padding: 0.08rem 0.32rem; }
 
 .col { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
-.colT { font-family: var(--mono); font-size: 0.54rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); margin-bottom: 0.45rem; }
+.colT { font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); margin-bottom: 0.45rem; }
 .link {
-  color: var(--sub); font-size: 0.8rem; text-decoration: none; width: fit-content;
+  color: var(--sub); font-size: var(--fs-sm); text-decoration: none; width: fit-content;
   transition: color 0.15s ease, transform 0.25s var(--ease-out);
 }
 .link:hover { color: var(--white); transform: translateX(2px); }
@@ -34,7 +34,7 @@
 .bottom {
   max-width: 1120px; margin: 2rem auto 0; padding-top: 1rem; border-top: 1px solid var(--line);
   display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
-  font-family: var(--mono); font-size: 0.58rem; color: var(--sub);
+  font-family: var(--mono); font-size: var(--fs-meta); color: var(--sub);
 }
 .dim { color: var(--dim); }
 
@@ -57,14 +57,10 @@
 /* Phone floor (audit 2026-10-23): column titles and the bottom line read at 12px; every link is a
    44px-tall target (the footer gets longer on a phone; it is the end of the page). */
 @media (max-width: 768px) {
-  .colT, .bottom, .dim, .cmd kbd { font-size: 0.75rem; }
+  .colT, .bottom, .dim, .cmd kbd { font-size: var(--fs-meta); }
   .colT { letter-spacing: 0.1em; }
   .link { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; }
   .col { gap: 0; } /* the 44px rows carry their own spacing */
   .logo { min-height: 44px; }
 }
 
-/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
-@media (max-width: 768px) {
-  .cmd { font-size: 0.75rem; }
-}

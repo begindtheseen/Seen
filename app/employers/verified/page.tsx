@@ -60,23 +60,23 @@ export default async function VerifiedDirectoryPage() {
 
       <div style={{ ...wrap, padding: '3.5rem 1.5rem 5rem' }}>
         <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--green)', marginBottom: '.7rem' }}>Transparency Verified</div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--green)', marginBottom: '.7rem' }}>Transparency Verified</div>
           <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.9rem,6vw,2.7rem)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', lineHeight: 1.05, margin: '0 auto .9rem', maxWidth: 640 }}>
             Companies that actually respond.
           </h1>
-          <p style={{ color: 'var(--sub)', fontSize: '.95rem', lineHeight: 1.75, maxWidth: 560, margin: '0 auto' }}>
+          <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-body)', lineHeight: 1.75, maxWidth: 560, margin: '0 auto' }}>
             These employers publicly committed to responding to applicants — a commitment we review against real outcome data. The grade and rates are their true public reputation, never bought.
           </p>
         </div>
 
         {companies.length === 0 ? (
           <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16, padding: '2.4rem', textAlign: 'center' }}>
-            <div style={{ fontSize: '1.8rem', marginBottom: '.5rem' }}>✓</div>
-            <div style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.4rem' }}>No verified employers yet</div>
-            <p style={{ color: 'var(--sub)', fontSize: '.82rem', lineHeight: 1.65, maxWidth: 440, margin: '0 auto 1.4rem' }}>
+            <div style={{ fontSize: 'var(--fs-fig)', marginBottom: '.5rem' }}>✓</div>
+            <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', marginBottom: '.4rem' }}>No verified employers yet</div>
+            <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.65, maxWidth: 440, margin: '0 auto 1.4rem' }}>
               The first employers to commit to responding will be listed here. If you hire, be one of them.
             </p>
-            <Link href="/employers#promote" style={{ display: 'inline-block', background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 9, padding: '.7rem 1.6rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.82rem', color: '#fff', textDecoration: 'none' }}>Get Transparency Verified →</Link>
+            <Link href="/employers#promote" style={{ display: 'inline-block', background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 9, padding: '.7rem 1.6rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)', color: '#fff', textDecoration: 'none' }}>Get Transparency Verified →</Link>
           </div>
         ) : (
           <>
@@ -84,26 +84,26 @@ export default async function VerifiedDirectoryPage() {
               {companies.map(c => (
                 <Link key={c.slug} href={`/company/${c.slug}`} style={{ display: 'block', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 14, padding: '1.3rem', textDecoration: 'none' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '.8rem', marginBottom: '.9rem' }}>
-                    <div style={{ width: 46, height: 46, borderRadius: 12, background: 'var(--raised)', border: '1px solid var(--line2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.2rem', color: 'var(--white)', flexShrink: 0, textTransform: 'uppercase' }}>{c.company[0] || '?'}</div>
+                    <div style={{ width: 46, height: 46, borderRadius: 12, background: 'var(--raised)', border: '1px solid var(--line2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-h3)', color: 'var(--white)', flexShrink: 0, textTransform: 'uppercase' }}>{c.company[0] || '?'}</div>
                     <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontFamily: 'var(--display)', fontSize: '.95rem', fontWeight: 700, color: 'var(--white)', textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.company}</div>
-                      <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', fontWeight: 700, color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '.08em', marginTop: '.15rem' }}>✓ Verified</div>
+                      <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.company}</div>
+                      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '.08em', marginTop: '.15rem' }}>✓ Verified</div>
                     </div>
-                    <div style={{ fontFamily: 'var(--display)', fontSize: '1.6rem', fontWeight: 800, color: gradeColor(c.grade), lineHeight: 1, flexShrink: 0 }}>{c.grade ?? '—'}</div>
+                    <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: gradeColor(c.grade), lineHeight: 1, flexShrink: 0 }}>{c.grade ?? '—'}</div>
                   </div>
                   <div style={{ display: 'flex', gap: '1.2rem' }}>
-                    <div><div style={{ fontFamily: 'var(--display)', fontSize: '1rem', fontWeight: 800, color: 'var(--green)' }}>{c.responseRate == null ? '—' : `${c.responseRate}%`}</div><div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.06em' }}>response</div></div>
-                    <div><div style={{ fontFamily: 'var(--display)', fontSize: '1rem', fontWeight: 800, color: 'var(--red)' }}>{c.ghostRate == null ? '—' : `${c.ghostRate}%`}</div><div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.06em' }}>ghost</div></div>
-                    <div style={{ marginLeft: 'auto', alignSelf: 'flex-end' }}><div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--muted)' }}>{c.reportCount || 0} report{c.reportCount === 1 ? '' : 's'}{c.grade == null ? ` · not graded yet (needs ${MIN_REPORTS_FOR_GRADE})` : ''}</div></div>
+                    <div><div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--green)' }}>{c.responseRate == null ? '—' : `${c.responseRate}%`}</div><div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.06em' }}>response</div></div>
+                    <div><div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--red)' }}>{c.ghostRate == null ? '—' : `${c.ghostRate}%`}</div><div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.06em' }}>ghost</div></div>
+                    <div style={{ marginLeft: 'auto', alignSelf: 'flex-end' }}><div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>{c.reportCount || 0} report{c.reportCount === 1 ? '' : 's'}{c.grade == null ? ` · not graded yet (needs ${MIN_REPORTS_FOR_GRADE})` : ''}</div></div>
                   </div>
                 </Link>
               ))}
             </div>
 
             <div style={{ textAlign: 'center', marginTop: '3rem', padding: '2rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16 }}>
-              <div style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.5rem' }}>Hire people who show up?</div>
-              <p style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--sub)', marginBottom: '1rem', lineHeight: 1.6 }}>Commit to responding to applicants and earn the Transparency Verified badge — reviewed against your real outcomes.</p>
-              <Link href="/employers#promote" style={{ display: 'inline-block', background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 9, padding: '.7rem 1.8rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.82rem', color: '#fff', textDecoration: 'none' }}>Get Verified →</Link>
+              <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', marginBottom: '.5rem' }}>Hire people who show up?</div>
+              <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '1rem', lineHeight: 1.6 }}>Commit to responding to applicants and earn the Transparency Verified badge — reviewed against your real outcomes.</p>
+              <Link href="/employers#promote" style={{ display: 'inline-block', background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 9, padding: '.7rem 1.8rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)', color: '#fff', textDecoration: 'none' }}>Get Verified →</Link>
             </div>
           </>
         )}

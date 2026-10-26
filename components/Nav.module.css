@@ -25,7 +25,7 @@
   padding: 0.42rem 0.62rem;
   border-radius: 8px;
   font-family: var(--body);
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   font-weight: 500;
   line-height: 1;
   color: rgba(255, 255, 255, 0.55);
@@ -133,7 +133,7 @@
 
 .menuLabel {
   font-family: var(--mono);
-  font-size: 0.5rem;
+  font-size: var(--fs-meta);
   text-transform: uppercase;
   letter-spacing: 0.14em;
   color: var(--dim);
@@ -148,7 +148,7 @@
   padding: 0.5rem 0.6rem;
   border-radius: 8px;
   font-family: var(--body);
-  font-size: 0.78rem;
+  font-size: var(--fs-meta);
   font-weight: 500;
   color: var(--sub);
   text-decoration: none;
@@ -203,7 +203,7 @@
   background: var(--bdim);
   border: 1px solid var(--bmid);
   font-family: var(--mono);
-  font-size: 0.58rem;
+  font-size: var(--fs-meta);
   line-height: 1.5;
   color: var(--blue);
 }
@@ -219,7 +219,7 @@
   border: none;
   background: none;
   font-family: var(--mono);
-  font-size: 0.66rem;
+  font-size: var(--fs-meta);
   font-weight: 500;
   line-height: 1;
   color: var(--sub);
@@ -260,8 +260,8 @@
   display: inline-flex;
   align-items: center;
   font-family: var(--mono);
-  font-size: 0.62rem;
-  font-weight: 700;
+  font-size: var(--fs-meta);
+  font-weight: 500;
   letter-spacing: 0.03em;
   line-height: 1;
   color: var(--green);
@@ -298,14 +298,14 @@
   display: inline-flex; align-items: center; gap: 0.45rem;
   height: 34px; padding: 0 0.55rem 0 0.65rem; border-radius: 9px;
   border: 1px solid var(--line); background: rgba(255, 255, 255, 0.025);
-  color: var(--dim); font-family: var(--body); font-size: 0.76rem; cursor: pointer;
+  color: var(--dim); font-family: var(--body); font-size: var(--fs-meta); cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
 .cmdk:hover { color: var(--sub); border-color: var(--line2); background: rgba(255, 255, 255, 0.05); }
 .cmdk svg { width: 15px; height: 15px; flex: none; }
 .cmdkLabel { white-space: nowrap; }
 .cmdkKey {
-  font-family: var(--mono); font-size: 0.56rem; letter-spacing: 0.04em; color: var(--sub);
+  font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.04em; color: var(--sub);
   border: 1px solid var(--line2); border-bottom-width: 2px; border-radius: 4px; padding: 0.08rem 0.32rem;
 }
 @media (max-width: 1024px) { .cmdkLabel { display: none; } .cmdk { padding: 0 0.5rem; } }
@@ -333,8 +333,8 @@
   background: linear-gradient(135deg, var(--g-start) 0%, var(--g-mid) 55%, var(--g-end) 100%);
   color: #fff;
   font-family: var(--body);
-  font-size: 0.78rem;
-  font-weight: 700;
+  font-size: var(--fs-meta);
+  font-weight: 600;
   line-height: 1;
   transition: transform 0.3s var(--ease-spring), box-shadow 0.25s ease;
 }
@@ -401,11 +401,11 @@ div.drawer.drawerOpen { transform: translateX(0); }
 .drawerClose:hover, .drawerClose:focus-visible { color: var(--white); background: rgba(255, 255, 255, 0.07); outline: none; }
 .drawerClose:focus-visible { box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.6); }
 /* Every control in the drawer's foot is a real thumb target (≥44px). */
-.drawerCta { width: 100%; justify-content: center; min-height: 44px; font-size: 0.84rem; }
+.drawerCta { width: 100%; justify-content: center; min-height: 44px; font-size: var(--fs-sm); }
 .drawerGhost, .drawerDanger {
   display: flex; align-items: center; justify-content: center; width: 100%; min-height: 44px;
   border-radius: 10px; padding: 0.5rem 1rem; cursor: pointer; text-decoration: none;
-  font-family: var(--body); font-size: 0.84rem; font-weight: 600;
+  font-family: var(--body); font-size: var(--fs-sm); font-weight: 600;
 }
 .drawerGhost { background: none; border: 1px solid var(--line2); color: var(--sub); }
 .drawerDanger { background: rgba(239, 68, 68, 0.07); border: 1px solid rgba(239, 68, 68, 0.25); color: var(--red); }
@@ -414,7 +414,3 @@ div.drawer.drawerOpen { transform: translateX(0); }
 }
 div.drawer :global(.side-menu-item) { min-height: 44px; }
 
-/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
-@media (max-width: 768px) {
-  .menuLabel, .menuNote, .chip, .pro, .cmdkKey { font-size: 0.75rem; }
-}

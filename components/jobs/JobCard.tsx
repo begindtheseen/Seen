@@ -31,7 +31,7 @@ const OPTIMIZE_PRICE = creditCostLabel(RESUME_OPTIMIZE_COST)
 // narrow phone, so the number is always visible.
 const optimizeBtn: React.CSSProperties = {
   background: 'rgba(99,102,241,.08)', color: '#a5b4fc', border: '1px solid rgba(99,102,241,.35)',
-  borderRadius: 8, padding: '.55rem .5rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.74rem', lineHeight: 1.15,
+  borderRadius: 8, padding: '.55rem .5rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-meta)', lineHeight: 1.15,
   cursor: 'pointer', textAlign: 'center', minWidth: 0,
 }
 // Split row: a grid with minmax(0, 1fr) tracks so the row's min-content can never widen the
@@ -131,7 +131,7 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
   }
 
   return (
-    <div className="jlc spot" style={{ animation: `riseIn .5s ${Math.min(index, 12) * 0.05}s cubic-bezier(.16,1,.3,1) both` }}>
+    <div className="jlc" style={{ animation: `riseIn .5s ${Math.min(index, 12) * 0.05}s cubic-bezier(.16,1,.3,1) both` }}>
       <div
         className="jlc-top"
         onClick={() => onOpen(job)}
@@ -151,39 +151,39 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem', flexWrap: 'wrap', margin: '.35rem 0' }}>
         {job.featured && (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem', fontFamily: 'var(--mono)', fontSize: '.55rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: '#f7c948', background: 'rgba(247,201,72,.12)', border: '1px solid rgba(247,201,72,.4)', borderRadius: 999, padding: '.15rem .5rem' }}>★ Featured</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.06em', color: '#f7c948', background: 'rgba(247,201,72,.12)', border: '1px solid rgba(247,201,72,.4)', borderRadius: 999, padding: '.15rem .5rem' }}>★ Featured</span>
         )}
         {job.employer_posted && (
-          <span title="Posted directly on Seen by the employer" style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem', fontFamily: 'var(--mono)', fontSize: '.55rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--green)', background: 'var(--gdim)', border: '1px solid var(--green)', borderRadius: 999, padding: '.15rem .5rem' }}>✓ Posted on Seen</span>
+          <span title="Posted directly on Seen by the employer" style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--green)', background: 'var(--gdim)', border: '1px solid var(--green)', borderRadius: 999, padding: '.15rem .5rem' }}>✓ Posted on Seen</span>
         )}
         {wl && <span className={`${wl.cls} waste-badge`}>{wl.txt}</span>}
         {job.waste != null && job.waste >= 55 && (
           <span className="vibe v-r" style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem' }}>
-            <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--red)', animation: 'pulse 1.2s infinite', display: 'inline-block', flexShrink: 0 }} />
+            <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--red)', display: 'inline-block', flexShrink: 0 }} />
             👻 high ghost risk
           </span>
         )}
         {job.availability_status === 'stale' && (
-          <span className="vibe v-a" style={{ fontSize: '.57rem' }}>⚠ may be closed</span>
+          <span className="vibe v-a" style={{ fontSize: 'var(--fs-meta)' }}>⚠ may be closed</span>
         )}
         {(job.availability_status === 'expired' || job.availability_status === 'closed') && (
-          <span className="vibe v-r" style={{ fontSize: '.57rem' }}>✕ likely closed</span>
+          <span className="vibe v-r" style={{ fontSize: 'var(--fs-meta)' }}>✕ likely closed</span>
         )}
         {preview && (
-          <span className="vibe v-a" title="This source gives Seen only a short preview of the posting" style={{ fontSize: '.57rem' }}>✂ Preview — full posting on the employer&apos;s site</span>
+          <span className="vibe v-a" title="This source gives Seen only a short preview of the posting" style={{ fontSize: 'var(--fs-meta)' }}>✂ Preview — full posting on the employer&apos;s site</span>
         )}
         {vibes.map((v, i) => (
           <span key={i} className={`vibe ${v.cls}`}>{v.txt}</span>
         ))}
         {alreadyApplied && (
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '.57rem', background: 'rgba(99,102,241,.1)', border: '1px solid rgba(99,102,241,.22)', borderRadius: 5, padding: '.12rem .4rem', color: 'var(--indigo)' }}>✓ Applied</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', background: 'rgba(99,102,241,.1)', border: '1px solid rgba(99,102,241,.22)', borderRadius: 5, padding: '.12rem .4rem', color: 'var(--indigo)' }}>✓ Applied</span>
         )}
       </div>
 
       {/* The posting's first sentence about the ROLE (lib/jobs/descriptionText.js roleSnippet) — not the
           company's mission paragraph that every one of its cards used to open with. */}
       {snippet && (
-        <div style={{ fontSize: '.72rem', color: 'var(--muted)', margin: '.25rem 0', lineHeight: 1.55 }}>
+        <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--muted)', margin: '.25rem 0', lineHeight: 1.55 }}>
           {snippet}
         </div>
       )}
@@ -194,7 +194,7 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
             type="button"
             onClick={e => { e.stopPropagation(); setMoreOpen(o => !o) }}
             aria-expanded={moreOpen}
-            style={{ background: 'none', border: 'none', padding: '.35rem 0', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--blue)', cursor: 'pointer', minHeight: 44 }}
+            style={{ background: 'none', border: 'none', padding: '.35rem 0', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', cursor: 'pointer', minHeight: 44 }}
           >
             📍 {moreOpen ? 'Hide' : 'Show'} {more.length} more location{more.length !== 1 ? 's' : ''} for this role {moreOpen ? '▴' : '▾'}
           </button>
@@ -207,8 +207,8 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
                   onClick={e => { e.stopPropagation(); onOpen(m) }}
                   style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.5rem', width: '100%', minWidth: 0, minHeight: 44, textAlign: 'left', background: 'var(--raised)', border: '1px solid var(--line)', borderRadius: 8, padding: '.45rem .7rem', cursor: 'pointer', color: 'inherit' }}
                 >
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.64rem', color: 'var(--sub)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>📍 {m.location}</span>
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--green)', flexShrink: 0 }}>Open →</span>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>📍 {m.location}</span>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', flexShrink: 0 }}>Open →</span>
                 </button>
               ))}
             </div>
@@ -234,7 +234,7 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
       ) : (
         <button
           onClick={e => { e.stopPropagation(); onCheckCompany(job.company) }}
-          style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--amber)', padding: '.1rem 0 .55rem', opacity: .8, cursor: 'pointer' }}
+          style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--amber)', padding: '.1rem 0 .55rem', opacity: .8, cursor: 'pointer' }}
         >
           🏢 Check {companyName} →
         </button>
@@ -294,7 +294,7 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
         prefetch={false}
         data-testid="view-details"
         onClick={e => { e.stopPropagation(); JobCache.set(job) }}
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', minHeight: 44, textDecoration: 'none', borderTop: '1px solid var(--line)', marginTop: '.6rem', fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--green)' }}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', minHeight: 44, textDecoration: 'none', borderTop: '1px solid var(--line)', marginTop: '.6rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)' }}
       >
         View details + AI insights →
       </Link>
@@ -303,14 +303,14 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
         <button
           onClick={reportInactive}
           disabled={reportingInactive}
-          style={{ background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', cursor: 'pointer', padding: '.1rem 0', opacity: .55, transition: 'opacity .15s', display: 'block' }}
+          style={{ background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', cursor: 'pointer', padding: '.1rem 0', opacity: .55, transition: 'opacity .15s', display: 'block' }}
           onMouseOver={e => (e.currentTarget.style.opacity = '1')}
           onMouseOut={e => (e.currentTarget.style.opacity = '.55')}
         >
           {reportingInactive ? 'Reporting…' : '⚑ Not active? Report it'}
         </button>
       ) : (
-        <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--amber)', display: 'block', padding: '.1rem 0' }}>✓ Reported — thanks</span>
+        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--amber)', display: 'block', padding: '.1rem 0' }}>✓ Reported — thanks</span>
       )}
     </div>
   )

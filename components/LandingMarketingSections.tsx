@@ -77,7 +77,7 @@ export default function LandingMarketingSections() {
           <div className={styles.grid}>
             {FEATURES.map((f, i) => (
               <Reveal key={f.href} delay={i * 80}>
-                <Link href={f.href} className={`${styles.card} spot`}>
+                <Link href={f.href} className={`${styles.card}`}>
                   <div className={styles.cardTop}>
                     <span className={styles.ico}>{f.icon}</span>
                     <span className={styles.tag}>{f.tag}</span>

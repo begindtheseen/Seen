@@ -88,11 +88,11 @@ export function ToastHost() {
           >
             <div style={{
               flexShrink: 0, width: 26, height: 26, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: `${sev.accent}22`, color: sev.accent, fontFamily: 'var(--mono)', fontSize: '.85rem', fontWeight: 800,
+              background: `${sev.accent}22`, color: sev.accent, fontFamily: 'var(--mono)', fontSize: 'var(--fs-ui)', fontWeight: 500,
             }}>{sev.icon}</div>
             <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 700, color: 'var(--white)', lineHeight: 1.3 }}>{t.title}</div>
-              {t.sub && <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', marginTop: 2, lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.sub}</div>}
+              <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--white)', lineHeight: 1.3 }}>{t.title}</div>
+              {t.sub && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginTop: 2, lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.sub}</div>}
             </div>
           </div>
         )

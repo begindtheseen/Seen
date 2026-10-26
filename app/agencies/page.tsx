@@ -85,9 +85,9 @@ function ReportedRow({ r, rank }: { r: Ranked; rank: number }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '.85rem 1rem', marginBottom: '.55rem' }}>
       <div style={{ ...mono('var(--fs-62)', 'var(--muted)'), width: 18, textAlign: 'right', flexShrink: 0 }}>{rank}</div>
-      <div style={{ fontFamily: 'var(--display)', fontSize: '1.5rem', fontWeight: 800, color: accent, width: 30, textAlign: 'center', flexShrink: 0 }}>{grade(s.overall_score)}</div>
+      <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: accent, width: 30, textAlign: 'center', flexShrink: 0 }}>{grade(s.overall_score)}</div>
       <div style={{ minWidth: 0, flex: 1 }}>
-        <Link href={`/company/${r.slug}`} className="tap" style={{ fontFamily: 'var(--display)', fontSize: '.92rem', fontWeight: 700, color: 'var(--white)', textDecoration: 'none' }}>{r.agency.name}</Link>
+        <Link href={`/company/${r.slug}`} className="tap" style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', textDecoration: 'none' }}>{r.agency.name}</Link>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.15rem .7rem', marginTop: '.2rem' }}>
           {ghost != null && <span style={mono('var(--fs-62)', 'var(--red)')}>{ghost}% ghost</span>}
           {reply != null && <span style={mono('var(--fs-62)', 'var(--green)')}>{reply}% reply</span>}
@@ -110,9 +110,9 @@ function BuildingRow({ r }: { r: Ranked }) {
   const n = r.reports
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '.85rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '.85rem 1rem', marginBottom: '.55rem', opacity: 0.92 }}>
-      <div style={{ fontFamily: 'var(--display)', fontSize: '1.5rem', fontWeight: 800, color: 'var(--muted)', width: 30, textAlign: 'center', flexShrink: 0 }}>—</div>
+      <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--muted)', width: 30, textAlign: 'center', flexShrink: 0 }}>—</div>
       <div style={{ minWidth: 0, flex: 1 }}>
-        <Link href={`/company/${r.slug}`} className="tap" style={{ fontFamily: 'var(--display)', fontSize: '.92rem', fontWeight: 700, color: 'var(--white)', textDecoration: 'none' }}>{r.agency.name}</Link>
+        <Link href={`/company/${r.slug}`} className="tap" style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', textDecoration: 'none' }}>{r.agency.name}</Link>
         <div style={{ ...mono('var(--fs-60)', 'var(--dim)'), marginTop: '.15rem' }}>
           {/* The one wording every surface uses — reports plus half of each online mention, like the company page. */}
           {notEnoughReviewsLabel(r.row?.score ?? null)}
@@ -277,10 +277,10 @@ export default async function AgenciesPage() {
             score. Renders only when the owner has granted an active sponsor (employer_perks.sponsor_until). */}
         {sponsor && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '.9rem', flexWrap: 'wrap', margin: '0 0 2.6rem', padding: '.9rem 1.1rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12 }}>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-50)', textTransform: 'uppercase', letterSpacing: '.16em', color: 'var(--muted)', border: '1px solid var(--line2)', borderRadius: 5, padding: '.15rem .4rem', flexShrink: 0 }}>Sponsored</span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.16em', color: 'var(--muted)', border: '1px solid var(--line2)', borderRadius: 5, padding: '.15rem .4rem', flexShrink: 0 }}>Sponsored</span>
             <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ fontFamily: 'var(--display)', fontSize: '.92rem', fontWeight: 700, color: 'var(--white)', textTransform: 'capitalize' }}>{sponsor.company}</div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-56)', color: 'var(--sub)', marginTop: '.1rem' }}>Sponsors the Staffing Agency Ghost Index · placement only, never part of the ranking</div>
+              <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', textTransform: 'capitalize' }}>{sponsor.company}</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginTop: '.1rem' }}>Sponsors the Staffing Agency Ghost Index · placement only, never part of the ranking</div>
             </div>
             <Link href={`/company/${slugify(sponsor.company)}`} className="btn btn-ghost" style={{ padding: '.5rem 1rem', flexShrink: 0 }}>View their record →</Link>
           </div>
@@ -288,40 +288,40 @@ export default async function AgenciesPage() {
 
         {reported.length > 0 && (
           <section style={{ marginBottom: '2.4rem' }}>
-            <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Ranked by reported ghost rate</h2>
-            <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 300 }}>{`Agencies with enough evidence for a grade: at least one real applicant report and ${MIN_REPORTS_FOR_GRADE} pieces in total. Applicant accounts shared publicly in discussion threads and on review sites count (labeled and down-weighted), online mentions count half. Worst ghost rate first; rows with fewer than 10 reports are marked low confidence.`}</p>
+            <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Ranked by reported ghost rate</h2>
+            <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 400 }}>{`Agencies with enough evidence for a grade: at least one real applicant report and ${MIN_REPORTS_FOR_GRADE} pieces in total. Applicant accounts shared publicly in discussion threads and on review sites count (labeled and down-weighted), online mentions count half. Worst ghost rate first; rows with fewer than 10 reports are marked low confidence.`}</p>
             {reported.map((r, i) => <ReportedRow key={r.agency.name} r={r} rank={i + 1} />)}
           </section>
         )}
 
         {building.length > 0 && (
           <section style={{ marginBottom: '2.4rem' }}>
-            <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Building a record — not graded yet</h2>
-            <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 300 }}>{`These agencies have applicant reports you can read on their page, but not yet ${MIN_REPORTS_FOR_GRADE} pieces of evidence — too few for a fair grade or ghost rate. Every new report gets them closer.`}</p>
+            <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Building a record — not graded yet</h2>
+            <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 400 }}>{`These agencies have applicant reports you can read on their page, but not yet ${MIN_REPORTS_FOR_GRADE} pieces of evidence — too few for a fair grade or ghost rate. Every new report gets them closer.`}</p>
             {building.map(r => <BuildingRow key={r.agency.name} r={r} />)}
           </section>
         )}
 
         {unlisted.length > 0 && (
           <section style={{ marginBottom: '2.4rem' }}>
-            <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Not enough reports yet ({unlisted.length})</h2>
-            <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 300 }}>No applicant reports on these agencies yet, so no grade or rate — we won&apos;t invent a number.</p>
+            <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Not enough reports yet ({unlisted.length})</h2>
+            <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 400 }}>No applicant reports on these agencies yet, so no grade or rate — we won&apos;t invent a number.</p>
             <NoDataList rows={unlisted} />
           </section>
         )}
 
         {reported.length === 0 && building.length === 0 && unlisted.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-70)' }}>
+          <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)' }}>
             The index is loading its first data. Check back shortly — or <Link href="/report?outcome=ghosted" style={{ color: 'var(--blue)' }}>add the first report</Link>.
           </div>
         )}
 
         <section style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.4rem', marginBottom: '1.5rem' }}>
-          <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .8rem' }}>What is a staffing agency ghost rate?</h2>
+          <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', margin: '0 0 .8rem' }}>What is a staffing agency ghost rate?</h2>
           {faqQa.map(({ q, a }) => (
             <div key={q} style={{ marginBottom: '.9rem' }}>
-              <div style={{ fontFamily: 'var(--display)', fontSize: '.85rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.25rem' }}>{q}</div>
-              <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.7, fontWeight: 300, margin: 0 }}>{a}</p>
+              <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-ui)', fontWeight: 700, color: 'var(--white)', marginBottom: '.25rem' }}>{q}</div>
+              <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.7, fontWeight: 400, margin: 0 }}>{a}</p>
             </div>
           ))}
         </section>

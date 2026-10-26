@@ -65,11 +65,11 @@ export default function HiringProbability({ responseRate, ghostRate, overallScor
     if (tooFew) return null
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: '.45rem', marginTop: '.3rem' }}>
-        <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', flexShrink: 0 }}>Response chance</span>
+        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', flexShrink: 0 }}>Response chance</span>
         <div style={{ flex: 1, height: 3, background: 'rgba(255,255,255,.08)', borderRadius: 2, overflow: 'hidden' }}>
           <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 2 }} />
         </div>
-        <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', fontWeight: 600, color, flexShrink: 0 }}>{personalized ? '≈' : ''}{pct}%</span>
+        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, color, flexShrink: 0 }}>{personalized ? '≈' : ''}{pct}%</span>
       </div>
     )
   }
@@ -78,10 +78,10 @@ export default function HiringProbability({ responseRate, ghostRate, overallScor
     return (
       <div style={{ background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.15)', borderRadius: 9, padding: '.65rem .85rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.35rem', gap: '.6rem' }}>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Response chance</span>
-          <span style={{ fontFamily: 'var(--display)', fontSize: '.95rem', fontWeight: 700, color: 'var(--muted)', lineHeight: 1 }}>Too few reports</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Response chance</span>
+          <span style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--muted)', lineHeight: 1 }}>Too few reports</span>
         </div>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)', lineHeight: 1.5 }}>{givenContext || tooFewReportsLine(reportCount!)}</div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.5 }}>{givenContext || tooFewReportsLine(reportCount!)}</div>
       </div>
     )
   }
@@ -98,13 +98,13 @@ export default function HiringProbability({ responseRate, ghostRate, overallScor
   return (
     <div style={{ background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.15)', borderRadius: 9, padding: '.65rem .85rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.35rem' }}>
-        <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.08em' }}>{personalized ? 'Estimated response chance' : 'Response chance'}</span>
-        <span style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color, lineHeight: 1 }}>{pct}%</span>
+        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.08em' }}>{personalized ? 'Estimated response chance' : 'Response chance'}</span>
+        <span style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color, lineHeight: 1 }}>{pct}%</span>
       </div>
       <div style={{ height: 4, background: 'rgba(255,255,255,.07)', borderRadius: 2, overflow: 'hidden', marginBottom: '.3rem' }}>
         <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 2, transition: 'width .8s ease' }} />
       </div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>{context}</div>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>{context}</div>
     </div>
   )
 }

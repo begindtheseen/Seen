@@ -48,7 +48,7 @@ type Ranked = ReturnType<typeof assembleGhostReport>['worstOffenders'][number]
 function Stat({ value, label, color }: { value: string; label: string; color: string }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '.25rem', minWidth: 0 }}>
-      <div style={{ fontFamily: 'var(--display)', fontSize: '1.7rem', fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
+      <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-fig)', fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
       <div style={mono('.55rem', 'var(--dim)')}>{label}</div>
     </div>
   )
@@ -59,9 +59,9 @@ function OffenderRow({ r, rank }: { r: Ranked; rank: number }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '.85rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '.8rem 1rem', marginBottom: '.5rem' }}>
       <div style={{ ...mono('.62rem', 'var(--muted)'), minWidth: 40, textAlign: 'right', flexShrink: 0 }}>{rank}</div>
-      <div style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: accent, minWidth: 36, textAlign: 'center', flexShrink: 0 }}>{grade(r.overallScore)}</div>
+      <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: accent, minWidth: 36, textAlign: 'center', flexShrink: 0 }}>{grade(r.overallScore)}</div>
       <div style={{ minWidth: 0, flex: 1 }}>
-        <Link href={`/company/${slugify(r.name)}`} style={{ fontFamily: 'var(--display)', fontSize: '.92rem', fontWeight: 700, color: 'var(--white)', textDecoration: 'none', textTransform: 'capitalize' }}>{r.name}</Link>
+        <Link href={`/company/${slugify(r.name)}`} style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', textDecoration: 'none', textTransform: 'capitalize' }}>{r.name}</Link>
         <div style={{ ...mono('.58rem', 'var(--dim)'), marginTop: '.15rem' }}>
           {r.reportCount.toLocaleString()} report{r.reportCount !== 1 ? 's' : ''}
           {r.isAgency ? ' · staffing agency' : ''}
@@ -108,7 +108,7 @@ export default async function GhostReportPage() {
             {report.agencySpotlight && (
               <div style={{ background: 'linear-gradient(135deg, rgba(239,68,68,.10), rgba(239,68,68,.02))', border: '1px solid rgba(239,68,68,.3)', borderRadius: 12, padding: '1.1rem 1.3rem', marginBottom: '2.2rem' }}>
                 <div style={{ ...mono('.55rem', 'var(--red)'), textTransform: 'uppercase', letterSpacing: '.15em', marginBottom: '.4rem' }}>Agency spotlight</div>
-                <div style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 700, color: 'var(--white)', lineHeight: 1.5 }}>
+                <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', lineHeight: 1.5 }}>
                   <span style={{ textTransform: 'capitalize' }}>{report.agencySpotlight.name}</span> is the most-reported ghosting staffing agency this week — {report.agencySpotlight.ghostPct}% of {report.agencySpotlight.reportCount.toLocaleString()} reported applications got no response at all.
                 </div>
                 <Link href="/agencies" style={{ ...mono('.62rem', 'var(--blue)'), textDecoration: 'none', display: 'inline-block', marginTop: '.6rem' }}>See the full staffing-agency ghost index →</Link>
@@ -117,8 +117,8 @@ export default async function GhostReportPage() {
 
             {report.worstOffenders.length > 0 && (
               <section style={{ marginBottom: '2.4rem' }}>
-                <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Most-reported ghosters</h2>
-                <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 300 }}>Ranked by reported ghost rate among companies with real applicant reports. No reports, no number.</p>
+                <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Most-reported ghosters</h2>
+                <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 400 }}>Ranked by reported ghost rate among companies with real applicant reports. No reports, no number.</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                 {report.worstOffenders.map((r, i) => (
                 <OffenderRow key={r.name} r={r} rank={i + 1} />
@@ -129,8 +129,8 @@ export default async function GhostReportPage() {
 
                 {report.responseLeaders.length > 0 && (
                 <section style={{ marginBottom: '2.4rem' }}>
-                <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Actually replies</h2>
-                <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 300 }}>The companies applicants reported hearing back from most — proof that responding is a choice.</p>
+                <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Actually replies</h2>
+                <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 400 }}>The companies applicants reported hearing back from most — proof that responding is a choice.</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                 {report.responseLeaders.map((r, i) => (
                 <OffenderRow key={r.name} r={r} rank={i + 1} />
@@ -141,7 +141,7 @@ export default async function GhostReportPage() {
           </>
         ) : (
           <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.6rem', margin: '1.4rem 0 2.4rem' }}>
-            <p style={{ color: 'var(--sub)', fontSize: '.9rem', lineHeight: 1.7, fontWeight: 300, margin: 0 }}>
+            <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-ui)', lineHeight: 1.7, fontWeight: 400, margin: 0 }}>
               The report is waiting on its first substantial batch of applicant outcomes. The framework is live — every report you submit becomes a data point in next week&apos;s edition. We&apos;ll never print a number we don&apos;t have.
             </p>
           </div>

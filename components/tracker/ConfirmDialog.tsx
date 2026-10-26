@@ -40,7 +40,7 @@ export default function ConfirmDialog({ title, body, confirmLabel, busyLabel = '
             <button type="button" className={s.close} onClick={onClose} aria-label="Close" disabled={busy}>✕</button>
           </div>
           <div className={s.dialogBody}>
-            <p className={s.hint} style={{ color: 'var(--sub)', fontSize: '.84rem' }}>{body}</p>
+            <p className={s.hint} style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)' }}>{body}</p>
             {err && <div role="alert" className={s.err}>{err}</div>}
             <div className={s.dialogBtns}>
               <button type="button" className={s.act} onClick={onClose} disabled={busy}>Keep it</button>

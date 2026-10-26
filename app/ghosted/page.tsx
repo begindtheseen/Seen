@@ -45,17 +45,17 @@ export default function GhostedPage() {
   return (
     <div className="page-full">
       <div style={wrap}>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.2em', color: 'var(--red)', marginBottom: '.7rem', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.2em', color: 'var(--red)', marginBottom: '.7rem', display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ width: 20, height: 1, background: 'var(--red)', display: 'inline-block' }} />
           For the ghosted
         </div>
         <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.9rem,6.5vw,3rem)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', lineHeight: 1.06, margin: '0 0 1rem' }}>
           Been ghosted?<br />Make it count.
         </h1>
-        <p style={{ color: 'var(--sub)', fontSize: '.98rem', lineHeight: 1.75, fontWeight: 300, margin: '0 0 1rem' }}>
+        <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-lead)', lineHeight: 1.75, fontWeight: 400, margin: '0 0 1rem' }}>
           Three interviews. A take-home. &ldquo;We&apos;ll be in touch by Friday.&rdquo; Then nothing — not even a template rejection. You can vent about it in a thread that disappears by tomorrow, or you can put it on a record that doesn&apos;t.
         </p>
-        <p style={{ color: 'var(--sub)', fontSize: '.85rem', lineHeight: 1.75, fontWeight: 300, margin: '0 0 1.6rem' }}>
+        <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-ui)', lineHeight: 1.75, fontWeight: 400, margin: '0 0 1.6rem' }}>
           You&apos;re not the exception — Criteria Corp&apos;s 2026 hiring research found 53% of job seekers were ghosted in the past year. The only thing that changes it is making it visible, per company, per agency.
         </p>
         <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', margin: '0 0 3rem' }}>
@@ -66,25 +66,25 @@ export default function GhostedPage() {
         <section style={{ marginBottom: '2.6rem' }}>
           {STEPS.map(s => (
             <div key={s.n} style={{ display: 'flex', gap: '1rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.15rem 1.25rem', marginBottom: '.65rem' }}>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.7rem', color: 'var(--blue)', fontWeight: 700, flexShrink: 0, paddingTop: '.15rem' }}>{s.n}</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', fontWeight: 500, flexShrink: 0, paddingTop: '.15rem' }}>{s.n}</div>
               <div>
-                <div style={{ fontFamily: 'var(--display)', fontSize: '.95rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.3rem' }}>{s.title}</div>
-                <p style={{ color: 'var(--sub)', fontSize: '.82rem', lineHeight: 1.7, fontWeight: 300, margin: 0 }}>{s.body}</p>
+                <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', marginBottom: '.3rem' }}>{s.title}</div>
+                <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.7, fontWeight: 400, margin: 0 }}>{s.body}</p>
               </div>
             </div>
           ))}
         </section>
 
         <section style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.4rem', marginBottom: '2rem' }}>
-          <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .6rem' }}>Check before your next application</h2>
-          <ul style={{ color: 'var(--sub)', fontSize: '.85rem', lineHeight: 1.8, fontWeight: 300, margin: 0, paddingLeft: '1.1rem' }}>
+          <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', margin: '0 0 .6rem' }}>Check before your next application</h2>
+          <ul style={{ color: 'var(--sub)', fontSize: 'var(--fs-ui)', lineHeight: 1.8, fontWeight: 400, margin: 0, paddingLeft: '1.1rem' }}>
             <li><Link href="/agencies" style={{ color: 'var(--blue)' }}>The Staffing Agency Ghost Index</Link> — who replies, who disappears.</li>
             <li><Link href="/companies" style={{ color: 'var(--blue)' }}>Company ghost rates</Link> — look any employer up before you spend an evening on their portal.</li>
             <li><Link href="/tracker" style={{ color: 'var(--blue)' }}>Track your applications</Link> — know exactly when silence officially becomes a ghost.</li>
           </ul>
         </section>
 
-        <p style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', lineHeight: 1.7 }}>
+        <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', lineHeight: 1.7 }}>
           Reports are anonymous and treated as claims, not verdicts — they&apos;re aggregated with confidence weighting into each company&apos;s score. That&apos;s what keeps the index fair, and worth checking.
         </p>
       </div>

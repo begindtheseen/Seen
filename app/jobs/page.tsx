@@ -93,7 +93,7 @@ export default function JobsPage() {
     borderRadius: 6,
     padding: '.33rem .68rem',
     fontFamily: 'var(--mono)',
-    fontSize: '.68rem',
+    fontSize: 'var(--fs-meta)',
     color: 'var(--sub)',
     outline: 'none',
     cursor: 'pointer',
@@ -252,12 +252,12 @@ export default function JobsPage() {
                 <button
                   onClick={() => setSwipeMode(false)}
                   title="List view"
-                  style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', fontWeight: swipeMode ? 400 : 600, padding: '.35rem .75rem', background: swipeMode ? 'transparent' : 'var(--surface)', color: swipeMode ? 'var(--dim)' : 'var(--white)', border: 'none', borderRight: '1px solid var(--line2)', cursor: 'pointer', transition: 'background .12s,color .12s' }}
+                  style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: swipeMode ? 400 : 600, padding: '.35rem .75rem', background: swipeMode ? 'transparent' : 'var(--surface)', color: swipeMode ? 'var(--dim)' : 'var(--white)', border: 'none', borderRight: '1px solid var(--line2)', cursor: 'pointer', transition: 'background .12s,color .12s' }}
                 >☰ List</button>
                 <button
                   onClick={() => setSwipeMode(true)}
                   title="Swipe mode — drag right to save, left to pass"
-                  style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', fontWeight: swipeMode ? 600 : 400, padding: '.35rem .75rem', background: swipeMode ? 'var(--surface)' : 'transparent', color: swipeMode ? 'var(--white)' : 'var(--dim)', border: 'none', cursor: 'pointer', transition: 'background .12s,color .12s' }}
+                  style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: swipeMode ? 600 : 400, padding: '.35rem .75rem', background: swipeMode ? 'var(--surface)' : 'transparent', color: swipeMode ? 'var(--white)' : 'var(--dim)', border: 'none', cursor: 'pointer', transition: 'background .12s,color .12s' }}
                 >⚡ Swipe</button>
               </div>
             )}
@@ -314,9 +314,9 @@ export default function JobsPage() {
           </div>
         ) : view === 'idle' ? (
           <div style={{ textAlign: 'center', padding: '2.75rem 1.5rem 3.25rem' }}>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '.16em', marginBottom: '.5rem' }}>Start a search</div>
-            <div style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', letterSpacing: '-.02em', marginBottom: '.4rem' }}>What role are you hunting?</div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)', marginBottom: '1.15rem' }}>Every result is transparency-scored before you waste a single application.</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '.16em', marginBottom: '.5rem' }}>Start a search</div>
+            <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', letterSpacing: '-.02em', marginBottom: '.4rem' }}>What role are you hunting?</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginBottom: '1.15rem' }}>Every result is transparency-scored before you waste a single application.</div>
             <div style={{ display: 'flex', gap: '.45rem', flexWrap: 'wrap', justifyContent: 'center' }}>
               {SUGGESTED_ROLES.map(role => (
                 <button key={role} className="sugg-chip" onClick={() => { setQuery(role); searchJobs(role) }}>{role}</button>
@@ -325,13 +325,13 @@ export default function JobsPage() {
             {/* Only when the ACCOUNT has no résumé on file (the rail says so) — never because the rail is empty. */}
             {isLoggedIn && recStatus === 'done' && recommended.length === 0 && recHasResume === false && (
               <div style={{ marginTop: '1.5rem', padding: '.85rem 1.1rem', background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: 10, maxWidth: 340, margin: '1.5rem auto 0', textAlign: 'left' }}>
-                <div style={{ fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.22rem' }}>Get personalized matches</div>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.65rem' }}>Upload your resume and we&apos;ll surface jobs that match your skills and experience level automatically.</div>
-                <a href="/resume" style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: '#a78bfa', textDecoration: 'none' }}>Upload resume →</a>
+                <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--white)', marginBottom: '.22rem' }}>Get personalized matches</div>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.65rem' }}>Upload your resume and we&apos;ll surface jobs that match your skills and experience level automatically.</div>
+                <a href="/resume" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: '#a78bfa', textDecoration: 'none' }}>Upload resume →</a>
               </div>
             )}
             {isLoggedIn && recStatus === 'done' && recommended.length === 0 && recHasResume === true && recReason !== 'no_city' && (
-              <div style={{ marginTop: '1.25rem', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)' }}>Nothing near {recCity || 'you'} matched your résumé&apos;s roles yet — search by title above.</div>
+              <div style={{ marginTop: '1.25rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>Nothing near {recCity || 'you'} matched your résumé&apos;s roles yet — search by title above.</div>
             )}
           </div>
         ) : view === 'loading' ? (
@@ -351,9 +351,9 @@ export default function JobsPage() {
           </div>
         ) : view === 'empty' ? (
           <div style={{ textAlign: 'center', padding: '4rem 2rem' }}>
-            <div style={{ fontSize: '2rem', marginBottom: '.75rem' }}>🔍</div>
-            <div style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.4rem' }}>No matches for this search</div>
-            <div style={{ color: 'var(--sub)', fontFamily: 'var(--body)', fontSize: '.82rem', fontWeight: 300, maxWidth: 360, margin: '0 auto', lineHeight: 1.6 }}>Try a broader job title, widen the radius, or clear a filter — new roles are indexed continuously.</div>
+            <div style={{ fontSize: 'var(--fs-h2)', marginBottom: '.75rem' }}>🔍</div>
+            <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', marginBottom: '.4rem' }}>No matches for this search</div>
+            <div style={{ color: 'var(--sub)', fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', fontWeight: 400, maxWidth: 360, margin: '0 auto', lineHeight: 1.6 }}>Try a broader job title, widen the radius, or clear a filter — new roles are indexed continuously.</div>
           </div>
         ) : null}
       </div>

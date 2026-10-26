@@ -92,7 +92,22 @@ function prep(canvas: HTMLCanvasElement, f: Frame): Ctx {
 }
 
 const white = (a: number) => `rgba(255,255,255,${a})`
-const font = (weight: number, px: number, family: string = TYPE.text) => `${weight} ${px}px ${family}`
+// next/font self-hosts the faces under generated family names ("__Syne_1a2b3c"), exposed as the CSS
+// variables --font-syne / --font-instrument / --font-dm-mono on <html> (app/layout.tsx). A canvas
+// cannot read a CSS variable, so the shared theme's plain names ("Syne") are swapped for the live
+// family list here; the server OG route keeps the plain names (satori registers its own fonts).
+const FAMILY_VARS: Array<[RegExp, string]> = [[/"Syne"/g, '--font-syne'], [/"Instrument Sans"/g, '--font-instrument'], [/"DM Mono"/g, '--font-dm-mono']]
+export function canvasFamily(family: string): string {
+  if (typeof document === 'undefined') return family
+  const cs = getComputedStyle(document.documentElement)
+  let out = family
+  for (const [re, v] of FAMILY_VARS) {
+    const live = cs.getPropertyValue(v).trim()
+    if (live) out = out.replace(re, live)
+  }
+  return out
+}
+const font = (weight: number, px: number, family: string = TYPE.text) => `${weight} ${px}px ${canvasFamily(family)}`
 
 // ── Primitives ─────────────────────────────────────────────────────────────────────────────
 function roundRect(c: Ctx, x: number, y: number, w: number, h: number, r: number) {
@@ -316,7 +331,7 @@ function drawDayGrid(c: Ctx, x: number, y: number, kind: string, days: number | 
       if (cell.mark) drawEventMark(c, cell.mark, cx + g.cell / 2, cy + g.cell / 2, g.cell, accent)
       if (cell.kind === 'more' && cell.label) {
         const fs = fitFont(c, cell.label, 700, TYPE.text, Math.round(g.cell * 0.34), 12, g.cell - 10)
-        c.font = font(700, fs); c.fillStyle = rgba(accent, Math.min(1, 0.55 + (cell.alpha ?? 1) * 0.4)); c.textAlign = 'center'; c.textBaseline = 'middle'
+        c.font = font(600, fs); c.fillStyle = rgba(accent, Math.min(1, 0.55 + (cell.alpha ?? 1) * 0.4)); c.textAlign = 'center'; c.textBaseline = 'middle'
         c.fillText(cell.label, cx + g.cell / 2, cy + g.cell / 2 + 1)
         c.textAlign = 'left'; c.textBaseline = 'alphabetic'
       }

@@ -23,10 +23,10 @@ export const metadata: Metadata = pageMetadata({
 })
 
 const wrap = { maxWidth: 760, margin: '0 auto', padding: '4rem 2rem', width: '100%', boxSizing: 'border-box' as const }
-const h2 = { fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: '0 0 .65rem' } as const
-const p = { fontFamily: 'var(--body)', fontSize: '.82rem', color: 'var(--sub)', lineHeight: 1.8, margin: '0 0 .9rem' } as const
+const h2 = { fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: '0 0 .65rem' } as const
+const p = { fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.8, margin: '0 0 .9rem' } as const
 const quote = { ...p, borderLeft: '2px solid var(--line2)', paddingLeft: '1rem' } as const
-const li = { fontFamily: 'var(--body)', fontSize: '.82rem', color: 'var(--sub)', lineHeight: 1.8, marginBottom: '.35rem' } as const
+const li = { fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.8, marginBottom: '.35rem' } as const
 const ul = { margin: '0 0 .9rem', paddingLeft: '1.1rem' } as const
 const section = { marginBottom: '2rem', scrollMarginTop: 80 } as const
 const link = { color: 'var(--blue)', textDecoration: 'none' } as const
@@ -45,7 +45,7 @@ export default function TermsPage() {
   return (
     <div className="rise-in" style={{ minHeight: '100vh' }}>
       <div style={wrap}>
-        <h1 style={{ fontFamily: 'var(--display)', fontSize: '2rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', margin: '0 0 .35rem' }}>
+        <h1 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-h2)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', margin: '0 0 .35rem' }}>
           Terms of Service
         </h1>
         <LegalMeta />

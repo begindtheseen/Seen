@@ -94,7 +94,7 @@ export default function NotificationsBell({ uid, className }: { uid: string; cla
       <button type="button" onClick={openModal} className={className} title="Application updates" aria-label={unread ? `Application updates — ${unread} new` : 'Application updates'} style={{ position: 'relative', cursor: 'pointer' }}>
         <BellIcon />
         {unread > 0 && (
-          <span aria-hidden style={{ position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 999, background: 'var(--red)', color: '#fff', fontFamily: 'var(--mono)', fontSize: '.55rem', fontWeight: 700, lineHeight: '16px', textAlign: 'center', boxSizing: 'border-box' }}>
+          <span aria-hidden style={{ position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 999, background: 'var(--red)', color: '#fff', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, lineHeight: '16px', textAlign: 'center', boxSizing: 'border-box' }}>
             {unread > 9 ? '9+' : unread}
           </span>
         )}
@@ -106,14 +106,14 @@ export default function NotificationsBell({ uid, className }: { uid: string; cla
             <div role="dialog" aria-modal="true" aria-label="Application updates" onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 460, background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 16, padding: '1.1rem 1.1rem 1.2rem', boxShadow: '0 30px 90px rgba(0,0,0,.6)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', marginBottom: '.8rem' }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--blue)' }}>Notifications</div>
-                  <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.05rem', color: 'var(--white)', marginTop: '.15rem' }}>Application updates</div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--blue)' }}>Notifications</div>
+                  <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-lead)', color: 'var(--white)', marginTop: '.15rem' }}>Application updates</div>
                 </div>
                 <button type="button" onClick={closeModal} aria-label="Close" style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 10, width: 44, height: 44, color: 'var(--muted)', cursor: 'pointer', flexShrink: 0 }}>✕</button>
               </div>
 
               {items.length === 0 ? (
-                <div style={{ fontFamily: 'var(--mono)', fontSize: '.64rem', color: 'var(--muted)', lineHeight: 1.6, padding: '.6rem 0 .2rem' }}>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.6, padding: '.6rem 0 .2rem' }}>
                   {loading ? 'Checking for updates…' : 'No updates yet. When an employer reviews, messages or decides on an application you sent on Seen, it shows up here.'}
                 </div>
               ) : (
@@ -125,17 +125,17 @@ export default function NotificationsBell({ uid, className }: { uid: string; cla
                         style={{ textAlign: 'left', width: '100%', cursor: 'pointer', background: isNew ? 'rgba(59,130,246,.07)' : 'var(--raised)', border: `1px solid ${isNew ? 'rgba(59,130,246,.3)' : 'var(--line)'}`, borderRadius: 10, padding: '.6rem .7rem', display: 'flex', gap: '.6rem', alignItems: 'flex-start' }}>
                         <span aria-hidden style={{ width: 7, height: 7, borderRadius: '50%', marginTop: '.4rem', flexShrink: 0, background: isNew ? toneColor(it.tone) : 'transparent', border: `1px solid ${toneColor(it.tone)}` }} />
                         <span style={{ flex: 1, minWidth: 0 }}>
-                          <span style={{ display: 'block', fontSize: '.82rem', color: 'var(--white)', fontWeight: isNew ? 700 : 500, lineHeight: 1.4 }}>{it.text}</span>
-                          {it.role && <span style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--sub)', marginTop: '.15rem' }}>{it.role}</span>}
-                          {it.message && <span style={{ fontSize: '.76rem', color: 'var(--sub)', lineHeight: 1.45, marginTop: '.3rem', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as React.CSSProperties}>“{it.message}”</span>}
+                          <span style={{ display: 'block', fontSize: 'var(--fs-sm)', color: 'var(--white)', fontWeight: isNew ? 700 : 500, lineHeight: 1.4 }}>{it.text}</span>
+                          {it.role && <span style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginTop: '.15rem' }}>{it.role}</span>}
+                          {it.message && <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.45, marginTop: '.3rem', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as React.CSSProperties}>“{it.message}”</span>}
                         </span>
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)', flexShrink: 0, marginTop: '.15rem' }}>{when(it.at)}</span>
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', flexShrink: 0, marginTop: '.15rem' }}>{when(it.at)}</span>
                       </button>
                     )
                   })}
                 </div>
               )}
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)', marginTop: '.75rem', lineHeight: 1.5 }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.75rem', lineHeight: 1.5 }}>
                 Tap an update to open it in your tracker.
               </div>
             </div>

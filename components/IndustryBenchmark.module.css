@@ -20,14 +20,14 @@
 }
 .kicker {
   font-family: var(--mono);
-  font-size: 0.52rem;
+  font-size: var(--fs-meta);
   text-transform: uppercase;
   letter-spacing: 0.16em;
   color: var(--dim);
 }
 .scope {
   font-family: var(--mono);
-  font-size: 0.52rem;
+  font-size: var(--fs-meta);
   color: var(--sub);
   background: var(--raised);
   border: 1px solid var(--line);
@@ -40,7 +40,7 @@
 .verdict { margin-bottom: 1.1rem; }
 .verdictHead {
   font-family: var(--display);
-  font-size: 1.02rem;
+  font-size: var(--fs-lead);
   font-weight: 800;
   letter-spacing: -0.02em;
   line-height: 1.2;
@@ -48,7 +48,7 @@
 }
 .verdictDetail {
   color: var(--sub);
-  font-size: 0.78rem;
+  font-size: var(--fs-meta);
   line-height: 1.6;
   margin: 0;
 }
@@ -62,7 +62,7 @@
 .row { display: grid; grid-template-columns: 92px 1fr auto; gap: 0.7rem; align-items: center; }
 .rowLabel {
   font-family: var(--mono);
-  font-size: 0.6rem;
+  font-size: var(--fs-meta);
   color: var(--dim);
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -96,7 +96,7 @@
 }
 .rowVals {
   font-family: var(--mono);
-  font-size: 0.62rem;
+  font-size: var(--fs-meta);
   color: var(--sub);
   white-space: nowrap;
   text-align: right;
@@ -116,12 +116,12 @@
   border: 1px solid color-mix(in srgb, var(--red) 26%, transparent);
   border-left: 3px solid var(--red);
 }
-.costIcon { flex-shrink: 0; font-size: 0.9rem; }
-.costText { font-family: var(--mono); font-size: 0.64rem; line-height: 1.5; color: color-mix(in srgb, var(--red) 82%, var(--white)); }
+.costIcon { flex-shrink: 0; font-size: var(--fs-ui); }
+.costText { font-family: var(--mono); font-size: var(--fs-meta); line-height: 1.5; color: color-mix(in srgb, var(--red) 82%, var(--white)); }
 
 .foot {
   font-family: var(--mono);
-  font-size: 0.53rem;
+  font-size: var(--fs-meta);
   color: var(--muted);
   line-height: 1.6;
   margin: 1.1rem 0 0;
@@ -134,10 +134,6 @@
 
 /* Phone floor (audit 2026-10-23): labels, values and the footnote read at 12px. */
 @media (max-width: 768px) {
-  .kicker, .scope, .rowLabel, .rowVals, .costText, .foot { font-size: 0.75rem; }
+  .kicker, .scope, .rowLabel, .rowVals, .costText, .foot { font-size: var(--fs-meta); }
 }
 
-/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
-@media (max-width: 768px) {
-  .kicker, .scope, .rowLabel, .rowVals, .costText, .foot { font-size: 0.75rem; }
-}

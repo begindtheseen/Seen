@@ -216,11 +216,11 @@ export default async function CompanySlugLayout(
   const summaryDate = summary ? summaryMonth(summary.generated_at) : null
   const summaryBlock = summary ? (
     <div style={{ marginTop: hasFacts ? '.85rem' : 0, paddingTop: hasFacts ? '.85rem' : 0, borderTop: hasFacts ? '1px solid var(--line)' : 'none' }}>
-      <h2 style={{ fontFamily: 'var(--display)', fontSize: '.86rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .4rem' }}>
+      <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-ui)', fontWeight: 700, color: 'var(--white)', margin: '0 0 .4rem' }}>
         What applicants report about {name}
       </h2>
-      <p style={{ fontSize: '.86rem', lineHeight: 1.65, color: 'var(--sub)', margin: 0, fontWeight: 300 }}>{summary.summary}</p>
-      <p style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)', margin: '.45rem 0 0', opacity: 0.85 }}>
+      <p style={{ fontSize: 'var(--fs-ui)', lineHeight: 1.65, color: 'var(--sub)', margin: 0, fontWeight: 400 }}>{summary.summary}</p>
+      <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', margin: '.45rem 0 0', opacity: 0.85 }}>
         Based on {summary.data_basis || `${summary.report_count_at_generation} self-reported applicant reports`}
         {summaryDate ? ` · summary generated ${summaryDate}` : ''} · self-reported claims, not verified facts
       </p>
@@ -260,7 +260,7 @@ export default async function CompanySlugLayout(
             <h2
               style={{
                 fontFamily: 'var(--display)',
-                fontSize: '1.05rem',
+                fontSize: 'var(--fs-lead)',
                 fontWeight: 700,
                 color: 'var(--white)',
                 letterSpacing: '-.01em',
@@ -272,11 +272,11 @@ export default async function CompanySlugLayout(
             </h2>
             <p
               style={{
-                fontSize: '.86rem',
+                fontSize: 'var(--fs-ui)',
                 lineHeight: 1.65,
                 color: 'var(--sub)',
                 margin: 0,
-                fontWeight: 300,
+                fontWeight: 400,
               }}
             >
               {name} has a Seen Grade of{' '}
@@ -306,8 +306,8 @@ export default async function CompanySlugLayout(
             >
               {/* The hiring-process and application-status questions are answered in the FAQ below; the
                   old /faq/<x> pages now point their canonical here, so they are not linked. */}
-              <a href="/methods" style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--blue)', textDecoration: 'none' }}>How grades work</a>
-              <a href={`/compare?a=${encodeURIComponent(name)}`} style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--blue)', textDecoration: 'none' }}>Compare {name} vs another</a>
+              <a href="/methods" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none' }}>How grades work</a>
+              <a href={`/compare?a=${encodeURIComponent(name)}`} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none' }}>Compare {name} vs another</a>
             </div>
           </div>
 
@@ -316,15 +316,15 @@ export default async function CompanySlugLayout(
               the initial HTML. Real-data-gated — no fabricated rates. */}
           {faq.length > 0 && (
             <div style={{ marginTop: '1rem' }}>
-              <h2 style={{ fontFamily: 'var(--display)', fontSize: '.9rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .7rem' }}>
+              <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-ui)', fontWeight: 700, color: 'var(--white)', margin: '0 0 .7rem' }}>
                 {name} hiring — frequently asked
               </h2>
               {faq.map(f => (
                 <details key={f.question} style={{ borderTop: '1px solid var(--line)', padding: '.65rem 0' }}>
-                  <summary style={{ cursor: 'pointer', fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 600, color: 'var(--white)', listStyle: 'none' }}>
+                  <summary style={{ cursor: 'pointer', fontFamily: 'var(--display)', fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--white)', listStyle: 'none' }}>
                     {f.question}
                   </summary>
-                  <p style={{ fontSize: '.82rem', lineHeight: 1.65, color: 'var(--sub)', margin: '.5rem 0 0', fontWeight: 300 }}>{f.answer}</p>
+                  <p style={{ fontSize: 'var(--fs-sm)', lineHeight: 1.65, color: 'var(--sub)', margin: '.5rem 0 0', fontWeight: 400 }}>{f.answer}</p>
                 </details>
               ))}
             </div>

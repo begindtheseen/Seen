@@ -5,7 +5,7 @@
 @media (min-width: 768px) { .wrap { padding: 0 2rem; } }
 
 .head { text-align: center; max-width: 46ch; margin: 0 auto clamp(1.8rem, 4vw, 2.6rem); }
-.kicker { font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.16em; text-transform: uppercase; color: #a5b4fc; margin-bottom: 0.8rem; }
+.kicker { font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.16em; text-transform: uppercase; color: #a5b4fc; margin-bottom: 0.8rem; }
 .h2 { font-family: var(--display); font-weight: 800; color: #fff; letter-spacing: -0.035em; line-height: 1.08; font-size: clamp(1.9rem, 4.6vw, 3rem); margin: 0; }
 .sub { margin: 0.9rem auto 0; color: var(--sub); font-size: clamp(0.95rem, 2vw, 1.05rem); line-height: 1.6; }
 
@@ -34,10 +34,10 @@
 }
 .ico svg { width: 19px; height: 19px; }
 .card:hover .ico { transform: scale(1.08) rotate(-4deg); color: #c7d2fe; background: rgba(99, 102, 241, 0.2); }
-.tag { font-family: var(--mono); font-size: 0.56rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
-.cardT { font-family: var(--display); font-weight: 700; font-size: 1.1rem; color: #fff; letter-spacing: -0.02em; margin: 0 0 0.45rem; }
-.cardD { font-size: 0.88rem; color: var(--sub); line-height: 1.6; margin: 0 0 1rem; }
-.more { margin-top: auto; font-family: var(--mono); font-size: 0.66rem; color: #a5b4fc; }
+.tag { font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
+.cardT { font-family: var(--display); font-weight: 700; font-size: var(--fs-lead); color: #fff; letter-spacing: -0.02em; margin: 0 0 0.45rem; }
+.cardD { font-size: var(--fs-ui); color: var(--sub); line-height: 1.6; margin: 0 0 1rem; }
+.more { margin-top: auto; font-family: var(--mono); font-size: var(--fs-meta); color: #a5b4fc; }
 .more span { display: inline-block; transition: transform 0.3s var(--ease-out); }
 .card:hover .more span { transform: translateX(4px); }
 
@@ -48,10 +48,6 @@
 
 /* Phone floor (audit 2026-10-23): kicker, card tags and "Open →" read at 12px. */
 @media (max-width: 768px) {
-  .kicker, .tag, .more { font-size: 0.75rem; }
+  .kicker, .tag, .more { font-size: var(--fs-meta); }
 }
 
-/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
-@media (max-width: 768px) {
-  .kicker, .tag, .more { font-size: 0.75rem; }
-}

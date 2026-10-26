@@ -28,7 +28,7 @@
 .ico svg { width: 21px; height: 21px; }
 .item:active .ico { transform: scale(0.9); }
 .label {
-  font-family: var(--mono); font-size: 0.54rem; letter-spacing: 0.04em;
+  font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.04em;
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .on { color: #fff; }
@@ -43,7 +43,3 @@
   .item:active .ico { transform: none; }
 }
 
-/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
-@media (max-width: 768px) {
-  .label { font-size: 0.75rem; }
-}

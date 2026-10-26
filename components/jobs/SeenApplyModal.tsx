@@ -114,39 +114,39 @@ export default function SeenApplyModal({ job, onClose, onApplied }: {
     }
   }
 
-  const label: React.CSSProperties = { display: 'block', fontFamily: 'var(--mono)', fontSize: '.58rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--muted)', margin: '.75rem 0 .3rem' }
-  const input: React.CSSProperties = { width: '100%', boxSizing: 'border-box', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 8, padding: '.6rem .75rem', color: 'var(--white)', fontFamily: 'var(--body)', fontSize: '.85rem', outline: 'none' }
-  const primary: React.CSSProperties = { width: '100%', background: 'var(--green)', color: 'var(--ink)', border: 'none', borderRadius: 9, padding: '.75rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.88rem', cursor: busy ? 'wait' : 'pointer', opacity: busy ? .7 : 1, marginTop: '1rem' }
+  const label: React.CSSProperties = { display: 'block', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--muted)', margin: '.75rem 0 .3rem' }
+  const input: React.CSSProperties = { width: '100%', boxSizing: 'border-box', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 8, padding: '.6rem .75rem', color: 'var(--white)', fontFamily: 'var(--body)', fontSize: 'var(--fs-ui)', outline: 'none' }
+  const primary: React.CSSProperties = { width: '100%', background: 'var(--green)', color: 'var(--ink)', border: 'none', borderRadius: 9, padding: '.75rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)', cursor: busy ? 'wait' : 'pointer', opacity: busy ? .7 : 1, marginTop: '1rem' }
 
   let content: React.ReactNode
   if (!ready) {
-    content = <p style={{ color: 'var(--muted)', fontSize: '.8rem' }}>Loading…</p>
+    content = <p style={{ color: 'var(--muted)', fontSize: 'var(--fs-sm)' }}>Loading…</p>
   } else if (!isLoggedIn) {
     const next = typeof window !== 'undefined' ? encodeURIComponent(window.location.pathname + window.location.search) : ''
     content = (
       <>
-        <p style={{ color: 'var(--sub)', fontSize: '.85rem', lineHeight: 1.6, margin: '0 0 1rem' }}>Sign in to apply on Seen. Your application goes straight to {job.company}, and it lands in your tracker so you can see if they respond.</p>
+        <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-ui)', lineHeight: 1.6, margin: '0 0 1rem' }}>Sign in to apply on Seen. Your application goes straight to {job.company}, and it lands in your tracker so you can see if they respond.</p>
         <Link href={`/login?next=${next}`} style={{ ...primary, display: 'block', textAlign: 'center', textDecoration: 'none' }}>Sign in to apply →</Link>
       </>
     )
   } else if (loadErr) {
-    content = <p style={{ color: 'var(--red)', fontSize: '.8rem' }}>{loadErr}</p>
+    content = <p style={{ color: 'var(--red)', fontSize: 'var(--fs-sm)' }}>{loadErr}</p>
   } else if (!status) {
-    content = <p style={{ color: 'var(--muted)', fontSize: '.8rem' }}>Loading…</p>
+    content = <p style={{ color: 'var(--muted)', fontSize: 'var(--fs-sm)' }}>Loading…</p>
   } else if (status.available === false || status.accepts_seen === false) {
-    content = <p style={{ color: 'var(--sub)', fontSize: '.85rem' }}>This listing doesn’t take applications on Seen.</p>
+    content = <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-ui)' }}>This listing doesn’t take applications on Seen.</p>
   } else if (done) {
     content = (
       <>
-        <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.1rem', color: 'var(--green)', marginBottom: '.4rem' }}>✓ Application sent</div>
-        <p style={{ color: 'var(--sub)', fontSize: '.85rem', lineHeight: 1.6, margin: '0 0 1rem' }}>{job.company} has your application. It’s in your tracker — we’ll check in if you don’t hear back.</p>
+        <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-lead)', color: 'var(--green)', marginBottom: '.4rem' }}>✓ Application sent</div>
+        <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-ui)', lineHeight: 1.6, margin: '0 0 1rem' }}>{job.company} has your application. It’s in your tracker — we’ll check in if you don’t hear back.</p>
         <Link href="/tracker" style={{ ...primary, display: 'block', textAlign: 'center', textDecoration: 'none' }}>Open my tracker →</Link>
       </>
     )
   } else if (status.already_applied) {
     content = (
       <>
-        <p style={{ color: 'var(--sub)', fontSize: '.85rem', lineHeight: 1.6, margin: '0 0 1rem' }}>You already applied to this listing on Seen.</p>
+        <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-ui)', lineHeight: 1.6, margin: '0 0 1rem' }}>You already applied to this listing on Seen.</p>
         <Link href="/tracker" style={{ ...primary, display: 'block', textAlign: 'center', textDecoration: 'none' }}>See it in my tracker →</Link>
       </>
     )
@@ -163,12 +163,12 @@ export default function SeenApplyModal({ job, onClose, onApplied }: {
 
         <span style={label}>Résumé</span>
         {hasSaved && (
-          <label style={{ display: 'flex', gap: '.5rem', alignItems: 'center', fontSize: '.8rem', color: 'var(--sub)', marginBottom: '.35rem', cursor: 'pointer' }}>
+          <label style={{ display: 'flex', gap: '.5rem', alignItems: 'center', fontSize: 'var(--fs-sm)', color: 'var(--sub)', marginBottom: '.35rem', cursor: 'pointer' }}>
             <input type="radio" name="sa-src" checked={source === 'saved'} onChange={() => setSource('saved')} />
             Use my résumé on Seen{status.prefill?.saved_resume_file_name ? ` (${status.prefill.saved_resume_file_name})` : ''}
           </label>
         )}
-        <label style={{ display: 'flex', gap: '.5rem', alignItems: 'center', fontSize: '.8rem', color: 'var(--sub)', cursor: 'pointer' }}>
+        <label style={{ display: 'flex', gap: '.5rem', alignItems: 'center', fontSize: 'var(--fs-sm)', color: 'var(--sub)', cursor: 'pointer' }}>
           {hasSaved && <input type="radio" name="sa-src" checked={source === 'upload'} onChange={() => setSource('upload')} />}
           {hasSaved ? 'Upload a different file' : 'Upload your résumé'}
         </label>
@@ -177,20 +177,20 @@ export default function SeenApplyModal({ job, onClose, onApplied }: {
             type="file"
             accept=".pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
             onChange={e => setFile(e.target.files?.[0] || null)}
-            style={{ marginTop: '.45rem', fontSize: '.75rem', color: 'var(--sub)' }}
+            style={{ marginTop: '.45rem', fontSize: 'var(--fs-meta)', color: 'var(--sub)' }}
           />
         )}
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', marginTop: '.3rem' }}>PDF, Word or text · up to 3 MB</div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.3rem' }}>PDF, Word or text · up to 3 MB</div>
 
         <label style={label} htmlFor="sa-note">Note to {job.company} (optional)</label>
         <textarea autoComplete="off" id="sa-note" style={{ ...input, minHeight: 80, resize: 'vertical' }} maxLength={2000} value={note} onChange={e => setNote(e.target.value)} />
 
-        <label style={{ display: 'flex', gap: '.55rem', alignItems: 'flex-start', fontSize: '.76rem', color: 'var(--sub)', lineHeight: 1.5, marginTop: '.85rem', cursor: 'pointer' }}>
+        <label style={{ display: 'flex', gap: '.55rem', alignItems: 'flex-start', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5, marginTop: '.85rem', cursor: 'pointer' }}>
           <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} style={{ marginTop: '.2rem' }} />
           <span>Your name, email, résumé and note will be shared with {job.company}.</span>
         </label>
 
-        {err && <div role="alert" style={{ color: 'var(--red)', fontSize: '.76rem', marginTop: '.6rem' }}>{err}</div>}
+        {err && <div role="alert" style={{ color: 'var(--red)', fontSize: 'var(--fs-meta)', marginTop: '.6rem' }}>{err}</div>}
         <button type="button" onClick={submit} disabled={busy} style={primary}>{busy ? 'Sending…' : `Send application to ${job.company}`}</button>
       </>
     )
@@ -202,9 +202,9 @@ export default function SeenApplyModal({ job, onClose, onApplied }: {
         <div role="dialog" aria-modal="true" aria-label={`Apply to ${job.title} at ${job.company}`} onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 460, background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 16, padding: '1.25rem 1.25rem 1.4rem', boxShadow: '0 30px 90px rgba(0,0,0,.6)' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.75rem', marginBottom: '.4rem' }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--green)' }}>Apply on Seen</div>
-              <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.05rem', color: 'var(--white)', marginTop: '.2rem' }}>{job.title}</div>
-              <div style={{ fontSize: '.78rem', color: 'var(--sub)' }}>{job.company}{job.location ? ` · ${job.location}` : ''}</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--green)' }}>Apply on Seen</div>
+              <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-lead)', color: 'var(--white)', marginTop: '.2rem' }}>{job.title}</div>
+              <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)' }}>{job.company}{job.location ? ` · ${job.location}` : ''}</div>
             </div>
             <button type="button" onClick={onClose} aria-label="Close" style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, width: 32, height: 32, color: 'var(--muted)', cursor: 'pointer', flexShrink: 0 }}>✕</button>
           </div>

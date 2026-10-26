@@ -21,7 +21,7 @@ export default function ListingScoreRing({ score, size = 46, caption = true }: {
       >
         {unrated ? '–' : score}
       </div>
-      {caption && <span aria-hidden="true" style={{ fontFamily: 'var(--body)', fontSize: '.75rem', lineHeight: 1, color: 'var(--muted)' }}>Listing</span>}
+      {caption && <span aria-hidden="true" style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', lineHeight: 1, color: 'var(--muted)' }}>Listing</span>}
     </div>
   )
 }

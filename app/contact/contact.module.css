@@ -7,32 +7,28 @@
   background: linear-gradient(150deg, #171a2b, #0f111d);
   box-shadow: 0 12px 45px rgba(0, 0, 0, 0.18);
 }
-.label { font-family: var(--mono); font-size: 0.58rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); }
+.label { font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); }
 .mail {
   display: inline-flex; align-items: center; min-height: 44px; margin-top: 0.3rem;
   font-family: var(--display); font-weight: 800; font-size: clamp(1.2rem, 4.6vw, 1.7rem); letter-spacing: -0.02em;
   color: var(--white); text-decoration: none; overflow-wrap: anywhere;
 }
 .mail:hover { color: var(--blue); }
-.p { font-size: 0.84rem; color: var(--sub); line-height: 1.7; margin: 0.5rem 0 0; }
+.p { font-size: var(--fs-sm); color: var(--sub); line-height: 1.7; margin: 0.5rem 0 0; }
 .p b { color: var(--white); font-weight: 600; }
 .p a { color: var(--blue); }
 
 .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.85rem; margin-top: 1rem; }
 @media (max-width: 600px) { .grid { grid-template-columns: minmax(0, 1fr); } }
 .tile { min-width: 0; padding: 1.05rem 1.15rem; border-radius: 14px; border: 1px solid var(--line); background: var(--card); }
-.tileT { font-family: var(--display); font-weight: 700; font-size: 0.92rem; color: var(--white); }
+.tileT { font-family: var(--display); font-weight: 700; font-size: var(--fs-body); color: var(--white); }
 
 .links { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; margin-top: 1.6rem; }
 .links .label { width: 100%; margin-bottom: 0.1rem; }
 .link {
   display: inline-flex; align-items: center; min-height: 44px; padding: 0 0.9rem; border-radius: 10px;
-  border: 1px solid var(--line2); color: var(--sub); font-size: 0.82rem; text-decoration: none;
+  border: 1px solid var(--line2); color: var(--sub); font-size: var(--fs-sm); text-decoration: none;
   transition: color 0.15s ease, border-color 0.15s ease;
 }
 .link:hover { color: var(--white); border-color: rgba(129, 140, 248, 0.5); }
 
-/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
-@media (max-width: 768px) {
-  .label { font-size: 0.75rem; }
-}

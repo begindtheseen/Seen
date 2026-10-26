@@ -9,10 +9,10 @@ function Col({ name, s }: { name: string; s: GrowthScore | null }) {
   if (!s) {
     return (
       <div style={{ flex: '1 1 0', minWidth: 0, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.1rem', textAlign: 'center' }}>
-        <div style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 800, color: 'var(--white)', wordBreak: 'break-word' }}>{name}</div>
-        <div style={{ fontFamily: 'var(--display)', fontSize: '2.6rem', fontWeight: 800, color: 'var(--dim)', margin: '.6rem 0' }}>?</div>
-        <div style={{ fontSize: '.74rem', color: 'var(--sub)', lineHeight: 1.5 }}>No reports yet.</div>
-        <Link href={`/report`} className="btn btn-ghost" style={{ marginTop: '.8rem', fontSize: '.7rem', padding: '.5rem .9rem' }}>Be the first to report</Link>
+        <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', wordBreak: 'break-word' }}>{name}</div>
+        <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-fig-m)', fontWeight: 800, color: 'var(--dim)', margin: '.6rem 0' }}>?</div>
+        <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5 }}>No reports yet.</div>
+        <Link href={`/report`} className="btn btn-ghost" style={{ marginTop: '.8rem', fontSize: 'var(--fs-meta)', padding: '.5rem .9rem' }}>Be the first to report</Link>
       </div>
     )
   }
@@ -23,11 +23,11 @@ function Col({ name, s }: { name: string; s: GrowthScore | null }) {
     return (
       <div style={{ flex: '1 1 0', minWidth: 0, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.1rem', textAlign: 'center' }}>
         <Link href={`/company/${cslug}`} style={{ textDecoration: 'none' }}>
-          <div style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 800, color: 'var(--white)', wordBreak: 'break-word', lineHeight: 1.15 }}>{name}</div>
+          <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', wordBreak: 'break-word', lineHeight: 1.15 }}>{name}</div>
         </Link>
-        <div style={{ fontFamily: 'var(--display)', fontSize: '2.6rem', fontWeight: 800, color: 'var(--dim)', margin: '.6rem 0' }}>—</div>
-        <div style={{ fontSize: '.74rem', color: 'var(--sub)', lineHeight: 1.5 }}>{`Not enough reviews to grade yet (${Math.min(fp, MIN_REPORTS_FOR_GRADE)} of ${MIN_REPORTS_FOR_GRADE}).`}</div>
-        <Link href={fp > 0 ? `/company/${cslug}` : `/report`} className="btn btn-ghost" style={{ marginTop: '.8rem', fontSize: '.7rem', padding: '.5rem .9rem' }}>{fp > 0 ? 'Read the reports' : 'Be the first to report'}</Link>
+        <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-fig-m)', fontWeight: 800, color: 'var(--dim)', margin: '.6rem 0' }}>—</div>
+        <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5 }}>{`Not enough reviews to grade yet (${Math.min(fp, MIN_REPORTS_FOR_GRADE)} of ${MIN_REPORTS_FOR_GRADE}).`}</div>
+        <Link href={fp > 0 ? `/company/${cslug}` : `/report`} className="btn btn-ghost" style={{ marginTop: '.8rem', fontSize: 'var(--fs-meta)', padding: '.5rem .9rem' }}>{fp > 0 ? 'Read the reports' : 'Be the first to report'}</Link>
       </div>
     )
   }
@@ -41,19 +41,19 @@ function Col({ name, s }: { name: string; s: GrowthScore | null }) {
   return (
     <div style={{ flex: '1 1 0', minWidth: 0, background: 'var(--card)', border: '1px solid var(--line)', borderTop: `3px solid ${accent}`, borderRadius: 12, padding: '1.1rem', textAlign: 'center' }}>
       <Link href={`/company/${cslug}`} style={{ textDecoration: 'none' }}>
-        <div style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 800, color: 'var(--white)', wordBreak: 'break-word', lineHeight: 1.15 }}>{name}</div>
+        <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', wordBreak: 'break-word', lineHeight: 1.15 }}>{name}</div>
       </Link>
-      <div style={{ fontFamily: 'var(--display)', fontSize: '2.8rem', fontWeight: 800, color: accent, lineHeight: 1, margin: '.5rem 0 .15rem' }}>{grade(s.overall_score)}</div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', letterSpacing: '.1em', color: accent }}>{s.overall_score}/100 · {riskLabel(s.risk_level)}</div>
+      <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-fig-m)', fontWeight: 800, color: accent, lineHeight: 1, margin: '.5rem 0 .15rem' }}>{grade(s.overall_score)}</div>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', letterSpacing: '.1em', color: accent }}>{s.overall_score}/100 · {riskLabel(s.risk_level)}</div>
       <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
         {rows.map(r => (
           <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '.5rem', borderTop: '1px solid var(--line)', paddingTop: '.5rem' }}>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)' }}>{r.label}</span>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '.85rem', fontWeight: 500, color: r.color || 'var(--white)' }}>{r.value}</span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)' }}>{r.label}</span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-ui)', fontWeight: 500, color: r.color || 'var(--white)' }}>{r.value}</span>
           </div>
         ))}
       </div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)', marginTop: '.7rem', lineHeight: 1.5 }}>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.7rem', lineHeight: 1.5 }}>
         {`Based on ${fp.toLocaleString()} applicant report${fp === 1 ? '' : 's'}`}
       </div>
     </div>
@@ -72,8 +72,8 @@ function Verdict({ aName, a, bName, b }: { aName: string; a: GrowthScore | null;
   const anyEst = firstPartyReportCount(a) === 0 || firstPartyReportCount(b) === 0
   return (
     <div style={{ background: 'var(--raised)', border: '1px solid var(--line)', borderRadius: 12, padding: '1rem 1.2rem', margin: '1.4rem 0 0' }}>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--blue)', marginBottom: '.5rem' }}>The verdict</div>
-      <p style={{ color: 'var(--sub)', fontSize: '.84rem', lineHeight: 1.65, margin: 0, fontWeight: 300 }}>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--blue)', marginBottom: '.5rem' }}>The verdict</div>
+      <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.65, margin: 0, fontWeight: 400 }}>
         {tie
           ? `${aName} and ${bName} score evenly at ${hi}/100 on hiring transparency. Compare the ghost and response rates above to break the tie for your situation.`
           : <>On {anyEst ? 'Seen’s hiring-transparency grade' : 'reported hiring transparency'}, <strong style={{ color: 'var(--white)' }}>{better}</strong> scores higher ({hi}/100) than <strong style={{ color: 'var(--white)' }}>{worse}</strong> ({lo}/100). {anyEst ? 'At least one of these grades is estimated from aggregated public data rather than applicant reports, so treat the gap as directional.' : `That means applicants to ${better} were more likely to hear back.`} Scores are community signals, not verified facts.</>}
@@ -89,7 +89,7 @@ export default function CompareView({
     <div style={{ maxWidth: 720, margin: '0 auto', width: '100%' }}>
       <div style={{ display: 'flex', gap: '.75rem', alignItems: 'stretch' }}>
         <Col name={aName} s={a} />
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', color: 'var(--dim)', flexShrink: 0 }}>vs</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)', color: 'var(--dim)', flexShrink: 0 }}>vs</div>
         <Col name={bName} s={b} />
       </div>
       <Verdict aName={aName} a={a} bName={bName} b={b} />

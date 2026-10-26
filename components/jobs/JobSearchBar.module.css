@@ -39,7 +39,7 @@
   padding: 0.62rem 0.9rem;
   color: var(--white);
   font-family: var(--body);
-  font-size: 0.875rem;
+  font-size: var(--fs-ui);
   outline: none;
   caret-color: var(--blue);
 }
@@ -57,7 +57,7 @@
   place-items: center;
   background: none;
   border: none;
-  font-size: 0.9rem;
+  font-size: var(--fs-ui);
   color: var(--muted);
   padding: 0;
   line-height: 1;
@@ -74,7 +74,7 @@
   border-radius: 6px;
   padding: 0.33rem 0.68rem;
   font-family: var(--mono);
-  font-size: 0.68rem;
+  font-size: var(--fs-meta);
   color: var(--sub);
   outline: none;
   cursor: pointer;
@@ -89,7 +89,7 @@
   padding: 0.62rem 1.25rem;
   font-family: var(--display);
   font-weight: 800;
-  font-size: 0.85rem;
+  font-size: var(--fs-ui);
   cursor: pointer;
   box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
 }
@@ -103,7 +103,7 @@
   background: rgba(245, 158, 11, 0.07);
   border-radius: 8px;
   font-family: var(--mono);
-  font-size: 0.64rem;
+  font-size: var(--fs-meta);
   line-height: 1.5;
   color: var(--amber);
 }
@@ -112,7 +112,7 @@
 .cityLine {
   margin: 0.2rem 0 1.1rem;
   font-family: var(--mono);
-  font-size: 0.64rem;
+  font-size: var(--fs-meta);
   color: var(--dim);
 }
 .cityLine a { color: #a78bfa; text-decoration: none; }
@@ -124,7 +124,7 @@
   .row { flex-wrap: wrap; }
   .loc { flex: 1 1 100%; }
   .input { font-size: 16px; padding: 0.68rem 0.85rem; }
-  .radius { font-size: 0.78rem; padding: 0.33rem 0.6rem; }
+  .radius { font-size: var(--fs-meta); padding: 0.33rem 0.6rem; }
   .go { flex: 1 1 auto; padding: 0.62rem 0.95rem; }
 }
 
@@ -139,14 +139,14 @@
 }
 .dividerTitle {
   font-family: var(--mono);
-  font-size: 0.75rem;
+  font-size: var(--fs-meta);
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--sub);
 }
 .dividerSub {
   font-family: var(--mono);
-  font-size: 0.75rem;
+  font-size: var(--fs-meta);
   color: var(--dim);
   line-height: 1.5;
 }
@@ -161,7 +161,7 @@
   border: 1px solid var(--line2);
   border-radius: 10px;
   font-family: var(--mono);
-  font-size: 0.78rem;
+  font-size: var(--fs-meta);
   color: var(--sub);
   cursor: pointer;
 }
@@ -174,13 +174,9 @@
   border: 1px solid var(--line2);
   border-radius: 8px;
   font-family: var(--mono);
-  font-size: 0.75rem;
+  font-size: var(--fs-meta);
   color: var(--sub);
   cursor: pointer;
   white-space: nowrap;
 }
 
-/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
-@media (max-width: 768px) {
-  .notice, .cityLine { font-size: 0.75rem; }
-}

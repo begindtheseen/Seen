@@ -13,18 +13,18 @@ const inp: React.CSSProperties = {
   padding: '.72rem 1rem',
   color: 'var(--white)',
   fontFamily: 'var(--body)',
-  fontSize: '.875rem',
+  fontSize: 'var(--fs-ui)',
   outline: 'none',
   caretColor: 'var(--blue)',
   boxSizing: 'border-box',
 }
-const label: React.CSSProperties = { fontFamily: 'var(--mono)', fontSize: '.6rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)', display: 'block', marginBottom: '.35rem' }
-const h1: React.CSSProperties = { fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', margin: '0 0 .2rem' }
-const sub: React.CSSProperties = { fontSize: '.82rem', color: 'var(--sub)', fontWeight: 300, marginBottom: '.5rem' }
-const fine: React.CSSProperties = { fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)', lineHeight: 1.55, marginBottom: '1.5rem' }
+const label: React.CSSProperties = { fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)', display: 'block', marginBottom: '.35rem' }
+const h1: React.CSSProperties = { fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', margin: '0 0 .2rem' }
+const sub: React.CSSProperties = { fontSize: 'var(--fs-sm)', color: 'var(--sub)', fontWeight: 300, marginBottom: '.5rem' }
+const fine: React.CSSProperties = { fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.55, marginBottom: '1.5rem' }
 const focusOn = (e: React.FocusEvent<HTMLInputElement>) => { e.target.style.borderColor = 'var(--blue)' }
 const focusOff = (e: React.FocusEvent<HTMLInputElement>) => { e.target.style.borderColor = 'var(--line2)' }
-const cta = (busy: boolean): React.CSSProperties => ({ width: '100%', padding: '.85rem', background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)', color: '#fff', border: 'none', borderRadius: 8, fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.9rem', cursor: busy ? 'not-allowed' : 'pointer', marginBottom: '.75rem', boxShadow: '0 0 20px rgba(59,130,246,0.3)', opacity: busy ? 0.7 : 1 })
+const cta = (busy: boolean): React.CSSProperties => ({ width: '100%', padding: '.85rem', background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)', color: '#fff', border: 'none', borderRadius: 8, fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)', cursor: busy ? 'not-allowed' : 'pointer', marginBottom: '.75rem', boxShadow: '0 0 20px rgba(59,130,246,0.3)', opacity: busy ? 0.7 : 1 })
 
 /** The neutral answer to "send me a code" — the same words whether or not the address has an account
  *  (the raw Supabase error, "Signups not allowed for otp", told anyone which emails are registered;
@@ -177,14 +177,14 @@ export default function ResetPage() {
       </div>
     </>
   )
-  const message = msg && <div role="status" style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: ok ? 'var(--green)' : 'var(--red)', marginBottom: '.85rem', lineHeight: 1.6 }}>{msg}</div>
+  const message = msg && <div role="status" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: ok ? 'var(--green)' : 'var(--red)', marginBottom: '.85rem', lineHeight: 1.6 }}>{msg}</div>
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 1.5rem 1.5rem' }}>
       <div className="rise-in" style={{ width: '100%', maxWidth: 420 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '2rem', justifyContent: 'center' }}>
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--blue)', boxShadow: '0 0 10px rgba(59,130,246,0.6)', display: 'inline-block' }} />
-          <span style={{ fontFamily: 'var(--display)', fontSize: '1.3rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em' }}>Seen</span>
+          <span style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-h3)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em' }}>Seen</span>
         </div>
 
         {mode === 'detecting' && (
@@ -205,7 +205,7 @@ export default function ResetPage() {
               {verifying ? 'Saving...' : 'Save new password →'}
             </button>
             <div style={{ textAlign: 'center' }}>
-              <Link href="/dashboard" style={{ color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.65rem', textDecoration: 'none' }}>
+              <Link href="/dashboard" style={{ color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textDecoration: 'none' }}>
                 Keep my current password
               </Link>
             </div>
@@ -242,7 +242,7 @@ export default function ResetPage() {
               {sending ? 'Sending...' : 'Send code →'}
             </button>
             <div style={{ textAlign: 'center' }}>
-              <Link href="/login" style={{ color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.65rem', textDecoration: 'none' }}>
+              <Link href="/login" style={{ color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textDecoration: 'none' }}>
                 Back to sign in
               </Link>
             </div>
@@ -267,7 +267,7 @@ export default function ResetPage() {
                 onFocus={focusOn}
                 onBlur={focusOff}
                 placeholder="12345678"
-                style={{ ...inp, fontFamily: 'var(--mono)', fontSize: '1.4rem', letterSpacing: '.2em', textAlign: 'center' }}
+                style={{ ...inp, fontFamily: 'var(--mono)', fontSize: 'var(--fs-xl)', letterSpacing: '.2em', textAlign: 'center' }}
               />
             </div>
             {passwordFields(verifyCode)}
@@ -278,7 +278,7 @@ export default function ResetPage() {
             <div style={{ textAlign: 'center' }}>
               <button
                 onClick={() => { setStep(1); setCode(''); setMsg('') }}
-                style={{ background: 'none', border: 'none', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.65rem', cursor: 'pointer', minHeight: 44 }}
+                style={{ background: 'none', border: 'none', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', cursor: 'pointer', minHeight: 44 }}
               >
                 Resend code
               </button>

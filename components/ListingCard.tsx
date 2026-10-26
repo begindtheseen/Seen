@@ -7,6 +7,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { track } from '@/lib/analytics'
 import ModalPortal from '@/components/ModalPortal'
+import { canvasFamily } from '@/lib/cardKit'
 
 export interface ListingCardData {
   title: string
@@ -68,16 +69,16 @@ async function drawCard(d: ListingCardData): Promise<HTMLCanvasElement> {
   c.strokeStyle = 'rgba(255,255,255,0.06)'; c.lineWidth = 1.5; c.stroke()
 
   // Eyebrow
-  c.font = '600 13px "DM Mono",monospace'; c.fillStyle = 'rgba(255,255,255,0.20)'
+  c.font = `500 13px ${canvasFamily('"DM Mono"')},monospace`; c.fillStyle = 'rgba(255,255,255,0.20)'
   c.textAlign = 'left'; c.textBaseline = 'top'
   c.fillText('SEEN  ·  JOB LISTING', PAD, PAD)
   c.textAlign = 'right'; c.fillText('seenjobs.io', W - PAD, PAD)
 
   // Title — fit down, then ellipsize so a long role never overflows.
   const titleY = PAD + 50; let tFs = 56
-  c.font = `800 ${tFs}px "Syne",sans-serif`
+  c.font = `800 ${tFs}px ${canvasFamily('"Syne"')},sans-serif`
   while (c.measureText(d.title || 'Role').width > W - PAD * 2 && tFs > 34) {
-    tFs -= 2; c.font = `800 ${tFs}px "Syne",sans-serif`
+    tFs -= 2; c.font = `800 ${tFs}px ${canvasFamily('"Syne"')},sans-serif`
   }
   let title = d.title || 'Role'
   while (c.measureText(title).width > W - PAD * 2 && title.length > 4) title = title.slice(0, -1)
@@ -87,7 +88,7 @@ async function drawCard(d: ListingCardData): Promise<HTMLCanvasElement> {
 
   // Company · location subline
   const subY = titleY + tFs + 10
-  c.font = '400 21px "DM Mono",monospace'; c.fillStyle = 'rgba(255,255,255,0.42)'
+  c.font = `400 21px ${canvasFamily('"DM Mono"')},monospace`; c.fillStyle = 'rgba(255,255,255,0.42)'
   let sub = `${d.company}${d.location ? '  ·  ' + d.location : ''}`
   while (c.measureText(sub).width > W - PAD * 2 && sub.length > 4) sub = sub.slice(0, -1)
   c.fillText(sub, PAD, subY)
@@ -99,9 +100,9 @@ async function drawCard(d: ListingCardData): Promise<HTMLCanvasElement> {
 
   // Big grade headline (like the outcome word)
   const HEAD = rated ? `${grade}  ·  ${score}/100` : 'UNRATED'
-  let oFs = 138; c.font = `800 ${oFs}px "Syne",sans-serif`
+  let oFs = 138; c.font = `800 ${oFs}px ${canvasFamily('"Syne"')},sans-serif`
   while (c.measureText(HEAD).width > W - PAD * 2 && oFs > 72) {
-    oFs -= 4; c.font = `800 ${oFs}px "Syne",sans-serif`
+    oFs -= 4; c.font = `800 ${oFs}px ${canvasFamily('"Syne"')},sans-serif`
   }
   const oY = d1Y + 26
   c.fillStyle = OC; c.textAlign = 'left'; c.textBaseline = 'top'
@@ -123,9 +124,9 @@ async function drawCard(d: ListingCardData): Promise<HTMLCanvasElement> {
     c.fillText(f.e, PAD, fy)
     const textX = PAD + eFs + 18
     let fFs = 30
-    c.font = `500 ${fFs}px "DM Mono",monospace`; c.fillStyle = 'rgba(255,255,255,0.90)'
+    c.font = `500 ${fFs}px ${canvasFamily('"DM Mono"')},monospace`; c.fillStyle = 'rgba(255,255,255,0.90)'
     while (c.measureText(f.t).width > W - textX - PAD && fFs > 16) {
-      fFs--; c.font = `500 ${fFs}px "DM Mono",monospace`
+      fFs--; c.font = `500 ${fFs}px ${canvasFamily('"DM Mono"')},monospace`
     }
     let ft = f.t
     while (c.measureText(ft).width > W - textX - PAD && ft.length > 4) ft = ft.slice(0, -1)
@@ -137,7 +138,7 @@ async function drawCard(d: ListingCardData): Promise<HTMLCanvasElement> {
   // Footer
   c.strokeStyle = 'rgba(255,255,255,0.08)'; c.lineWidth = 1
   c.beginPath(); c.moveTo(PAD, footerDivY); c.lineTo(W - PAD, footerDivY); c.stroke()
-  c.font = '400 16px "DM Mono",monospace'; c.fillStyle = 'rgba(255,255,255,0.30)'
+  c.font = `400 16px ${canvasFamily('"DM Mono"')},monospace`; c.fillStyle = 'rgba(255,255,255,0.30)'
   c.textAlign = 'center'; c.textBaseline = 'middle'
   c.fillText('Job intel from Seen  ·  seenjobs.io', W / 2, footerDivY + 28)
 
@@ -224,32 +225,32 @@ export default function ListingCard({ data, onClose }: { data: ListingCardData; 
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(2,4,10,0.97)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '1.5rem 1.25rem 2.5rem', overflowY: 'auto' }}>
       <div style={{ width: '100%', maxWidth: 480 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: OC, textTransform: 'uppercase', letterSpacing: '.1em', fontWeight: 600 }}>{data.title} — {data.company}</div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', padding: '.2rem .4rem' }}>✕ close</button>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: OC, textTransform: 'uppercase', letterSpacing: '.1em', fontWeight: 500 }}>{data.title} — {data.company}</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', padding: '.2rem .4rem' }}>✕ close</button>
         </div>
 
-        <div style={{ fontFamily: 'var(--display)', fontSize: '1.15rem', fontWeight: 800, color: '#fff', marginBottom: '.2rem', letterSpacing: '-.02em' }}>Your share card is ready</div>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'rgba(255,255,255,0.35)', marginBottom: '1.1rem', lineHeight: 1.7 }}>Share this listing with its Seen hiring grade and intel.</div>
+        <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: '#fff', marginBottom: '.2rem', letterSpacing: '-.02em' }}>Your share card is ready</div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'rgba(255,255,255,0.35)', marginBottom: '1.1rem', lineHeight: 1.7 }}>Share this listing with its Seen hiring grade and intel.</div>
 
         {dataUrl ? (
           <img src={dataUrl} alt="Share card" style={{ width: '100%', borderRadius: 12, boxShadow: `0 24px 80px rgba(0,0,0,0.9), 0 0 60px ${OC}22`, marginBottom: '1rem', display: 'block' }} />
         ) : (
           <div style={{ width: '100%', aspectRatio: '1 / 1', borderRadius: 12, background: '#0c0f1a', border: `1px solid ${OC}22`, marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'rgba(255,255,255,0.2)', letterSpacing: '.1em' }}>Generating your card…</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'rgba(255,255,255,0.2)', letterSpacing: '.1em' }}>Generating your card…</div>
           </div>
         )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '.5rem', marginBottom: '.5rem' }}>
-          <button onClick={() => share('linkedin')} style={{ background: 'rgba(10,102,194,0.15)', border: '1px solid rgba(10,102,194,0.4)', color: '#60a5fa', fontFamily: 'var(--mono)', fontSize: '.65rem', fontWeight: 600, padding: '.7rem .6rem', borderRadius: 9, cursor: 'pointer' }}>💼 LinkedIn</button>
-          <button onClick={() => share('twitter')} style={{ background: 'rgba(29,161,242,0.1)', border: '1px solid rgba(29,161,242,0.3)', color: 'rgba(150,210,255,0.9)', fontFamily: 'var(--mono)', fontSize: '.65rem', fontWeight: 600, padding: '.7rem .6rem', borderRadius: 9, cursor: 'pointer' }}>𝕏 Twitter</button>
-          <button onClick={() => share('reddit')} style={{ background: 'rgba(255,69,0,0.15)', border: '1px solid rgba(255,69,0,0.4)', color: '#ff6314', fontFamily: 'var(--mono)', fontSize: '.65rem', fontWeight: 600, padding: '.7rem .6rem', borderRadius: 9, cursor: 'pointer' }}>🔴 Reddit</button>
+          <button onClick={() => share('linkedin')} style={{ background: 'rgba(10,102,194,0.15)', border: '1px solid rgba(10,102,194,0.4)', color: '#60a5fa', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, padding: '.7rem .6rem', borderRadius: 9, cursor: 'pointer' }}>💼 LinkedIn</button>
+          <button onClick={() => share('twitter')} style={{ background: 'rgba(29,161,242,0.1)', border: '1px solid rgba(29,161,242,0.3)', color: 'rgba(150,210,255,0.9)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, padding: '.7rem .6rem', borderRadius: 9, cursor: 'pointer' }}>𝕏 Twitter</button>
+          <button onClick={() => share('reddit')} style={{ background: 'rgba(255,69,0,0.15)', border: '1px solid rgba(255,69,0,0.4)', color: '#ff6314', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, padding: '.7rem .6rem', borderRadius: 9, cursor: 'pointer' }}>🔴 Reddit</button>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.5rem', marginBottom: '.7rem' }}>
-          <button onClick={() => share('threads')} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.18)', color: '#fff', fontFamily: 'var(--mono)', fontSize: '.65rem', fontWeight: 600, padding: '.7rem .9rem', borderRadius: 9, cursor: 'pointer' }}>🧵 Threads</button>
-          <button onClick={() => share('download')} disabled={!dataUrl} style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', color: 'rgba(180,180,255,0.85)', fontFamily: 'var(--mono)', fontSize: '.65rem', padding: '.7rem .9rem', borderRadius: 9, cursor: dataUrl ? 'pointer' : 'not-allowed', opacity: dataUrl ? 1 : 0.5 }}>↓ Save Image</button>
+          <button onClick={() => share('threads')} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.18)', color: '#fff', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, padding: '.7rem .9rem', borderRadius: 9, cursor: 'pointer' }}>🧵 Threads</button>
+          <button onClick={() => share('download')} disabled={!dataUrl} style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', color: 'rgba(180,180,255,0.85)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.7rem .9rem', borderRadius: 9, cursor: dataUrl ? 'pointer' : 'not-allowed', opacity: dataUrl ? 1 : 0.5 }}>↓ Save Image</button>
         </div>
 
-        <button onClick={onClose} style={{ background: 'none', border: 'none', width: '100%', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'rgba(255,255,255,0.25)', cursor: 'pointer', padding: '.5rem', textAlign: 'center' }}>Skip</button>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', width: '100%', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'rgba(255,255,255,0.25)', cursor: 'pointer', padding: '.5rem', textAlign: 'center' }}>Skip</button>
       </div>
     </div>
     </ModalPortal>

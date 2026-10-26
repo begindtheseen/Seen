@@ -130,7 +130,7 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
   const watch = isActive ? ghostWatch(days, intel) : null
   const listing = listingHref(app)
   // 40px hit area without growing the row (negative vertical margin).
-  const linkStyle = { fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--blue)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', minHeight: 40, padding: '0 .4rem', margin: '-8px -.4rem' } as const
+  const linkStyle = { fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', minHeight: 40, padding: '0 .4rem', margin: '-8px -.4rem' } as const
   // "Next check-in Oct 30 — did they respond?" — while a check is due the card asks it instead; a check
   // put off with "Later" says when it comes back ("We'll ask again Oct 25 — …", audit 3 M6).
   const next = isActive && !check ? EventStore.nextCheck(app) : null
@@ -170,7 +170,7 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
             const last = fromEmail[fromEmail.length - 1]
             const label: Record<string, string> = { application_submitted: 'confirmation', interview_received: 'interview invite', assessment_received: 'assessment', rejected: 'rejection', offer_received: 'offer' }
             return (
-              <div title="Updated from an email you forwarded to Seen" style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem', marginTop: '.25rem', marginLeft: app.seenApply && app.employerStage ? '.35rem' : 0, fontFamily: 'var(--mono)', fontSize: '.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--blue)', border: '1px solid currentColor', borderRadius: 999, padding: '.12rem .5rem' }}>
+              <div title="Updated from an email you forwarded to Seen" style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem', marginTop: '.25rem', marginLeft: app.seenApply && app.employerStage ? '.35rem' : 0, fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--blue)', border: '1px solid currentColor', borderRadius: 999, padding: '.12rem .5rem' }}>
                 ✉ From email: {label[String(last.type)] || 'update'}
               </div>
             )
@@ -178,14 +178,14 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '.25rem', flexShrink: 0 }}>
           {app.score != null && (
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: app.score >= 70 ? 'var(--green)' : app.score >= 40 ? 'var(--amber)' : 'var(--red)', fontWeight: 600 }}>{app.score}</span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: app.score >= 70 ? 'var(--green)' : app.score >= 40 ? 'var(--amber)' : 'var(--red)', fontWeight: 500 }}>{app.score}</span>
           )}
           {ghostRate != null && ghostRate > 0.3 && (
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: ghostRate > 0.55 ? 'var(--red)' : 'var(--amber)', background: ghostRate > 0.55 ? 'rgba(239,68,68,.08)' : 'rgba(245,158,11,.08)', border: `1px solid ${ghostRate > 0.55 ? 'rgba(239,68,68,.2)' : 'rgba(245,158,11,.2)'}`, borderRadius: 4, padding: '.1rem .3rem', marginTop: '.1rem' }}>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: ghostRate > 0.55 ? 'var(--red)' : 'var(--amber)', background: ghostRate > 0.55 ? 'rgba(239,68,68,.08)' : 'rgba(245,158,11,.08)', border: `1px solid ${ghostRate > 0.55 ? 'rgba(239,68,68,.2)' : 'rgba(245,158,11,.2)'}`, borderRadius: 4, padding: '.1rem .3rem', marginTop: '.1rem' }}>
               {ghostRate > 0.55 ? '👻' : '⚠'} {Math.round(ghostRate * 100)}% ghost
             </span>
           )}
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--muted)', background: 'var(--raised)', border: '1px solid var(--line)', borderRadius: 4, padding: '.1rem .35rem' }}>Day {days}</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', background: 'var(--raised)', border: '1px solid var(--line)', borderRadius: 4, padding: '.1rem .35rem' }}>Day {days}</span>
           {sync === 'saving' && <span className={`${s.sync} ${s.syncSaving}`} role="status">Saving…</span>}
           {sync === 'unsynced' && (
             <button type="button" className={`${s.sync} ${s.syncOff}`} onClick={e => { e.stopPropagation(); onRetry(app.id) }} title="This change is saved on this device but has not reached your account yet. Tap to send it again.">
@@ -221,7 +221,7 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
       {/* Ghost Watch — time-aware verdict from this company's real Seen data */}
       {watch && (
         <div style={{
-          marginTop: '.55rem', fontFamily: 'var(--mono)', fontSize: '.75rem', lineHeight: 1.6, borderRadius: 7, padding: '.45rem .7rem',
+          marginTop: '.55rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', lineHeight: 1.6, borderRadius: 7, padding: '.45rem .7rem',
           color: watch.tone === 'danger' ? 'var(--red)' : watch.tone === 'warn' ? 'var(--amber)' : 'var(--muted)',
           background: watch.tone === 'danger' ? 'rgba(239,68,68,.07)' : watch.tone === 'warn' ? 'rgba(245,158,11,.06)' : 'var(--raised)',
           border: `1px solid ${watch.tone === 'danger' ? 'rgba(239,68,68,.2)' : watch.tone === 'warn' ? 'rgba(245,158,11,.2)' : 'var(--line)'}`,
@@ -239,8 +239,8 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
 
       {/* Meta row */}
       <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', marginTop: '.5rem', alignItems: 'center', minHeight: 24 }}>
-        <span style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--muted)' }}>Applied {fmt(app.appliedAt)}</span>
-        {app.platform && <span style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--muted)' }}>via {app.platform}</span>}
+        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>Applied {fmt(app.appliedAt)}</span>
+        {app.platform && <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>via {app.platform}</span>}
         {listing && (listing.internal
           // A listing posted on Seen: its page is /jobs/<id> here, so open it in the app.
           ? <Link href={listing.href} onClick={e => e.stopPropagation()} style={linkStyle}>View listing →</Link>
@@ -250,7 +250,7 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
       {/* The employer edited the listing after this application went in — dated so the applicant
           knows the posting they read may have changed. */}
       {app.listingEditedAt && Date.parse(app.listingEditedAt) > app.appliedAt && (
-        <div style={{ marginTop: '.45rem', fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--amber)' }}>
+        <div style={{ marginTop: '.45rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--amber)' }}>
           ✎ Listing edited by the employer {fmt(Date.parse(app.listingEditedAt))} — after you applied
         </div>
       )}
@@ -261,12 +261,12 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
         <div style={{ marginTop: '.7rem', display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
           {app.messages.map((m, i) => (
             <div key={i} style={{ borderRadius: 9, padding: '.5rem .7rem', background: m.from === 'employer' ? 'rgba(59,130,246,.08)' : 'var(--raised)', border: `1px solid ${m.from === 'employer' ? 'rgba(59,130,246,.25)' : 'var(--line)'}` }}>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: m.from === 'employer' ? 'var(--blue)' : 'var(--muted)', marginBottom: '.2rem' }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: m.from === 'employer' ? 'var(--blue)' : 'var(--muted)', marginBottom: '.2rem' }}>
                 {m.from === 'employer' ? `🏢 ${app.company}` : m.withdrawal ? 'You · withdrew' : 'You'} · {fmt(Date.parse(m.at))}
               </div>
               {m.text
-                ? <div style={{ fontSize: '.8rem', color: 'var(--white)', lineHeight: 1.5, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{m.text}</div>
-                : <div style={{ fontSize: '.75rem', color: 'var(--muted)' }}>Withdrew without a note.</div>}
+                ? <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--white)', lineHeight: 1.5, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{m.text}</div>
+                : <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>Withdrew without a note.</div>}
             </div>
           ))}
         </div>
@@ -297,7 +297,7 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
             <button type="button" className={`${s.act} ${s.actQuiet}`} onClick={() => setDeleting(true)} title="Added by mistake? Delete files nothing.">🗑 Delete</button>
             <button type="button" className={`${s.act} ${s.actRed}`} onClick={() => setWithdrawing(true)}>↩ Withdraw</button>
           </div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--dim)', marginTop: '.5rem', lineHeight: 1.5 }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.5rem', lineHeight: 1.5 }}>
             Delete = added by mistake, nothing is filed. Withdraw = you pulled out; the card stays.
           </div>
         </div>
@@ -981,7 +981,7 @@ function TrackerPage() {
         {/* Funnel visualization — needs enough applications to mean anything */}
         {apps.length >= 5 && (
           <div className={s.after} style={{ marginBottom: '1.5rem', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 12, padding: '1rem 1.25rem' }}>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', textTransform: 'uppercase', letterSpacing: '.09em', color: 'var(--dim)', marginBottom: '.85rem' }}>Application Funnel</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.09em', color: 'var(--dim)', marginBottom: '.85rem' }}>Application Funnel</div>
             <div className="funnel">
               {(() => {
                 const stageLevel = (s: string) => ['Applied', 'Viewed', 'Phone Screen', 'Interview', 'Final Round', 'Offer'].indexOf(s)
@@ -1026,8 +1026,8 @@ function TrackerPage() {
           if (!atRisk.length) return null
           return (
             <div style={{ marginBottom: '1.25rem', background: 'rgba(239,68,68,.05)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 12, padding: '1rem 1.1rem' }}>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', textTransform: 'uppercase', letterSpacing: '.09em', color: 'var(--red)', marginBottom: '.65rem', display: 'flex', alignItems: 'center', gap: '.5rem' }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--red)', display: 'inline-block', animation: 'pulse 2s infinite' }} />
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.09em', color: 'var(--red)', marginBottom: '.65rem', display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--red)', display: 'inline-block' }} />
                 {atRisk.length} application{atRisk.length > 1 ? 's' : ''} at ghost risk
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
@@ -1039,14 +1039,14 @@ function TrackerPage() {
                   return (
                     <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.75rem' }}>
                       <div>
-                        <span style={{ fontFamily: 'var(--display)', fontSize: '.8rem', fontWeight: 700, color: 'var(--white)' }}>{a.company}</span>
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--muted)', marginLeft: '.5rem' }}>{a.role}</span>
+                        <span style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--white)' }}>{a.company}</span>
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginLeft: '.5rem' }}>{a.role}</span>
                       </div>
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <div style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--red)', fontWeight: 600 }}>
+                        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--red)', fontWeight: 500 }}>
                           {Math.round(score.ghost_rate * 100)}% ghost rate
                         </div>
-                        <div style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--muted)' }}>
+                        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>
                           {daysLeft > 0 ? `~${daysLeft}d to ghost point` : `past ghost window (day ${days})`}
                         </div>
                       </div>
@@ -1062,10 +1062,10 @@ function TrackerPage() {
         {updateInsight && (
           <div style={{ marginBottom: '1.25rem', background: updateInsight.color, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '1rem 1.1rem', animation: 'fadeUp .3s ease both', display: 'flex', gap: '.85rem', alignItems: 'flex-start' }}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.3rem' }}>{updateInsight.title}</div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--sub)', lineHeight: 1.7 }}>{updateInsight.body}</div>
+              <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--white)', marginBottom: '.3rem' }}>{updateInsight.title}</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.7 }}>{updateInsight.body}</div>
             </div>
-            <button type="button" aria-label="Dismiss" onClick={() => setUpdateInsight(null)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '.75rem', minWidth: 44, minHeight: 44, margin: '-.6rem -.6rem -.6rem 0', flexShrink: 0 }}>✕</button>
+            <button type="button" aria-label="Dismiss" onClick={() => setUpdateInsight(null)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 'var(--fs-meta)', minWidth: 44, minHeight: 44, margin: '-.6rem -.6rem -.6rem 0', flexShrink: 0 }}>✕</button>
           </div>
         )}
 
@@ -1087,9 +1087,9 @@ function TrackerPage() {
         {/* Empty state — both ways in: track one yourself, or Apply on a job. Never shown for a failed load. */}
         {apps.length === 0 && !loadFailed && (
           <div className={s.empty}>
-            <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>📋</div>
-            <div style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.5rem' }}>No applications yet</div>
-            <div style={{ fontSize: '.82rem', color: 'var(--sub)', lineHeight: 1.6, maxWidth: 420, margin: '0 auto' }}>Add one you already sent, or hit Apply on a job here and it lands on this list by itself.</div>
+            <div style={{ fontSize: 'var(--fs-fig-m)', marginBottom: '1rem' }}>📋</div>
+            <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', marginBottom: '.5rem' }}>No applications yet</div>
+            <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.6, maxWidth: 420, margin: '0 auto' }}>Add one you already sent, or hit Apply on a job here and it lands on this list by itself.</div>
             <div className={s.emptyBtns}>
               <button type="button" className={`${s.act} ${s.actPrimary}`} onClick={() => setShowManual(true)}>+ Track application</button>
               <Link href="/jobs" className={s.act}>Browse jobs →</Link>
@@ -1120,19 +1120,19 @@ function TrackerPage() {
             }}
           >
             <div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--indigo)', fontWeight: 600, marginBottom: '.12rem', display: 'flex', alignItems: 'center', gap: '.35rem' }}>
-                <span style={{ fontSize: '.75rem' }}>✦</span>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--indigo)', fontWeight: 500, marginBottom: '.12rem', display: 'flex', alignItems: 'center', gap: '.35rem' }}>
+                <span style={{ fontSize: 'var(--fs-meta)' }}>✦</span>
                 {creditsEarned > 0 ? `You earned ${creditsEarned} credit${creditsEarned !== 1 ? 's' : ''} — keep going` : 'Earn up to 5 credits today'}
               </div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--sub)' }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)' }}>
                 Share what happened with your applications — 90 sec, helps future job seekers
               </div>
             </div>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--indigo)', flexShrink: 0 }}>Start →</span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--indigo)', flexShrink: 0 }}>Start →</span>
           </div>
         )}
         {creditsEarned > 0 && !showSurvey && (
-          <div className={s.after} style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--green)', textAlign: 'center', marginBottom: '.65rem' }}>
+          <div className={s.after} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', textAlign: 'center', marginBottom: '.65rem' }}>
             ✓ +{creditsEarned} credits earned this session
           </div>
         )}

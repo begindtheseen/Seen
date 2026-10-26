@@ -356,7 +356,7 @@ export default function DashboardPage() {
                 : <>{statusLine}{apps.length ? <span className={styles.statusDim}> · {apps.length} tracked total</span> : null}</>}
             </p>
           </div>
-          <Link href="/tracker?add=1" className={`${styles.primary} btn-shine`}>+ Track application</Link>
+          <Link href="/tracker?add=1" className={`${styles.primary}`}>+ Track application</Link>
         </header>
 
         {loadFailed && (
@@ -372,7 +372,7 @@ export default function DashboardPage() {
 
         {/* ── Row 1: search health | next best move ── */}
         <div className={styles.row}>
-          <section className={`${styles.card} ${styles.health} spot`}>
+          <section className={`${styles.card} ${styles.health}`}>
             <div className={styles.cardHead}>
               <span className={styles.eyebrow}>Job search health</span>
               <span className={`${styles.badge} ${styles[healthHead.tone]}`}>● {healthHead.badge}</span>
@@ -396,7 +396,7 @@ export default function DashboardPage() {
             {ratedCount > 0 && <p className={styles.caption}>Based on {ratedCount} tracked application{ratedCount !== 1 ? 's' : ''}{apps.length > ratedCount ? ` · ${apps.length - ratedCount} withdrawn not counted` : ''}</p>}
           </section>
 
-          <section className={`${styles.card} spot`}>
+          <section className={`${styles.card}`}>
             <div className={styles.cardHead}>
               <h2 className={styles.cardT}>Next best move</h2>
               {topMoves.length > 0 && <span className={styles.eyebrow}>{topMoves.length} action{topMoves.length !== 1 ? 's' : ''}</span>}
@@ -417,7 +417,7 @@ export default function DashboardPage() {
                 <b>Start tracking applications</b>
                 <p>Your real response rate, ghost rate and company benchmarks fill in from here.</p>
                 <div className={styles.emptyBtns}>
-                  <Link href="/jobs" className={`${styles.primary} btn-shine`}>Find jobs</Link>
+                  <Link href="/jobs" className={`${styles.primary}`}>Find jobs</Link>
                   <Link href="/tracker?add=1" className={styles.ghostBtn}>Add one I applied to</Link>
                 </div>
               </div>
@@ -520,29 +520,29 @@ export default function DashboardPage() {
           <h2 className={styles.secT}>Your toolkit</h2>
         </div>
         <div className={styles.tools}>
-          <Link href="/resume" className={`${styles.tool} spot`}>
+          <Link href="/resume" className={`${styles.tool}`}>
             <span className={styles.sym}>🧠</span>
             <b>Résumé AI</b>
             <small>{hasResume ? `${profile?.resume_file_name || 'Résumé on file'} · Scan fit →` : 'Add your résumé →'}</small>
           </Link>
-          <Link href="/tracker" className={`${styles.tool} spot`}>
+          <Link href="/tracker" className={`${styles.tool}`}>
             <span className={styles.sym}>📋</span>
             <b>Applications</b>
             <small>{dueChecks.length ? `${dueChecks.length} check-in${dueChecks.length > 1 ? 's' : ''} waiting →` : 'Manage your pipeline →'}</small>
           </Link>
           {inbox?.ready && (
-            <Link href="/tracker#autopilot" className={`${styles.tool} spot`}>
+            <Link href="/tracker#autopilot" className={`${styles.tool}`}>
               <span className={styles.sym}>✉️</span>
               <b>Inbox Autopilot</b>
               <small>{inbox.enabled ? `On · ${inbox.received_count || 0} email${inbox.received_count === 1 ? '' : 's'} read →` : 'Forward job emails — tracking fills itself →'}</small>
             </Link>
           )}
-          <Link href="/companies" className={`${styles.tool} spot`}>
+          <Link href="/companies" className={`${styles.tool}`}>
             <span className={styles.sym}>🏢</span>
             <b>Company intel</b>
             <small>See who actually responds →</small>
           </Link>
-          <Link href="/report" className={`${styles.tool} spot`}>
+          <Link href="/report" className={`${styles.tool}`}>
             <span className={styles.sym}>📣</span>
             <b>Report an outcome</b>
             <small>Warn the next applicant →</small>

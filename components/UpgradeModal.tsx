@@ -67,7 +67,7 @@ export default function UpgradeModal({ reason, onClose, featureName, surface }: 
   useEffect(() => { funnelEvent('offer_shown', { surface: where, once: `${where}_${reason}_${featureName || ''}` }) }, [where, reason, featureName])
 
   const { headline, sub } = copyFor(reason, featureName)
-  const label: React.CSSProperties = { fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--sub)', textAlign: 'center', margin: '.4rem 0 0' }
+  const label: React.CSSProperties = { fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', textAlign: 'center', margin: '.4rem 0 0' }
 
   return (
     <ModalPortal>
@@ -83,26 +83,26 @@ export default function UpgradeModal({ reason, onClose, featureName, surface }: 
 
         <div style={{ padding: '.75rem 1.25rem .5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '.75rem' }}>
           <div style={{ minWidth: 0 }}>
-            <div id="upgrade-h" style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', marginBottom: '.3rem', lineHeight: 1.25 }}>{headline}</div>
-            <div style={{ fontFamily: 'var(--body)', fontSize: '.8rem', color: 'var(--sub)', lineHeight: 1.55 }}>{sub}</div>
+            <div id="upgrade-h" style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', marginBottom: '.3rem', lineHeight: 1.25 }}>{headline}</div>
+            <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.55 }}>{sub}</div>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontSize: '1rem', minWidth: 44, minHeight: 44, margin: '-.5rem -.6rem 0 0', flexShrink: 0 }}>✕</button>
+          <button type="button" onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontSize: 'var(--fs-lead)', minWidth: 44, minHeight: 44, margin: '-.5rem -.6rem 0 0', flexShrink: 0 }}>✕</button>
         </div>
 
         <div style={{ padding: '0 1.25rem', paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom))' }}>
           {/* The Job Search Pass */}
           <div style={{ background: 'rgba(99,102,241,.07)', border: '1px solid rgba(99,102,241,.3)', borderRadius: 12, padding: '.9rem 1rem', marginTop: '.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '.5rem', flexWrap: 'wrap' }}>
-              <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.95rem', color: 'var(--white)' }}>{PASS.name}</span>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: '.8rem', color: '#c7d2fe' }}>{PASS_PRICE} · {PASS.pro_days} days of everything</span>
+              <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-body)', color: 'var(--white)' }}>{PASS.name}</span>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-sm)', color: '#c7d2fe' }}>{PASS_PRICE} · {PASS.pro_days} days of everything</span>
             </div>
             <ul style={{ listStyle: 'none', margin: '.55rem 0 .75rem', padding: 0 }}>
               {PASS_INCLUDES.slice(0, 3).map(f => (
-                <li key={f} style={{ display: 'flex', gap: '.45rem', fontFamily: 'var(--body)', fontSize: '.78rem', color: 'var(--sub)', lineHeight: 1.45, marginBottom: '.3rem' }}><span style={{ color: '#818cf8' }}>✓</span>{f}</li>
+                <li key={f} style={{ display: 'flex', gap: '.45rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.45, marginBottom: '.3rem' }}><span style={{ color: '#818cf8' }}>✓</span>{f}</li>
               ))}
             </ul>
             <button type="button" onClick={() => void start('pass30')} disabled={busy !== null} data-testid="modal-buy-pass30"
-              style={{ width: '100%', minHeight: 48, background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', border: 'none', borderRadius: 10, fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.88rem', color: '#fff', cursor: busy ? 'default' : 'pointer', opacity: busy && busy !== 'pass30' ? .6 : 1 }}>
+              style={{ width: '100%', minHeight: 48, background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', border: 'none', borderRadius: 10, fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)', color: '#fff', cursor: busy ? 'default' : 'pointer', opacity: busy && busy !== 'pass30' ? .6 : 1 }}>
               {busy === 'pass30' ? 'Opening checkout…' : `Get the ${PASS.name} · ${PASS_PRICE}`}
             </button>
             <p style={label}>{ONE_TIME_NOTE}</p>
@@ -110,18 +110,18 @@ export default function UpgradeModal({ reason, onClose, featureName, surface }: 
 
           {/* Interview Prep */}
           <div style={{ border: '1px solid rgba(16,185,129,.35)', borderRadius: 12, padding: '.8rem 1rem', marginTop: '.7rem' }}>
-            <div style={{ fontFamily: 'var(--body)', fontSize: '.8rem', color: 'var(--text)', lineHeight: 1.5, marginBottom: '.55rem' }}>
+            <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--text)', lineHeight: 1.5, marginBottom: '.55rem' }}>
               <b style={{ color: 'var(--white)' }}>Interview coming up?</b> {PREP.name} is {PREP_PRICE} for one interview — questions for the role and answers from your résumé. It also opens {PREP.pro_days} days of Pro.
             </div>
             <button type="button" onClick={() => void start('interview')} disabled={busy !== null} data-testid="modal-buy-interview"
-              style={{ width: '100%', minHeight: 44, background: 'rgba(16,185,129,.12)', border: '1px solid rgba(16,185,129,.4)', borderRadius: 10, fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.84rem', color: 'var(--green)', cursor: busy ? 'default' : 'pointer' }}>
+              style={{ width: '100%', minHeight: 44, background: 'rgba(16,185,129,.12)', border: '1px solid rgba(16,185,129,.4)', borderRadius: 10, fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)', color: 'var(--green)', cursor: busy ? 'default' : 'pointer' }}>
               {busy === 'interview' ? 'Opening checkout…' : `Get ${PREP.name} · ${PREP_PRICE}`}
             </button>
             <p style={label}>{ONE_TIME_NOTE}</p>
           </div>
 
           {error && (
-            <div role="alert" style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, padding: '.55rem .85rem', marginTop: '.75rem', fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--red)', lineHeight: 1.5 }}>
+            <div role="alert" style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, padding: '.55rem .85rem', marginTop: '.75rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--red)', lineHeight: 1.5 }}>
               {error}
             </div>
           )}
@@ -134,7 +134,7 @@ export default function UpgradeModal({ reason, onClose, featureName, surface }: 
             <div style={{ textAlign: 'center', marginTop: '.4rem' }}>
               <button type="button"
                 onClick={() => { onClose(); window.dispatchEvent(new CustomEvent('seen:open-survey')) }}
-                style={{ minHeight: 44, background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--blue)', cursor: 'pointer', textDecoration: 'underline' }}>
+                style={{ minHeight: 44, background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', cursor: 'pointer', textDecoration: 'underline' }}>
                 Or earn a free credit now with a quick survey →
               </button>
             </div>
