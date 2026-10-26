@@ -49,6 +49,7 @@ type Pack = {
   resume_check?: { line: string; note: string }[]
   job_match?: { label: string; status: 'shown' | 'stated' | 'gap' | 'expired' | 'in progress'; proof?: string; say: string; duty?: boolean }[]
   ask_them?: { q: string }[]
+  format?: string
   emails: { thankYou: { subject: string; body: string }; followUp: { subject: string; body: string } }
   follow_up: FollowUp
 }
@@ -392,6 +393,12 @@ function PackView({ pack, company, fu }: { pack: Pack; company: string; fu: Foll
               </li>
             ))}
           </ul>
+        </div>
+      )}
+      {!!pack.format && (
+        <div className={s.block}>
+          <div className={s.label}>How this interview usually runs</div>
+          <p className={s.prose}>{pack.format}</p>
         </div>
       )}
       {!!pack.ask_them?.length && (
