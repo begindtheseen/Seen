@@ -2,8 +2,9 @@
 //
 // Every 15 minutes (vercel.json) this claims ≤3 companies that real visitors looked up while they
 // had ZERO first-party reports (queued by api/reports.js → lib/server/enrichmentQueue.js), finds
-// public Reddit hiring threads about each, extracts first-hand experiences with the free LLM gateway,
-// and writes them as attributed, down-weighted reports. The whole pipeline lives in
+// public Reddit hiring threads about each, keeps the first-hand applicant accounts with the strict
+// rule-based classifier (lib/reports/applicantRules.js — no model is called), and writes them as
+// attributed, down-weighted reports. The whole pipeline lives in
 // lib/server/companyEnrichmentWorker.js (I/O injected, unit-tested); this file is auth + wiring.
 //
 // AUTH (fails closed, like api/prune-jobs.js): the Vercel cron header, CRON_SECRET (Authorization:

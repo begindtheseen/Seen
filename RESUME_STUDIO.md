@@ -2,8 +2,8 @@
 
 Shipped 2026-10-19 on `claude/resume-handling-optimization-ywotv9`. This is the reference for the
 résumé pipeline that replaced the regex-only text handling: **extract → structure → score → fix →
-tailor → render → check**. Every stage is deterministic and keyless unless stated; the one optional
-LLM step runs behind `lib/server/llm.js` and the fabrication firewall.
+tailor → render → check**. Every stage is deterministic and keyless. No model API is called anywhere
+(owner decision 2026-10-26: the optional "AI polish" pass and `lib/server/llm.js` were removed).
 
 ## Map
 
@@ -14,10 +14,10 @@ LLM step runs behind `lib/server/llm.js` and the fabrication firewall.
 | Parse | `lib/resume/parse/*` | Rich lines → doc: section vocabulary + typography, date grammar (`YYYY-MM`/`YYYY`/`present` tokens, seasons, quarters, 'YY), role segmentation with non-destructive header folding, document-level orientation vote, packed roles, known-city gazetteer, UK-style trailing-role titles, single-date pieces, parked-unknown slot occupancy. `PARSER_VERSION = resume_parser_v2`. |
 | Health | `lib/resume/health/*` | Job-independent score (100 pts: Impact 35 · Language 15 · Structure 15 · Timeline 10 · Length 10 · Parseability 15), bands/grades, every finding anchored `{section,itemId,bulletId}` with a fix: `rewrite` (text), `verbs` (options), `prompt` (text). |
 | Rewrite | `lib/resume/rewrite/*` | Rules R1–R9 (pronouns, weak leads, hidden verbs, passive, filler, doublets, tense, hygiene) with per-change provenance and `passesFirewall(original, rewritten, allowed)`: no new numbers, proper nouns or content words (lemma-aware; hyphen compounds license their parts; number words may become digits). |
-| Tailor (v2) | `lib/resume/tailor/*` | `tailorResume(doc, job)` → `{ plan, variant }`. **The optimizer** (see the section below): `competencies.js` (what a job *is* — the competency vector a title/employer/posting implies), `relevance.js` (per-role fit), `optimizer.js` (keep / trim / condense / drop decisions, bullet selection inside a page budget, transferable fill flagged for confirmation, prompts for missing facts, targeted summary, layout, objective search; `applyPlan` is the ONE apply path used by the server and the browser). Around it: keyword layer (`extractJobKeywords`: one keyword per taxonomy concept with all aliases as surfaces, containment-merged), skills reorder + **résumé-own-surface** additions as plan data, terminology proposals (applied only on request), honest gaps with `likely_covered` downgrade, before/after scores from `lib/resume-intelligence`. `polish.js` = optional LLM pass, strict JSON patch, firewall + style gate, `{available:false}` without a provider. |
+| Tailor (v2) | `lib/resume/tailor/*` | `tailorResume(doc, job)` → `{ plan, variant }`. **The optimizer** (see the section below): `competencies.js` (what a job *is* — the competency vector a title/employer/posting implies), `relevance.js` (per-role fit), `optimizer.js` (keep / trim / condense / drop decisions, bullet selection inside a page budget, transferable fill flagged for confirmation, prompts for missing facts, targeted summary, layout, objective search; `applyPlan` is the ONE apply path used by the server and the browser). Around it: keyword layer (`extractJobKeywords`: one keyword per taxonomy concept with all aliases as surfaces, containment-merged), skills reorder + **résumé-own-surface** additions as plan data, terminology proposals (applied only on request), honest gaps with `likely_covered` downgrade, before/after scores from `lib/resume-intelligence`. |
 | Render | `lib/resume/render/*` | PDF (pdfkit; templates `classic`/`engineering`/`modern`; text "•" bullets; measured keep-together; dates flush right on the same baseline; built-in Times/Helvetica or embedded Liberation Sans (OFL, from pdfjs-dist) — automatic for non-WinAnsi text; links; metadata; page numbers on 2+ pages; **no characterSpacing anywhere**), DOCX (`docx` 9.12: Heading 1 styles, `numPr` bullets, `<w:tab/>` to a right tab stop, hyperlinks, properties), TXT (ASCII, one role header per line, no wrapping), Markdown, JSON Resume (`toJsonResume`/`fromJsonResume`, lossless via `x-seen`). `renderResume()` is the one entry; the free-tier brand line vs Pro-unbranded rule lives there. |
 | ATS check | `lib/resume/render/atsCheck.js` | Render → extract → parse → compare: contact, sections, every role's title/company/dates, bullets, skills, education, certifications, word fidelity, letter-spacing, columns, pages. Score 0–100 with weighted checks. |
-| Server | `lib/server/resumeStudio.js`, `api/resume.js` | Actions `structure`, `health`, `rewrite`, `ats_check`, `templates` (free, rate key `resume-studio`), `export` (free with brand line / Pro unbranded, `resume-export`), `tailor` (1 credit via `gateAI('resume_tailor')`; `polish` only for Pro and only when `llmAvailable()`). `parse` now also returns `doc`, `health`, `coverage`, `layout`, `warnings`. `download_resume` / `email_analysis` render through the structured renderer (legacy Harvard builder kept as the fallback and still exported as `buildResumePDF`). |
+| Server | `lib/server/resumeStudio.js`, `api/resume.js` | Actions `structure`, `health`, `rewrite`, `ats_check`, `templates` (free, rate key `resume-studio`), `export` (free with brand line / Pro unbranded, `resume-export`), `tailor` (1 credit via `gateAI('resume_tailor')`; deterministic — a `polish` body field is ignored and no `polish` result is returned). `parse` now also returns `doc`, `health`, `coverage`, `layout`, `warnings`. `download_resume` / `email_analysis` render through the structured renderer (legacy Harvard builder kept as the fallback and still exported as `buildResumePDF`). |
 | Client | `app/resume/studio/page.tsx`, `components/resume/*`, `lib/resume/engine-client.ts`, `lib/stores/ResumeDocStore.ts` | Parse/score/rewrite run **in the browser** (the pure modules import no Node built-ins); rendering, tailoring and the ATS check call the API. Base résumé autosaves as canonical text through `ResumeStore` (DB for signed-in users); the server's layout-aware doc from an upload is cached per user keyed by text hash; tailored variants are device-local per user and swept on sign-out (`lib/auth.tsx`). |
 
 ## Contracts worth knowing
@@ -28,12 +28,11 @@ LLM step runs behind `lib/server/llm.js` and the fabrication firewall.
   format × template).
 - **Tokens:** dates are `'YYYY-MM' | 'YYYY' | 'present' | ''`; `dateText` keeps the author's
   wording ("Summer 2017") and is preferred by renderers when there is no end token.
-- **Credits/Pro (locked):** parse = 1 credit (unchanged), tailor = 1 credit, polish = Pro, exports
+- **Credits/Pro (locked):** parse = 1 credit (unchanged), tailor = 1 credit, exports
   free with the "Optimized with Seen · seenjobs.io" line and unbranded for Pro; structure / health /
   rewrite / ATS check are free (CPU only, rate-limited).
 - **Fabrication firewall** guards every text-producing path: rewrites, the tailored summary, skill
-  additions (résumé-own surfaces only), and LLM polish (per-bullet, against the résumé + the
-  evidenced keyword list).
+  additions (résumé-own surfaces only).
 - **Vercel:** `vercel.json` adds `includeFiles: node_modules/pdfjs-dist/**` to `api/resume.js`
   and `api/apply.js` (the worker, standard fonts and CMaps are loaded by path/URL, not traced).
 - **One apply path.** The tailor plan is fully serialisable and self-sufficient: every decision
@@ -120,8 +119,8 @@ chronological with nothing dropped and nothing added.
   `application/pdf`) and DOCX downloads → signed-out "Optimize for this job" redirects to
   `/login?next=/resume/studio?tab=tailor` → 390 px without horizontal overflow → zero page errors,
   every API call 200.
-- Not verified live: a signed-in `tailor` call against production Supabase, LLM polish with a real
-  provider, Vercel's `includeFiles` tracing on an actual deployment (see the first-landing record).
+- Not verified live: a signed-in `tailor` call against production Supabase, Vercel's `includeFiles`
+  tracing on an actual deployment (see the first-landing record).
 
 ## Verification record (2026-10-19, first landing)
 

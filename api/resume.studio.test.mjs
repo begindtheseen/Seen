@@ -9,7 +9,6 @@ import fs from 'node:fs';
 
 process.env.SUPABASE_URL = 'https://db.example';
 process.env.SUPABASE_SERVICE_KEY = 'service-key';
-delete process.env.LLM_API_KEY; delete process.env.ANTHROPIC_KEY;
 globalThis.fetch = async () => new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } });
 const { default: handler } = await import('./resume.js');
 const { extractResumeFile } = await import('../lib/resume/extract/index.js');

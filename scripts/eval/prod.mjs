@@ -1,7 +1,6 @@
 // Model-backed tools, called on a live deployment (production by default) as the eval account.
 //
 //   interview_prep  POST /api/interview-prep {action:'build'} — the model writes questions, answers, intro
-//   tailor_polish   POST /api/resume {action:'tailor', polish:true} — the Pro model polish of tailored bullets
 //
 // Credentials: the account file (columns: name email password user_id) is read at runtime from
 // --accounts / EVAL_ACCOUNTS_FILE, row `eval`. The password and the session token are never written to
@@ -131,21 +130,5 @@ function toPrepRecord(tool, res) {
   const p = r.body?.pack || {};
   const rec = { tool, status: r.status, ms: r.ms, charged: 0, error: r.status >= 400 ? JSON.stringify(r.body).slice(0, 300) : null, ui_reachable: tool === 'interview_prep', from_cache: !!res.fromCache, output: prepOutput(p), items: [], meta: { family: p.family, remaining: r.remaining, at: res.rec.at } };
   prepItems(rec.items, p);
-  return rec;
-}
-
-/** Studio tailor with the Pro polish, as TailorPanel sends it. */
-export async function prodTailorPolish(client, fx, doc) {
-  const tool = 'tailor_polish';
-  const body = { action: 'tailor', doc, jobTitle: fx.job.title, company: fx.job.company, jobDescription: fx.jd, jobId: `eval-${fx.id}`, polish: true };
-  const key = hash({ v: 1, resume: fx.resumeText, jd: fx.jd, title: fx.job.title });
-  const res = await client.call(tool, fx, key, () => client.post('/api/resume', body, { model: true }));
-  if (!res.rec) return { tool, status: 0, ms: 0, charged: 0, error: null, deferred: res.deferred, ui_reachable: true, output: { deferred: res.deferred }, items: [], meta: {} };
-  const r = res.rec.resp;
-  const pol = r.body?.polish || {};
-  const rec = { tool, status: r.status, ms: r.ms, charged: 0, error: r.status >= 400 ? JSON.stringify(r.body).slice(0, 300) : null, ui_reachable: true, from_cache: !!res.fromCache,
-    output: { polish_available: pol.available, reason: pol.reason || pol.error || null, applied: pol.applied, changes: (pol.changes || []).map((c) => ({ from: c.from, to: c.text, reason: c.reason })), rejected: (pol.rejected || []).map((x) => `${x.reason}${x.text ? ': ' + x.text : ''}`), summary: r.body?.plan?.summary?.text || null },
-    items: [], meta: { remaining: r.remaining, at: res.rec.at, pairs: (pol.changes || []).map((c) => [c.from, c.text]) } };
-  for (const c of pol.changes || []) rec.items.push({ field: 'polish.changes', kind: 'claim', text: c.text });
   return rec;
 }

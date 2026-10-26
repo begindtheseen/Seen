@@ -13,9 +13,6 @@ export function installEnv() {
   process.env.SUPABASE_URL = `https://${DB_HOST}`;
   process.env.SUPABASE_SERVICE_KEY = 'eval-service-key';
   process.env.SUPABASE_JWT_SECRET = JWT_SECRET;
-  // no model in-process: the deterministic paths are what we measure here
-  delete process.env.LLM_API_KEY;
-  delete process.env.ANTHROPIC_KEY;
   delete process.env.SEENFIT_ENGINE_ENABLED;
   delete process.env.HUMANPROOF_ENABLED;
   delete process.env.HUMANPROOF_PAID_ONLY;

@@ -44,15 +44,15 @@ export const PREP_INCLUDES: string[] = [
  * The Job Search Pass — described by what the person gets for their search, not by credits. Every line
  * is something Pro access grants in code: Interview Prep builds (gateAI proOnly), résumé optimize /
  * tailor / scan and job insights with no daily cap (gateAI, Pro bypasses the cap), HumanProof
- * (api/optimizer.js proOnly; Pro optimize results also come back in that voice), AI polish in Résumé
- * Studio (proOnly) and unbranded downloads (lib/server/resumeStudio.js).
+ * (api/optimizer.js proOnly; Pro optimize results also come back in that voice) and unbranded Résumé
+ * Studio downloads (lib/server/resumeStudio.js).
  */
 export const PASS_INCLUDES: string[] = [
   'Interview Prep for every interview in those 30 days',
   'A résumé tailored to every job you apply to — no daily limit',
   'What each job asks for, on any listing with a full description',
   'HumanProof: your bullets rewritten so they sound like you, nothing invented',
-  'AI polish in Résumé Studio, and downloads without the Seen footer',
+  'Résumé Studio downloads without the Seen footer',
 ]
 
 /** "$9.99 — for one interview" */
@@ -65,7 +65,7 @@ export function offerLine(): string {
   return `${PREP.name} is ${PREP_PRICE} for one interview; the ${PASS.name} is ${PASS_PRICE} for ${PASS.pro_days} days of everything, including Interview Prep for every interview. Both are one-time and never renew.`
 }
 
-/** Under every Pro-only lock (HumanProof, AI polish): what unlocks it, priced, once. */
+/** Under every Pro-only lock (HumanProof, unbranded downloads): what unlocks it, priced, once. */
 export const LOCK_NOTE = `Comes with the ${PASS.name} (${PASS_PRICE}) or ${PREP.name} (${PREP_PRICE}). ${ONE_TIME_NOTE}.`
 /** After a tailored résumé: the outcome the pass buys, not a credit count. */
 export const PASS_AFTER_WIN = `Applying to a lot of jobs? The ${PASS.name} tailors every one for ${PASS.pro_days} days →`

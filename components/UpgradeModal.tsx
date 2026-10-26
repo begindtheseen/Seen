@@ -1,7 +1,7 @@
 'use client'
 
 // The upgrade sheet — opened when a free account runs out of today's AI credit, presses a Pro-only tool
-// (HumanProof, AI polish) or an upsell link. Same menu as /pricing (owner decisions 2026-10-25): the
+// (HumanProof, unbranded downloads) or an upsell link. Same menu as /pricing (owner decisions 2026-10-25): the
 // 30-day Job Search Pass and Interview Prep, both one-time and never renewing; no subscription, no trial.
 // In a résumé-tool moment the pass leads (it is what removes the limit for the whole search); Interview
 // Prep is the second line for someone with an interview coming up. Out of credits, the free path is
@@ -23,7 +23,7 @@ import s from './UpgradeModal.module.css'
 interface UpgradeModalProps {
   reason: 'credits' | 'pro' | 'generic'
   onClose: () => void
-  /** The Pro-only tool that was pressed: "HumanProof" or "AI polish". */
+  /** The Pro-only tool that was pressed: "HumanProof" or "unbranded downloads". */
   featureName?: string
   /** Where the sheet was opened from, for the funnel counters. A Pro-only tool's lock card by default. */
   surface?: OfferSurface
