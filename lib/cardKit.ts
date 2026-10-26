@@ -33,7 +33,7 @@ export interface CompanyGradeContext {
   ghostRate?: number | null     // 0–1
   responseRate?: number | null  // 0–1
   avgWaitDays?: number | null
-  /** First-party applicant reports behind the grade — printed as "based on N reports" when ≥ 5. */
+  /** First-party applicant reports behind the grade — printed as "based on N applicant accounts" when ≥ 5. */
   reports?: number | null
 }
 
