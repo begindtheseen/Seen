@@ -79,7 +79,10 @@ test('rewrite: needs a diagnosis; charges once; answers become checked lines; re
   const texts = r.body.proposals.map((p) => p.after);
   assert.ok(texts.includes("Run the store on the Store Manager's 2 days off every week"), JSON.stringify(texts));
   assert.ok(!texts.some((t) => /P&L/.test(t)), 'a "no" never becomes a line');
-  assert.ok(r.body.summary && /^Assistant Store Manager with about 5½ years at Desert Sun Apparel who /.test(r.body.summary.text), JSON.stringify(r.body.summary));
+  // the summary names the field and its years, credits no result to the wrong employer, and replaces
+  // the résumé's own summary instead of sitting beside it
+  assert.ok(r.body.summary && /^Assistant Store Manager with about 12½ years in retail; bilingual \(Spanish\)\. Cut shrink/.test(r.body.summary.text), JSON.stringify(r.body.summary));
+  assert.match(r.body.summary.replaces, /^Retail leader with 9 years/);
   assert.ok(r.body.gaps.find((g) => /p&l/i.test(g.label)).advice.match(/said you have not/), 'gap advice follows the "no"');
   const reopen = await call({ action: 'rewrite', ...base, answers });
   assert.equal(reopen.body.cached, true);

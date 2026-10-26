@@ -135,7 +135,7 @@ export function applyAccepted(resume: string, proposals: OptimizeProposal[], acc
   }
   if (summary && summaryAccepted) {
     const lines = out.split('\n')
-    const h = lines.findIndex((l) => /^\s*(summary|professional summary|profile|about)\s*:?\s*$/i.test(l))
+    const h = lines.findIndex((l) => /^\s*(summary|professional summary|profile|professional profile|about|about me|objective|career objective)\s*:?\s*$/i.test(l))
     if (h >= 0) {
       let end = h + 1
       while (end < lines.length && lines[end].trim() && !/^[A-Z][A-Z &/]{3,}$/.test(lines[end].trim())) end++
