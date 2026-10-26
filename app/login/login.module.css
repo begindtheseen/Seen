@@ -57,3 +57,6 @@
   .auto::before { animation: none; }
 }
 
+
+/* Check-your-email screen: the icon above the heading (was a mailbox emoji). */
+.mailIcon { display: inline-grid; place-items: center; width: 64px; height: 64px; border-radius: var(--r-card); background: var(--accent-tint); border: 1px solid var(--accent-line); color: var(--accent); margin-bottom: var(--sp-4); }

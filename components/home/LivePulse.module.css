@@ -66,3 +66,10 @@
   .more { display: inline-flex; align-items: center; min-height: 44px; }
 }
 
+
+/* Outcome icons (components/ui/Icon) take the tone's readable text colour. */
+.red .ico { color: var(--bad-text); }
+.amber .ico { color: var(--caution-text); }
+.blue .ico { color: var(--info-text); }
+.green .ico { color: var(--good-text); }
+.dim .ico { color: var(--text-3); }

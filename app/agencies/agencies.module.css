@@ -11,7 +11,7 @@
 .letter { font-family: var(--body); font-size: var(--fs-xl); font-weight: 600; width: 34px; text-align: center; flex-shrink: 0; font-variant-numeric: tabular-nums; }
 .letterNone { color: var(--text-4); }
 .main { min-width: 0; flex: 1; }
-.name { display: inline-flex; align-items: center; min-height: 44px; font-family: var(--body); font-size: var(--fs-body); font-weight: 600; color: var(--text-1); text-decoration: none; margin: -.6rem 0; }
+.name { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; font-family: var(--body); font-size: var(--fs-body); font-weight: 600; color: var(--text-1); text-decoration: none; margin: -.6rem 0; }
 .name:hover { color: var(--accent); }
 .rates { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); margin-top: .3rem; }
 .meta { font-family: var(--body); font-size: var(--fs-meta); color: var(--text-3); margin-top: .3rem; line-height: 1.5; }
@@ -20,10 +20,10 @@
 
 .none { background: var(--surface-1); border: 1px dashed var(--border-2); border-radius: var(--r-card); padding: .9rem 1rem; }
 .noneNames { display: flex; flex-wrap: wrap; gap: 0 var(--sp-4); }
-.noneName { display: inline-flex; align-items: center; min-height: 44px; font-family: var(--body); font-size: var(--fs-sm); color: var(--text-2); text-decoration: none; }
+.noneName { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; font-family: var(--body); font-size: var(--fs-sm); color: var(--text-2); text-decoration: none; }
 .noneName:hover { color: var(--text-1); }
 .noneNote { font-family: var(--body); font-size: var(--fs-sm); color: var(--text-3); margin: .5rem 0 0; line-height: 1.6; }
-.inline { color: var(--accent); text-decoration: none; display: inline-block; padding: .6rem 0; margin: -.6rem 0; }
+.inline { color: var(--accent); text-decoration: none; display: inline-block; padding: .75rem 0; margin: -.75rem 0; }
 .inline:hover { text-decoration: underline; }
 .emptyAll { text-align: center; padding: 2.5rem; color: var(--text-3); font-size: var(--fs-sm); }
 

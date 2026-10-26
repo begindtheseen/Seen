@@ -98,3 +98,6 @@
 .listCard:hover { border-color: var(--line2); }
 .listTitle { display: inline-flex; align-items: center; min-height: 44px; font-family: var(--body); font-size: var(--fs-lead); font-weight: 600; color: var(--white); text-decoration: none; }
 .listTitle:hover { color: var(--accent); }
+
+/* Short names ("IBM") still get a 44px-wide tap box. */
+.coLink { min-width: 44px; }

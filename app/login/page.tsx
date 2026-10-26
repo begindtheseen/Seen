@@ -11,6 +11,7 @@ import { parseSignupParams, intentCopy, nextLabel } from '@/lib/signupIntent.js'
 import { pendingApplicationsForSignup, PENDING_META_KEY } from '@/lib/pendingApplicationClient'
 import { hasPendingRef } from '@/lib/referralClient'
 import styles from './login.module.css'
+import Icon from '@/components/ui/Icon'
 
 // "Check your email" auto-detects the click: poll while the tab is visible, every 5 s, for at
 // most 5 minutes (60 polls); "I verified my email →" stays as the manual fallback.
@@ -389,12 +390,13 @@ function LoginContent() {
   const destLabel = signupType === 'employer' ? 'your employer dashboard' : nextLabel(explicitReturn, intent.company)
 
   const btnStyle: React.CSSProperties = {
-    width: '100%', padding: '.85rem',
-    background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)',
-    color: '#fff', border: 'none', borderRadius: 8,
-    fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)',
+    // The one primary on this screen: the CTA gradient, body face at a loaded weight (Syne is for headings).
+    width: '100%', minHeight: 48, padding: '.85rem',
+    background: 'var(--cta-gradient)',
+    color: '#fff', border: 'none', borderRadius: 'var(--r-control)',
+    fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-ui)',
     cursor: loading ? 'not-allowed' : 'pointer', marginBottom: '.75rem',
-    boxShadow: '0 0 20px rgba(59,130,246,0.3)', opacity: loading ? 0.6 : 1,
+    boxShadow: 'var(--sh-control)', opacity: loading ? 0.6 : 1,
   }
 
   // Password input with a show/hide toggle — the same control on signup and sign-in.
@@ -462,7 +464,7 @@ function LoginContent() {
                 <h1 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', margin: '0 0 .2rem' }}>Create your employer account</h1>
                 <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--sub)', fontWeight: 400, marginBottom: '.6rem' }}>Then claim your company on the employers page. Free.</div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.6rem', flexWrap: 'wrap', background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.55rem .8rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '1.25rem' }}>
-                  <span>🏢 Employer account · a work email at your company&apos;s domain gets your claim approved instantly</span>
+                  <span><Icon name="briefcase-business" size={14} /> Employer account · a work email at your company&apos;s domain gets your claim approved instantly</span>
                   <button type="button" className={styles.linkBtn} onClick={() => { setSignupType('seeker'); clearError() }} style={{ fontSize: 'var(--fs-meta)' }}>Not an employer?</button>
                 </div>
               </>
@@ -519,16 +521,16 @@ function LoginContent() {
         {/* ── STEP: LINK SENT (passwordless) ── */}
         {step === 'linksent' && (
           <div style={{ textAlign: 'center' }} data-testid="linksent-step">
-            <div style={{ fontSize: 'var(--fs-fig-l)', marginBottom: '1rem' }}>📬</div>
+            <div className={styles.mailIcon}><Icon name="mail" size={30} /></div>
             <h1 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', margin: '0 0 .5rem' }}>Check your email</h1>
             <div style={{ fontSize: 'var(--fs-ui)', color: 'var(--sub)', fontWeight: 400, lineHeight: 1.7, marginBottom: '1.25rem' }}>
               We sent a sign-in link to<br />
               <strong style={{ color: 'var(--white)' }}>{verifyEmail}</strong>
             </div>
             <div style={{ background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.85rem 1rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', marginBottom: '1rem', lineHeight: 1.65, textAlign: 'left' }}>
-              ✓ Open the link in your email<br />
-              ✓ It signs you in and opens {destLabel}<br />
-              ✓ No password needed
+              <Icon name="check" size={13} /> Open the link in your email<br />
+              <Icon name="check" size={13} /> It signs you in and opens {destLabel}<br />
+              <Icon name="check" size={13} /> No password needed
             </div>
             <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '.25rem 1.25rem' }}>
               <button type="button" className={`${styles.linkBtn} ${styles.linkDim}`} onClick={() => { setNotice(''); clearError(); setStep('signup') }}>
@@ -544,16 +546,16 @@ function LoginContent() {
         {/* ── STEP: VERIFY ── */}
         {step === 'verify' && (
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 'var(--fs-fig-l)', marginBottom: '1rem' }}>📬</div>
+            <div className={styles.mailIcon}><Icon name="mail" size={30} /></div>
             <h1 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', margin: '0 0 .5rem' }}>Check your email</h1>
             <div style={{ fontSize: 'var(--fs-ui)', color: 'var(--sub)', fontWeight: 400, lineHeight: 1.7, marginBottom: '1.25rem' }}>
               We sent a verification link to<br />
               <strong style={{ color: 'var(--white)' }}>{verifyEmail}</strong>
             </div>
             <div style={{ background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.85rem 1rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', marginBottom: '1rem', lineHeight: 1.65, textAlign: 'left' }}>
-              ✓ Open the link in your email<br />
-              ✓ It signs you in and opens {destLabel}<br />
-              ✓ Left this tab open? It moves on by itself
+              <Icon name="check" size={13} /> Open the link in your email<br />
+              <Icon name="check" size={13} /> It signs you in and opens {destLabel}<br />
+              <Icon name="check" size={13} /> Left this tab open? It moves on by itself
             </div>
             <div className={styles.auto} aria-live="polite">Watching for your click — no need to refresh</div>
             <button style={btnStyle} onClick={checkVerification} disabled={loading}>
