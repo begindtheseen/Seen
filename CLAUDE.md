@@ -50,6 +50,32 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-10-26: PR #375 merged (no model API) + willingness-to-pay round 3
+- **#375 merged** (merge 8f9ecce); prod deployment dpl_HvqFsmsWSN8NmNVupsW7SJzqNTAn served on seenjobs.io within ~1 min, 0
+  runtime errors. Migrations 20261025140000 + 20261025160000 still unapplied (code is backward-compatible: interview_preps /
+  funnel_events writes are best-effort; `comped` exists since 051).
+- **Round 3** (same 4 personas, live Prep $9.99 / Pass $19.99 funnel; brief `scratchpad/wtp/BRIEF3.md`): pay-now / worth-it
+  Tasha 3/2, Dev 5/3 (Pass), Ray 3/2, Maria 3/2 (neither). Nobody pays. Praised: one-time honest prices, interview date,
+  prep on every device, zero invented facts. Rejected: the prep is a worksheet (résumé line + [blanks]), recruiter
+  questions had no drafted answer, nothing company-specific (Amazon LPs), pay null, false job-match rows.
+- **Fixed on claude/wip-round3:** passive-verb reading ("I was promoted seasonal launches"); résumé casing + plural verbs +
+  the line's second half in from→to stories; one prompt per answer; generic words no longer match a story to a question;
+  intro from dates/field/education ("I just finished…", "I also work as…", never "Before that" for a job still held);
+  "(nonprofit)" dropped from spoken names; move question ignores a comma's team name and counts a degree; phone-screen
+  format note; salaried roles not asked their hours; drafted recruiter answers (why <company> from a line naming it, why
+  now from the latest job's dates, pay, level + years on a professional phone screen); pay falls back to the same title
+  at other employers (labelled `scope:'market'`, salaried fields yearly only); job-match needs the specific word
+  ("process" alone never proves "shipment processing"), "listed" only when the résumé says it, CS fundamentals never
+  denied, posting meta-sentences ("…a bonus, not a requirement") are not requirements; "your workday" ≠ Workday;
+  "Target" the employer and a job's own date range are never "a plan that has passed"; a capitalised name inside a line
+  keeps its tense ("Drive Up"). Thank-you email no longer says "today".
+- **Not fixed (reported):** Amazon Leadership Principles / company-specific formats; posting pasted before paying is lost
+  (checkout sends no job_text); guest interview date lost at sign-in; Studio drops a SKILLS & CERTIFICATIONS cert (Ray's
+  OSHA forklift); tailor lowers scores / ranks the senior role lowest; optimizer summary "Dependable … candidate" under
+  "every word is in your résumé"; card "N accounts of interviewing" vs company page counts; no time-of-day field.
+- Test accounts: round-3 Pro windows cleared, balances restored (7/7/6/10); 18 old test preps deleted after a backup
+  (`scratchpad/wtp/preps-backup-r3.json`).
+
 ## Session 2026-10-24: SEO/AI visibility, cron auth, conversion, scoring weight (PRs #359–#366, all merged)
 - **Owner direction:** share cards are retired as a growth lever ("No one is sharing that shit"); the funnel card
   branch `claude/wip-fix3-funnel` is shelved. Marketing plan = Claude Doc artifact Duen9PchrgV5smKKFBnbku. Supabase

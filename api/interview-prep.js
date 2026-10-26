@@ -83,10 +83,21 @@ export async function readRecord({ supabaseUrl, serviceKey, company, role }) {
   // (round 2). A role with no clear field gets the company-wide range, labelled as such.
   const fam = prepFamily(role);
   const pool = fam !== 'general' ? jobs.filter((j) => prepFamily(j.title || '') === fam) : jobs;
-  const pay = payRange(pool);
+  const unit = /^(?:software_engineering|data_analytics|marketing|finance_accounting|education|project_management)$/.test(fam) ? { unit: 'year' } : {};
+  let pay = payRange(pool, unit);
+  let scope = pay ? (fam !== 'general' ? 'role' : 'company') : null;
+  // too few of the company's own listings state pay (round 3: Amazon, Grubhub, Stripe all null) → the same
+  // title at other employers on Seen, labelled as that, never as the company's pay
+  const core = String(role || '').replace(/\([^)]*\)/g, ' ').split(/\s+[-–—|]\s+|,\s/)[0].toLowerCase().split(/[^a-z]+/).filter((w) => w.length > 2 && !/^(?:and|the|for|part|time|full)$/.test(w)).slice(0, 3);
+  if (!pay && core.length) {
+    const mRes = await fetch(`${supabaseUrl}/rest/v1/jobs?title=ilike.${encodeURIComponent(`*${core.join('*')}*`)}&or=${encodeURIComponent('(salary_min.not.is.null,salary.not.is.null)')}&select=title,salary,salary_min,salary_max&limit=600`, { headers: h }).catch(() => null);
+    const market = mRes && mRes.ok ? await mRes.json().catch(() => []) : [];
+    pay = payRange(fam !== 'general' ? market.filter((j) => prepFamily(j.title || '') === fam) : market, unit);
+    if (pay) scope = 'market';
+  }
   return {
     record: interviewRecord(reports, { role }),
-    pay: pay ? { ...pay, scope: fam !== 'general' ? 'role' : 'company' } : null,
+    pay: pay ? { ...pay, scope } : null,
   };
 }
 

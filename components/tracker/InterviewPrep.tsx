@@ -40,11 +40,11 @@ type InterviewRecord = {
   waitDays: number | null
   quotes: Quote[]
 }
-type Pay = { unit: 'hour' | 'year'; low: number; high: number; listings: number; scope: 'role' | 'company' }
+type Pay = { unit: 'hour' | 'year'; low: number; high: number; listings: number; scope: 'role' | 'company' | 'market' }
 type FollowUp = { thankYouBy: string; followUpOn: string; lastCheckOn: string }
 type Pack = {
   questions: { q: string; why: string }[]
-  answers: { q: string; answer: string; resume_fact: string; coached?: boolean }[]
+  answers: { q: string; answer: string; resume_fact: string; coached?: boolean; script?: boolean }[]
   intro: string | null
   resume_check?: { line: string; note: string }[]
   job_match?: { label: string; status: 'shown' | 'stated' | 'gap' | 'expired' | 'in progress'; proof?: string; say: string; duty?: boolean }[]
@@ -215,7 +215,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
   )
   // One real question for free, so the offer is not a blind buy (round 2: "nothing to preview").
   const sample = data?.pay
-    ? { q: 'What are your pay expectations?', why: `${company}'s similar listings on Seen pay about ${money(data.pay)}. Give a range you would accept.` }
+    ? { q: 'What are your pay expectations?', why: data.pay.scope === 'market' ? `${role || 'This job'} listings at other employers on Seen pay about ${money(data.pay)} (${company}'s own listings don't say). Give a range you would accept.` : `${company}'s similar listings on Seen pay about ${money(data.pay)}. Give a range you would accept.` }
     : { q: `What do you know about ${company}?`, why: 'Name what they sell, who their customers are, and one recent thing you read about them.' }
 
   return (
@@ -243,7 +243,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
               <p className={s.factDim}>Reading what applicants report about {company}…</p>
             )}
             {data?.pay && (
-              <p className={s.fact}>Pay on {company}&apos;s {data.pay.scope === 'role' ? 'similar ' : ''}listings: <b>{money(data.pay)}</b> <span className={s.dim}>({data.pay.listings} listings)</span></p>
+              <p className={s.fact}>{data.pay.scope === 'market' ? <>Pay for this job at other employers on Seen ({company}&apos;s listings don&apos;t say): </> : <>Pay on {company}&apos;s {data.pay.scope === 'role' ? 'similar ' : ''}listings: </>}<b>{money(data.pay)}</b> <span className={s.dim}>({data.pay.listings} listings)</span></p>
             )}
             {pickDay}
             {fu ? (
@@ -372,13 +372,13 @@ function PackView({ pack, company, fu }: { pack: Pack; company: string; fu: Foll
         </ol>
       </div>
       <div className={s.block}>
-        <div className={s.label}>Answers from your résumé</div>
+        <div className={s.label}>Your answers</div>
         <p className={s.dim} style={{ margin: '0 0 .45rem' }}>Fill in anything in [brackets], practise them out loud, and change any detail that isn&apos;t exactly what happened.</p>
         {pack.answers.map((a, i) => (
           <details key={i} className={s.answer} open={i === 0}>
             <summary>{a.q}</summary>
             <p className={s.prose}>{a.answer}</p>
-            <span className={s.dim}>Built on: “{a.resume_fact}”</span>
+            {a.resume_fact ? <span className={s.dim}>Built on: “{a.resume_fact}”</span> : <span className={s.dim}>Built from your résumé&apos;s dates and the posting.</span>}
           </details>
         ))}
       </div>
