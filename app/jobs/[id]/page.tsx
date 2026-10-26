@@ -380,7 +380,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     )
   }
 
-  if (!job) return <div className="page-full"><div className={d.loading}><div className="spinner" /></div></div>
+  // Same column as the loaded page (d.page), so the listing lands in place instead of the whole
+  // container jumping from full width to the reading column (CLS 0.15–0.19 measured at 1440px).
+  if (!job) return <div className="page-full"><div className={d.page}>{backBtn}<div className={d.loading}><div className="spinner" /></div></div></div>
 
   const companyName = displayCompanyName(job.company) || job.company
   const pay = displayPay(job)

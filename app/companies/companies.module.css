@@ -15,7 +15,7 @@
 .grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr)); gap: var(--sp-3); align-items: stretch; }
 .item { display: flex; min-width: 0; }
 .skCard { height: 168px; border-radius: var(--r-card); }
-.divider { grid-column: 1 / -1; margin-top: var(--sp-4); padding-top: var(--sp-4); border-top: 1px solid var(--border-1); font-family: var(--mono); font-size: var(--fs-meta); font-weight: 500; letter-spacing: var(--ls-meta); text-transform: uppercase; color: var(--text-3); }
+.divider { grid-column: 1 / -1; margin-top: var(--sp-4); padding-top: var(--sp-4); border-top: 1px solid var(--border-1); font-family: var(--body); font-size: var(--fs-sm); font-weight: 600; color: var(--text-3); }
 
 .card { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-4) var(--sp-5); border-radius: var(--r-card); background: var(--surface-1); border: 1px solid var(--border-1); color: inherit; text-decoration: none; transition: border-color var(--dur-state) var(--ease-out), background var(--dur-state) var(--ease-out); }
 .card:hover { border-color: var(--border-3); background: var(--surface-2); }

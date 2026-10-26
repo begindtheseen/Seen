@@ -307,7 +307,7 @@
 /* Fixed width: the label flips "⌘K" → "CtrlK" after the platform check, and a width change there
    shifted the whole right cluster (CLS 0.19 on desktop, audit #11). */
 .cmdkKey {
-  display: inline-block; min-width: 3.5em; text-align: center;
+  display: inline-block; width: 4.6em; box-sizing: border-box; white-space: nowrap; text-align: center;
   font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.04em; color: var(--sub);
   border: 1px solid var(--line2); border-bottom-width: 2px; border-radius: 4px; padding: 0.08rem 0.32rem;
 }

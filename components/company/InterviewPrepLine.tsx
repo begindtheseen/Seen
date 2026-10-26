@@ -31,7 +31,7 @@ export default function InterviewPrepLine({ company }: { company: string }) {
   return (
     <p ref={ref} className={s.small} data-testid="company-prep-line" style={{ margin: '.75rem 0 0' }}>
       Got an interview at {company}?{' '}
-      <Link href={prepTrackHref(company)} onClick={() => funnelEvent('offer_clicked', { surface: 'company_page', sku: 'interview', company })} style={{ color: 'var(--accent)', fontWeight: 600, display: 'inline-block', padding: '.7rem 0', margin: '-.7rem 0' }}>
+      <Link href={prepTrackHref(company)} onClick={() => funnelEvent('offer_clicked', { surface: 'company_page', sku: 'interview', company })} style={{ color: 'var(--accent)', fontWeight: 600, display: 'inline-block', padding: '.75rem 0', margin: '-.75rem 0' }}>
         Get your prep
       </Link>
       {' '}— questions for the role, answers from your résumé, and what applicants report about {company}&apos;s interviews.
