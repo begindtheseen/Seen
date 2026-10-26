@@ -4,8 +4,8 @@
 //
 //   1. Read (free): how the résumé reads for this job — what it already proves, what it does not,
 //      honest gaps — and up to 6 short questions whose answers would make a line stronger.
-//   2. Write (1 credit, Pro free): rewrites built only from the résumé and the answers, each one
-//      checked by Seen (grammar and tense, every number and name traced, no new claims, no word swaps).
+//   2. Write (1 credit, Pro free): changes built by Seen's own engine (no model API) from the résumé
+//      and the answers, each one checked (grammar and tense, every number and name traced, no new claims).
 //   3. Review: every change before → after with why; keep or skip each; nothing is applied silently.
 //   4. Done: the updated résumé, ready to copy, download or save.
 //
@@ -56,7 +56,6 @@ export default function ResumeOptimizer(props: ResumeOptimizerProps) {
   const [kept, setKept] = useState<Set<string>>(new Set())
   const [keepSummary, setKeepSummary] = useState(true)
   const [finalText, setFinalText] = useState('')
-  const [elapsed, setElapsed] = useState(0)
   const [copied, setCopied] = useState(false)
   const started = useRef(false)
 
@@ -73,15 +72,6 @@ export default function ResumeOptimizer(props: ResumeOptimizerProps) {
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  // a visible clock while Seen writes and checks (one server call; no invented progress steps)
-  useEffect(() => {
-    if (phase !== 'writing' && phase !== 'reading') return
-    setElapsed(0)
-    const t0 = Date.now()
-    const id = setInterval(() => setElapsed(Math.round((Date.now() - t0) / 1000)), 1000)
-    return () => clearInterval(id)
-  }, [phase])
 
   function fail(e: OptimizeError) {
     if (e.credits_required || e.pro_required || e.status === 401 || e.status === 402) { onNeedCredits?.(e); }
@@ -137,7 +127,7 @@ export default function ResumeOptimizer(props: ResumeOptimizerProps) {
       </header>
 
       {phase === 'reading' && (
-        <Busy line="Reading the posting and your résumé" sub={`Seen maps what the job asks for to what your résumé shows. ${elapsed}s`} />
+        <Busy line="Reading the posting and your résumé" sub="Seen maps what the job asks for to what your résumé shows." />
       )}
 
       {phase === 'error' && (
@@ -217,7 +207,7 @@ export default function ResumeOptimizer(props: ResumeOptimizerProps) {
       )}
 
       {phase === 'writing' && (
-        <Busy line="Writing and checking your changes" sub={`Each line is checked for tense, grammar and facts against your résumé${answeredCount ? ' and answers' : ''}. Usually about a minute — ${elapsed}s`} />
+        <Busy line="Writing and checking your changes" sub={`Each line is checked for tense, grammar and facts against your résumé${answeredCount ? ' and answers' : ''}.`} />
       )}
 
       {phase === 'review' && result && (

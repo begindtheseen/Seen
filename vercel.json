@@ -120,7 +120,7 @@
       "maxDuration": 150
     },
     "api/optimize.js": {
-      "maxDuration": 150
+      "maxDuration": 30
     }
   },
   "crons": [

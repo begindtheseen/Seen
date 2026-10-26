@@ -1,5 +1,7 @@
-// /api/optimize — Seen's résumé optimizer v3 (lib/resume/optimize/engine.js). Its own function so the
-// two model passes have room (vercel.json maxDuration); the old optimize tool in api/resume.js is
+// /api/optimize — Seen's résumé optimizer. No model API (owner decision 2026-10-26: "We are not relying
+// on api"): the diagnosis and every rewrite are Seen's own code — lib/resume/optimize/local.js builds them
+// from the posting reader, the fact sheet, the rule-based rewriter and the person's answers, and
+// lib/resume/optimize/engine.js + claims.js check every line. The old optimize tool in api/resume.js is
 // untouched until the new screen replaces it.
 //
 //   POST { action:'diagnose', resume, job, company, jobDescription, jobId? }
@@ -24,11 +26,9 @@ import { isReadableResume } from '../lib/server/resumeReadability.js';
 import { canonicalResumeText } from '../lib/resume/canonical.js';
 import { loadSkillTaxonomy } from '../lib/server/skillTaxonomy.js';
 import { unoptimizableListing } from '../lib/server/optimizePackage.js';
-import { chat, llmAvailable, LLMUnavailableError } from '../lib/server/llm.js';
 import { textHash } from '../lib/server/optimizeCache.js';
-import {
-  OPTIMIZER_V3, gapsAfterAnswers, buildContext, diagnosePrompt, guardDiagnosis, rewritePrompt, reviewPrompt, guardRewrites, repairPrompt, repairable,
-} from '../lib/resume/optimize/engine.js';
+import { OPTIMIZER_V3, gapsAfterAnswers, buildContext } from '../lib/resume/optimize/engine.js';
+import { localDiagnosis, localRewrite } from '../lib/resume/optimize/local.js';
 
 const sha = (s) => createHash('sha256').update(s).digest('hex');
 const clean = (s, n) => String(s || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, n);
@@ -80,20 +80,9 @@ async function inputs(req, res, body) {
   return { uid: authed.uid, resume, jobDescription, job, company, jobId: clean(body.jobId, 80), taxonomy };
 }
 
-async function diagnose(inp) {
+function diagnose(inp) {
   const ctx = buildContext({ resumeText: inp.resume, jobTitle: inp.job, company: inp.company, jobDescription: inp.jobDescription, taxonomy: inp.taxonomy });
-  let raw = {};
-  let model = false;
-  if (llmAvailable()) {
-    try {
-      const { system, user } = diagnosePrompt(ctx);
-      raw = await chat({ system, user, maxTokens: 3000, timeoutMs: 55000, json: true, tier: 'quality' });
-      model = true;
-    } catch (e) {
-      if (!(e instanceof LLMUnavailableError)) console.error('[optimize] diagnose model failed:', String(e?.message || e).slice(0, 160));
-    }
-  }
-  return { ctx, diagnosis: { ...guardDiagnosis(raw, ctx), model } };
+  return { ctx, diagnosis: { ...localDiagnosis(ctx), model: false } };
 }
 
 export default async function handler(req, res) {
@@ -108,9 +97,9 @@ export default async function handler(req, res) {
       const key = sessionKey({ uid: inp.uid, resume: inp.resume, jobDescription: inp.jobDescription, jobId: inp.jobId });
       const hit = body.fresh ? null : await readRun(inp.uid, `${key}:d`);
       if (hit) return res.status(200).json({ ok: true, key, cached: true, diagnosis: hit.output.diagnosis });
-      const { diagnosis } = await diagnose(inp);
+      const { diagnosis } = diagnose(inp);
       await writeRun(inp.uid, `${key}:d`, { version: OPTIMIZER_V3, job: inp.job, company: inp.company, diagnosis });
-      return res.status(200).json({ ok: true, key, cached: false, diagnosis, engine: { quality_model: !!process.env.ANTHROPIC_QUALITY_MODEL } });
+      return res.status(200).json({ ok: true, key, cached: false, diagnosis });
     }
 
     if (action === 'rewrite') {
@@ -130,57 +119,11 @@ export default async function handler(req, res) {
       const rkey = `${key}:r:${answersKey(answers)}`;
       const hit = body.fresh ? null : await readRun(inp.uid, rkey);
       if (hit) return res.status(200).json({ ok: true, key, cached: true, charged: false, ...hit.output.result });
-      if (!llmAvailable()) return res.status(503).json({ error: 'The rewriter is not available right now — nothing was charged.', charged: false });
       const gate = await gateAI(req, 'resume_optimize');
       if (!gate.ok) return res.status(gate.status).json({ error: gate.error, credits_required: gate.credits_required, pro_required: gate.pro_required, balance: gate.balance ?? 0, charged: false });
 
       const ctx = buildContext({ resumeText: inp.resume, jobTitle: inp.job, company: inp.company, jobDescription: inp.jobDescription, taxonomy: inp.taxonomy });
-      let draft = null;
-      let review = null;
-      try {
-        const w = rewritePrompt(ctx, diagnosis, answers);
-        draft = await chat({ system: w.system, user: w.user, maxTokens: 3600, timeoutMs: 60000, json: true, tier: 'quality' });
-      } catch (e) {
-        console.error('[optimize] rewrite model failed:', String(e?.message || e).slice(0, 160));
-      }
-      if (draft) {
-        try {
-          const v = reviewPrompt(ctx, draft, answers);
-          review = await chat({ system: v.system, user: v.user, maxTokens: 3200, timeoutMs: 50000, json: true, tier: 'quality' });
-        } catch (e) {
-          console.error('[optimize] fact-check failed, gating the draft alone:', String(e?.message || e).slice(0, 160));
-        }
-      }
-      const gated = draft ? guardRewrites(ctx, diagnosis, draft, review, answers) : { proposals: [], summary: null, skills: [], rejected: [] };
-      // One repair pass: each refused line goes back with the reason Seen refused it, and every answer
-      // that added a fact but went unused goes with it; the result passes the same checks.
-      let repaired = 0;
-      if (draft && (repairable(gated.rejected).length || gated.unused.length)) {
-        try {
-          const rp = repairPrompt(ctx, gated.rejected, answers, gated.unused);
-          const fix = await chat({ system: rp.system, user: rp.user, maxTokens: 2400, timeoutMs: 40000, json: true, tier: 'quality' });
-          let review2 = null;
-          try {
-            const v2 = reviewPrompt(ctx, fix, answers);
-            review2 = await chat({ system: v2.system, user: v2.user, maxTokens: 2400, timeoutMs: 35000, json: true, tier: 'quality' });
-          } catch { /* the deterministic checks still run */ }
-          const taken = new Set(gated.proposals.flatMap((p) => [p.id, ...(p.merges || [])]));
-          const again = guardRewrites(ctx, diagnosis, { rewrites: (fix?.rewrites || []).filter((r) => !taken.has(String(r?.id))), additions: fix?.additions || [] }, review2, answers);
-          const perJob = new Map();
-          for (const p of gated.proposals) if (p.add) perJob.set(p.job, (perJob.get(p.job) || 0) + 1);
-          for (const p of again.proposals) {
-            if (taken.has(p.id) || (p.merges || []).some((m) => taken.has(m)) || gated.proposals.some((x) => x.after.toLowerCase() === p.after.toLowerCase())) continue;
-            const q = p.add ? { ...p, id: `${p.job}.new${(perJob.get(p.job) || 0) + 1}` } : p;
-            if (p.add) perJob.set(p.job, (perJob.get(p.job) || 0) + 1);
-            gated.proposals.push({ ...q, repaired: true });
-            taken.add(q.id);
-            repaired += 1;
-          }
-          gated.rejected = gated.rejected.filter((r) => !again.proposals.some((p) => p.id === r.id)).concat(again.rejected.map((r) => ({ ...r, pass: 'repair' })));
-        } catch (e) {
-          console.error('[optimize] repair pass failed:', String(e?.message || e).slice(0, 160));
-        }
-      }
+      const gated = localRewrite(ctx, diagnosis, answers);
       const result = {
         version: OPTIMIZER_V3,
         proposals: gated.proposals,
@@ -192,13 +135,12 @@ export default async function handler(req, res) {
         requirements: diagnosis.requirements,
         answered: answers.map((a) => a.id),
         rejected_count: gated.rejected.length,
-        repaired,
         // What Seen considered and refused, and why — shown so the person can see nothing was slipped in.
         refused: gated.rejected.filter((r) => r.text).slice(0, 20).map((r) => ({ id: r.id, text: r.text, reason: clean(r.reason, 200) })),
-        model: !!draft,
+        model: false,
       };
       await writeRun(inp.uid, rkey, { version: OPTIMIZER_V3, job: inp.job, company: inp.company, answers, result, rejected: gated.rejected });
-      return res.status(200).json({ ok: true, key, cached: false, charged: !gate.pro, pro: !!gate.pro, balance: gate.balance, ...result, engine: { quality_model: !!process.env.ANTHROPIC_QUALITY_MODEL } });
+      return res.status(200).json({ ok: true, key, cached: false, charged: !gate.pro, pro: !!gate.pro, balance: gate.balance, ...result });
     }
 
     if (action === 'decide') {
