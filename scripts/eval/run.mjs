@@ -154,7 +154,7 @@ const summary = {
   records: records.map(({ meta, ...r }) => ({ ...r, meta: { family: meta?.family, remaining: meta?.remaining, probe: meta?.probe ? { status: meta.probe.status, error: meta.probe.body?.error } : undefined, layout: meta?.layout?.method } })),
 };
 
-function mdEscape(s) { return String(s ?? '').replace(/\|/g, '\\|').replace(/\n/g, ' ⏎ '); }
+function mdEscape(s) { return String(s ?? '').replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, ' ⏎ '); }
 const md = [];
 md.push(`# Seen Pro tools — evaluation scorecard (${label}, ${today})`, '');
 md.push(`Commit \`${sha}\` · ${fixtures.length} fixtures · in-process handlers for the deterministic tools · live model calls on \`${prod?.base}\` for ${prodTools.join(', ')}${args.prod ? '' : ' (from cache — pass --prod to refresh)'}.`, '');

@@ -231,7 +231,6 @@ export function checkRecord(rec, fx, opts = {}) {
 
   for (const it of items) {
     const t = it.text || '';
-    const tl = squash(t);
     if (it.kind === 'claim') {
       // tenure claims about one employer ("almost four years at St. Aurelia") must match the résumé's dates
       const tw = wordsToDigits(t);

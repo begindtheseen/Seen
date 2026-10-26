@@ -175,7 +175,7 @@ export async function runInsights(fx) {
   out.charged += probe.charged;
   const b = r.body || {};
   out.output = { what_they_want: b.what_they_want, hidden_requirements: b.hidden_requirements, insider_tip: b.insider_tip, _src: b._src, charged: b.charged };
-  for (const w of b.what_they_want || []) push(out.items, 'what_they_want', 'requirement', w, { anyOf: /^Any of:|\(or similar\)/.test(w) ? w : null });
+  for (const w of b.what_they_want || []) push(out.items, 'what_they_want', 'requirement', w, { anyOf: /(?:^Any of:)|(?:\(or similar\))/.test(w) ? w : null });
   for (const h of b.hidden_requirements || []) push(out.items, 'hidden_requirements', 'advice', h);
   push(out.items, 'insider_tip', 'advice', b.insider_tip);
   push(out.items, 'description_summary', 'excerpt', b.description_summary);
