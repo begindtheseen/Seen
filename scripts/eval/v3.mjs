@@ -68,7 +68,18 @@ for (const fx of fixtures) {
     writeFileSync(`${d}/questions.md`, md.join('\n'));
     summary.push(`${fx.id}: ${r.status} ${r.ms}ms · ${(dg.questions || []).length} questions · ${(dg.requirements || []).length} requirements · model ${dg.model}`);
   } else {
-    const answers = existsSync(`${d}/answers.json`) ? JSON.parse(readFileSync(`${d}/answers.json`, 'utf8')) : [];
+    let answers = existsSync(`${d}/answers.json`) ? JSON.parse(readFileSync(`${d}/answers.json`, 'utf8')) : [];
+    // answers were written against the questions in this folder's diagnosis.json; when the engine's
+    // questions have changed since, each answer follows its question TEXT to the new id (an answer whose
+    // question is gone is dropped) — matching by id fed the travel answer to "Have you used Concur?"
+    if (LOCAL && existsSync(`${d}/diagnosis.json`)) {
+      const asked = new Map((JSON.parse(readFileSync(`${d}/diagnosis.json`, 'utf8')).diagnosis?.questions || []).map((q) => [q.id, q.ask]));
+      const ctx = engine.buildContext({ resumeText: fx.resumeText, jobTitle: fx.job.title, company: fx.job.company, jobDescription: fx.jd });
+      const now = new Map(engine.localDiagnosis(ctx).questions.map((q) => [q.ask, q.id]));
+      const moved = answers.map((a) => ({ ...a, id: now.get(asked.get(a.id)) })).filter((a) => a.id);
+      if (moved.length !== answers.length || moved.some((a, i) => a.id !== answers[i].id)) console.log(`${fx.id}: ${answers.length - moved.length} answer(s) dropped, ids remapped by question text`);
+      answers = moved;
+    }
     const b = { action: 'rewrite', ...body(fx), answers, fresh: !!args.fresh };
     const res = LOCAL ? await localCall(b).then((rec) => ({ rec })) : await client.call('optimize_v3_rewrite', fx, hash({ v: 1, b }), () => client.post('/api/optimize', b, { model: true }));
     const r = res.rec?.resp;
