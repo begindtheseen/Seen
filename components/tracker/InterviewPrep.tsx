@@ -47,6 +47,8 @@ type Pack = {
   answers: { q: string; answer: string; resume_fact: string; coached?: boolean }[]
   intro: string | null
   resume_check?: { line: string; note: string }[]
+  job_match?: { label: string; status: 'shown' | 'stated' | 'gap' | 'expired' | 'in progress'; proof?: string; say: string; duty?: boolean }[]
+  ask_them?: { q: string }[]
   emails: { thankYou: { subject: string; body: string }; followUp: { subject: string; body: string } }
   follow_up: FollowUp
 }
@@ -336,6 +338,8 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
   )
 }
 
+const MATCH_WORD = { shown: 'your résumé shows it', stated: 'listed, not shown in a line', gap: 'not on your résumé', expired: 'lapsed', 'in progress': 'in progress' } as const
+
 function PackView({ pack, company, fu }: { pack: Pack; company: string; fu: FollowUp | null | undefined }) {
   const intro = pack.intro
   return (
@@ -377,6 +381,27 @@ function PackView({ pack, company, fu }: { pack: Pack; company: string; fu: Foll
           </details>
         ))}
       </div>
+      {!!pack.job_match?.length && (
+        <div className={s.block}>
+          <div className={s.label}>What this job asks for — and your answer</div>
+          <ul className={s.qs}>
+            {pack.job_match.map((m, i) => (
+              <li key={i}>
+                <b>{m.label}</b> <span className={s.dim}>· {MATCH_WORD[m.status]}</span>
+                {m.proof ? <span className={s.why}>Your line: “{m.proof}”</span> : <span className={s.why}>{m.say}</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {!!pack.ask_them?.length && (
+        <div className={s.block}>
+          <div className={s.label}>Questions to ask them</div>
+          <ul className={s.qs}>
+            {pack.ask_them.map((q, i) => <li key={i}>{q.q}</li>)}
+          </ul>
+        </div>
+      )}
       <div className={s.block}>
         <div className={s.label}>Emails</div>
         <details className={s.answer}>

@@ -174,31 +174,22 @@ function installModel(calls, { verifyStatus = 200 } = {}) {
   return modelCalls;
 }
 
-test('build: draft then fact-check on the quality model; an invented practice never reaches the pack', async () => {
-  process.env.ANTHROPIC_KEY = 'k'; process.env.ANTHROPIC_QUALITY_MODEL = 'quality-model-x';
+test('build: Seen\'s own engine — no model call even with a key; every answer is a résumé line told aloud', async () => {
+  process.env.ANTHROPIC_KEY = 'must-not-be-used';
   try {
     const calls = installFetch({ pro: true });
     const modelCalls = installModel(calls);
     const res = await call({ action: 'build', company: 'Ross Stores', role: 'Assistant Store Manager', refresh: true });
     assert.equal(res.code, 200, JSON.stringify(res.body));
-    assert.equal(modelCalls.length, 2);
-    assert.ok(modelCalls.every((c) => c.model === 'quality-model-x'));
-    assert.match(modelCalls[1].messages[0].content, /DRAFT PACK/);
-    const a = res.body.pack.answers.find((x) => !x.coached);
-    assert.ok(a && /95% of the time/.test(a.answer), JSON.stringify(res.body.pack.answers));
-    assert.ok(!res.body.pack.answers.some((x) => /coupon/.test(x.answer)));
-  } finally { delete process.env.ANTHROPIC_KEY; delete process.env.ANTHROPIC_QUALITY_MODEL; }
-});
-
-test('build: when the fact-check call fails, the guard still cuts the draft\'s invented sentence', async () => {
-  process.env.ANTHROPIC_KEY = 'k'; process.env.ANTHROPIC_QUALITY_MODEL = 'quality-model-x';
-  try {
-    const calls = installFetch({ pro: true });
-    installModel(calls, { verifyStatus: 400 });
-    const res = await call({ action: 'build', company: 'Ross Stores', role: 'Assistant Store Manager', refresh: true });
-    assert.equal(res.code, 200);
-    assert.ok(!res.body.pack.answers.some((x) => /20% coupon/.test(x.answer)), JSON.stringify(res.body.pack.answers));
-  } finally { delete process.env.ANTHROPIC_KEY; delete process.env.ANTHROPIC_QUALITY_MODEL; }
+    assert.equal(modelCalls.length, 0, 'no model call (owner decision 2026-10-26)');
+    assert.equal(res.body.pack.model, false);
+    assert.ok(res.body.pack.answers.length >= 2);
+    for (const a of res.body.pack.answers) {
+      assert.ok(RESUME.includes(a.resume_fact), a.resume_fact);
+      assert.match(a.answer, /\bI\b/, 'told in first person');
+    }
+    assert.ok(Array.isArray(res.body.pack.ask_them) && res.body.pack.ask_them.length >= 3);
+  } finally { delete process.env.ANTHROPIC_KEY; }
 });
 
 // ── The free preview before the ask (owner decisions 2026-10-25) ───────────────────────────────────────

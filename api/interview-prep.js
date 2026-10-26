@@ -22,11 +22,11 @@
 
 import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { gateAI } from '../lib/server/credits.js';
-import { chat, llmAvailable, LLMUnavailableError } from '../lib/server/llm.js';
+import { localPack } from '../lib/server/prepLocal.js';
 import { SCORABLE_REPORTS_FILTER } from '../lib/server/reportCounts.js';
 import { ONE_TIME_SKUS } from '../lib/server/creditRules.js';
 import {
-  interviewRecord, payRange, followUpPlan, prepPrompt, verifyPrompt, guardPack, fallbackPack, prepEmails, prepKey, signOffName, prepFamily,
+  interviewRecord, payRange, followUpPlan, guardPack, fallbackPack, prepEmails, prepKey, signOffName, prepFamily,
 } from '../lib/server/interviewPrep.js';
 import { CLIENT_EVENTS, funnelRow, recordFunnelEvent } from '../lib/server/funnelEvents.js';
 
@@ -47,7 +47,8 @@ export function previewFrom({ company, role, resumeText, stage = '' }) {
   const bank = new Set(fallbackPack({ company, role, resumeText: text }).questions.map((q) => q.q));
   const roleQs = pack.questions.filter((q) => bank.has(q.q));
   const questions = (roleQs.length >= 2 ? roleQs : pack.questions).slice(0, 2).map((q) => ({ q: q.q, why: q.why }));
-  const a = hasResume ? pack.answers[0] : null;
+  const local = hasResume ? localPack({ company, role, resumeText: text, stage }) : null;
+  const a = local?.answers?.[0] || (hasResume ? pack.answers[0] : null);
   return {
     questions,
     answer: a ? { q: a.q, answer: a.answer, resume_fact: a.resume_fact } : null,
@@ -217,30 +218,9 @@ export default async function handler(req, res) {
     }
     const stage = ['Phone Screen', 'Interview', 'Final Round'].includes(body.stage) ? body.stage : '';
     const pay = recOut?.pay || null;
-    let pack;
-    if (llmAvailable()) {
-      try {
-        // Draft → fact-check → guard. The draft and the check both use the stronger model (a paid,
-        // high-stakes pack); the check may only remove or bracket, never add. If the check fails, the
-        // guard still runs on the draft.
-        const { system, user } = prepPrompt({ company, role, jobText, resumeText, stage });
-        const draft = await chat({ system, user, maxTokens: 3200, timeoutMs: 55000, json: true, tier: 'quality' });
-        let checked = draft;
-        try {
-          const v = verifyPrompt({ company, role, jobText, resumeText, draft });
-          const out = await chat({ system: v.system, user: v.user, maxTokens: 3200, timeoutMs: 50000, json: true, tier: 'quality' });
-          if (out && Array.isArray(out.answers)) checked = out;
-        } catch (e) {
-          if (!(e instanceof LLMUnavailableError)) console.error('[interview-prep] fact-check failed, guarding the draft:', String(e?.message || e).slice(0, 160));
-        }
-        pack = guardPack(checked, { company, role, resumeText, pay, stage });
-      } catch (e) {
-        if (!(e instanceof LLMUnavailableError)) console.error('[interview-prep] model failed, using the coached pack:', String(e?.message || e).slice(0, 160));
-        pack = guardPack({}, { company, role, resumeText, pay, stage });
-      }
-    } else {
-      pack = guardPack({}, { company, role, resumeText, pay, stage });
-    }
+    // Seen's own engine, no model API (owner decision 2026-10-26): résumé lines told out loud, the
+    // posting's requirements and your answer to each, questions to ask them.
+    const pack = localPack({ company, role, resumeText, jobText, pay, stage });
 
     const name = signOffName(resumeText, clean(prof?.name, 80));
     const full = {
