@@ -110,7 +110,7 @@ export default async function handler(req, res) {
       if (hit) return res.status(200).json({ ok: true, key, cached: true, diagnosis: hit.output.diagnosis });
       const { diagnosis } = await diagnose(inp);
       await writeRun(inp.uid, `${key}:d`, { version: OPTIMIZER_V3, job: inp.job, company: inp.company, diagnosis });
-      return res.status(200).json({ ok: true, key, cached: false, diagnosis });
+      return res.status(200).json({ ok: true, key, cached: false, diagnosis, engine: { quality_model: !!process.env.ANTHROPIC_QUALITY_MODEL } });
     }
 
     if (action === 'rewrite') {
@@ -198,7 +198,7 @@ export default async function handler(req, res) {
         model: !!draft,
       };
       await writeRun(inp.uid, rkey, { version: OPTIMIZER_V3, job: inp.job, company: inp.company, answers, result, rejected: gated.rejected });
-      return res.status(200).json({ ok: true, key, cached: false, charged: !gate.pro, pro: !!gate.pro, balance: gate.balance, ...result });
+      return res.status(200).json({ ok: true, key, cached: false, charged: !gate.pro, pro: !!gate.pro, balance: gate.balance, ...result, engine: { quality_model: !!process.env.ANTHROPIC_QUALITY_MODEL } });
     }
 
     if (action === 'decide') {
