@@ -44,10 +44,10 @@ export default class ErrorBoundary extends Component<Props, { hasError: boolean 
         }}
       >
         <div style={{ fontSize: 'var(--fs-xl)', marginBottom: '.5rem' }}>⚠️</div>
-        <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: 'var(--fs-body)', marginBottom: '.35rem' }}>
+        <div style={{ fontFamily: 'var(--body)', fontWeight: 600, color: 'var(--white)', fontSize: 'var(--fs-body)', marginBottom: '.35rem' }}>
           This section couldn&apos;t be displayed
         </div>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6 }}>
+        <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6 }}>
           Something in this result didn&apos;t render. The rest of your analysis is unaffected — try re-running it.
         </div>
       </div>

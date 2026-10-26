@@ -137,7 +137,7 @@ export default function CompanyScoreModal({ companyName, onClose }: { companyNam
           </div>
         ) : notFound || !s ? (
           <div style={{ padding: '0.5rem 0 1.25rem', textAlign: 'center' }}>
-            <p style={{ color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', lineHeight: 1.7, marginBottom: '1.25rem' }}>
+            <p style={{ color: 'var(--sub)', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', lineHeight: 1.7, marginBottom: '1.25rem' }}>
               No score yet for “{shownName}”. Open the full report to research it.
             </p>
             <a href={`/company/${slugify(companyName)}`} className={styles.full}>Open full report →</a>

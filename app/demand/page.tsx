@@ -255,7 +255,7 @@ export default function DemandPage() {
         {/* Freshness, said out loud: the BLS blend is refreshed monthly by cron; when that has not
             happened for 65+ days the data is stale and the page says so instead of hiding it. */}
         {fresh.stale && (
-          <div style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.3)', borderRadius: 10, padding: '.65rem 1rem', marginBottom: '1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--amber)', lineHeight: 1.6 }}>
+          <div style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.3)', borderRadius: 10, padding: '.65rem 1rem', marginBottom: '1rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--amber)', lineHeight: 1.6 }}>
             ⚠ Modeled figures last refreshed {fresh.updatedAt ? relAgo(fresh.updatedAt) : 'a while ago'}{blsPeriod ? ` (BLS ${blsPeriod})` : ''}. Treat them as a vintage, not a live reading.
           </div>
         )}
@@ -294,7 +294,7 @@ export default function DemandPage() {
             ))}
           </div>
         ) : (
-          <div style={{ textAlign: 'center', padding: '4rem 2rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', lineHeight: 1.7 }}>
+          <div style={{ textAlign: 'center', padding: '4rem 2rem', color: 'var(--muted)', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', lineHeight: 1.7 }}>
             {loadFailed ? (
               <>Couldn&apos;t load demand data just now — refresh to retry.</>
             ) : locFilter.trim().length >= 3 ? (

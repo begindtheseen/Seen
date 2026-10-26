@@ -39,9 +39,9 @@
 /* Verdict — the one stinging/affirming line. Tone drives the accent. */
 .verdict { margin-bottom: 1.1rem; }
 .verdictHead {
-  font-family: var(--display);
+  font-family: var(--body);
   font-size: var(--fs-lead);
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.2;
   margin: 0 0 0.28rem;
@@ -117,10 +117,10 @@
   border-left: 3px solid var(--red);
 }
 .costIcon { flex-shrink: 0; font-size: var(--fs-ui); }
-.costText { font-family: var(--mono); font-size: var(--fs-meta); line-height: 1.5; color: color-mix(in srgb, var(--red) 82%, var(--white)); }
+.costText { font-family: var(--body); font-size: var(--fs-meta); line-height: 1.5; color: color-mix(in srgb, var(--red) 82%, var(--white)); }
 
 .foot {
-  font-family: var(--mono);
+  font-family: var(--body);
   font-size: var(--fs-meta);
   color: var(--muted);
   line-height: 1.6;

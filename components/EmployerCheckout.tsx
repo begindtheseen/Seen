@@ -33,10 +33,10 @@ export function EmployerPurchaseConfirm() {
       : "We've got your payment and emailed a receipt. Transparency Verified is reviewed by our team against your real outcome data — we'll set it up and follow up at the email you used, usually within one business day."
   return (
     <div style={{ background: 'linear-gradient(135deg,rgba(16,185,129,.12),rgba(16,185,129,.03))', border: '1px solid rgba(16,185,129,.35)', borderRadius: 14, padding: '1.25rem 1.5rem', marginBottom: '2rem', textAlign: 'center' }}>
-      <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', marginBottom: '.3rem' }}>
+      <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', marginBottom: '.3rem' }}>
         {state === 'pending' ? 'Confirming your purchase…' : `🎉 You're in — ${name} is booked.`}
       </div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6 }}>
+      <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6 }}>
         {state === 'pending' ? 'One moment while we confirm your payment…' : okCopy}
       </div>
     </div>
@@ -95,11 +95,11 @@ export function EmployerCheckout() {
         return (
           <div key={sku} style={{ background: 'var(--card)', border: `1.5px solid ${isOpen ? 'var(--blue)' : 'var(--line)'}`, borderRadius: 16, padding: '1.75rem' }}>
             <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--blue)', marginBottom: '.5rem' }}>{tagline}</div>
-            <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', marginBottom: '.25rem' }}>{def.name}</div>
-            <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-h2)', fontWeight: 800, color: 'var(--white)' }}>{price}<span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', fontWeight: 400 }}> one-time · {def.days} days</span></div>
+            <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', marginBottom: '.25rem' }}>{def.name}</div>
+            <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-h2)', fontWeight: 600, color: 'var(--white)' }}>{price}<span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', fontWeight: 400 }}> one-time · {def.days} days</span></div>
             <div style={{ margin: '1rem 0 1.25rem' }}>
               {points.map(p => (
-                <div key={p} style={{ display: 'flex', gap: '.5rem', marginBottom: '.5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5 }}>
+                <div key={p} style={{ display: 'flex', gap: '.5rem', marginBottom: '.5rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5 }}>
                   <span style={{ color: 'var(--green)', flexShrink: 0 }}>✓</span> {p}
                 </div>
               ))}
@@ -113,13 +113,13 @@ export function EmployerCheckout() {
                 {/* What the handler does with the name (api/stripe.js employer_checkout → employerFulfillment.js):
                     it is stored as typed and, for Featured, keyed into employer_perks by that exact name — the
                     checkout does not verify the company exists on Seen. Say so, and offer the check. */}
-                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.6 }}>
+                <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.6 }}>
                   Placement is keyed to this exact name and applies to the roles Seen lists under it; the name is not checked at checkout.{' '}
                   {company.trim() ? <Link href={`/employers/dashboard?company=${encodeURIComponent(company.trim())}`} style={{ color: 'var(--sub)' }}>See what Seen has for “{company.trim()}” →</Link> : null}
                 </div>
                 {err && <div role="alert" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--red)' }}>{err}</div>}
                 <button type="submit" disabled={busy} style={{ ...btn, opacity: busy ? .6 : 1 }}>{busy ? 'Starting…' : `Continue to payment — ${price} →`}</button>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.6, textAlign: 'center' }}>
+                <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.6, textAlign: 'center' }}>
                   One-time payment via Stripe, no account. By continuing you agree to the <Link href="/terms#employer" style={{ color: 'var(--sub)' }}>employer terms</Link>; payments never change a score.
                 </div>
                 <button type="button" onClick={() => { setOpen(null); setErr('') }} style={{ background: 'none', border: 'none', color: 'var(--dim)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', cursor: 'pointer', padding: '.2rem' }}>Cancel</button>

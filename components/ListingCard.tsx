@@ -229,8 +229,8 @@ export default function ListingCard({ data, onClose }: { data: ListingCardData; 
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', padding: '.2rem .4rem' }}>✕ close</button>
         </div>
 
-        <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: '#fff', marginBottom: '.2rem', letterSpacing: '-.02em' }}>Your share card is ready</div>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'rgba(255,255,255,0.35)', marginBottom: '1.1rem', lineHeight: 1.7 }}>Share this listing with its Seen hiring grade and intel.</div>
+        <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: '#fff', marginBottom: '.2rem', letterSpacing: '-.02em' }}>Your share card is ready</div>
+        <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'rgba(255,255,255,0.35)', marginBottom: '1.1rem', lineHeight: 1.7 }}>Share this listing with its Seen hiring grade and intel.</div>
 
         {dataUrl ? (
           <img src={dataUrl} alt="Share card" style={{ width: '100%', borderRadius: 12, boxShadow: `0 24px 80px rgba(0,0,0,0.9), 0 0 60px ${OC}22`, marginBottom: '1rem', display: 'block' }} />

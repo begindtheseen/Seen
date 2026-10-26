@@ -91,7 +91,7 @@ export default async function CompareSlugsPage({ params }: { params: Promise<{ s
           <ComparePicker initialA={aName} initialB={bName} />
         </div>
 
-        <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '1.5rem', lineHeight: 1.7 }}>
+        <p style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '1.5rem', lineHeight: 1.7 }}>
           Seen Grades are community signals from applicant accounts, not verified facts. Track your application in the <Link href="/tracker" style={{ color: 'var(--blue)' }}>tracker</Link> or <Link href="/report" style={{ color: 'var(--blue)' }}>report an outcome</Link>.
         </p>
       </div>

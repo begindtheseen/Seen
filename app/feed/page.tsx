@@ -207,7 +207,7 @@ export default function FeedPage() {
                   </div>
 
                   {body && (
-                    <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.7, margin: 0 }}>
+                    <p style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.7, margin: 0 }}>
                       {body}
                     </p>
                   )}
@@ -241,13 +241,13 @@ export default function FeedPage() {
 
         {/* CTA */}
         <div style={{ marginTop: '2.5rem', textAlign: 'center', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.5rem' }}>
-          <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', marginBottom: '.4rem' }}>
+          <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', marginBottom: '.4rem' }}>
             Had a notable experience?
           </div>
           <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '1rem' }}>
             Takes 60 seconds. Helps the next applicant who checks this company.
           </p>
-          <a href="/report" style={{ display: 'inline-block', background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)', border: 'none', borderRadius: 8, padding: '.65rem 1.5rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)', color: '#fff', textDecoration: 'none', boxShadow: '0 0 20px rgba(59,130,246,0.3)' }}>
+          <a href="/report" style={{ display: 'inline-block', background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)', border: 'none', borderRadius: 8, padding: '.65rem 1.5rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', color: '#fff', textDecoration: 'none', boxShadow: '0 0 20px rgba(59,130,246,0.3)' }}>
             Submit your report →
           </a>
         </div>

@@ -125,8 +125,8 @@ export default function WelcomeOnboarding({
               >{s.done ? '✓' : s.icon}</span>
               {/* The text keeps ≥180px; on a phone the CTA wraps under it instead of squeezing the title. */}
               <div style={{ minWidth: 0, flex: '1 1 180px' }}>
-                <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-sm)', fontWeight: 700, color: s.done ? 'var(--sub)' : 'var(--white)', textDecoration: s.done ? 'line-through' : 'none' }}>{s.title}</div>
-                {!s.done && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.15rem', lineHeight: 1.45 }}>{s.sub}</div>}
+                <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', fontWeight: 600, color: s.done ? 'var(--sub)' : 'var(--white)', textDecoration: s.done ? 'line-through' : 'none' }}>{s.title}</div>
+                {!s.done && <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.15rem', lineHeight: 1.45 }}>{s.sub}</div>}
                 {!s.done && 'alt' in s && s.alt && (
                   <a href={s.alt.href} onClick={e => { e.preventDefault(); router.push(s.alt!.href) }} style={{ display: 'inline-flex', alignItems: 'center', minHeight: 40, fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none', marginTop: '-.2rem', marginBottom: '-.5rem' }}>{s.alt.label}</a>
                 )}

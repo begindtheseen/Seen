@@ -123,7 +123,7 @@ export default function CardShareModal(p: CardShareModalProps) {
           <button type="button" onClick={p.onClose} aria-label="Close" style={{ background: 'none', border: 'none', fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', fontWeight: 500, color: 'rgba(255,255,255,0.55)', cursor: 'pointer', minHeight: 44, padding: '0 .5rem' }}>Close</button>
         </div>
 
-        <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-h3)', fontWeight: 800, color: '#fff', marginBottom: '.25rem', letterSpacing: '-.02em', lineHeight: 1.1 }}>{p.title}</div>
+        <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-h3)', fontWeight: 600, color: '#fff', marginBottom: '.25rem', letterSpacing: '-.02em', lineHeight: 1.1 }}>{p.title}</div>
         <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-ui)', color: 'rgba(255,255,255,0.6)', marginBottom: '1rem', lineHeight: 1.55 }}>{p.sub}</div>
 
         <div role="tablist" aria-label="Card format" style={{ display: 'inline-flex', gap: 2, padding: 3, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, marginBottom: '.9rem' }}>

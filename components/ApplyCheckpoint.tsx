@@ -208,7 +208,7 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
     borderRadius: 20,
     border: '1px solid var(--line2)',
     padding: '0 0 env(safe-area-inset-bottom, 16px)',
-    animation: 'fadeUp .25s ease both',
+    animation: 'fadeUp .25s ease backwards',
     position: 'relative',
   }
 
@@ -473,7 +473,7 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
               {reportedGone === 'signin' ? 'Thanks for flagging.' : 'Flagged for review.'}
             </div>
             <div style={{
-              fontFamily: 'var(--mono)',
+              fontFamily: 'var(--body)',
               fontSize: 14,
               color: 'var(--sub)',
               lineHeight: 1.6,
@@ -525,7 +525,7 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
           <div style={innerStyle}>
             <div style={{ ...confirmedCheckStyle, fontSize: 40 }}>Got it.</div>
             <div style={{
-              fontFamily: 'var(--mono)',
+              fontFamily: 'var(--body)',
               fontSize: 14,
               color: 'var(--sub)',
               lineHeight: 1.6,
@@ -597,13 +597,13 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
             )}
 
             {responsePct != null && (
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--text)', lineHeight: 1.6, marginBottom: 10 }} data-testid="checkpoint-reply-rate">
+              <div style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--text)', lineHeight: 1.6, marginBottom: 10 }} data-testid="checkpoint-reply-rate">
                 {companyName} usually replies to {responsePct}% of applicants.
               </div>
             )}
 
             {isLoggedIn ? (
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 14, color: 'var(--sub)', lineHeight: 1.6, marginBottom: 22 }} data-testid="checkpoint-signed-in">
+              <div style={{ fontFamily: 'var(--body)', fontSize: 14, color: 'var(--sub)', lineHeight: 1.6, marginBottom: 22 }} data-testid="checkpoint-signed-in">
                 {checkinPlan.length
                   ? <>We&apos;ll email you on {joinDays(checkinPlan)} to ask what happened, unless you update it first.</>
                   : <>Update it in your tracker when you hear back.</>}

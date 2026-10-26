@@ -79,9 +79,9 @@ export default function HiringProbability({ responseRate, ghostRate, overallScor
       <div style={{ background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.15)', borderRadius: 9, padding: '.65rem .85rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.35rem', gap: '.6rem' }}>
           <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Response chance</span>
-          <span style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--muted)', lineHeight: 1 }}>Too few reports</span>
+          <span style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-body)', fontWeight: 600, color: 'var(--muted)', lineHeight: 1 }}>Too few reports</span>
         </div>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.5 }}>{givenContext || tooFewReportsLine(reportCount!)}</div>
+        <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.5 }}>{givenContext || tooFewReportsLine(reportCount!)}</div>
       </div>
     )
   }
@@ -99,7 +99,7 @@ export default function HiringProbability({ responseRate, ghostRate, overallScor
     <div style={{ background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.15)', borderRadius: 9, padding: '.65rem .85rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.35rem' }}>
         <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.08em' }}>{personalized ? 'Estimated response chance' : 'Response chance'}</span>
-        <span style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color, lineHeight: 1 }}>{pct}%</span>
+        <span style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color, lineHeight: 1 }}>{pct}%</span>
       </div>
       <div style={{ height: 4, background: 'rgba(255,255,255,.07)', borderRadius: 2, overflow: 'hidden', marginBottom: '.3rem' }}>
         <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 2, transition: 'width .8s ease' }} />

@@ -320,7 +320,7 @@ function ReportPage() {
           <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--white)', marginBottom: '.5rem' }}>
             Report submitted
           </h2>
-          <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.7, marginBottom: '1.5rem' }}>
+          <p style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.7, marginBottom: '1.5rem' }}>
             Thank you. Your experience has been added to the transparency feed and will update {company}&apos;s score in real time.
           </p>
           <div style={{ display: 'flex', gap: '.75rem', justifyContent: 'center' }}>
@@ -370,7 +370,7 @@ function ReportPage() {
       <div style={{ maxWidth: 680, margin: '0 auto', padding: '2.5rem 2rem', width: '100%', boxSizing: 'border-box' }}>
         {appId && auto && !autoApp && (
           <div style={{ background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.22)', borderRadius: 10, padding: '.7rem 1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.75rem', flexWrap: 'wrap' }}>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6 }}>
+            <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6 }}>
               ✦ Prefilled from your tracker.{company ? ` Reporting your ${company} outcome.` : ''}
             </div>
             <button
@@ -382,7 +382,7 @@ function ReportPage() {
           </div>
         )}
         {urlPrefilled && (
-          <div style={{ background: 'rgba(59,130,246,.08)', border: '1px solid rgba(59,130,246,.22)', borderRadius: 10, padding: '.7rem 1rem', marginBottom: '1.25rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6 }}>
+          <div style={{ background: 'rgba(59,130,246,.08)', border: '1px solid rgba(59,130,246,.22)', borderRadius: 10, padding: '.7rem 1rem', marginBottom: '1.25rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6 }}>
             ✦ Prefilled for you{company ? <> — reporting <span style={{ color: 'var(--white)', fontWeight: 700 }}>{company}</span></> : ''}. Fill any missing field and hit submit.
           </div>
         )}
@@ -522,14 +522,14 @@ function ReportPage() {
               value={notes}
               onChange={e => setNotes(e.target.value)}
               rows={4}
-              style={{ width: '100%', background: 'var(--surface)', border: '1.5px solid var(--line2)', borderRadius: 8, padding: '.72rem 1rem', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', outline: 'none', resize: 'vertical', lineHeight: 1.6, caretColor: 'var(--blue)' }}
+              style={{ width: '100%', background: 'var(--surface)', border: '1.5px solid var(--line2)', borderRadius: 8, padding: '.72rem 1rem', color: 'var(--white)', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', outline: 'none', resize: 'vertical', lineHeight: 1.6, caretColor: 'var(--blue)' }}
             />
           </div>
 
           <button
             onClick={submit}
             disabled={loading}
-            style={{ width: '100%', background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)', color: '#fff', border: 'none', borderRadius: 8, padding: '.85rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1, boxShadow: '0 0 20px rgba(59,130,246,0.3)' }}
+            style={{ width: '100%', background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)', color: '#fff', border: 'none', borderRadius: 8, padding: '.85rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-ui)', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1, boxShadow: '0 0 20px rgba(59,130,246,0.3)' }}
           >
             {loading ? 'Submitting...' : 'Submit report →'}
           </button>

@@ -177,14 +177,14 @@ export default function ResetPage() {
       </div>
     </>
   )
-  const message = msg && <div role="status" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: ok ? 'var(--green)' : 'var(--red)', marginBottom: '.85rem', lineHeight: 1.6 }}>{msg}</div>
+  const message = msg && <div role="status" style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: ok ? 'var(--green)' : 'var(--red)', marginBottom: '.85rem', lineHeight: 1.6 }}>{msg}</div>
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 1.5rem 1.5rem' }}>
       <div className="rise-in" style={{ width: '100%', maxWidth: 420 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '2rem', justifyContent: 'center' }}>
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--blue)', boxShadow: '0 0 10px rgba(59,130,246,0.6)', display: 'inline-block' }} />
-          <span style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-h3)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em' }}>Seen</span>
+          <span style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-h3)', fontWeight: 600, color: 'var(--white)', letterSpacing: '-.02em' }}>Seen</span>
         </div>
 
         {mode === 'detecting' && (

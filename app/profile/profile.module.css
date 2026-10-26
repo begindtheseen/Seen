@@ -23,11 +23,11 @@
   width: 44px; height: 44px; border-radius: 50%; flex: none;
   display: grid; place-items: center;
   background: linear-gradient(135deg, var(--g-start) 0%, var(--g-mid) 55%, var(--g-end) 100%);
-  color: #fff; font-family: var(--display); font-weight: 800; font-size: var(--fs-lead);
+  color: #fff; font-family: var(--body); font-weight: 600; font-size: var(--fs-lead);
   box-shadow: 0 6px 18px rgba(99, 102, 241, 0.35);
 }
 .meT { min-width: 0; }
-.meName { font-family: var(--display); font-weight: 800; font-size: var(--fs-lead); letter-spacing: -0.02em; color: var(--white); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.meName { font-family: var(--body); font-weight: 600; font-size: var(--fs-lead); letter-spacing: -0.02em; color: var(--white); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .meMail { font-family: var(--mono); font-size: var(--fs-meta); color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 0.1rem; }
 .plan { display: inline-flex; align-items: center; gap: 0.3rem; margin-top: 0.4rem; font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.1em; text-transform: uppercase; border-radius: 999px; padding: 0.22rem 0.55rem; border: 1px solid; }
 .planPro { color: #6ee7b7; border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.1); }
@@ -87,7 +87,7 @@
 .input:disabled { opacity: 0.55; cursor: not-allowed; }
 .select { appearance: none; cursor: pointer; padding-right: 2.4rem; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 0.9rem center; }
 .select option { background: #0e111c; color: var(--white); }
-.hint { font-family: var(--mono); font-size: var(--fs-meta); color: var(--dim); margin-top: 0.45rem; line-height: 1.5; }
+.hint { font-family: var(--body); font-size: var(--fs-meta); color: var(--dim); margin-top: 0.45rem; line-height: 1.5; }
 .skeleton { height: 2.65rem; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.07); background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.07) 50%, rgba(255,255,255,0.03) 75%); background-size: 200% 100%; animation: pulse 1.3s ease-in-out infinite; }
 
 
@@ -122,7 +122,7 @@
 
 .sub { margin-top: 0.9rem; padding-top: 0.9rem; border-top: 1px solid rgba(255, 255, 255, 0.07); }
 
-.msg { font-family: var(--mono); font-size: var(--fs-meta); margin-top: 0.7rem; line-height: 1.6; }
+.msg { font-family: var(--body); font-size: var(--fs-meta); margin-top: 0.7rem; line-height: 1.6; }
 .ok { color: #6ee7b7; }
 .err { color: #f87185; }
 .info { color: #93b4ff; }
@@ -136,13 +136,13 @@
 .fileMeta { font-family: var(--mono); font-size: var(--fs-meta); color: #6ee7b7; margin-top: 0.1rem; }
 
 .planCard { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; padding: 0.95rem 1rem; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.03); margin-bottom: 0.95rem; }
-.planName { font-family: var(--display); font-weight: 800; font-size: var(--fs-lead); letter-spacing: -0.02em; color: var(--white); }
+.planName { font-family: var(--body); font-weight: 600; font-size: var(--fs-lead); letter-spacing: -0.02em; color: var(--white); }
 .planMeta { font-family: var(--mono); font-size: var(--fs-meta); color: var(--sub); margin-top: 0.15rem; }
 .badge { font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.08em; text-transform: uppercase; border-radius: 999px; padding: 0.26rem 0.6rem; border: 1px solid; white-space: nowrap; }
 .bGreen { color: #6ee7b7; border-color: rgba(16, 185, 129, 0.4); }
 .bRed { color: #f87185; border-color: rgba(239, 68, 68, 0.4); }
 .bDim { color: var(--sub); border-color: var(--line2); }
-.fine { font-family: var(--mono); font-size: var(--fs-meta); color: var(--dim); margin-top: 0.9rem; line-height: 1.6; }
+.fine { font-family: var(--body); font-size: var(--fs-meta); color: var(--dim); margin-top: 0.9rem; line-height: 1.6; }
 .fine a { color: var(--sub); }
 @media (max-width: 768px) { .fine a { display: inline-block; padding: 1rem 0; margin: -1rem 0; } }
 

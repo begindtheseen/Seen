@@ -202,7 +202,7 @@
   border-radius: 8px;
   background: var(--bdim);
   border: 1px solid var(--bmid);
-  font-family: var(--mono);
+  font-family: var(--body);
   font-size: var(--fs-meta);
   line-height: 1.5;
   color: var(--blue);
@@ -420,7 +420,7 @@ div.drawer :global(.side-menu-item) { min-height: 44px; }
 
 /* ── Drawer pieces (were inline styles) ── */
 .chipWrap { position: relative; display: inline-flex; }
-.drawerWord { font-family: var(--display); font-weight: 800; font-size: var(--fs-lead); color: var(--text-1); letter-spacing: -0.02em; }
+.drawerWord { font-family: var(--body); font-weight: 600; font-size: var(--fs-lead); color: var(--text-1); letter-spacing: -0.02em; }
 .drawerCredit {
   display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2);
   width: calc(100% - 2rem); margin: 0.25rem 1rem 0.6rem; padding: 0 var(--sp-4); min-height: 48px;

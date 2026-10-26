@@ -138,7 +138,7 @@ export default function SeenApplyModal({ job, onClose, onApplied }: {
   } else if (done) {
     content = (
       <>
-        <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-lead)', color: 'var(--green)', marginBottom: '.4rem' }}>✓ Application sent</div>
+        <div style={{ fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-lead)', color: 'var(--green)', marginBottom: '.4rem' }}>✓ Application sent</div>
         <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-ui)', lineHeight: 1.6, margin: '0 0 1rem' }}>{job.company} has your application. It’s in your tracker — we’ll check in if you don’t hear back.</p>
         <Link href="/tracker" style={{ ...primary, display: 'block', textAlign: 'center', textDecoration: 'none' }}>Open my tracker →</Link>
       </>
@@ -203,7 +203,7 @@ export default function SeenApplyModal({ job, onClose, onApplied }: {
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.75rem', marginBottom: '.4rem' }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--green)' }}>Apply on Seen</div>
-              <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-lead)', color: 'var(--white)', marginTop: '.2rem' }}>{job.title}</div>
+              <div style={{ fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-lead)', color: 'var(--white)', marginTop: '.2rem' }}>{job.title}</div>
               <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)' }}>{job.company}{job.location ? ` · ${job.location}` : ''}</div>
             </div>
             <button type="button" onClick={onClose} aria-label="Close" style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, width: 32, height: 32, color: 'var(--muted)', cursor: 'pointer', flexShrink: 0 }}>✕</button>

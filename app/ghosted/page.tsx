@@ -68,7 +68,7 @@ export default function GhostedPage() {
             <div key={s.n} style={{ display: 'flex', gap: '1rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.15rem 1.25rem', marginBottom: '.65rem' }}>
               <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', fontWeight: 500, flexShrink: 0, paddingTop: '.15rem' }}>{s.n}</div>
               <div>
-                <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', marginBottom: '.3rem' }}>{s.title}</div>
+                <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-body)', fontWeight: 600, color: 'var(--white)', marginBottom: '.3rem' }}>{s.title}</div>
                 <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.7, fontWeight: 400, margin: 0 }}>{s.body}</p>
               </div>
             </div>
@@ -84,7 +84,7 @@ export default function GhostedPage() {
           </ul>
         </section>
 
-        <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', lineHeight: 1.7 }}>
+        <p style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', lineHeight: 1.7 }}>
           Reports are anonymous and treated as claims, not verdicts — they&apos;re aggregated with confidence weighting into each company&apos;s score. That&apos;s what keeps the index fair, and worth checking.
         </p>
       </div>

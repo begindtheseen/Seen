@@ -18,11 +18,11 @@
 .lead .name { color: var(--green); }
 .pass .name { color: #a5b4fc; }
 .priceRow { display: flex; align-items: baseline; gap: .45rem; flex-wrap: wrap; margin-bottom: .35rem; }
-.price { font-family: var(--display); font-size: var(--fs-h2); font-weight: 800; color: var(--white); line-height: 1; }
+.price { font-family: var(--body); font-size: var(--fs-h2); font-weight: 600; color: var(--white); line-height: 1; }
 .per { font-family: var(--mono); font-size: var(--fs-sm); color: var(--sub); }
 .pitch { font-family: var(--body); font-size: var(--fs-ui); color: var(--text); line-height: 1.55; margin: .35rem 0 1rem; }
 
-.btn { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 48px; box-sizing: border-box; border-radius: 10px; padding: .75rem 1rem; font-family: var(--display); font-weight: 800; font-size: var(--fs-ui); cursor: pointer; text-decoration: none; text-align: center; border: 1px solid transparent; }
+.btn { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 48px; box-sizing: border-box; border-radius: 10px; padding: .75rem 1rem; font-family: var(--body); font-weight: 600; font-size: var(--fs-ui); cursor: pointer; text-decoration: none; text-align: center; border: 1px solid transparent; }
 .btn:disabled { opacity: .6; cursor: default; }
 .btnLead { background: var(--green); color: #052e22; }
 .btnPass { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: #fff; }
@@ -37,10 +37,10 @@
 .pass .list li::before { color: #818cf8; }
 .small { font-family: var(--body); font-size: var(--fs-meta); color: var(--muted); line-height: 1.5; margin: .65rem 0 0; }
 
-.err { background: rgba(239, 68, 68, .08); border: 1px solid rgba(239, 68, 68, .25); border-radius: 8px; padding: .6rem .85rem; margin: 0 auto 1.25rem; max-width: 640px; font-family: var(--mono); font-size: var(--fs-meta); color: var(--red); line-height: 1.5; text-align: center; }
+.err { background: rgba(239, 68, 68, .08); border: 1px solid rgba(239, 68, 68, .25); border-radius: 8px; padding: .6rem .85rem; margin: 0 auto 1.25rem; max-width: 640px; font-family: var(--body); font-size: var(--fs-meta); color: var(--red); line-height: 1.5; text-align: center; }
 
 .manage { max-width: 640px; margin: 0 auto 2rem; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 1.1rem 1.25rem; }
-.manageT { font-family: var(--display); font-size: var(--fs-lead); font-weight: 800; color: var(--white); margin: 0 0 .3rem; }
+.manageT { font-family: var(--body); font-size: var(--fs-lead); font-weight: 600; color: var(--white); margin: 0 0 .3rem; }
 .manageS { font-family: var(--body); font-size: var(--fs-sm); color: var(--sub); line-height: 1.6; margin: 0 0 .75rem; }
 .ghostBtn { min-height: 44px; background: none; border: 1px solid var(--line2); border-radius: 9px; padding: .55rem 1rem; font-family: var(--mono); font-size: var(--fs-sm); color: var(--sub); cursor: pointer; }
 .ghostBtn.danger { border-color: rgba(239, 68, 68, .4); color: var(--red); }
@@ -50,12 +50,12 @@
 .steps li::before { content: counter(step); display: inline-grid; place-items: center; width: 1.6rem; height: 1.6rem; border-radius: 50%; background: var(--gdim); color: var(--green); font-family: var(--mono); font-size: var(--fs-meta); margin-bottom: .45rem; }
 .steps b { color: var(--white); font-weight: 600; display: block; margin-bottom: .2rem; }
 
-.promise { text-align: center; font-family: var(--mono); font-size: var(--fs-meta); color: var(--sub); line-height: 1.7; margin: 0 0 2.75rem; }
+.promise { text-align: center; font-family: var(--body); font-size: var(--fs-meta); color: var(--sub); line-height: 1.7; margin: 0 0 2.75rem; }
 .promise span { white-space: nowrap; }
 
 .h2 { font-family: var(--display); font-size: var(--fs-lead); font-weight: 800; color: var(--white); margin: 0 0 .9rem; }
 .faq { margin-bottom: .55rem; background: var(--card); border: 1px solid var(--line); border-radius: 10px; scroll-margin-top: 5rem; }
-.faq summary { padding: .8rem 1.1rem; min-height: 44px; box-sizing: border-box; font-family: var(--display); font-size: var(--fs-ui); font-weight: 700; color: var(--white); cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+.faq summary { padding: .8rem 1.1rem; min-height: 44px; box-sizing: border-box; font-family: var(--body); font-size: var(--fs-ui); font-weight: 600; color: var(--white); cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
 .faq summary::-webkit-details-marker { display: none; }
 .faqA { padding: 0 1.1rem .85rem; font-family: var(--body); font-size: var(--fs-sm); color: var(--sub); line-height: 1.7; }
 

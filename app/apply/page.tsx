@@ -210,7 +210,7 @@ function ApplyContent() {
           background: 'var(--raised)', border: `1px solid ${riskColor}22`, borderRadius: 12,
           padding: '.85rem 1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem',
         }}>
-          <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-h2)', fontWeight: 800, color: riskColor, lineHeight: 1, flexShrink: 0 }}>
+          <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-h2)', fontWeight: 600, color: riskColor, lineHeight: 1, flexShrink: 0 }}>
             {grade(score.overall_score)}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -254,7 +254,7 @@ function ApplyContent() {
           </div>
 
           {!isLoggedIn && (
-            <div style={{ background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 9, padding: '.65rem .9rem', marginBottom: '1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--amber)', lineHeight: 1.65 }}>
+            <div style={{ background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 9, padding: '.65rem .9rem', marginBottom: '1rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--amber)', lineHeight: 1.65 }}>
               <strong>Sign in</strong> to sync reminders across all devices.{' '}
               <a href={`/login?return=${encodeURIComponent(`/apply?co=${encodeURIComponent(co)}&role=${encodeURIComponent(role)}&jid=${encodeURIComponent(jid)}&jobUrl=${encodeURIComponent(jobUrl)}${city ? `&city=${encodeURIComponent(city)}` : ''}`)}`} style={{ color: 'var(--blue)', textDecoration: 'none' }}>Sign in →</a>
             </div>
@@ -265,7 +265,7 @@ function ApplyContent() {
             <button
               onClick={handleYes}
               disabled={saving}
-              style={{ width: '100%', background: 'linear-gradient(135deg, rgba(16,185,129,0.18) 0%, rgba(16,185,129,0.08) 100%)', border: '1.5px solid rgba(16,185,129,0.5)', color: 'var(--green)', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-body)', borderRadius: 12, padding: '.95rem 1.25rem', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1, letterSpacing: '-.01em', textAlign: 'left', boxShadow: '0 0 24px rgba(16,185,129,0.1)' }}
+              style={{ width: '100%', background: 'linear-gradient(135deg, rgba(16,185,129,0.18) 0%, rgba(16,185,129,0.08) 100%)', border: '1.5px solid rgba(16,185,129,0.5)', color: 'var(--green)', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-body)', borderRadius: 12, padding: '.95rem 1.25rem', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1, letterSpacing: '-.01em', textAlign: 'left', boxShadow: '0 0 24px rgba(16,185,129,0.1)' }}
             >
               ✅ Yes, I applied
               <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 400, color: 'rgba(52,211,153,0.65)', marginTop: '.25rem' }}>Start tracking your timeline</div>
@@ -273,7 +273,7 @@ function ApplyContent() {
 
             <button
               onClick={handleNotYet}
-              style={{ width: '100%', background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--white)', fontFamily: 'var(--display)', fontWeight: 700, fontSize: 'var(--fs-ui)', borderRadius: 12, padding: '.85rem 1.25rem', cursor: 'pointer', textAlign: 'left' }}
+              style={{ width: '100%', background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--white)', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-ui)', borderRadius: 12, padding: '.85rem 1.25rem', cursor: 'pointer', textAlign: 'left' }}
             >
               ⏳ Not yet
               <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 400, color: 'var(--sub)', marginTop: '.2rem' }}>Save it and come back</div>
@@ -325,7 +325,7 @@ function ApplyContent() {
       {/* === PHASE: changed_reason === */}
       {phase === 'changed_reason' && (
         <>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '1rem', lineHeight: 1.65 }}>
+          <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '1rem', lineHeight: 1.65 }}>
             Your feedback helps Seen flag risky companies for other applicants.
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
@@ -348,12 +348,12 @@ function ApplyContent() {
           {insight && (
             <div style={{ background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 12, padding: '1rem 1.1rem', marginBottom: '1.25rem' }}>
               <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--green)', fontWeight: 500, marginBottom: '.4rem' }}>Unlocked insight</div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'rgba(255,255,255,0.85)', lineHeight: 1.7 }}>{insight}</div>
+              <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'rgba(255,255,255,0.85)', lineHeight: 1.7 }}>{insight}</div>
             </div>
           )}
           <button
             onClick={() => router.push('/tracker?new=1')}
-            style={{ width: '100%', background: 'linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(16,185,129,0.1) 100%)', border: '1.5px solid rgba(16,185,129,0.4)', color: 'var(--green)', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-body)', borderRadius: 12, padding: '.95rem 1.25rem', cursor: 'pointer', marginBottom: '.65rem', letterSpacing: '-.01em' }}
+            style={{ width: '100%', background: 'linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(16,185,129,0.1) 100%)', border: '1.5px solid rgba(16,185,129,0.4)', color: 'var(--green)', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-body)', borderRadius: 12, padding: '.95rem 1.25rem', cursor: 'pointer', marginBottom: '.65rem', letterSpacing: '-.01em' }}
           >
             View my tracker →
           </button>
@@ -370,9 +370,9 @@ function ApplyContent() {
       {phase === 'done_other' && (
         <>
           <div style={{ background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 12, padding: '1rem 1.1rem', marginBottom: '1.25rem' }}>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.7 }}>
+            <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.7 }}>
               {answer === 'not_yet' && (
-                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.7 }}>
+                <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.7 }}>
                   {(notYetReason === 'comparing' || notYetReason === 'unsure') && score ? (
                     <>
                       <div style={{ marginBottom: '.5rem' }}>

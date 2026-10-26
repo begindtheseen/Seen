@@ -68,7 +68,7 @@ export default function CompanyPublicRecord({ companyName }: { companyName: stri
         <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--blue)', display: 'inline-block', flexShrink: 0 }} />
         Public records
       </div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginBottom: '1rem', lineHeight: 1.5 }}>
+      <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginBottom: '1rem', lineHeight: 1.5 }}>
         Official filings, linked to their source. Not Seen&apos;s assessment — open each record to read it yourself.
       </div>
 
@@ -76,11 +76,11 @@ export default function CompanyPublicRecord({ companyName }: { companyName: stri
         {items.map((s, i) => (
           <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 8, padding: '.85rem 1rem' }}>
             <a href={s.source_url} target="_blank" rel="noopener noreferrer nofollow"
-               style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white, #fff)', lineHeight: 1.5, textDecoration: 'none', display: 'block' }}>
+               style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--white, #fff)', lineHeight: 1.5, textDecoration: 'none', display: 'block' }}>
               {s.title} <span style={{ color: 'var(--blue)' }}>↗</span>
             </a>
             {s.detail && (
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.55, marginTop: '.4rem' }}>{s.detail}</div>
+              <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.55, marginTop: '.4rem' }}>{s.detail}</div>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap', marginTop: '.55rem' }}>
               <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', border: '1px solid var(--line2)', borderRadius: 4, padding: '.1rem .4rem' }}>
@@ -95,7 +95,7 @@ export default function CompanyPublicRecord({ companyName }: { companyName: stri
 
       {/* Honest footer: no promises of flows that don't exist. Every entry links to its
           official source; corrections go through the real employer-claims channel. */}
-      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.85rem', lineHeight: 1.5 }}>
+      <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.85rem', lineHeight: 1.5 }}>
         Public records surfaced for transparency — every entry links to its official source.
         Employers: <a href="/employers" style={{ color: 'var(--blue)', textDecoration: 'none' }}>claim your company</a> to flag a mis-attributed record for review.
       </div>

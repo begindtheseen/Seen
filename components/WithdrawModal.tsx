@@ -158,7 +158,7 @@ export default function WithdrawModal({ app, onClose, onWithdrawn }: {
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.75rem' }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--red)' }}>{step === 'confirm' ? 'Withdraw application' : 'Withdrawn'}</div>
-              <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-lead)', color: 'var(--white)', marginTop: '.2rem' }}>{app.role}</div>
+              <div style={{ fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-lead)', color: 'var(--white)', marginTop: '.2rem' }}>{app.role}</div>
               <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)' }}>{app.company}</div>
             </div>
             <button type="button" onClick={onClose} disabled={busy} aria-label="Close" style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, width: 44, height: 44, color: 'var(--muted)', cursor: 'pointer', flexShrink: 0 }}>✕</button>

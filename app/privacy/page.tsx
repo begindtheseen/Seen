@@ -47,7 +47,7 @@ export default function PrivacyPage() {
         </h1>
         <LegalMeta label="Privacy questions or requests:" />
 
-        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.65rem 1rem', marginBottom: '2rem', lineHeight: 1.6 }}>
+        <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.65rem 1rem', marginBottom: '2rem', lineHeight: 1.6 }}>
           The short version: we collect what we need to run Seen, we do not sell your data or use it for
           advertising, your résumé and tracker are private, and you can delete your account and data yourself
           in Settings at any time.

@@ -74,7 +74,7 @@ function DisputeForm({ companyName, presetPermalink, onClose }: {
     return (
       <div style={{ background: 'var(--card)', border: '1px solid rgba(16,185,129,.3)', borderRadius: 8, padding: '1rem', marginTop: '.75rem' }}>
         <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', marginBottom: '.3rem' }}>✓ Thank you — your correction was recorded.</div>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.5 }}>
+        <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.5 }}>
           A person will review it. We surface public discussion for transparency and correct it in good faith.
         </div>
         <button onClick={onClose} style={btnGhost}>Close</button>
@@ -84,7 +84,7 @@ function DisputeForm({ companyName, presetPermalink, onClose }: {
 
   return (
     <div style={{ background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 8, padding: '1rem', marginTop: '.75rem' }}>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginBottom: '.6rem', lineHeight: 1.5 }}>
+      <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginBottom: '.6rem', lineHeight: 1.5 }}>
         Dispute or correct the public discussion shown for <strong>{companyName}</strong>.
         {presetPermalink && <span style={{ color: 'var(--muted)' }}><br />Regarding a specific thread you flagged.</span>}
       </div>
@@ -107,7 +107,7 @@ function DisputeForm({ companyName, presetPermalink, onClose }: {
         </button>
         <button onClick={onClose} style={btnGhost}>Cancel</button>
       </div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.6rem', lineHeight: 1.5 }}>
+      <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.6rem', lineHeight: 1.5 }}>
         No account needed. Submissions are rate-limited and reviewed by a person.
       </div>
     </div>
@@ -156,7 +156,7 @@ export default function CompanyRedditDiscussion({ companyName, hasReportData = f
         <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--red)', display: 'inline-block', flexShrink: 0 }} />
         What people are saying on Reddit
       </div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginBottom: '1rem', lineHeight: 1.5 }}>
+      <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginBottom: '1rem', lineHeight: 1.5 }}>
         {PUBLIC_DISCUSSION_LABEL} — public third-party threads, linked to their source. Not Seen&apos;s assessment.
       </div>
 
@@ -181,7 +181,7 @@ export default function CompanyRedditDiscussion({ companyName, hasReportData = f
           {items.map(t => (
             <div key={t.id} style={{ background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 8, padding: '.85rem 1rem' }}>
               <a href={t.permalink} target="_blank" rel="noopener noreferrer nofollow"
-                 style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white, #fff)', lineHeight: 1.5, textDecoration: 'none', display: 'block' }}>
+                 style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--white, #fff)', lineHeight: 1.5, textDecoration: 'none', display: 'block' }}>
                 {t.title} <span style={{ color: 'var(--blue)' }}>↗</span>
               </a>
               <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap', marginTop: '.5rem' }}>
@@ -202,7 +202,7 @@ export default function CompanyRedditDiscussion({ companyName, hasReportData = f
 
       {/* Honest empty state — never a broken blank. Points to the first-party report data. */}
       {(status === 'empty' || (status === 'ok' && items.length === 0)) && (
-        <div style={{ textAlign: 'center', padding: '2rem 1.25rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 10, lineHeight: 1.6 }}>
+        <div style={{ textAlign: 'center', padding: '2rem 1.25rem', color: 'var(--muted)', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 10, lineHeight: 1.6 }}>
           No public Reddit discussion found yet for {companyName}.
           <br />
           <span style={{ fontSize: 'var(--fs-meta)', opacity: .75 }}>
@@ -217,13 +217,13 @@ export default function CompanyRedditDiscussion({ companyName, hasReportData = f
           and hides the section if nothing turns up — never a dead "Retry" on first load (audit 2026-10-23:
           Walmart / Sheetz / Insight Global sat on "Still checking… Retry" for 15 s+). */}
       {status === 'checking' && (
-        <div role="status" style={{ textAlign: 'center', padding: '1.75rem 1.25rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 10, lineHeight: 1.6 }}>
+        <div role="status" style={{ textAlign: 'center', padding: '1.75rem 1.25rem', color: 'var(--muted)', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 10, lineHeight: 1.6 }}>
           Still checking Reddit for {companyName}…
           <br /><span style={{ fontSize: 'var(--fs-meta)', opacity: .75 }}>This closes by itself if no hiring threads turn up.</span>
         </div>
       )}
       {status === 'error' && (
-        <div style={{ textAlign: 'center', padding: '1.75rem 1.25rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 10, lineHeight: 1.6 }}>
+        <div style={{ textAlign: 'center', padding: '1.75rem 1.25rem', color: 'var(--muted)', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 10, lineHeight: 1.6 }}>
           Couldn&apos;t load Reddit discussion just now.
           <br /><button onClick={load} style={{ ...btnGhost, marginTop: '.6rem' }}>Retry</button>
         </div>

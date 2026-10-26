@@ -5,7 +5,7 @@
 .wrap { max-width: 920px; margin: 0 auto; padding: 3.5rem 1.25rem 5rem; width: 100%; box-sizing: border-box; min-width: 0; }
 
 .lead {
-  font-family: var(--display); font-size: clamp(1.05rem, 2.6vw, 1.25rem); font-weight: 700; line-height: 1.5;
+  font-family: var(--body); font-size: clamp(1.05rem, 2.6vw, 1.25rem); font-weight: 600; line-height: 1.5;
   color: var(--white); margin: 0 0 .9rem; text-wrap: pretty; overflow-wrap: anywhere;
 }
 .meta { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .9rem; font-family: var(--mono); font-size: var(--fs-meta); color: var(--dim); margin: 0 0 1.8rem; }
@@ -35,10 +35,10 @@
   font-family: var(--mono); font-size: var(--fs-sm); text-decoration: none; transition: border-color .15s ease, background .15s ease;
 }
 .btn:hover { border-color: var(--blue); background: rgba(59, 130, 246, .1); }
-.small { font-family: var(--mono); font-size: var(--fs-meta); color: var(--dim); line-height: 1.6; margin: 0; overflow-wrap: anywhere; }
+.small { font-family: var(--body); font-size: var(--fs-meta); color: var(--dim); line-height: 1.6; margin: 0; overflow-wrap: anywhere; }
 
 .cite {
-  display: block; font-family: var(--mono); font-size: var(--fs-sm); line-height: 1.6; color: var(--text);
+  display: block; font-family: var(--body); font-size: var(--fs-sm); line-height: 1.6; color: var(--text);
   background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: .7rem .85rem; margin: 0 0 .6rem;
   overflow-wrap: anywhere; white-space: normal;
 }
@@ -81,7 +81,7 @@
 .say { display: block; font-family: var(--mono); font-size: var(--fs-meta); color: var(--dim); margin: -.45rem 0 .35rem; }
 .tag { display: inline-block; margin-left: .45rem; font-family: var(--mono); font-size: var(--fs-meta); color: var(--muted); }
 
-.grade { font-family: var(--display); font-weight: 800; font-size: var(--fs-lead); }
+.grade { font-family: var(--body); font-weight: 600; font-size: var(--fs-lead); }
 .gGood { color: var(--green); }
 .gMid { color: var(--amber); }
 .gBad { color: var(--red); }
@@ -96,5 +96,5 @@
 
 .listCard { display: block; text-decoration: none; }
 .listCard:hover { border-color: var(--line2); }
-.listTitle { display: inline-flex; align-items: center; min-height: 44px; font-family: var(--display); font-size: var(--fs-lead); font-weight: 700; color: var(--white); text-decoration: none; }
+.listTitle { display: inline-flex; align-items: center; min-height: 44px; font-family: var(--body); font-size: var(--fs-lead); font-weight: 600; color: var(--white); text-decoration: none; }
 .listTitle:hover { color: var(--blue); }

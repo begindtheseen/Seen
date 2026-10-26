@@ -123,9 +123,9 @@ function DataPanel({ name, s }: { name: string; s: GrowthScore }) {
   return (
     <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderLeft: `3px solid ${accent}`, borderRadius: 12, padding: '1.2rem 1.25rem', margin: '0 0 1.8rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: '1rem' }}>
-        <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-h2)', fontWeight: 800, color: accent, lineHeight: 1 }}>{grade(s.overall_score)}</div>
+        <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-h2)', fontWeight: 600, color: accent, lineHeight: 1 }}>{grade(s.overall_score)}</div>
         <div>
-          <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)' }}>Seen Grade {s.overall_score}/100</div>
+          <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)' }}>Seen Grade {s.overall_score}/100</div>
           <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', letterSpacing: '.1em', color: accent }}>{riskLabel(s.risk_level)}</div>
         </div>
       </div>
@@ -243,7 +243,7 @@ export default async function FaqSlugPage({ params }: { params: Promise<{ slug: 
 
         {graded ? <DataPanel name={name} s={graded} /> : (
           <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderLeft: '3px solid var(--blue)', borderRadius: 12, padding: '1.2rem 1.25rem', margin: '0 0 1.8rem' }}>
-            <div style={{ fontFamily: 'var(--display)', fontWeight: 700, color: 'var(--white)', marginBottom: '.4rem' }}>{fp > 0 ? `${name} is not graded yet (${Math.min(fp, MIN_REPORTS_FOR_GRADE)} of ${MIN_REPORTS_FOR_GRADE} applicant accounts)` : `No reports yet for ${name}`}</div>
+            <div style={{ fontFamily: 'var(--body)', fontWeight: 600, color: 'var(--white)', marginBottom: '.4rem' }}>{fp > 0 ? `${name} is not graded yet (${Math.min(fp, MIN_REPORTS_FOR_GRADE)} of ${MIN_REPORTS_FOR_GRADE} applicant accounts)` : `No reports yet for ${name}`}</div>
             <p style={{ ...S.p, margin: 0 }}>{fp > 0 ? `Read the ${fp} applicant account${fp === 1 ? '' : 's'} on ${name}'s page — and add yours so it can be graded fairly.` : `Be the first to report how ${name} treated your application. Your report becomes the data the next applicant searches for tonight.`}</p>
           </div>
         )}
@@ -262,7 +262,7 @@ export default async function FaqSlugPage({ params }: { params: Promise<{ slug: 
 
         <CTAs name={name} cslug={cslug} />
 
-        <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '2.5rem', lineHeight: 1.7 }}>
+        <p style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '2.5rem', lineHeight: 1.7 }}>
           Seen aggregates real applicant accounts into a 0–100 transparency grade. Scores are community signals, not verified facts, and update as new reports come in. Last refreshed hourly.
         </p>
       </div>

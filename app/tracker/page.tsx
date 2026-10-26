@@ -221,7 +221,7 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
       {/* Ghost Watch — time-aware verdict from this company's real Seen data */}
       {watch && (
         <div style={{
-          marginTop: '.55rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', lineHeight: 1.6, borderRadius: 7, padding: '.45rem .7rem',
+          marginTop: '.55rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', lineHeight: 1.6, borderRadius: 7, padding: '.45rem .7rem',
           color: watch.tone === 'danger' ? 'var(--red)' : watch.tone === 'warn' ? 'var(--amber)' : 'var(--muted)',
           background: watch.tone === 'danger' ? 'rgba(239,68,68,.07)' : watch.tone === 'warn' ? 'rgba(245,158,11,.06)' : 'var(--raised)',
           border: `1px solid ${watch.tone === 'danger' ? 'rgba(239,68,68,.2)' : watch.tone === 'warn' ? 'rgba(245,158,11,.2)' : 'var(--line)'}`,
@@ -297,7 +297,7 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
             <button type="button" className={`${s.act} ${s.actQuiet}`} onClick={() => setDeleting(true)} title="Added by mistake? Delete files nothing.">🗑 Delete</button>
             <button type="button" className={`${s.act} ${s.actRed}`} onClick={() => setWithdrawing(true)}>↩ Withdraw</button>
           </div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.5rem', lineHeight: 1.5 }}>
+          <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.5rem', lineHeight: 1.5 }}>
             Delete = added by mistake, nothing is filed. Withdraw = you pulled out; the card stays.
           </div>
         </div>
@@ -1039,7 +1039,7 @@ function TrackerPage() {
                   return (
                     <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.75rem' }}>
                       <div>
-                        <span style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--white)' }}>{a.company}</span>
+                        <span style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--white)' }}>{a.company}</span>
                         <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginLeft: '.5rem' }}>{a.role}</span>
                       </div>
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -1060,10 +1060,10 @@ function TrackerPage() {
 
         {/* Update insight — shown after answering a check card */}
         {updateInsight && (
-          <div style={{ marginBottom: '1.25rem', background: updateInsight.color, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '1rem 1.1rem', animation: 'fadeUp .3s ease both', display: 'flex', gap: '.85rem', alignItems: 'flex-start' }}>
+          <div style={{ marginBottom: '1.25rem', background: updateInsight.color, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '1rem 1.1rem', animation: 'fadeUp .3s ease backwards', display: 'flex', gap: '.85rem', alignItems: 'flex-start' }}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--white)', marginBottom: '.3rem' }}>{updateInsight.title}</div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.7 }}>{updateInsight.body}</div>
+              <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--white)', marginBottom: '.3rem' }}>{updateInsight.title}</div>
+              <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.7 }}>{updateInsight.body}</div>
             </div>
             <button type="button" aria-label="Dismiss" onClick={() => setUpdateInsight(null)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 'var(--fs-meta)', minWidth: 44, minHeight: 44, margin: '-.6rem -.6rem -.6rem 0', flexShrink: 0 }}>✕</button>
           </div>
@@ -1088,7 +1088,7 @@ function TrackerPage() {
         {apps.length === 0 && !loadFailed && (
           <div className={s.empty}>
             <div style={{ fontSize: 'var(--fs-fig-m)', marginBottom: '1rem' }}>📋</div>
-            <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', marginBottom: '.5rem' }}>No applications yet</div>
+            <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', marginBottom: '.5rem' }}>No applications yet</div>
             <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.6, maxWidth: 420, margin: '0 auto' }}>Add one you already sent, or hit Apply on a job here and it lands on this list by itself.</div>
             <div className={s.emptyBtns}>
               <button type="button" className={`${s.act} ${s.actPrimary}`} onClick={() => setShowManual(true)}>+ Track application</button>

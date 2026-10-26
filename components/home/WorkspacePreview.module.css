@@ -151,7 +151,7 @@
   font-size: var(--fs-xl);
   letter-spacing: -0.035em;
   color: var(--white);
-  animation: riseIn 0.5s var(--ease-out) both;
+  animation: riseIn 0.5s var(--ease-out) backwards;
 }
 .sub { font-family: var(--mono); font-size: var(--fs-meta); color: var(--dim); margin-top: 0.3rem; }
 .tag {
@@ -181,7 +181,7 @@
 .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.65rem; margin-bottom: 0.8rem; }
 .stat { border: 1px solid var(--line); border-radius: 12px; background: rgba(255, 255, 255, 0.025); padding: 0.85rem 0.9rem; min-width: 0; }
 .statK { display: block; font-family: var(--mono); font-size: var(--fs-meta); color: var(--dim); text-transform: uppercase; letter-spacing: 0.08em; }
-.statV { display: block; font-family: var(--display); font-weight: 800; font-size: var(--fs-fig); letter-spacing: -0.03em; color: var(--white); margin: 0.35rem 0 0.2rem; line-height: 1; }
+.statV { display: block; font-family: var(--body); font-weight: 600; font-size: var(--fs-fig); letter-spacing: -0.03em; color: var(--white); margin: 0.35rem 0 0.2rem; line-height: 1; }
 .statN { font-family: var(--mono); font-size: var(--fs-meta); color: var(--green); }
 /* Units (%, /100) sit small beside the figure so tiles never overflow on phones. */
 .statV :global(.odo-s) { font-size: 0.5em; letter-spacing: 0; color: var(--dim); margin-left: 0.1em; }
@@ -201,7 +201,7 @@
   background: rgba(99, 102, 241, 0.14);
   border: 1px solid rgba(99, 102, 241, 0.25);
 }
-.rowCo { font-family: var(--display); font-weight: 700; font-size: var(--fs-meta); color: var(--white); letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rowCo { font-family: var(--body); font-weight: 600; font-size: var(--fs-meta); color: var(--white); letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rowRole { font-family: var(--mono); font-size: var(--fs-meta); color: var(--dim); margin-top: 0.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ghost { flex-shrink: 0; font-family: var(--mono); font-size: var(--fs-meta); border-radius: 5px; padding: 0.12rem 0.35rem; border: 1px solid; }
 .ok { color: var(--green); border-color: rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.07); }
@@ -226,7 +226,7 @@
   border: 1px solid rgba(129, 140, 248, 0.3);
   background: linear-gradient(100deg, rgba(79, 70, 229, 0.18), rgba(124, 58, 237, 0.08));
 }
-.insight b { font-family: var(--display); font-size: var(--fs-sm); color: var(--white); }
+.insight b { font-family: var(--body); font-size: var(--fs-sm); color: var(--white); }
 .insight p { margin: 0.2rem 0 0; font-size: var(--fs-meta); color: var(--sub); line-height: 1.5; }
 .insight button {
   flex-shrink: 0; border: none; border-radius: 9px; cursor: pointer;
@@ -271,7 +271,7 @@
 .opt:hover { color: var(--white); border-color: rgba(255, 255, 255, 0.28); }
 .opt:active { transform: scale(0.94); }
 .optHi { color: var(--green); border-color: rgba(16, 185, 129, 0.45); }
-.checkDone { margin-top: 0.4rem; font-size: var(--fs-meta); color: #a7f3d0; line-height: 1.5; animation: riseIn 0.4s var(--ease-out) both; }
+.checkDone { margin-top: 0.4rem; font-size: var(--fs-meta); color: #a7f3d0; line-height: 1.5; animation: riseIn 0.4s var(--ease-out) backwards; }
 
 /* ── Company tab ── */
 .company { border: 1px solid var(--line); border-radius: 14px; background: rgba(255, 255, 255, 0.02); padding: 1.1rem 1.2rem; }
@@ -281,11 +281,11 @@
   font-family: var(--display); font-weight: 800; color: var(--white);
   background: var(--raised); border: 1px solid var(--line2);
 }
-.coName { font-family: var(--display); font-weight: 800; font-size: var(--fs-lead); color: var(--white); letter-spacing: -0.02em; }
+.coName { font-family: var(--body); font-weight: 600; font-size: var(--fs-lead); color: var(--white); letter-spacing: -0.02em; }
 .grade {
   flex-shrink: 0; width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center;
-  font-family: var(--display); font-weight: 800; font-size: var(--fs-xl);
-  animation: stampIn 0.62s var(--ease-out) 0.25s both;
+  font-family: var(--body); font-weight: 600; font-size: var(--fs-xl);
+  animation: riseIn 0.62s var(--ease-out) 0.25s backwards;
 }
 .safe { color: var(--green); background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.4); }
 .danger { color: var(--red); background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.4); }
@@ -318,11 +318,11 @@
 .resume > *:nth-child(3) { animation-delay: 0.16s; }
 .fitRow { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 12px; padding: 0.9rem 1rem; background: rgba(255, 255, 255, 0.02); }
 .fit small { display: block; font-family: var(--mono); font-size: var(--fs-meta); text-transform: uppercase; letter-spacing: 0.1em; color: var(--dim); }
-.fit b { display: block; font-family: var(--display); font-weight: 800; font-size: var(--fs-h2); letter-spacing: -0.03em; line-height: 1.1; }
+.fit b { display: block; font-family: var(--body); font-weight: 600; font-size: var(--fs-h2); letter-spacing: -0.03em; line-height: 1.1; }
 .fitBefore { color: var(--amber); }
 .fitAfter { color: var(--green); }
 .fitArrow { font-family: var(--mono); color: var(--dim); font-size: var(--fs-lead); }
-.fitFor { margin-left: auto; font-family: var(--mono); font-size: var(--fs-meta); color: var(--dim); text-align: right; line-height: 1.6; }
+.fitFor { margin-left: auto; font-family: var(--body); font-size: var(--fs-meta); color: var(--dim); text-align: right; line-height: 1.6; }
 .fitFor b { color: var(--white); font-family: var(--body); font-size: var(--fs-meta); }
 .kws { display: flex; flex-wrap: wrap; gap: 0.35rem; }
 .kwOk, .kwAdd { font-family: var(--mono); font-size: var(--fs-meta); border-radius: 999px; padding: 0.24rem 0.6rem; animation: riseIn 0.45s var(--ease-spring) backwards; }

@@ -56,11 +56,11 @@ export default function CreditConfirmDialog({ cost = 1, action, onConfirm, onCan
         onClick={onCancel}>
         <div ref={boxRef} onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 380, background: '#0e111c', border: '1px solid var(--line2)', borderRadius: 16, padding: '1.15rem 1.2rem 1rem', boxShadow: '0 30px 80px rgba(0,0,0,.7)' }}>
           <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', marginBottom: '.5rem' }}>Credit</div>
-          <div id="credit-confirm-title" style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', lineHeight: 1.3, marginBottom: '.45rem' }}>{headline}</div>
+          <div id="credit-confirm-title" style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', lineHeight: 1.3, marginBottom: '.45rem' }}>{headline}</div>
           <p style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6, margin: '0 0 .5rem' }}>
             {cost === 0 ? `We will ${action} for free.` : `It will ${action}. Every paid action costs ${label}; you will see the price on the button each time.`}
           </p>
-          <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.6, margin: '0 0 1rem' }}>
+          <p style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.6, margin: '0 0 1rem' }}>
             {dailyResetLabel()} · purchased credits never reset · we only ask this once.
           </p>
           <div style={{ display: 'flex', gap: '.5rem', flexDirection: 'column' }}>

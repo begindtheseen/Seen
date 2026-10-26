@@ -6,7 +6,7 @@
 .eyebrow { font-family: var(--mono); font-size: var(--fs-meta); text-transform: uppercase; letter-spacing: .09em; color: var(--green); margin-bottom: .3rem; }
 .title { font-family: var(--display); font-size: var(--fs-lead); font-weight: 700; color: var(--white); margin: 0 0 .3rem; }
 .sub { font-size: var(--fs-sm); color: var(--muted); line-height: 1.55; margin: 0 0 .35rem; }
-.fine { font-family: var(--mono); font-size: var(--fs-meta); color: var(--dim); line-height: 1.6; margin: 0; }
+.fine { font-family: var(--body); font-size: var(--fs-meta); color: var(--dim); line-height: 1.6; margin: 0; }
 
 .head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
 .headL { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; min-width: 0; font-size: var(--fs-ui); color: var(--white); }

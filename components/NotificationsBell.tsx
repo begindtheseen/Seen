@@ -94,7 +94,7 @@ export default function NotificationsBell({ uid, className }: { uid: string; cla
       <button type="button" onClick={openModal} className={className} title="Application updates" aria-label={unread ? `Application updates — ${unread} new` : 'Application updates'} style={{ position: 'relative', cursor: 'pointer' }}>
         <BellIcon />
         {unread > 0 && (
-          <span aria-hidden style={{ position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 999, background: 'var(--red)', color: '#fff', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, lineHeight: '16px', textAlign: 'center', boxSizing: 'border-box' }}>
+          <span aria-hidden style={{ position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 999, background: 'var(--red)', color: '#fff', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', fontWeight: 500, lineHeight: '16px', textAlign: 'center', boxSizing: 'border-box' }}>
             {unread > 9 ? '9+' : unread}
           </span>
         )}
@@ -107,13 +107,13 @@ export default function NotificationsBell({ uid, className }: { uid: string; cla
               <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', marginBottom: '.8rem' }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--blue)' }}>Notifications</div>
-                  <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-lead)', color: 'var(--white)', marginTop: '.15rem' }}>Application updates</div>
+                  <div style={{ fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-lead)', color: 'var(--white)', marginTop: '.15rem' }}>Application updates</div>
                 </div>
                 <button type="button" onClick={closeModal} aria-label="Close" style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 10, width: 44, height: 44, color: 'var(--muted)', cursor: 'pointer', flexShrink: 0 }}>✕</button>
               </div>
 
               {items.length === 0 ? (
-                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.6, padding: '.6rem 0 .2rem' }}>
+                <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.6, padding: '.6rem 0 .2rem' }}>
                   {loading ? 'Checking for updates…' : 'No updates yet. When an employer reviews, messages or decides on an application you sent on Seen, it shows up here.'}
                 </div>
               ) : (
@@ -129,13 +129,13 @@ export default function NotificationsBell({ uid, className }: { uid: string; cla
                           {it.role && <span style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginTop: '.15rem' }}>{it.role}</span>}
                           {it.message && <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.45, marginTop: '.3rem', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as React.CSSProperties}>“{it.message}”</span>}
                         </span>
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', flexShrink: 0, marginTop: '.15rem' }}>{when(it.at)}</span>
+                        <span style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', flexShrink: 0, marginTop: '.15rem' }}>{when(it.at)}</span>
                       </button>
                     )
                   })}
                 </div>
               )}
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.75rem', lineHeight: 1.5 }}>
+              <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.75rem', lineHeight: 1.5 }}>
                 Tap an update to open it in your tracker.
               </div>
             </div>

@@ -29,7 +29,7 @@ export function LegalMeta({ label = 'Questions?' }: { label?: string }) {
 /** The short footer every document ends with. */
 export function LegalFooter() {
   return (
-    <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '2rem', lineHeight: 1.7 }}>
+    <p style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '2rem', lineHeight: 1.7 }}>
       Effective {LEGAL_EFFECTIVE}. Questions about this document:{' '}
       <a href={`mailto:${LEGAL_CONTACT}`} style={{ color: 'var(--sub)' }}>{LEGAL_CONTACT}</a>.
     </p>

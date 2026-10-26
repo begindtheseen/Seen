@@ -184,7 +184,7 @@ export default function ResumeSurveyModal({ onClose, onCreditsEarned, onExhauste
             <div style={popOuter}>
               <div style={popInner}>
                 <div style={{ fontSize: 40, marginBottom: 4 }}>✦</div>
-                <div style={{ fontSize: 28, fontFamily: 'var(--display)', fontWeight: 700, color: '#a5b4fc', lineHeight: 1 }}>+{awarded}</div>
+                <div style={{ fontSize: 28, fontFamily: 'var(--body)', fontWeight: 600, color: '#a5b4fc', lineHeight: 1 }}>+{awarded}</div>
                 <div style={{ fontSize: 13, color: 'var(--sub)', fontFamily: 'var(--mono)', marginTop: 4 }}>credits earned</div>
               </div>
             </div>
@@ -203,7 +203,7 @@ export default function ResumeSurveyModal({ onClose, onCreditsEarned, onExhauste
               <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 18 }}>
                 <div style={avatar}>{companyLetter}</div>
                 <div>
-                  <div style={{ fontSize: 20, fontFamily: 'var(--display)', fontWeight: 700, color: 'var(--white)', lineHeight: 1.2 }}>{survey.company}</div>
+                  <div style={{ fontSize: 20, fontFamily: 'var(--body)', fontWeight: 600, color: 'var(--white)', lineHeight: 1.2 }}>{survey.company}</div>
                   {survey.role && <div style={{ fontSize: 13, color: 'var(--sub)', fontFamily: 'var(--mono)', marginTop: 2 }}>{survey.role}</div>}
                 </div>
               </div>
@@ -223,7 +223,7 @@ export default function ResumeSurveyModal({ onClose, onCreditsEarned, onExhauste
                   { v: '+2', l: 'credits' },
                 ].map(({ v, l }) => (
                   <div key={l}>
-                    <div style={{ fontSize: 24, fontFamily: 'var(--display)', fontWeight: 700, color: 'var(--indigo)', lineHeight: 1 }}>{v}</div>
+                    <div style={{ fontSize: 24, fontFamily: 'var(--body)', fontWeight: 600, color: 'var(--indigo)', lineHeight: 1 }}>{v}</div>
                     <div style={{ fontSize: 12, fontFamily: 'var(--mono)', color: 'var(--muted)', marginTop: 3 }}>{l}</div>
                   </div>
                 ))}
@@ -244,7 +244,7 @@ export default function ResumeSurveyModal({ onClose, onCreditsEarned, onExhauste
                 <span style={{ color: 'var(--indigo)' }}>✦ {creditsLeft} left today</span>
               </div>
               <div style={{ fontSize: 12, fontFamily: 'var(--mono)', color: 'var(--indigo)', marginBottom: 10, opacity: .75 }}>{survey.company}</div>
-              <div style={{ fontSize: 17, fontFamily: 'var(--display)', fontWeight: 700, color: 'var(--white)', lineHeight: 1.35, marginBottom: 18 }}>{q.text}</div>
+              <div style={{ fontSize: 17, fontFamily: 'var(--body)', fontWeight: 600, color: 'var(--white)', lineHeight: 1.35, marginBottom: 18 }}>{q.text}</div>
               <div style={{ marginBottom: 4 }}>
                 {q.options.map(opt => (
                   <button key={opt} className={`rs-opt${selected === opt ? ' sel' : ''}`} onClick={() => setSelected(opt)}>{opt}</button>
@@ -263,7 +263,7 @@ export default function ResumeSurveyModal({ onClose, onCreditsEarned, onExhauste
           {phase === 'done' && (
             <div style={{ ...pad, textAlign: 'center' }} className="rs-anim">
               <div style={{ fontSize: 56, marginBottom: 12, lineHeight: 1 }}>✦</div>
-              <div style={{ fontSize: 28, fontFamily: 'var(--display)', fontWeight: 700, color: 'var(--white)', marginBottom: 6 }}>
+              <div style={{ fontSize: 28, fontFamily: 'var(--body)', fontWeight: 600, color: 'var(--white)', marginBottom: 6 }}>
                 {awarded > 0 ? `You earned ${awarded} credit${awarded !== 1 ? 's' : ''}!` : 'Intel recorded'}
               </div>
               <div style={{ fontSize: 14, fontFamily: 'var(--mono)', color: 'var(--sub)', marginBottom: 18 }}>Balance: {balance} credits</div>
@@ -281,10 +281,10 @@ export default function ResumeSurveyModal({ onClose, onCreditsEarned, onExhauste
           {phase === 'none' && (
             <div style={{ padding: '2rem 1.5rem', textAlign: 'center' }}>
               <div style={{ fontSize: 'var(--fs-h2)', marginBottom: '1rem' }}>✓</div>
-              <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', marginBottom: '.5rem' }}>
+              <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-body)', fontWeight: 600, color: 'var(--white)', marginBottom: '.5rem' }}>
                 {(NONE_COPY[noneReason] || NONE_COPY.all_surveyed).title}
               </div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1.5rem' }}>
+              <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1.5rem' }}>
                 {(NONE_COPY[noneReason] || NONE_COPY.all_surveyed).body}
               </div>
               {(noneReason === 'no_resume' || noneReason === 'no_employment') && (
@@ -302,8 +302,8 @@ export default function ResumeSurveyModal({ onClose, onCreditsEarned, onExhauste
           {phase === 'error' && (
             <div style={{ padding: '2rem 1.5rem', textAlign: 'center' }}>
               <div style={{ fontSize: 'var(--fs-h2)', marginBottom: '1rem' }}>⚠️</div>
-              <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', marginBottom: '.5rem' }}>Something went wrong</div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1.5rem' }}>Tap retry to try again.</div>
+              <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-body)', fontWeight: 600, color: 'var(--white)', marginBottom: '.5rem' }}>Something went wrong</div>
+              <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1.5rem' }}>Tap retry to try again.</div>
               <button onClick={loadSurvey} style={{ background: 'var(--indigo)', border: 'none', color: '#fff', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', borderRadius: 8, padding: '.6rem 1.25rem', cursor: 'pointer', marginBottom: '0.5rem', width: '100%' }}>Retry →</button>
               <button onClick={onClose} style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', borderRadius: 8, padding: '.6rem 1.25rem', cursor: 'pointer', width: '100%' }}>Close</button>
             </div>

@@ -135,7 +135,7 @@ export default function FAQPage() {
             </div>
             {section.items.map(item => (
               <details key={item.q} style={{ marginBottom: '.65rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10 }}>
-                <summary style={{ padding: '1rem 1.25rem', fontFamily: 'var(--display)', fontSize: 'var(--fs-ui)', fontWeight: 700, color: 'var(--white)', cursor: 'pointer', listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <summary style={{ padding: '1rem 1.25rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-ui)', fontWeight: 600, color: 'var(--white)', cursor: 'pointer', listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   {item.q}
                   <span className="dt-chev" style={{ color: 'var(--dim)', fontWeight: 400, fontSize: 'var(--fs-meta)', flexShrink: 0, marginLeft: '.5rem' }}>▾</span>
                 </summary>

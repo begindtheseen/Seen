@@ -450,8 +450,8 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
                 <div style={{ fontSize: 40, marginBottom: 4 }}>✦</div>
                 <div style={{
                   fontSize: 28,
-                  fontFamily: 'var(--display)',
-                  fontWeight: 700,
+                  fontFamily: 'var(--body)',
+                  fontWeight: 600,
                   color: '#a5b4fc',
                   lineHeight: 1,
                 }}>
@@ -491,8 +491,8 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
                 <div>
                   <div style={{
                     fontSize: 20,
-                    fontFamily: 'var(--display)',
-                    fontWeight: 700,
+                    fontFamily: 'var(--body)',
+                    fontWeight: 600,
                     color: 'var(--white)',
                     lineHeight: 1.2,
                   }}>
@@ -533,8 +533,8 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
                   <div key={label}>
                     <div style={{
                       fontSize: 24,
-                      fontFamily: 'var(--display)',
-                      fontWeight: 700,
+                      fontFamily: 'var(--body)',
+                      fontWeight: 600,
                       color: 'var(--indigo)',
                       lineHeight: 1,
                     }}>
@@ -642,8 +642,8 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
           {phase === 'no-surveys' && (
             <div style={{ padding: '2rem 1.5rem', textAlign: 'center' }}>
               <div style={{ fontSize: 'var(--fs-h2)', marginBottom: '1rem' }}>✓</div>
-              <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', marginBottom: '.5rem' }}>All caught up!</div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1.5rem' }}>
+              <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-body)', fontWeight: 600, color: 'var(--white)', marginBottom: '.5rem' }}>All caught up!</div>
+              <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1.5rem' }}>
                 You've answered all available questions for your applications.<br/>Check back after new applications are added.
               </div>
               <button onClick={onClose} style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', borderRadius: 8, padding: '.6rem 1.25rem', cursor: 'pointer' }}>
@@ -656,8 +656,8 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
           {phase === 'error' && (
             <div style={{ padding: '2rem 1.5rem', textAlign: 'center' }}>
               <div style={{ fontSize: 'var(--fs-h2)', marginBottom: '1rem' }}>⚠️</div>
-              <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', marginBottom: '.5rem' }}>Couldn't load survey</div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1.5rem' }}>
+              <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-body)', fontWeight: 600, color: 'var(--white)', marginBottom: '.5rem' }}>Couldn't load survey</div>
+              <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1.5rem' }}>
                 Something went wrong — tap retry to try again.
               </div>
               <button
@@ -679,8 +679,8 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
 
               <div style={{
                 fontSize: 28,
-                fontFamily: 'var(--display)',
-                fontWeight: 700,
+                fontFamily: 'var(--body)',
+                fontWeight: 600,
                 color: 'var(--white)',
                 marginBottom: 6,
               }}>

@@ -10,7 +10,7 @@
 .label { font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); }
 .mail {
   display: inline-flex; align-items: center; min-height: 44px; margin-top: 0.3rem;
-  font-family: var(--display); font-weight: 800; font-size: clamp(1.2rem, 4.6vw, 1.7rem); letter-spacing: -0.02em;
+  font-family: var(--body); font-weight: 600; font-size: clamp(1.2rem, 4.6vw, 1.7rem); letter-spacing: -0.02em;
   color: var(--white); text-decoration: none; overflow-wrap: anywhere;
 }
 .mail:hover { color: var(--blue); }
@@ -21,7 +21,7 @@
 .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.85rem; margin-top: 1rem; }
 @media (max-width: 600px) { .grid { grid-template-columns: minmax(0, 1fr); } }
 .tile { min-width: 0; padding: 1.05rem 1.15rem; border-radius: 14px; border: 1px solid var(--line); background: var(--card); }
-.tileT { font-family: var(--display); font-weight: 700; font-size: var(--fs-body); color: var(--white); }
+.tileT { font-family: var(--body); font-weight: 600; font-size: var(--fs-body); color: var(--white); }
 
 .links { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; margin-top: 1.6rem; }
 .links .label { width: 100%; margin-bottom: 0.1rem; }

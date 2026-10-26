@@ -67,7 +67,7 @@ export default async function ComparePage() {
           </div>
         </div>
 
-        <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '2.5rem', lineHeight: 1.7 }}>
+        <p style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '2.5rem', lineHeight: 1.7 }}>
           Seen Grades are aggregated community signals from applicant accounts, not verified facts. Browse all <Link href="/companies" style={{ color: 'var(--blue)' }}>companies</Link>.
         </p>
       </div>

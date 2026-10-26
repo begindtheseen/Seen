@@ -48,7 +48,7 @@ type Ranked = ReturnType<typeof assembleGhostReport>['worstOffenders'][number]
 function Stat({ value, label, color }: { value: string; label: string; color: string }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '.25rem', minWidth: 0 }}>
-      <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-fig)', fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
+      <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-fig)', fontWeight: 600, color, lineHeight: 1 }}>{value}</div>
       <div style={mono('.55rem', 'var(--dim)')}>{label}</div>
     </div>
   )
@@ -59,7 +59,7 @@ function OffenderRow({ r, rank }: { r: Ranked; rank: number }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '.85rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '.8rem 1rem', marginBottom: '.5rem' }}>
       <div style={{ ...mono('.62rem', 'var(--muted)'), minWidth: 40, textAlign: 'right', flexShrink: 0 }}>{rank}</div>
-      <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: accent, minWidth: 36, textAlign: 'center', flexShrink: 0 }}>{grade(r.overallScore)}</div>
+      <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-xl)', fontWeight: 600, color: accent, minWidth: 36, textAlign: 'center', flexShrink: 0 }}>{grade(r.overallScore)}</div>
       <div style={{ minWidth: 0, flex: 1 }}>
         <Link href={`/company/${slugify(r.name)}`} style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', textDecoration: 'none', textTransform: 'capitalize' }}>{r.name}</Link>
         <div style={{ ...mono('.58rem', 'var(--dim)'), marginTop: '.15rem' }}>
@@ -108,7 +108,7 @@ export default async function GhostReportPage() {
             {report.agencySpotlight && (
               <div style={{ background: 'linear-gradient(135deg, rgba(239,68,68,.10), rgba(239,68,68,.02))', border: '1px solid rgba(239,68,68,.3)', borderRadius: 12, padding: '1.1rem 1.3rem', marginBottom: '2.2rem' }}>
                 <div style={{ ...mono('.55rem', 'var(--red)'), textTransform: 'uppercase', letterSpacing: '.15em', marginBottom: '.4rem' }}>Agency spotlight</div>
-                <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', lineHeight: 1.5 }}>
+                <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', lineHeight: 1.5 }}>
                   <span style={{ textTransform: 'capitalize' }}>{report.agencySpotlight.name}</span> is the most-reported ghosting staffing agency this week — {report.agencySpotlight.ghostPct}% of {report.agencySpotlight.reportCount.toLocaleString()} reported applications got no response at all.
                 </div>
                 <Link href="/agencies" style={{ ...mono('.62rem', 'var(--blue)'), textDecoration: 'none', display: 'inline-block', marginTop: '.6rem' }}>See the full staffing-agency ghost index →</Link>

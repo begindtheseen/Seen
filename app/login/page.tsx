@@ -431,7 +431,7 @@ function LoginContent() {
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '2rem', justifyContent: 'center' }}>
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--blue)', boxShadow: '0 0 10px rgba(59,130,246,0.6)', display: 'inline-block' }} />
-          <span style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-h3)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em' }}>Seen</span>
+          <span style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-h3)', fontWeight: 600, color: 'var(--white)', letterSpacing: '-.02em' }}>Seen</span>
         </div>
 
         {expiredNotice && <div className={styles.notice} role="status">{SESSION_EXPIRED_MESSAGE}</div>}
@@ -441,13 +441,13 @@ function LoginContent() {
             moment it appears (audit 2026-10-24: the message sat outside the empty role="alert"). */}
         <div role="alert" aria-live="assertive" aria-atomic="true">
           {error && (
-            <div data-testid="login-error" style={{ background: 'var(--rdim)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '.72rem 1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--red)', marginBottom: '1rem', textAlign: 'center', lineHeight: 1.6 }}>
+            <div data-testid="login-error" style={{ background: 'var(--rdim)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '.72rem 1rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--red)', marginBottom: '1rem', textAlign: 'center', lineHeight: 1.6 }}>
               {coolingDown ? `Too many attempts — try again in ${cooldownLeft}s. Forgot it? Use “Forgot password?” below.` : error}
             </div>
           )}
           {/* Correct password, unconfirmed address (M1): the fix is the link, not a new password. */}
           {unconfirmedEmail && step === 'signin' && (
-            <div data-testid="login-unconfirmed" style={{ background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.72rem 1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '1rem', textAlign: 'left', lineHeight: 1.65 }}>
+            <div data-testid="login-unconfirmed" style={{ background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.72rem 1rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '1rem', textAlign: 'left', lineHeight: 1.65 }}>
               Confirm your email first — we sent the link to <strong style={{ color: 'var(--white)' }}>{unconfirmedEmail}</strong>. Open it on any device, then sign in here.{' '}
               <button type="button" className={styles.linkBtn} onClick={() => resendVerification(unconfirmedEmail)} style={{ fontSize: 'inherit' }}>Resend the link →</button>
             </div>
@@ -473,7 +473,7 @@ function LoginContent() {
               </>
             )}
             {!EMPLOYER_SIGNUP_ENABLED && cameAsEmployer && (
-              <div style={{ background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.6rem .85rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '1.1rem', textAlign: 'center', lineHeight: 1.55 }}>
+              <div style={{ background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.6rem .85rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '1.1rem', textAlign: 'center', lineHeight: 1.55 }}>
                 Employer signups are currently closed. You can still create a job seeker account below.
               </div>
             )}
@@ -525,7 +525,7 @@ function LoginContent() {
               We sent a sign-in link to<br />
               <strong style={{ color: 'var(--white)' }}>{verifyEmail}</strong>
             </div>
-            <div style={{ background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.85rem 1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', marginBottom: '1rem', lineHeight: 1.65, textAlign: 'left' }}>
+            <div style={{ background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.85rem 1rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', marginBottom: '1rem', lineHeight: 1.65, textAlign: 'left' }}>
               ✓ Open the link in your email<br />
               ✓ It signs you in and opens {destLabel}<br />
               ✓ No password needed
@@ -550,7 +550,7 @@ function LoginContent() {
               We sent a verification link to<br />
               <strong style={{ color: 'var(--white)' }}>{verifyEmail}</strong>
             </div>
-            <div style={{ background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.85rem 1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', marginBottom: '1rem', lineHeight: 1.65, textAlign: 'left' }}>
+            <div style={{ background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.85rem 1rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', marginBottom: '1rem', lineHeight: 1.65, textAlign: 'left' }}>
               ✓ Open the link in your email<br />
               ✓ It signs you in and opens {destLabel}<br />
               ✓ Left this tab open? It moves on by itself
@@ -603,7 +603,7 @@ function LoginContent() {
                 skipped the email is not sent to reset a working password. Resend goes to anyone — no
                 account enumeration. */}
             {error && !coolingDown && !unconfirmedEmail && (
-              <div style={{ textAlign: 'center', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginBottom: '.75rem', lineHeight: 1.6 }}>
+              <div style={{ textAlign: 'center', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginBottom: '.75rem', lineHeight: 1.6 }}>
                 Just signed up and never confirmed your email?{' '}
                 <button type="button" className={`${styles.linkBtn} ${styles.linkDim}`} onClick={() => resendVerification()} style={{ fontSize: 'inherit' }}>Resend the confirmation link</button>
               </div>

@@ -60,7 +60,7 @@ export default function LegalPage() {
         <div style={{ display: 'grid', gap: '.75rem', marginBottom: '2.5rem' }}>
           {DOCS.map(d => (
             <Link key={d.href} href={d.href} style={{ display: 'block', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1rem 1.2rem', textDecoration: 'none' }}>
-              <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', marginBottom: '.25rem' }}>{d.title} →</div>
+              <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', marginBottom: '.25rem' }}>{d.title} →</div>
               <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.6 }}>{d.body}</div>
             </Link>
           ))}
@@ -69,7 +69,7 @@ export default function LegalPage() {
         <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', marginBottom: '.65rem' }}>
           The plain facts
         </h2>
-        <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.7, margin: '0 0 .9rem' }}>
+        <p style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.7, margin: '0 0 .9rem' }}>
           Each line below is what the product does today and is stated in the documents above
           (<Link href="/terms#one-time" style={{ color: 'var(--sub)' }}>Terms §9–10</Link>,{' '}
           <Link href="/privacy" style={{ color: 'var(--sub)' }}>Privacy §2–7</Link>).

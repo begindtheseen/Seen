@@ -28,9 +28,9 @@ function CompanyRow({ name, score, ghostRate, responseRate, sub }: { name: strin
   const accent = riskColor(score >= 70 ? 'safe' : score >= 40 ? 'warn' : 'danger')
   return (
     <Link href={`/company/${slugify(name)}`} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '.85rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '.85rem 1rem', marginBottom: '.55rem' }}>
-      <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: accent, width: 30, textAlign: 'center', flexShrink: 0 }}>{grade(score)}</div>
+      <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-xl)', fontWeight: 600, color: accent, width: 30, textAlign: 'center', flexShrink: 0 }}>{grade(score)}</div>
       <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{titleCase(name)}</div>
+        <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-body)', fontWeight: 600, color: 'var(--white)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{titleCase(name)}</div>
         <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.15rem' }}>{sub}</div>
       </div>
       <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -118,7 +118,7 @@ export default async function RedditPage() {
           </ul>
         </section>
 
-        <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '2rem', lineHeight: 1.7 }}>
+        <p style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '2rem', lineHeight: 1.7 }}>
           Seen Grades aggregate real applicant accounts into a 0–100 signal. They&apos;re community signals, not verified facts, and update hourly as new reports come in.
         </p>
       </div>

@@ -46,7 +46,7 @@ export default function ResumeMatches({ jobs, loading, skills, city, citySource,
               >
                 <ListingScoreRing score={job.score} size={34} caption={false} />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--white)', letterSpacing: '-.015em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{job.title}</div>
+                  <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--white)', letterSpacing: '-.015em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{job.title}</div>
                   <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayCompanyName(job.company)}{job.location ? ` · ${job.location}` : ''}{displayPay(job) ? ` · ${displayPay(job)}` : ''}</div>
                 </div>
                 <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', flexShrink: 0 }}>Open →</span>

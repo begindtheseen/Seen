@@ -74,7 +74,7 @@ export default function CreditsPopover({ info, onClose, onEarn, onUpgrade }: {
     <div ref={ref} role="dialog" aria-label="Your AI credits" data-testid="credits-popover"
       style={{ position: 'absolute', top: 'calc(100% + 8px)', right: -shift, width: 'min(280px, calc(100vw - 24px))', background: '#0e111c', border: '1px solid var(--line2)', borderRadius: 14, padding: '.95rem 1rem .9rem', boxShadow: '0 24px 60px rgba(0,0,0,.6)', zIndex: 1300, textAlign: 'left' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: '.5rem', marginBottom: '.65rem' }}>
-        <span style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: zero ? 'var(--red)' : 'var(--white)', lineHeight: 1 }}>{info.balance}</span>
+        <span style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-xl)', fontWeight: 600, color: zero ? 'var(--red)' : 'var(--white)', lineHeight: 1 }}>{info.balance}</span>
         <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.08em' }}>AI credit{info.balance === 1 ? '' : 's'} available</span>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '.3rem', paddingBottom: '.7rem', borderBottom: '1px solid var(--line)', marginBottom: '.7rem' }}>
@@ -85,10 +85,10 @@ export default function CreditsPopover({ info, onClose, onEarn, onUpgrade }: {
       </div>
       {/* The arithmetic, in one sentence from the same constants the server enforces (the audit saw
           "10 available · Free daily credit 1 · Welcome bonus 10" and could not tell how they add up). */}
-      <p data-testid="credits-explain" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6, margin: '0 0 .5rem' }}>
+      <p data-testid="credits-explain" style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6, margin: '0 0 .5rem' }}>
         {balanceExplanation({ balance: info.balance, daily: info.daily ?? null, purchased: info.purchased ?? 0, earned, welcome: !!info.welcome })}
       </p>
-      <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.6, margin: '0 0 .75rem' }}>
+      <p style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.6, margin: '0 0 .75rem' }}>
         Every AI action costs 1 credit and says so on its button. Résumé upload, company grades and the tracker are always free.
       </p>
       <div style={{ display: 'flex', gap: '.4rem' }}>

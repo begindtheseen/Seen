@@ -29,7 +29,7 @@ export default function PastePosting({ onAnalyze, busy = false, label = 'Analyze
       <textarea id="paste-posting" value={text} onChange={(e) => setText(e.target.value)} rows={6} data-testid="paste-posting-text"
         style={{ width: '100%', boxSizing: 'border-box', background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 8, color: 'var(--white)', padding: '.6rem .7rem', fontSize: 'var(--fs-sm)', lineHeight: 1.5, fontFamily: 'inherit' }} />
       <button type="button" disabled={!enough || busy} onClick={() => onAnalyze(text.trim())} data-testid="paste-posting-run"
-        style={{ alignSelf: 'flex-start', background: enough && !busy ? 'var(--green)' : 'var(--line2)', color: 'var(--ink)', border: 'none', borderRadius: 8, padding: '.55rem .95rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)', cursor: enough && !busy ? 'pointer' : 'default', minHeight: 44 }}>
+        style={{ alignSelf: 'flex-start', background: enough && !busy ? 'var(--green)' : 'var(--line2)', color: 'var(--ink)', border: 'none', borderRadius: 8, padding: '.55rem .95rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', cursor: enough && !busy ? 'pointer' : 'default', minHeight: 44 }}>
         {busy ? 'Reading…' : label}
       </button>
       {!enough && text.trim().length > 0 && <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>That looks too short to be the whole posting.</div>}

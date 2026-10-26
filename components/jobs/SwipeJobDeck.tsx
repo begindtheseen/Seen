@@ -157,7 +157,7 @@ export default function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply,
     return (
       <div style={{ textAlign: 'center', padding: '1.5rem 1rem', background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.18)', borderRadius: 14 }}>
         <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '.4rem' }}>Deck cleared</div>
-        <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', letterSpacing: '-.02em', marginBottom: '.3rem' }}>
+        <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', letterSpacing: '-.02em', marginBottom: '.3rem' }}>
           You matched {savedCount} job{savedCount !== 1 ? 's' : ''}
         </div>
         <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '1rem' }}>
@@ -254,13 +254,13 @@ export default function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply,
             background: `linear-gradient(135deg, ${scoreHsl(topJob.score, .25)}, rgba(255,255,255,.06))`,
             border: `1px solid ${scoreBorder(topJob.score)}`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-lead)',
+            fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-lead)',
             color: scoreHsl(topJob.score, 1), flexShrink: 0,
           }}>
             {(displayCompanyName(topJob.company) || '?')[0].toUpperCase()}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', letterSpacing: '-.02em', lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topJob.title}</div>
+            <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-body)', fontWeight: 600, color: 'var(--white)', letterSpacing: '-.02em', lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topJob.title}</div>
             <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.12rem' }}>{displayCompanyName(topJob.company)}{topJob.location ? ` · ${topJob.location}` : ''}</div>
           </div>
           <ListingScoreRing score={topJob.score} size={40} />

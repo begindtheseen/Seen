@@ -9,8 +9,8 @@ function Col({ name, s }: { name: string; s: GrowthScore | null }) {
   if (!s) {
     return (
       <div style={{ flex: '1 1 0', minWidth: 0, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.1rem', textAlign: 'center' }}>
-        <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', wordBreak: 'break-word' }}>{name}</div>
-        <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-fig-m)', fontWeight: 800, color: 'var(--dim)', margin: '.6rem 0' }}>?</div>
+        <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', wordBreak: 'break-word' }}>{name}</div>
+        <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-fig-m)', fontWeight: 600, color: 'var(--dim)', margin: '.6rem 0' }}>?</div>
         <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5 }}>No reports yet.</div>
         <Link href={`/report`} className="btn btn-ghost" style={{ marginTop: '.8rem', fontSize: 'var(--fs-meta)', padding: '.5rem .9rem' }}>Be the first to report</Link>
       </div>
@@ -23,9 +23,9 @@ function Col({ name, s }: { name: string; s: GrowthScore | null }) {
     return (
       <div style={{ flex: '1 1 0', minWidth: 0, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.1rem', textAlign: 'center' }}>
         <Link href={`/company/${cslug}`} style={{ textDecoration: 'none' }}>
-          <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', wordBreak: 'break-word', lineHeight: 1.15 }}>{name}</div>
+          <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', wordBreak: 'break-word', lineHeight: 1.15 }}>{name}</div>
         </Link>
-        <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-fig-m)', fontWeight: 800, color: 'var(--dim)', margin: '.6rem 0' }}>—</div>
+        <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-fig-m)', fontWeight: 600, color: 'var(--dim)', margin: '.6rem 0' }}>—</div>
         <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5 }}>{`Not graded yet (${Math.min(fp, MIN_REPORTS_FOR_GRADE)} of ${MIN_REPORTS_FOR_GRADE} applicant accounts).`}</div>
         <Link href={fp > 0 ? `/company/${cslug}` : `/report`} className="btn btn-ghost" style={{ marginTop: '.8rem', fontSize: 'var(--fs-meta)', padding: '.5rem .9rem' }}>{fp > 0 ? 'Read the reports' : 'Be the first to report'}</Link>
       </div>
@@ -41,9 +41,9 @@ function Col({ name, s }: { name: string; s: GrowthScore | null }) {
   return (
     <div style={{ flex: '1 1 0', minWidth: 0, background: 'var(--card)', border: '1px solid var(--line)', borderTop: `3px solid ${accent}`, borderRadius: 12, padding: '1.1rem', textAlign: 'center' }}>
       <Link href={`/company/${cslug}`} style={{ textDecoration: 'none' }}>
-        <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', wordBreak: 'break-word', lineHeight: 1.15 }}>{name}</div>
+        <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', wordBreak: 'break-word', lineHeight: 1.15 }}>{name}</div>
       </Link>
-      <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-fig-m)', fontWeight: 800, color: accent, lineHeight: 1, margin: '.5rem 0 .15rem' }}>{grade(s.overall_score)}</div>
+      <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-fig-m)', fontWeight: 600, color: accent, lineHeight: 1, margin: '.5rem 0 .15rem' }}>{grade(s.overall_score)}</div>
       <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', letterSpacing: '.1em', color: accent }}>{s.overall_score}/100 · {riskLabel(s.risk_level)}</div>
       <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
         {rows.map(r => (
@@ -53,7 +53,7 @@ function Col({ name, s }: { name: string; s: GrowthScore | null }) {
           </div>
         ))}
       </div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.7rem', lineHeight: 1.5 }}>
+      <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.7rem', lineHeight: 1.5 }}>
         {`Based on ${fp.toLocaleString()} applicant account${fp === 1 ? '' : 's'}`}
       </div>
     </div>
@@ -89,7 +89,7 @@ export default function CompareView({
     <div style={{ maxWidth: 720, margin: '0 auto', width: '100%' }}>
       <div style={{ display: 'flex', gap: '.75rem', alignItems: 'stretch' }}>
         <Col name={aName} s={a} />
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)', color: 'var(--dim)', flexShrink: 0 }}>vs</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-ui)', color: 'var(--dim)', flexShrink: 0 }}>vs</div>
         <Col name={bName} s={b} />
       </div>
       <Verdict aName={aName} a={a} bName={bName} b={b} />

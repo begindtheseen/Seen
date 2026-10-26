@@ -96,7 +96,7 @@ export default function DangerConfirmDialog({
               />
             </label>
           )}
-          {error && <div role="alert" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', lineHeight: 1.6, color: '#f87185', marginBottom: '.7rem' }}>{error}</div>}
+          {error && <div role="alert" style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', lineHeight: 1.6, color: '#f87185', marginBottom: '.7rem' }}>{error}</div>}
           <div style={{ display: 'flex', gap: '.5rem', flexDirection: 'column' }}>
             <button
               ref={confirmRef}
