@@ -6,7 +6,7 @@ import { getLeaderboard, titleCase, slugify, grade, riskColor, riskLabel } from 
 // Reddit landing: "Real hiring outcomes from Reddit." Surfaces the worst ghosters and fastest
 // responders from real leaderboard data, in Reddit-native voice, with tight internal links.
 //
-// HONESTY: every list and every "N reports" here uses FIRST-PARTY applicant reports
+// HONESTY: every list and every "N reports" here uses FIRST-PARTY applicant accounts
 // (score.first_party_report_count) — never the fused report_count, which adds the web-research
 // pipeline's *claimed* mention count (live: McDonald's "12,775 reports" with zero report rows).
 // Companies scored only from web research never appear in these "reported" lists.
@@ -19,7 +19,7 @@ export const metadata: Metadata = pageMetadata({
   keywords: ['reddit hiring', 'does anyone know if they ghost', 'reddit job application ghosted', 'companies that ghost applicants reddit', 'reddit recruiting', 'r/recruitinghell'],
   path: '/reddit',
   ogTitle: 'Real Hiring Outcomes from Reddit',
-  ogDescription: 'Ghost rates and response times from real applicant reports — the data Reddit threads are missing.',
+  ogDescription: 'Ghost rates and response times from real applicant accounts — the data Reddit threads are missing.',
 })
 
 const wrap = { maxWidth: 760, margin: '0 auto', padding: '3.5rem 1.25rem 5rem', width: '100%', boxSizing: 'border-box' as const }
@@ -119,7 +119,7 @@ export default async function RedditPage() {
         </section>
 
         <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '2rem', lineHeight: 1.7 }}>
-          Seen Grades aggregate real applicant reports into a 0–100 signal. They&apos;re community signals, not verified facts, and update hourly as new reports come in.
+          Seen Grades aggregate real applicant accounts into a 0–100 signal. They&apos;re community signals, not verified facts, and update hourly as new reports come in.
         </p>
       </div>
     </div>

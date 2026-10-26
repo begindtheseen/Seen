@@ -9,7 +9,7 @@ import { REPORT_REWARD_PRO_DAYS, REPORT_REWARD_MONTHLY_CAP_DAYS, REPORT_REWARD_M
 export const metadata: Metadata = pageMetadata({
   title: 'FAQ — How Seen Works, What It Costs, Where the Data Comes From',
   description:
-    'Answers about Seen: what the company grades and ghost rates mean, where applicant reports come from, what is free and what Pro adds, how the tracker and Résumé AI work, and how to contact us.',
+    'Answers about Seen: what the company grades and ghost rates mean, where applicant accounts come from, what is free and what Pro adds, how the tracker and Résumé work, and how to contact us.',
   path: '/faq',
   ogTitle: 'Seen FAQ',
 })
@@ -24,7 +24,7 @@ export default function FAQPage() {
       items: [
         {
           q: 'What is Seen?',
-          a: 'Seen is a hiring transparency platform that scores companies by how they actually treat applicants. We aggregate applicant reports — submitted to Seen, plus public review-site and discussion accounts (labeled and down-weighted) — into a 0–100 transparency score, ghost rate, and response rate for any company you look up. Hundreds of companies carry a grade today; any company can be looked up and self-fills from public sources. Ghost-surge signals (3+ ghosted reports in 7 days) show on your dashboard for the companies you are waiting on.',
+          a: 'Seen is a hiring transparency platform that scores companies by how they actually treat applicants. We aggregate applicant accounts — submitted to Seen, plus public review-site and discussion accounts (labeled and down-weighted) — into a 0–100 transparency score, ghost rate, and response rate for any company you look up. Hundreds of companies carry a grade today; any company can be looked up and self-fills from public sources. Ghost-surge signals (3+ ghosted reports in 7 days) show on your dashboard for the companies you are waiting on.',
         },
         {
           q: 'Is Seen free for job seekers?',
@@ -48,16 +48,16 @@ export default function FAQPage() {
       heading: 'How scores work',
       items: [
         {
-          q: 'How are transparency scores calculated?',
-          a: 'Scores start at a neutral 50, then add response rate (×40), subtract ghost rate (×30) and average wait (up to −15), and add a small log-scale bonus for the trust-weighted volume of evidence (capped at +10). Reports submitted to Seen count fully; public review-site and discussion accounts count at reduced weight; admin-confirmed dead listings apply a bounded penalty. No company is graded until it has at least one real applicant report (sent to Seen or posted publicly) and five pieces of evidence in total (an online mention counts as half). 70+ is Safe, 40–69 is Caution, below 40 is Danger. All scores are expressions of aggregated applicant claims, not verified facts.',
+          q: 'How is a Seen Grade calculated?',
+          a: 'Scores start at a neutral 50, then add response rate (×40), subtract ghost rate (×30) and average wait (up to −15), and add a small log-scale bonus for the trust-weighted volume of evidence (capped at +10). Reports submitted to Seen count fully; public review-site and discussion accounts count at reduced weight; admin-confirmed dead listings apply a bounded penalty. No company is graded until it has at least one real applicant account (sent to Seen or posted publicly) and five in total (an online mention counts as half). The letter follows fixed bands: A for 90 and up, B for 80–89, C for 70–79, D for 60–69 and F below 60, each with a plus or minus step. All scores are expressions of aggregated applicant claims, not verified facts.',
         },
         {
           q: 'What are ghost surge alerts?',
           a: 'A ghost surge is detected when a company receives 3 or more "ghosted" reports within a 7-day rolling window — meaningfully more than its recent baseline. Surges appear on your dashboard for the companies you have open applications with. They flag deteriorating hiring behavior so you can factor it into your follow-ups. Note: a surge can reflect seasonal patterns or a small number of reports — treat it as a signal, not a verdict.',
         },
         {
-          q: 'What is the Waste Probability score?',
-          a: 'Waste risk estimates how likely an application is to go nowhere. For a company it is modeled from the reported ghost rate, interview rounds and unpaid-work rate; for a listing it is modeled from signals in the posting itself (staffing-intermediary language, unpaid or commission-only terms, missing pay, which ATS it runs on). It is a model, not a tally of people saying it wasted their time.',
+          q: 'What is wasted-effort risk?',
+          a: 'Wasted-effort risk estimates how likely an application is to go nowhere. For a company it is modeled from the reported ghost rate, interview rounds and unpaid-work rate; for a listing it is modeled from signals in the posting itself (staffing-intermediary language, unpaid or commission-only terms, missing pay, which ATS it runs on). It is a model, not a tally of people saying it wasted their time.',
         },
         {
           q: 'Why does the same company have different scores in different cities?',

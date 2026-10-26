@@ -18,7 +18,7 @@ export default function EmployerGradeChip({ company, score, onClick }: { company
       href={`/company/${companySlug(company)}`}
       prefetch={false}
       onClick={e => { e.stopPropagation(); onClick?.(e) }}
-      title={`${name}'s Seen grade from applicant reports — how it treats applicants, not this posting`}
+      title={`${name}'s Seen grade from applicant accounts — how it treats applicants, not this posting`}
       style={{ display: 'inline-flex', alignItems: 'center', gap: '.35rem', minHeight: 44, padding: '.15rem .7rem', border: '1px solid var(--line2)', borderRadius: 999, background: 'var(--raised)', textDecoration: 'none', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', maxWidth: '100%', minWidth: 0 }}
     >
       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{name} · Seen grade</span>

@@ -57,7 +57,7 @@ export default async function Image() {
             <div style={{ display: 'flex', flexDirection: 'column', width: 360, flexShrink: 0, justifyContent: 'center' }}>
               <div style={{ display: 'flex', fontSize: 132, fontWeight: 800, color: '#ef4444', lineHeight: 1 }}>{h.avgGhostRatePct != null ? `${h.avgGhostRatePct}%` : `${h.reportsTotal}`}</div>
               <div style={{ display: 'flex', fontSize: 26, color: '#9ca3af', marginTop: 10, maxWidth: 340, lineHeight: 1.3 }}>
-                {h.avgGhostRatePct != null ? 'average reported ghost rate' : 'applicant reports and counting'}
+                {h.avgGhostRatePct != null ? 'average reported ghost rate' : 'applicant accounts and counting'}
               </div>
               <div style={{ display: 'flex', fontSize: 22, color: '#6b7280', marginTop: 24 }}>
                 {h.reportsTotal.toLocaleString()} reports · {h.companiesTracked} companies
@@ -79,7 +79,7 @@ export default async function Image() {
         ) : (
           <div style={{ display: 'flex', flex: 1, alignItems: 'center' }}>
             <div style={{ display: 'flex', fontSize: 42, color: '#e5e7eb', lineHeight: 1.35, maxWidth: 900 }}>
-              A public ghost-rate index, built from real applicant reports. It&apos;s filling now — no fabricated numbers, ever. Add yours.
+              A public ghost-rate index, built from real applicant accounts. It&apos;s filling now — no fabricated numbers, ever. Add yours.
             </div>
           </div>
         )}

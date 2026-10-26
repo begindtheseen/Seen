@@ -5,7 +5,7 @@
 //   Dashboard   → app/dashboard (Command Center: health, pills, next best move, pipeline)
 //   Tracker     → app/tracker (stage pipe, ghost tags, the inline day-N check-in)
 //   Company     → app/company/[slug] — REAL, live-refreshed data (HomeHero passes the Amazon score)
-//   Résumé AI   → app/resume (SeenFit score before/after tailoring)
+//   Résumé   → app/resume (SeenFit score before/after tailoring)
 // Dashboard / Tracker / Résumé use EXAMPLE data and say so on screen. No visitor counts or
 // community-size claims: Seen does not have them (brain: seen:growth state_2026_10_18).
 //
@@ -30,7 +30,7 @@ export interface ProofScore {
   waste: number
   /** FUSED total (first-party + web-research claim) — never rendered as "reports". */
   report_count: number
-  /** Real applicant-report rows — the only count the card may call "applicant reports". */
+  /** Real applicant-report rows — the only count the card may call "applicant accounts". */
   first_party_report_count: number
 }
 
@@ -39,7 +39,7 @@ const TABS: Array<{ id: Tab; label: string; icon: string; title: string; sub: st
   { id: 'dashboard', label: 'Dashboard', icon: '◫', title: 'Hey, Alex.', sub: '6 open applications · 2 check-ins due' },
   { id: 'tracker', label: 'Tracker', icon: '▤', title: 'My applications', sub: 'Every application, with the next thing to do on each one.' },
   { id: 'company', label: 'Company intel', icon: '◈', title: 'Check before you apply', sub: 'Real data, live from Seen.' },
-  { id: 'resume', label: 'Résumé AI', icon: '✧', title: 'SeenFit', sub: 'Your résumé, scored against one exact role.' },
+  { id: 'resume', label: 'Résumé', icon: '✧', title: 'SeenFit', sub: 'Your résumé, scored against one exact role.' },
 ]
 const CYCLE_MS = 6500
 
@@ -261,7 +261,7 @@ function CompanyTab({ proof }: { proof: ProofScore }) {
           <div className={styles.coName}>{proof.name}</div>
           <div className={styles.rowRole}>
             {proof.first_party_report_count > 0
-              ? `${proof.first_party_report_count.toLocaleString()} applicant report${proof.first_party_report_count === 1 ? '' : 's'}`
+              ? `${proof.first_party_report_count.toLocaleString()} applicant account${proof.first_party_report_count === 1 ? '' : 's'}`
               : 'Estimated from public web data'}
           </div>
         </div>
@@ -284,14 +284,14 @@ function CompanyTab({ proof }: { proof: ProofScore }) {
         </div>
       </div>
       <div className={styles.coFoot}>
-        <span>Seen grade {proof.overall_score}/100 · from {proof.first_party_report_count} applicant reports</span>
+        <span>Seen grade {proof.overall_score}/100 · from {proof.first_party_report_count} applicant accounts</span>
         <Link href="/company/amazon">Full report →</Link>
       </div>
     </div>
   )
 }
 
-/* ── Résumé AI (app/resume SeenFit) ──────────────────────────────────────────────────── */
+/* ── Résumé (app/resume SeenFit) ──────────────────────────────────────────────────── */
 function ResumeTab() {
   return (
     <div className={styles.resume}>

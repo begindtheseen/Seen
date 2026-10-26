@@ -22,7 +22,7 @@ function Table({ l, section, ranked }: { l: RankedList; section: ListSection; ra
               <th scope="col" className={styles.colCo}>{l.slug === 'employers-that-respond' ? 'Employer' : 'Staffing agency'}</th>
               <th scope="col" className={styles.num}>Hear back</th>
               <th scope="col" className={styles.num}>Never hear back</th>
-              <th scope="col" className={styles.num}>Applicant reports</th>
+              <th scope="col" className={styles.num}>Applicant accounts</th>
               <th scope="col" className={styles.num}>Grade</th>
             </tr>
           </thead>
@@ -63,7 +63,7 @@ export default function ListView({ l, attribution }: { l: RankedList; attributio
         <p className={styles.lead}>{l.lead}</p>
         <div className={styles.meta}>
           <span>Updated {l.month}</span>
-          <span>Cutoff: {l.cutoff} applicant reports</span>
+          <span>Cutoff: {l.cutoff} applicant accounts</span>
           <Link className={styles.metaLink} href={METHODS_PATH}>How Seen measures</Link>
           <Link className={styles.metaLink} href={DATA_PATH}>Full dataset</Link>
         </div>
@@ -76,7 +76,7 @@ export default function ListView({ l, attribution }: { l: RankedList; attributio
           <section className={styles.section} aria-labelledby="below-h">
             <h2 id="below-h" className={styles.h2}>Under the {l.cutoff} report cutoff: not ranked</h2>
             <p className={styles.p}>
-              {`These ${l.below.length === 1 ? ent.one : ent.many} have between ${MIN_REPORTS_FOR_RATES} and ${l.cutoff - 1} applicant reports each: enough for a rate on their own page, too few to rank. ${plural(l.below.length, ent.one, ent.many)} in all${l.belowSections.length > 1 ? `; the ${l.belowSections[0].rows.length} at each end are shown, the rest are in the full dataset` : ''}. Read them with care.`}
+              {`These ${l.below.length === 1 ? ent.one : ent.many} have between ${MIN_REPORTS_FOR_RATES} and ${l.cutoff - 1} applicant accounts each: enough for a rate on their own page, too few to rank. ${plural(l.below.length, ent.one, ent.many)} in all${l.belowSections.length > 1 ? `; the ${l.belowSections[0].rows.length} at each end are shown, the rest are in the full dataset` : ''}. Read them with care.`}
             </p>
             {l.belowSections.map((s) => <Table key={`below-${s.title || 'all'}`} l={l} section={s} ranked={false} />)}
           </section>
@@ -85,7 +85,7 @@ export default function ListView({ l, attribution }: { l: RankedList; attributio
         <section className={styles.section} aria-labelledby="about-h">
           <h2 id="about-h" className={styles.h2}>About these numbers</h2>
           <p className={styles.p}>
-            “Hear back” is the share of applicants who got a reply from a person (a screen, an interview, a rejection or an offer); “never hear back” is the share who reported silence. Automated rejections count as neither, so the two can add up to less than 100%. Applicant reports are outcomes submitted to Seen or first-hand accounts found in public posts such as Reddit threads and review sites, which count at reduced weight; online mentions count half. They are self-reported claims, not verified facts. Each name links to its page, where every report behind the number is listed.
+            “Hear back” is the share of applicants who got a reply from a person (a screen, an interview, a rejection or an offer); “never hear back” is the share who reported silence. Automated rejections count as neither, so the two can add up to less than 100%. Applicant accounts are outcomes submitted to Seen or first-hand accounts found in public posts such as Reddit threads and review sites, which count at reduced weight; online mentions count half. They are self-reported claims, not verified facts. Each name links to its page, where every report behind the number is listed.
           </p>
           <p className={styles.small}>{attribution}. Reuse under CC BY 4.0: <Link href={DATA_PATH}>download the data</Link>.</p>
         </section>

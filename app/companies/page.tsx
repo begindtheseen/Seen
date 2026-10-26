@@ -32,7 +32,7 @@ interface Company {
   }
 }
 
-// "12 reports" = 12 first-party applicant reports (it read "11R" — cryptic, audit 2026-10-23). A
+// "12 reports" = 12 first-party applicant accounts (it read "11R" — cryptic, audit 2026-10-23). A
 // score with none behind it is a web-research estimate and says so — the fused report_count once
 // rendered here as "12775r".
 function reportsLabel(s: Company['score']): string {
@@ -153,7 +153,7 @@ export default function CompaniesPage() {
             eyebrow="Transparency rankings"
             title="Company scoreboard"
             crumbLabel="Companies"
-            sub={<>Ranked by hiring transparency score. Ghost rate, response rate, and process quality — all in one place. A company is graded once it has at least one real applicant report (sent to Seen or posted publicly) and {MIN_REPORTS_FOR_GRADE} pieces of evidence in total (an online mention counts as half).</>}
+            sub={<>Ranked by hiring transparency score. Ghost rate, response rate, and process quality — all in one place. A company is graded once it has at least one real applicant account (sent to Seen or posted publicly) and {MIN_REPORTS_FOR_GRADE} pieces of evidence in total (an online mention counts as half).</>}
           />
 
           {/* Hero company lookup */}
@@ -344,7 +344,7 @@ export default function CompaniesPage() {
               const g = grade(co.score.overall_score)
               const divider = thinStart >= 0 && i === thinStart ? (
                 <div key="thin-divider" style={{ gridColumn: '1 / -1', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', letterSpacing: '.08em', textTransform: 'uppercase', padding: '.9rem .2rem .3rem', borderTop: '1px solid var(--line)' }}>
-                  Early grades · fewer than {WELL_EVIDENCED_REPORTS} applicant reports{thinStart >= TOP_SLOTS ? '' : ` · the top ${TOP_SLOTS} need ${WELL_EVIDENCED_REPORTS}+`}
+                  Early grades · fewer than {WELL_EVIDENCED_REPORTS} applicant accounts{thinStart >= TOP_SLOTS ? '' : ` · the top ${TOP_SLOTS} need ${WELL_EVIDENCED_REPORTS}+`}
                 </div>
               ) : null
               const fillPct = Math.max(4, co.score.overall_score)
@@ -467,7 +467,7 @@ export default function CompaniesPage() {
                       )}
                     </div>
                     {co.score.waste > 0 && (
-                      <div className="ldr-waste">⚠ {co.score.waste}% waste risk</div>
+                      <div className="ldr-waste">⚠ {co.score.waste}% wasted-effort risk</div>
                     )}
                     <div className="ldr-label">
                       {co.score.overall_score}/100 · {reportsLabel(co.score)}

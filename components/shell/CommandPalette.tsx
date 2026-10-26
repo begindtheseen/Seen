@@ -22,7 +22,7 @@ const SEEKER_PAGES: Item[] = [
   { id: 'jobs', label: 'Jobs', hint: 'Transparency-first job search', group: 'Go to', href: '/jobs', keys: 'g j', icon: '💼', kw: 'search openings' },
   { id: 'track', label: 'Application tracker', hint: 'Every application, check-ins, outcomes', group: 'Go to', href: '/tracker', keys: 'g t', icon: '✓', kw: 'applications pipeline' },
   { id: 'cos', label: 'Company intel', hint: 'Ghost rates and grades', group: 'Go to', href: '/companies', keys: 'g c', icon: '🏢', kw: 'companies scoreboard' },
-  { id: 'resume', label: 'Résumé AI', hint: 'Fit score and rewrites for one job', group: 'Go to', href: '/resume', keys: 'g r', icon: '🧠', kw: 'resume optimize' },
+  { id: 'resume', label: 'Résumé', hint: 'Fit score and rewrites for one job', group: 'Go to', href: '/resume', keys: 'g r', icon: '🧠', kw: 'resume optimize' },
   { id: 'saved', label: 'Saved jobs', group: 'Go to', href: '/saved', keys: 'g s', icon: '♥', kw: 'bookmarks' },
   { id: 'agencies', label: 'Agency ghost index', group: 'Explore', href: '/agencies', icon: '👻', kw: 'staffing recruiters' },
   { id: 'demand', label: 'Hiring demand', group: 'Explore', href: '/demand', icon: '📊', kw: 'markets cities' },

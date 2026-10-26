@@ -18,7 +18,7 @@ import styles from './methods.module.css'
 
 export const metadata: Metadata = pageMetadata({
   title: 'How Seen grades companies',
-  description: `How a Seen Grade is computed from applicant reports: what counts as a report, how each source is weighted, the ${MIN_REPORTS_FOR_GRADE} pieces of evidence a grade needs, and how an employer can respond. Money never changes a score.`,
+  description: `How a Seen Grade is computed from applicant accounts: what counts as a report, how each source is weighted, the ${MIN_REPORTS_FOR_GRADE} applicant accounts a grade needs, and how an employer can respond. Money never changes a score.`,
   path: '/methods',
   ogTitle: 'How Seen grades companies',
 })
@@ -104,12 +104,12 @@ export default function MethodsPage() {
         <section className={styles.card} aria-labelledby="m-min">
           <h2 id="m-min" className={styles.h2}>When a company gets a grade</h2>
           <p className={styles.p}>
-            A grade needs at least {MIN_REAL_REPORTS_FOR_GRADE} real applicant report and {MIN_REPORTS_FOR_GRADE} pieces of evidence in total, where
+            A grade needs at least {MIN_REAL_REPORTS_FOR_GRADE} real applicant account and {MIN_REPORTS_FOR_GRADE} in total, where
             each report counts 1 and each online mention counts {half}. Mentions alone never grade a company. Below that bar the page shows no letter,
-            no score and no rates, only what Seen holds so far, as &ldquo;Not enough reviews to grade yet (2 of {MIN_REPORTS_FOR_GRADE})&rdquo;.
+            no score and no rates, only what Seen holds so far, as &ldquo;Not graded yet (2 of {MIN_REPORTS_FOR_GRADE} applicant accounts)&rdquo;.
           </p>
           <p className={styles.p}>
-            Response and ghost percentages need {MIN_REPORTS_FOR_RATES} applicant reports of their own. A company graded with fewer shows its grade
+            Response and ghost percentages need {MIN_REPORTS_FOR_RATES} applicant accounts of their own. A company graded with fewer shows its grade
             and says there are too few reports for a rate yet.
           </p>
         </section>
@@ -145,7 +145,7 @@ export default function MethodsPage() {
         <section className={styles.card} aria-labelledby="m-claims">
           <h2 id="m-claims" className={styles.h2}>Reports are claims</h2>
           <p className={styles.p}>
-            Seen does not check each account with the company, so every number is worded as what applicant reports say, never as a fact about the
+            Seen does not check each account with the company, so every number is worded as what applicant accounts say, never as a fact about the
             employer. To keep one person from moving a grade, a report is held for review and does not count until someone at Seen approves it when it
             is sent without signing in, when the same person already reported the same company in the last {SUBMIT_HOLDS.dupDays} days, or when one
             account sends {SUBMIT_HOLDS.dailyCap} or more in a day. Reports an admin rejects, and second copies of a report Seen already holds, are kept

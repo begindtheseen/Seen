@@ -9,8 +9,8 @@ import { MIN_REPORTS_FOR_RATES, oddsPhrase, responseVerdict, tooFewReportsLine }
 // The wording ("Most applicants here hear back" …) comes from lib/companyPageSummary.ts responseVerdict —
 // the SAME thresholds as the hero's verdict sentence, so the two can never disagree (audit 2026-10-23:
 // Insight Global's hero said "Most applicants never hear back" over an odds panel saying "Most applicants
-// here hear back"). With fewer than MIN_REPORTS_FOR_RATES applicant reports no percentage is shown at all
-// (Chipotle: "77% … the share of 2 applicant reports").
+// here hear back"). With fewer than MIN_REPORTS_FOR_RATES applicant accounts no percentage is shown at all
+// (Chipotle: "77% … the share of 2 applicant accounts").
 interface HiringProbabilityProps {
   responseRate?: number | null   // e.g. 0.22 (22%)
   ghostRate?: number | null      // e.g. 0.55 (55%)
@@ -18,7 +18,7 @@ interface HiringProbabilityProps {
   jobLevel?: string       // e.g. "Senior", "Entry Level", "Mid level"
   profileExp?: string     // from profile.experience e.g. "2-5 years", "Senior"
   compact?: boolean       // compact mode for swipe cards (less height)
-  /** Applicant reports the rate was computed from — named as the basis; below MIN_REPORTS_FOR_RATES no percentage is shown. */
+  /** Applicant accounts the rate was computed from — named as the basis; below MIN_REPORTS_FOR_RATES no percentage is shown. */
   reportCount?: number
   /** Online mentions that also feed the rate (each counts half) — named with the basis. */
   mentionCount?: number
@@ -88,9 +88,9 @@ export default function HiringProbability({ responseRate, ghostRate, overallScor
 
   const basis = typeof reportCount === 'number' && reportCount > 0
     ? (mentionCount > 0
-        ? `the share of ${reportCount} applicant report${reportCount === 1 ? '' : 's'} (and ${mentionCount} online mention${mentionCount === 1 ? '' : 's'}, each counting half) that heard back`
-        : `the share of ${reportCount} applicant report${reportCount === 1 ? '' : 's'} that heard back`)
-    : 'the share of applicant reports that heard back'
+        ? `the share of ${reportCount} applicant account${reportCount === 1 ? '' : 's'} (and ${mentionCount} online mention${mentionCount === 1 ? '' : 's'}, each counting half) that heard back`
+        : `the share of ${reportCount} applicant account${reportCount === 1 ? '' : 's'} that heard back`)
+    : 'the share of applicant accounts that heard back'
   const context = personalized
     ? `${oddsPhrase(responseVerdict(prob))} · adjusted for your level`
     : (givenContext || `${oddsPhrase(responseVerdict(prob))} · ${basis}`)

@@ -2,7 +2,7 @@
 // "Listing signals" — the company's rating from its OWN open job posts (POST /api/jobs
 // {action:'listing_signals'} → lib/server/listingSignals.js). Shown for every company that has posts,
 // next to — never inside — the Seen Grade, which stays report-only (owner decision 2026-10-20).
-// Every number is a stated factor; the label says plainly that this is not applicant reports.
+// Every number is a stated factor; the label says plainly that this is not applicant accounts.
 import { useEffect, useState } from 'react'
 import styles from './ListingSignals.module.css'
 
@@ -29,7 +29,7 @@ export default function ListingSignals({ companyName }: { companyName: string })
     <section className={`${styles.card} ${styles[s.band]}`} aria-label="Listing signals">
       <div className={styles.head}>
         <span className={styles.kicker}>Listing signals</span>
-        <span className={styles.scope}>from its job posts · not applicant reports</span>
+        <span className={styles.scope}>from its job posts · not applicant accounts</span>
       </div>
       <div className={styles.top}>
         <span className={styles.score}>{s.score}<small>/100</small></span>

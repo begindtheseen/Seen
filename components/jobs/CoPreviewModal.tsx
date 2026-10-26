@@ -32,7 +32,7 @@ function coVibes(sc: CoPreviewScore): { label: string; cls: string }[] {
   else if (sc.ghost_rate > 0.4)   vibes.push({ label: '👻 High ghost rate',   cls: 'v-r' })
   if (sc.avg_wait_days > 21)      vibes.push({ label: `⏳ ${sc.avg_wait_days}d avg wait`, cls: 'v-y' })
   if (sc.avg_rounds >= 4)         vibes.push({ label: `📋 ${sc.avg_rounds.toFixed(1)} rounds avg`, cls: 'v-b' })
-  if (sc.waste > 55)              vibes.push({ label: '⚠ High waste risk',    cls: 'v-y' })
+  if (sc.waste > 55)              vibes.push({ label: '⚠ High wasted-effort risk',    cls: 'v-y' })
   if (sc.response_rate > 0.72)    vibes.push({ label: '✅ Highly responsive', cls: 'v-g' })
   if (sc.overall_score >= 80)     vibes.push({ label: '🌟 Strong process',    cls: 'v-g' })
   if (sc.overall_score < 35)      vibes.push({ label: '❌ Low transparency',   cls: 'v-r' })
@@ -108,7 +108,7 @@ export default function CoPreviewModal({ company, onClose }: { company: string; 
                   <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--white)', lineHeight: 1, letterSpacing: '-.03em' }}>{graded.overall_score}<span style={{ fontSize: 'var(--fs-ui)', color: 'var(--muted)' }}>/100</span></div>
                   {(() => {
                     const fp = firstPartyReportCount(graded)
-                    return <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.15rem' }}>{fp > 0 ? `${fp} applicant report${fp === 1 ? '' : 's'}` : 'Estimated from public web data'}</div>
+                    return <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.15rem' }}>{fp > 0 ? `${fp} applicant account${fp === 1 ? '' : 's'}` : 'Estimated from public web data'}</div>
                   })()}
                 </div>
               </div>

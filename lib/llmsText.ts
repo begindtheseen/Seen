@@ -18,7 +18,7 @@ export const LLMS_TOP_COMPANIES = 25
 
 const abs = (path: string) => `${SITE_ORIGIN}${path}`
 
-/** "- [Walmart](https://seenjobs.io/company/walmart): 87% of applicants hear back, 13% never do (48 applicant reports and 32 online mentions, Oct 2026)" */
+/** "- [Walmart](https://seenjobs.io/company/walmart): 87% of applicants hear back, 13% never do (48 applicant accounts and 32 online mentions, Oct 2026)" */
 export function llmsCompanyItem(r: DatasetRow): string {
   const label = r.agency ? `${r.company} (staffing agency)` : r.company
   // Markdown link text: brackets in a name would end the link early.
@@ -30,11 +30,11 @@ function header(d: Dataset): string[] {
   return [
     '# Seen',
     '',
-    '> Seen (seenjobs.io) publishes how employers treat job applicants: the share who hear back, the share who never do, and a 0 to 100 Seen Grade, from applicant reports submitted to Seen or found in public posts. Free to read, no account needed.',
+    '> Seen (seenjobs.io) publishes how employers treat job applicants: the share who hear back, the share who never do, and a 0 to 100 Seen Grade, from applicant accounts submitted to Seen or found in public posts. Free to read, no account needed.',
     '',
     datasetSummary(d),
     '',
-    `Percentages are published only for companies with at least ${MIN_REPORTS_FOR_RATES} applicant reports. Applicant reports are self-reported claims, not verified facts; every company page shows how many stand behind its numbers and where they came from. Estimates from web research are never counted as reports.`,
+    `Percentages are published only for companies with at least ${MIN_REPORTS_FOR_RATES} applicant accounts. Applicant accounts are self-reported claims, not verified facts; every company page shows how many stand behind its numbers and where they came from. Estimates from web research are never counted as reports.`,
     '',
     `Each line below states one company's figures with its basis and month, in the same words as its company page. Company pages follow the pattern ${SITE_ORIGIN}/company/{slug}, where the slug is the company name in lowercase with spaces as hyphens (for example /company/walmart, /company/bank-of-america).`,
     '',
@@ -49,8 +49,8 @@ function header(d: Dataset): string[] {
     '',
     '## Rankings',
     '',
-    `- [Employers that respond to applicants](${abs('/lists/employers-that-respond')}): monthly ranking of employers with ${LIST_MIN_REPORTS} or more applicant reports`,
-    `- [Staffing agencies that ghost applicants](${abs('/lists/staffing-agencies-ghosting')}): monthly ranking of staffing agencies with ${LIST_MIN_REPORTS} or more applicant reports`,
+    `- [Employers that respond to applicants](${abs('/lists/employers-that-respond')}): monthly ranking of employers with ${LIST_MIN_REPORTS} or more applicant accounts`,
+    `- [Staffing agencies that ghost applicants](${abs('/lists/staffing-agencies-ghosting')}): monthly ranking of staffing agencies with ${LIST_MIN_REPORTS} or more applicant accounts`,
     `- [Staffing Agency Ghost Index](${abs('/agencies')}): major staffing agencies by reported ghost rate`,
     `- [Company scoreboard](${abs('/companies')}): browse and search every company`,
     '',
@@ -58,12 +58,12 @@ function header(d: Dataset): string[] {
 }
 
 export function llmsTxt(d: Dataset, top = LLMS_TOP_COMPANIES): string {
-  const rows = d.rows.slice(0, top) // dataset rows are already ordered by applicant reports, most first
+  const rows = d.rows.slice(0, top) // dataset rows are already ordered by applicant accounts, most first
   return [
     ...header(d),
     `## Most reported companies (${d.month})`,
     '',
-    ...(rows.length ? rows.map(llmsCompanyItem) : ['- [Company scoreboard](' + abs('/companies') + '): no company has enough applicant reports for a grade yet']),
+    ...(rows.length ? rows.map(llmsCompanyItem) : ['- [Company scoreboard](' + abs('/companies') + '): no company has enough applicant accounts for a grade yet']),
     '',
     '## Optional',
     '',

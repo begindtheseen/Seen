@@ -145,7 +145,7 @@ export default async function CompanySlugLayout(
   if (s?.industry) org.industry = s.industry
   const fpSeo = facts.reportCount
 
-  // FAQ built ONLY from the same facts (percentages only with MIN_REPORTS_FOR_RATES applicant reports;
+  // FAQ built ONLY from the same facts (percentages only with MIN_REPORTS_FOR_RATES applicant accounts;
   // the grade Q always names its basis). Backs both a FAQPage node AND the visible block below — the
   // format AI answer engines (ChatGPT, Perplexity, Gemini) cite for "does <company> ghost applicants?".
   const baseFaq = s
@@ -207,7 +207,7 @@ export default async function CompanySlugLayout(
   const hasFacts = facts.gradeable && s != null
   const accent = accentFor(s?.risk_level)
   // Same numbers as the meta description, the FAQ and the page (lib/companyMeta.ts): rates only with
-  // enough applicant reports, first-party count only.
+  // enough applicant accounts, first-party count only.
   const ghostPct = facts.ghostPct
   const respPct = facts.respPct
   const waitDays = facts.waitDays
@@ -221,7 +221,7 @@ export default async function CompanySlugLayout(
       </h2>
       <p style={{ fontSize: 'var(--fs-ui)', lineHeight: 1.65, color: 'var(--sub)', margin: 0, fontWeight: 400 }}>{summary.summary}</p>
       <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', margin: '.45rem 0 0', opacity: 0.85 }}>
-        Based on {summary.data_basis || `${summary.report_count_at_generation} self-reported applicant reports`}
+        Based on {summary.data_basis || `${summary.report_count_at_generation} self-reported applicant accounts`}
         {summaryDate ? ` · summary generated ${summaryDate}` : ''} · self-reported claims, not verified facts
       </p>
     </div>
@@ -290,7 +290,7 @@ export default async function CompanySlugLayout(
                   .{' '}
                 </>
               )}
-              {ghostPct == null && <>Too few applicant reports yet for a response or ghost rate. </>}
+              {ghostPct == null && <>Too few applicant accounts yet for a response or ghost rate. </>}
               {interpret(s)}
             </p>
             </>)}

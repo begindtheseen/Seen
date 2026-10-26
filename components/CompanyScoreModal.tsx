@@ -48,7 +48,7 @@ function DataQuality({ s }: { s: Score }) {
       s.employee_review_count ? `${s.employee_review_count} employee review${s.employee_review_count === 1 ? '' : 's'}` : '',
       s.mention_count ? `${s.mention_count} online mention${s.mention_count === 1 ? '' : 's'}` : '',
     ].filter(Boolean)
-    return <span className={styles.dq} style={{ color: 'var(--green)' }}>🟢 {[`${fp} applicant report${fp === 1 ? '' : 's'}`, ...extra].join(' · ')}</span>
+    return <span className={styles.dq} style={{ color: 'var(--green)' }}>🟢 {[`${fp} applicant account${fp === 1 ? '' : 's'}`, ...extra].join(' · ')}</span>
   }
   return <span className={styles.dq} style={{ color: 'var(--amber)' }}>🌐 Web-research estimate — no first-party reports yet</span>
 }
@@ -148,7 +148,7 @@ export default function CompanyScoreModal({ companyName, onClose }: { companyNam
               <div className={styles.gradeMeta}>
                 <div className={styles.gradeVerdict}>{notEnoughReviewsLabel(s)}</div>
                 <span className={styles.dq} style={{ color: 'var(--muted)' }}>
-                  We grade a company only once {MIN_REPORTS_FOR_GRADE} real applicant reports are in — open the full report to read what we have.
+                  We grade a company only once {MIN_REPORTS_FOR_GRADE} real applicant accounts are in — open the full report to read what we have.
                 </span>
               </div>
             </div>

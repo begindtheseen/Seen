@@ -300,7 +300,7 @@ export function EmployerAnalyticsView() {
   const h = analytics.headline
   const rs = analytics.responseSummary
 
-  // Matched by name, but no applicant reports on record — an honest clean slate. Apply activity can
+  // Matched by name, but no applicant accounts on record — an honest clean slate. Apply activity can
   // still exist without outcome reports, so it renders above the empty-reports notice.
   if (!analytics.hasData) {
     return (
@@ -312,7 +312,7 @@ export function EmployerAnalyticsView() {
         )}
         <ActivityCard activity={data.activity} />
         <StateCard
-          title={`No applicant reports for “${resolvedCompany}” yet.`}
+          title={`No applicant accounts for “${resolvedCompany}” yet.`}
           cta={<Link href="/employers" style={ctaStyle}>See your reputation →</Link>}
         >
           Nothing to chart yet — which is a clean slate, not a bad sign. As candidates report how your postings went, their sources, volume, and response outcomes will appear here. This is the same record that builds your public reputation, so there are no numbers to show until the first real report lands.
@@ -357,7 +357,7 @@ export function EmployerAnalyticsView() {
         </div>
 
         <div style={{ display: 'flex', gap: '1.8rem', flexWrap: 'wrap', paddingTop: '1.2rem', borderTop: '1px solid var(--line)' }}>
-          <CountTile target={h.reportCount} render={n => Math.round(n).toLocaleString()} label="applicant reports" revealDelay={40} />
+          <CountTile target={h.reportCount} render={n => Math.round(n).toLocaleString()} label="applicant accounts" revealDelay={40} />
           {h.ghostPct == null
             ? <StatTile value="—" label="ghost rate" color="var(--red)" revealDelay={100} />
             : <CountTile target={h.ghostPct} render={(n, done) => (done ? fmtPct(h.ghostPct) : `${Math.round(n)}%`)} label="ghost rate" color="var(--red)" note={h.ratesComputedLive ? 'from reports' : undefined} revealDelay={100} />}
@@ -382,7 +382,7 @@ export function EmployerAnalyticsView() {
         <div style={kicker}>Application volume over time</div>
         <h2 style={h2}>When applicants reported applying</h2>
         <p style={sub}>
-          Count of applicant reports per month. This is real reported volume — Seen doesn’t host your
+          Count of applicant accounts per month. This is real reported volume — Seen doesn’t host your
           postings or track impressions, so there’s no applications-per-view rate to show, and we don’t invent one.
         </p>
         <div style={{ display: 'grid', gap: '.5rem' }}>

@@ -2,14 +2,14 @@
 // visitor can read — hero, odds panel, "how the grade is built", the reports list headers, the share
 // card — is read from here, computed once from the score payload and the listed report rows.
 //
-// Why (audit 2026-10-23/24, seenjobs.io): Walmart's hero said "48 applicant reports" while the same page
+// Why (audit 2026-10-23/24, seenjobs.io): Walmart's hero said "48 applicant accounts" while the same page
 // said "77 community reports" and "from public discussion · 77"; Insight Global's hero said "Most
 // applicants never hear back" while its odds panel said "Most applicants here hear back"; Chipotle showed
-// "77% … the share of 2 applicant reports"; Target's card said "High confidence" under a "Moderate
+// "77% … the share of 2 applicant accounts"; Target's card said "High confidence" under a "Moderate
 // confidence" hero. Each surface had its own arithmetic. Now each has none.
 //
 // Vocabulary (fixed — copy must use these words):
-//   applicant reports  = first-party rows WITH an outcome, the rows the grade is built from
+//   applicant accounts  = first-party rows WITH an outcome, the rows the grade is built from
 //                        (score.first_party_report_count; lib/server/reportCounts.js).
 //   still waiting      = listed hiring rows with no outcome yet — listed, never counted.
 //   employee reviews   = workplace accounts; their letter grades nudge the score, never hiring outcomes.
@@ -21,13 +21,14 @@
 import { NONTERMINAL_OUTCOMES } from '../api/_utils/companyIntel.js'
 import { firstPartyReportCount, mentionCount, webClaimCount, isScorableReport } from './server/reportCounts.js'
 import { isEmployeeReview, isImportedReview, isPublicDiscussion } from './reportSource.ts'
+import { accountSources } from './glossary.js'
 
-/** Below this many applicant reports no response / ghost PERCENTAGE is shown — "too few reports" instead. */
+/** Below this many applicant accounts no response / ghost PERCENTAGE is shown — "too few reports" instead. */
 export const MIN_REPORTS_FOR_RATES = 5
 
-/** The confidence WORD a visitor reads never says "High" until this many applicant reports came from Seen
+/** The confidence WORD a visitor reads never says "High" until this many applicant accounts came from Seen
  *  users (rows submitted to Seen, not public posts). Display only — the stored data_quality and every
- *  score input are untouched (conversion audit 2026-10-24: "High confidence · 48 applicant reports" sat
+ *  score input are untouched (conversion audit 2026-10-24: "High confidence · 48 applicant accounts" sat
  *  above "none was submitted by a Seen user"). */
 export const MIN_SEEN_REPORTS_FOR_HIGH_CONFIDENCE = 5
 
@@ -83,7 +84,7 @@ export interface OutcomeCounts { ghosted: number; rejected: number; interview: n
 
 export interface CompanySummary {
   graded: boolean
-  /** First-party applicant reports with an outcome — THE "N applicant reports" everywhere. */
+  /** First-party applicant accounts with an outcome — THE "N applicant accounts" everywhere. */
   applicantReports: number
   mentions: number
   employeeReviews: number
@@ -101,13 +102,13 @@ export interface CompanySummary {
   verdict: string
   /** The odds panel's one-line context, built from the SAME response rate as the verdict. */
   oddsContext: string
-  /** "48 applicant reports · 32 online mentions" — what the grade stands on. */
+  /** "48 applicant accounts · 32 online mentions" — what the grade stands on. */
   evidenceLine: string
   /** `word` is the bare "High confidence" the share card prints; `label` adds the evidence line;
-   *  `sources` names where the applicant reports came from ('' when the list is not loaded);
+   *  `sources` names where the applicant accounts came from ('' when the list is not loaded);
    *  `capNote` explains a capped word ('' when not capped). */
   confidence: { level: ConfidenceLevel; word: string; label: string; emoji: string; sources?: string; capNote?: string } | null
-  /** Applicant reports with an outcome by origin, from the UNFILTERED list; null until it has loaded. */
+  /** Applicant accounts with an outcome by origin, from the UNFILTERED list; null until it has loaded. */
   sources: { seen: number; public: number } | null
   /** Set when the listed rows with an outcome differ from the grade's count (a stale stored score). */
   listedNote: string
@@ -136,9 +137,9 @@ export function oddsPhrase(kind: ResponseVerdict | null): string {
   return ''
 }
 
-/** "Too few applicant reports (2) to estimate a response chance — 5 needed." */
+/** "Too few applicant accounts (2) to estimate a response chance — 5 needed." */
 export function tooFewReportsLine(n: number): string {
-  return `Too few applicant reports (${n}) to estimate a response chance — ${MIN_REPORTS_FOR_RATES} needed.`
+  return `Too few applicant accounts (${n}) to estimate a response chance — ${MIN_REPORTS_FOR_RATES} needed.`
 }
 
 /** The ONE confidence label, from the stored data_quality — never re-derived from a row count elsewhere. */
@@ -153,7 +154,7 @@ export function confidenceFrom(dataQuality: string | null | undefined, evidence:
 
 /**
  * The confidence a visitor may READ: the stored level, capped at moderate while fewer than
- * MIN_SEEN_REPORTS_FOR_HIGH_CONFIDENCE applicant reports came from Seen users. An unknown Seen count
+ * MIN_SEEN_REPORTS_FOR_HIGH_CONFIDENCE applicant accounts came from Seen users. An unknown Seen count
  * (list not loaded) is treated as 0, so the badge never overclaims while it loads. Display only.
  */
 export function capDisplayConfidence(conf: CompanySummary['confidence'], seenUserReports: number | null | undefined): CompanySummary['confidence'] {
@@ -164,23 +165,21 @@ export function capDisplayConfidence(conf: CompanySummary['confidence'], seenUse
   const rest = conf.label.startsWith(conf.word) ? conf.label.slice(conf.word.length) : ` · ${conf.label}`
   return {
     ...conf, level: 'moderate', word, emoji: '🟡', label: `${word}${rest}`,
-    capNote: `Shown as moderate until ${MIN_SEEN_REPORTS_FOR_HIGH_CONFIDENCE} applicant reports come from Seen users (${seen} so far) — most of this evidence is public posts.`,
+    capNote: `Shown as moderate until ${MIN_SEEN_REPORTS_FOR_HIGH_CONFIDENCE} reports come from Seen users (${seen} so far) — most of this evidence is public posts.`,
   }
 }
 
-/** Where the applicant reports came from, for the hero badge: "47 from public posts · 1 from Seen users".
+/** Where the applicant accounts came from, for the hero badge: "47 from public posts · 1 from a Seen user".
  *  Built from the listed rows (the same counts as the reports section); when they don't add up to the
- *  grade's count (a stale stored score) only the Seen-user count — the one that matters — is named. */
+ *  grade's count (a stale stored score) only the Seen-user count — the one that matters — is named.
+ *  The wording lives in lib/glossary.js (accountSources). */
 export function sourcesPhrase(applicantReports: number, seen: number, pub: number): string {
-  if (applicantReports <= 0) return ''
-  if (seen <= 0) return pub >= applicantReports ? 'all from public posts · none from Seen users yet' : 'none from Seen users yet'
-  if (seen + pub === applicantReports) return pub > 0 ? `${pub} from public posts · ${seen} from Seen ${seen === 1 ? 'user' : 'users'}` : `all from Seen users`
-  return `${seen} from Seen ${seen === 1 ? 'user' : 'users'}`
+  return accountSources(applicantReports, pub, seen)
 }
 
-/** "48 applicant reports · 32 online mentions · 12 employee reviews" — every kind of evidence behind the grade. */
+/** "48 applicant accounts · 32 online mentions · 12 employee reviews" — every kind of evidence behind the grade. */
 export function evidenceLineOf(applicantReports: number, mentions = 0, employeeReviews = 0): string {
-  const parts = [plural(applicantReports, 'applicant report')]
+  const parts = [plural(applicantReports, 'applicant account')]
   if (employeeReviews > 0) parts.push(plural(employeeReviews, 'employee review'))
   if (mentions > 0) parts.push(plural(mentions, 'online mention'))
   return parts.join(' · ')
@@ -244,7 +243,7 @@ export function buildCompanySummary(score: ScoreLike, reports: ReportLike[] | nu
   if (graded) {
     const wait = s!.avg_wait_days != null && Number.isFinite(Number(s!.avg_wait_days)) ? ` Typical wait to hear back: ${Math.round(Number(s!.avg_wait_days))} days.` : ''
     if (!ratesShown) {
-      verdict = `Graded from ${evidenceLine} — too few applicant reports for a reliable response rate (${MIN_REPORTS_FOR_RATES} needed).${wait}`
+      verdict = `Graded from ${evidenceLine} — too few applicant accounts for a reliable response rate (${MIN_REPORTS_FOR_RATES} needed).${wait}`
       oddsContext = tooFewReportsLine(applicantReports)
     } else {
       const g = ghostPct ?? 0
@@ -252,8 +251,8 @@ export function buildCompanySummary(score: ScoreLike, reports: ReportLike[] | nu
       else if (verdictKind === 'mixed') verdict = `Mixed: about ${responsePct}% of applicants hear back, ${g}% are ghosted.${wait}`
       else verdict = `Most applicants never hear back — only ${responsePct}% get a response${g > 0 ? `, ${g}% are ghosted` : ''}.${wait}`
       const basis = mentions > 0
-        ? `the share of ${plural(applicantReports, 'applicant report')} (and ${plural(mentions, 'online mention')}, each counting half) that heard back`
-        : `the share of ${plural(applicantReports, 'applicant report')} that heard back`
+        ? `the share of ${plural(applicantReports, 'applicant account')} (and ${plural(mentions, 'online mention')}, each counting half) that heard back`
+        : `the share of ${plural(applicantReports, 'applicant account')} that heard back`
       oddsContext = `${oddsPhrase(verdictKind)} · ${basis}`
     }
   }
@@ -268,7 +267,7 @@ export function buildCompanySummary(score: ScoreLike, reports: ReportLike[] | nu
   // The list is read at a different moment than the stored score, and the API self-repairs a stale
   // score on the next request — but a visitor must never see two unexplained numbers.
   const listedNote = graded && scorableWithOutcome > 0 && scorableWithOutcome !== applicantReports
-    ? `The grade was last built from ${plural(applicantReports, 'applicant report')}; this page lists ${scorableWithOutcome} with an outcome — it is refreshed on the next recompute.`
+    ? `The grade was last built from ${plural(applicantReports, 'applicant account')}; this page lists ${scorableWithOutcome} with an outcome — it is refreshed on the next recompute.`
     : ''
 
   return { graded, applicantReports, mentions, employeeReviews, webClaim, listed, outcomes, responseRate, ghostRate, ratesShown, responsePct, ghostPct, verdictKind, verdict, oddsContext, evidenceLine, confidence, sources, listedNote }
@@ -276,7 +275,7 @@ export function buildCompanySummary(score: ScoreLike, reports: ReportLike[] | nu
 
 /** Subheading over the public rows, shown only when the list ALSO holds reports submitted to Seen
  *  (otherwise the provenance line already says every row is from public posts). Owner 2026-10-24:
- *  the section said "29 applicant reports" four ways; each fact now appears once. */
+ *  the section said "29 applicant accounts" four ways; each fact now appears once. */
 export function publicRowsHeading(listed: ListedCounts): string {
   return `From public posts · ${listed.publicDiscussion + listed.imported}`
 }
@@ -287,7 +286,7 @@ export function reportsSectionSummary(sum: CompanySummary): string {
   if (sum.listed.rows === 0) return 'None yet — be the first to report'
   const { listed, outcomes } = sum
   return [
-    listed.employee > 0 ? plural(listed.withOutcome, 'applicant report') : '',
+    listed.employee > 0 ? plural(listed.withOutcome, 'applicant account') : '',
     listed.employee > 0 ? plural(listed.employee, 'employee review') : '',
     `${outcomes.ghosted} ghosted`, `${outcomes.interview} interviewed`, `${outcomes.hired} hired`,
     listed.waiting > 0 ? `${listed.waiting} still waiting` : '',

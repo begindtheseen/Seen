@@ -17,12 +17,13 @@ import { buildSearchUrl, parseRedditSearchAtom } from './_utils/companyReddit.js
 import { SECURITY_PREAMBLE, fenceUntrusted, scanInjection } from '../lib/server/promptGuard.js';
 import { fetchIndustryBenchmark } from '../lib/server/benchmark.js';
 import { isEvidencedScore, suppressionReason, servedDataSource } from '../lib/server/scoreProvenance.js';
-import { firstPartyReportCount, mentionCount, webClaimCount, gateScore, isGradeable, SCORABLE_REPORTS_FILTER, scorableResolvedCountPath, parseExactCount, EMPLOYEE_REVIEW_RE, scoreUpdatedAt } from '../lib/server/reportCounts.js';
+import { firstPartyReportCount, mentionCount, webClaimCount, gateScore, isGradeable, SCORABLE_REPORTS_FILTER, scorableResolvedCountPath, parseExactCount, EMPLOYEE_REVIEW_RE, scoreUpdatedAt, seenUserReportsPath, countSeenUserReports, seenUserShare } from '../lib/server/reportCounts.js';
 import { feedRowPasses } from '../lib/reports/feedFilter.js';
 import { redditPlatform } from '../lib/reports/platformLabel.js';
 import { enqueueCompanyEnrichment } from '../lib/server/enrichmentQueue.js';
 import { rewardReport } from '../lib/server/growthRewards.js';
 import { isVercelCron } from '../lib/server/cronAuth.js';
+import { EXCLUDED_SEARCH_DOMAINS } from '../lib/reports/excludedSources.js';
 
 // Authorize admin/cron-only actions (the Anthropic web-research endpoints). Accepts a Vercel
 // cron header, a shared CRON_SECRET, or a valid admin_sessions token. Everything Anthropic in
@@ -411,12 +412,20 @@ export default async function handler(req, res) {
       // rows (McDonald's 12.7k claimed) take the slots and the gate then threw them away — the board
       // showed 66 companies while ≥150 were gradeable (nike 8/8, apple 7/7, marriott 8/8 missing).
       const order = 'first_party_report_count.desc.nullslast,report_count.desc';
-      const r = await fetch(
-        `${SUPABASE_URL}/rest/v1/company_scores?select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,waste_score,report_count,first_party_report_count${await mentionSel(SUPABASE_URL, hdrsBase)},web_report_count,data_source,data_quality,verification_status,industry&first_party_report_count=gte.1&order=${order}&limit=150`,
-        { headers: hdrsBase }
-      );
+      // In parallel: the Seen-user reports (one small read), so every card can say how many of its
+      // applicant accounts were filed with Seen and how many are public posts (audit #3). A failed
+      // read leaves the split unknown (null) — cards then show no split, never a wrong one.
+      const [r, seenRes] = await Promise.all([
+        fetch(
+          `${SUPABASE_URL}/rest/v1/company_scores?select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,waste_score,report_count,first_party_report_count${await mentionSel(SUPABASE_URL, hdrsBase)},web_report_count,data_source,data_quality,verification_status,industry&first_party_report_count=gte.1&order=${order}&limit=150`,
+          { headers: hdrsBase }
+        ),
+        fetch(`${SUPABASE_URL}/rest/v1/${seenUserReportsPath()}`, { headers: hdrsBase }).catch(() => null),
+      ]);
       if (!r.ok) return res.status(200).json({ companies: [] });
       const rows = await r.json();
+      let seenCounts = null;
+      try { if (seenRes && seenRes.ok) seenCounts = countSeenUserReports(await seenRes.json()); } catch { seenCounts = null; }
       const overall = s => s || 0;
       // Grade gate (lib/server/reportCounts.js): a ranked list is a list of verdicts, so only companies
       // with enough real reports to be graded are on it.
@@ -430,7 +439,11 @@ export default async function handler(req, res) {
           response_rate: c.response_rate || 0,
           avg_wait_days: c.avg_wait_days || 0,
           report_count: c.report_count || 0,
+          // Applicant accounts behind the grade (public posts + Seen-user reports — the field keeps its
+          // old name; see lib/server/reportCounts.js firstPartyReportCount).
           first_party_report_count: firstPartyReportCount(c),
+          // Of those, how many a Seen user filed (null = unknown). The rest are public posts.
+          seen_user_report_count: seenUserShare(seenCounts, c.company_name, firstPartyReportCount(c)),
           mention_count: mentionCount(c),
           web_report_count: webClaimCount(c),
           data_source: servedDataSource(c),
@@ -1739,9 +1752,9 @@ async function handleCompanyScore(req, res, body) {
         headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01', 'anthropic-beta': 'web-search-2025-03-05' },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001', max_tokens: 1500,
-          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-          system: 'You are a hiring transparency researcher. Search Reddit (r/jobs, r/recruitinghell, r/cscareerquestions), Glassdoor, and news for real hiring data. Return ONLY valid JSON, no markdown.',
-          messages: [{ role: 'user', content: `Research hiring practices for: ${co}${locationStr}. Return ONLY this JSON: {"summary":"2-3 sentences","ghost_rate_estimate":0.0-1.0 or null,"response_rate_estimate":0.0-1.0 or null,"avg_rounds_estimate":number or null,"known_issues":["up to 5 real complaints"],"known_positives":["up to 3 positives"],"process_notes":"string or null","data_confidence":"high|medium|low","sources_note":"string","reddit_mentions":number,"glassdoor_rating":number or null}` }],
+          tools: [{ type: 'web_search_20250305', name: 'web_search', blocked_domains: EXCLUDED_SEARCH_DOMAINS }],
+          system: 'You are a hiring transparency researcher. Search Reddit (r/jobs, r/recruitinghell, r/cscareerquestions), Blind and news coverage for real hiring data. Never use Glassdoor, Indeed, LinkedIn or Hacker News. Return ONLY valid JSON, no markdown.',
+          messages: [{ role: 'user', content: `Research hiring practices for: ${co}${locationStr}. Return ONLY this JSON: {"summary":"2-3 sentences","ghost_rate_estimate":0.0-1.0 or null,"response_rate_estimate":0.0-1.0 or null,"avg_rounds_estimate":number or null,"known_issues":["up to 5 real complaints"],"known_positives":["up to 3 positives"],"process_notes":"string or null","data_confidence":"high|medium|low","sources_note":"string","reddit_mentions":number}` }],
         })
       });
       if (!apiRes.ok) throw new Error(`Claude ${apiRes.status}`);
@@ -1805,7 +1818,7 @@ async function handleCompanyScore(req, res, body) {
     const results = [];
     for (const co of batch) {
       try {
-        const apiRes = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01', 'anthropic-beta': 'web-search-2025-03-05' }, body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 2000, tools: [{ type: 'web_search_20250305', name: 'web_search' }], system: 'You are a hiring transparency researcher. Search Reddit, Glassdoor, and Blind for real applicant experiences. Return ONLY valid JSON — no markdown.', messages: [{ role: 'user', content: `Research hiring experience at "${co}". Find 4-6 real applicant quotes from Reddit/Glassdoor/Blind (2023-2025). Return ONLY this JSON: {"ghost_rate":0.0-1.0,"response_rate":0.0-1.0,"avg_rounds":1-8,"avg_wait_days":5-120,"unpaid_rate":0.0-1.0,"report_count":number,"data_quality":"high|medium|low","industry":"string","summary":"2-3 sentences","reviews":[{"text":"quote","sentiment":"positive|negative|mixed","source":"Reddit r/...","year":"2024"}]}` }] }) });
+        const apiRes = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01', 'anthropic-beta': 'web-search-2025-03-05' }, body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 2000, tools: [{ type: 'web_search_20250305', name: 'web_search', blocked_domains: EXCLUDED_SEARCH_DOMAINS }], system: 'You are a hiring transparency researcher. Search Reddit and Blind for real applicant experiences. Never use Glassdoor, Indeed, LinkedIn or Hacker News. Return ONLY valid JSON — no markdown.', messages: [{ role: 'user', content: `Research hiring experience at "${co}". Find 4-6 real applicant quotes from Reddit or Blind (2023-2025). Return ONLY this JSON: {"ghost_rate":0.0-1.0,"response_rate":0.0-1.0,"avg_rounds":1-8,"avg_wait_days":5-120,"unpaid_rate":0.0-1.0,"report_count":number,"data_quality":"high|medium|low","industry":"string","summary":"2-3 sentences","reviews":[{"text":"quote","sentiment":"positive|negative|mixed","source":"Reddit r/...","year":"2024"}]}` }] }) });
         if (!apiRes.ok) throw new Error(`Claude ${apiRes.status}`);
         const d = await apiRes.json();
         const txt = (d.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
@@ -1952,7 +1965,7 @@ async function handleCompanyScore(req, res, body) {
     apiRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01', 'anthropic-beta': 'web-search-2025-03-05' },
-      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 2000, tools: [{ type: 'web_search_20250305', name: 'web_search' }], system: 'You are a hiring transparency researcher. First verify the company exists online, then search Reddit (r/recruitinghell, r/jobs, r/cscareerquestions), Glassdoor interview reviews, Blind, and LinkedIn for real applicant experiences. Focus on posts from 2023-2025. Return ONLY a valid JSON object — no markdown, no explanation.', messages: [{ role: 'user', content: `First, search online to verify that "${name}" is a real, findable company. If it does NOT appear to be a real company — it seems fictional, misspelled, has no web presence, or you cannot find any credible online results — return ONLY this JSON and nothing else: {"not_found":true,"reason":"one sentence explanation"}.\n\nOtherwise, research the hiring process and applicant experience at "${name}". Search for: ghosting complaints, interview timelines, number of rounds, unpaid take-home tests, and overall process reputation. Find 4-6 specific quotes or close paraphrases from real applicants on Reddit, Glassdoor, or Blind.\n\nReturn ONLY this JSON:\n{"ghost_rate":0.0-1.0,"response_rate":0.0-1.0,"avg_rounds":1-8,"avg_wait_days":5-120,"unpaid_rate":0.0-1.0,"report_count":number,"data_quality":"high|medium|low","industry":"e.g. E-Commerce, Fintech","summary":"2-3 sentences","reviews":[{"text":"quote","sentiment":"positive|negative|mixed","source":"Reddit r/...","year":"2024"}]}` }] })
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 2000, tools: [{ type: 'web_search_20250305', name: 'web_search', blocked_domains: EXCLUDED_SEARCH_DOMAINS }], system: 'You are a hiring transparency researcher. First verify the company exists online, then search Reddit (r/recruitinghell, r/jobs, r/cscareerquestions) and Blind for real applicant experiences. Never use Glassdoor, Indeed, LinkedIn or Hacker News. Focus on posts from 2023-2025. Return ONLY a valid JSON object — no markdown, no explanation.', messages: [{ role: 'user', content: `First, search online to verify that "${name}" is a real, findable company. If it does NOT appear to be a real company — it seems fictional, misspelled, has no web presence, or you cannot find any credible online results — return ONLY this JSON and nothing else: {"not_found":true,"reason":"one sentence explanation"}.\n\nOtherwise, research the hiring process and applicant experience at "${name}". Search for: ghosting complaints, interview timelines, number of rounds, unpaid take-home tests, and overall process reputation. Find 4-6 specific quotes or close paraphrases from real applicants on Reddit or Blind.\n\nReturn ONLY this JSON:\n{"ghost_rate":0.0-1.0,"response_rate":0.0-1.0,"avg_rounds":1-8,"avg_wait_days":5-120,"unpaid_rate":0.0-1.0,"report_count":number,"data_quality":"high|medium|low","industry":"e.g. E-Commerce, Fintech","summary":"2-3 sentences","reviews":[{"text":"quote","sentiment":"positive|negative|mixed","source":"Reddit r/...","year":"2024"}]}` }] })
     });
     if (apiRes.status !== 429 && apiRes.status !== 529) break;
   }

@@ -14,7 +14,7 @@ export type TableRow = {
   /** score 0–100 */ s: number
   /** response % or null */ r: number | null
   /** ghost % or null */ gh: number | null
-  /** applicant reports */ n: number
+  /** applicant accounts */ n: number
   /** of n, from public posts (null = unknown) */ pub: number | null
   /** staffing agency */ a: boolean
   /** last updated YYYY-MM-DD */ u: string | null
@@ -26,7 +26,7 @@ const COLS: { key: Key; label: string; num: boolean; first: 'asc' | 'desc' }[] =
   { key: 's', label: 'Grade', num: true, first: 'desc' },
   { key: 'r', label: 'Hear back', num: true, first: 'desc' },
   { key: 'gh', label: 'Never hear back', num: true, first: 'desc' },
-  { key: 'n', label: 'Applicant reports', num: true, first: 'desc' },
+  { key: 'n', label: 'Applicant accounts', num: true, first: 'desc' },
   { key: 'u', label: 'Last updated', num: true, first: 'desc' },
 ]
 
@@ -108,8 +108,8 @@ export default function DataTable({ rows }: { rows: TableRow[] }) {
                   {r.a && <span className={styles.tag}>agency</span>}
                 </td>
                 <td className={styles.num}><span className={`${styles.grade} ${gradeClass(r.s)}`}>{r.g}</span> <span className={styles.dash}>{r.s}</span></td>
-                <td className={styles.num}>{r.r == null ? <span className={styles.dash} title="Too few applicant reports for a rate">n/a</span> : `${r.r}%`}</td>
-                <td className={styles.num}>{r.gh == null ? <span className={styles.dash} title="Too few applicant reports for a rate">n/a</span> : `${r.gh}%`}</td>
+                <td className={styles.num}>{r.r == null ? <span className={styles.dash} title="Too few applicant accounts for a rate">n/a</span> : `${r.r}%`}</td>
+                <td className={styles.num}>{r.gh == null ? <span className={styles.dash} title="Too few applicant accounts for a rate">n/a</span> : `${r.gh}%`}</td>
                 <td className={styles.num}>
                   {r.n.toLocaleString('en-US')}
                   {r.pub != null && r.pub > 0 && <span className={styles.tag} title="Found in public posts (Reddit threads, review sites)">{r.pub === r.n ? 'all public posts' : `${r.pub.toLocaleString('en-US')} public`}</span>}

@@ -16,7 +16,7 @@ function Col({ name, s }: { name: string; s: GrowthScore | null }) {
       </div>
     )
   }
-  // First-party applicant reports only — the fused report_count includes the web-research claim.
+  // First-party applicant accounts only — the fused report_count includes the web-research claim.
   const fp = firstPartyReportCount(s)
   // Grade gate: below MIN_REPORTS_FOR_GRADE real reports there is no grade or rate to compare.
   if (s.overall_score == null) {
@@ -26,7 +26,7 @@ function Col({ name, s }: { name: string; s: GrowthScore | null }) {
           <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', wordBreak: 'break-word', lineHeight: 1.15 }}>{name}</div>
         </Link>
         <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-fig-m)', fontWeight: 800, color: 'var(--dim)', margin: '.6rem 0' }}>—</div>
-        <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5 }}>{`Not enough reviews to grade yet (${Math.min(fp, MIN_REPORTS_FOR_GRADE)} of ${MIN_REPORTS_FOR_GRADE}).`}</div>
+        <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5 }}>{`Not graded yet (${Math.min(fp, MIN_REPORTS_FOR_GRADE)} of ${MIN_REPORTS_FOR_GRADE} applicant accounts).`}</div>
         <Link href={fp > 0 ? `/company/${cslug}` : `/report`} className="btn btn-ghost" style={{ marginTop: '.8rem', fontSize: 'var(--fs-meta)', padding: '.5rem .9rem' }}>{fp > 0 ? 'Read the reports' : 'Be the first to report'}</Link>
       </div>
     )
@@ -54,7 +54,7 @@ function Col({ name, s }: { name: string; s: GrowthScore | null }) {
         ))}
       </div>
       <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.7rem', lineHeight: 1.5 }}>
-        {`Based on ${fp.toLocaleString()} applicant report${fp === 1 ? '' : 's'}`}
+        {`Based on ${fp.toLocaleString()} applicant account${fp === 1 ? '' : 's'}`}
       </div>
     </div>
   )
@@ -76,7 +76,7 @@ function Verdict({ aName, a, bName, b }: { aName: string; a: GrowthScore | null;
       <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.65, margin: 0, fontWeight: 400 }}>
         {tie
           ? `${aName} and ${bName} score evenly at ${hi}/100 on hiring transparency. Compare the ghost and response rates above to break the tie for your situation.`
-          : <>On {anyEst ? 'Seen’s hiring-transparency grade' : 'reported hiring transparency'}, <strong style={{ color: 'var(--white)' }}>{better}</strong> scores higher ({hi}/100) than <strong style={{ color: 'var(--white)' }}>{worse}</strong> ({lo}/100). {anyEst ? 'At least one of these grades is estimated from aggregated public data rather than applicant reports, so treat the gap as directional.' : `That means applicants to ${better} were more likely to hear back.`} Scores are community signals, not verified facts.</>}
+          : <>On {anyEst ? 'Seen’s hiring-transparency grade' : 'reported hiring transparency'}, <strong style={{ color: 'var(--white)' }}>{better}</strong> scores higher ({hi}/100) than <strong style={{ color: 'var(--white)' }}>{worse}</strong> ({lo}/100). {anyEst ? 'At least one of these grades is estimated from aggregated public data rather than applicant accounts, so treat the gap as directional.' : `That means applicants to ${better} were more likely to hear back.`} Scores are community signals, not verified facts.</>}
       </p>
     </div>
   )

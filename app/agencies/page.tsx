@@ -14,7 +14,7 @@ import PageHeader from '@/components/shell/PageHeader'
 // Supabase via lib/growth (never a self-fetch of the live API — see the warning in lib/growth.ts).
 //
 // HONESTY RULES (load-bearing — do not soften):
-// - Ghost/response percentages are shown ONLY for agencies with actual applicant reports
+// - Ghost/response percentages are shown ONLY for agencies with actual applicant accounts
 //   (first_party_report_count > 0 — NEVER the fused report_count, which adds the web-research
 //   pipeline's *claimed* mention count: live, Robert Half showed "3,085 reports" with zero report
 //   rows behind it).
@@ -51,9 +51,9 @@ const mono = (size: string, color: string): React.CSSProperties => ({ fontFamily
 
 type Ranked = {
   agency: StaffingAgency
-  row: LeaderboardRow | null // matched company_scores row (may have 0 applicant reports)
+  row: LeaderboardRow | null // matched company_scores row (may have 0 applicant accounts)
   slug: string // slug of the matched stored name when scored, else of the display name
-  reports: number // FIRST-PARTY applicant reports behind the row (0 when none / no row)
+  reports: number // FIRST-PARTY applicant accounts behind the row (0 when none / no row)
   publicDiscussion: number | null // of `reports`, how many came from public discussion threads / review sites; null = unknown
 }
 
@@ -69,7 +69,7 @@ function ReportCta({ agencyName }: { agencyName: string }) {
   )
 }
 
-// Row for an agency WITH first-party applicant reports: grade + honest percentages + count, and how
+// Row for an agency WITH first-party applicant accounts: grade + honest percentages + count, and how
 // much of that count is attributed public discussion / review-site content.
 function ReportedRow({ r, rank }: { r: Ranked; rank: number }) {
   const s = r.row!.score
@@ -104,7 +104,7 @@ function ReportedRow({ r, rank }: { r: Ranked; rank: number }) {
   )
 }
 
-// Row for an agency with SOME applicant reports but fewer than the grade bar: the reports are
+// Row for an agency with SOME applicant accounts but fewer than the grade bar: the reports are
 // readable on its page, but no grade or percentage is shown until it has enough of them.
 function BuildingRow({ r }: { r: Ranked }) {
   const n = r.reports
@@ -190,7 +190,7 @@ export default async function AgenciesPage() {
   const sponsor = await fetchActiveSponsor()
 
   const matched = STAFFING_AGENCIES.map(agency => {
-    // Best match across aliases: prefer the row with the most FIRST-PARTY applicant reports, then
+    // Best match across aliases: prefer the row with the most FIRST-PARTY applicant accounts, then
     // the larger fused total (more evidence behind the estimate), then alias order.
     let row: LeaderboardRow | null = null
     for (const alias of agency.aliases) {
@@ -243,7 +243,7 @@ export default async function AgenciesPage() {
     },
     {
       q: 'Are these ghost rates verified facts?',
-      a: 'No. They are aggregated community signals from applicant reports and public hiring data, with confidence labels where data is thin. Agencies with no reports show no numbers at all — Seen never fabricates a rate.',
+      a: 'No. They are aggregated community signals from applicant accounts and public hiring data, with confidence labels where data is thin. Agencies with no reports show no numbers at all — Seen never fabricates a rate.',
     },
   ]
   const jsonLd = {
@@ -289,7 +289,7 @@ export default async function AgenciesPage() {
         {reported.length > 0 && (
           <section style={{ marginBottom: '2.4rem' }}>
             <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Ranked by reported ghost rate</h2>
-            <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 400 }}>{`Agencies with enough evidence for a grade: at least one real applicant report and ${MIN_REPORTS_FOR_GRADE} pieces in total. Applicant accounts shared publicly in discussion threads and on review sites count (labeled and down-weighted), online mentions count half. Worst ghost rate first; rows with fewer than 10 reports are marked low confidence.`}</p>
+            <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 400 }}>{`Agencies with enough evidence for a grade: at least one real applicant account and ${MIN_REPORTS_FOR_GRADE} pieces in total. Applicant accounts shared publicly in discussion threads and on review sites count (labeled and down-weighted), online mentions count half. Worst ghost rate first; rows with fewer than 10 reports are marked low confidence.`}</p>
             {reported.map((r, i) => <ReportedRow key={r.agency.name} r={r} rank={i + 1} />)}
           </section>
         )}
@@ -297,7 +297,7 @@ export default async function AgenciesPage() {
         {building.length > 0 && (
           <section style={{ marginBottom: '2.4rem' }}>
             <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Building a record — not graded yet</h2>
-            <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 400 }}>{`These agencies have applicant reports you can read on their page, but not yet ${MIN_REPORTS_FOR_GRADE} pieces of evidence — too few for a fair grade or ghost rate. Every new report gets them closer.`}</p>
+            <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 400 }}>{`These agencies have applicant accounts you can read on their page, but fewer than ${MIN_REPORTS_FOR_GRADE} in all (an online mention counts half) — too few for a fair grade or ghost rate. Every new report gets them closer.`}</p>
             {building.map(r => <BuildingRow key={r.agency.name} r={r} />)}
           </section>
         )}
@@ -305,7 +305,7 @@ export default async function AgenciesPage() {
         {unlisted.length > 0 && (
           <section style={{ marginBottom: '2.4rem' }}>
             <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Not enough reports yet ({unlisted.length})</h2>
-            <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 400 }}>No applicant reports on these agencies yet, so no grade or rate — we won&apos;t invent a number.</p>
+            <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 400 }}>No applicant accounts on these agencies yet, so no grade or rate — we won&apos;t invent a number.</p>
             <NoDataList rows={unlisted} />
           </section>
         )}
@@ -327,7 +327,7 @@ export default async function AgenciesPage() {
         </section>
 
         <p style={{ ...mono('var(--fs-60)', 'var(--dim)'), lineHeight: 1.7 }}>
-          Seen Grades aggregate applicant reports and public hiring signals into a 0–100 score. They are community signals, not verified facts, and update hourly as new reports arrive. Grades and percentages appear only once at least {MIN_REPORTS_FOR_GRADE} applicants have reported outcomes. Report counts include outcomes shared publicly in discussion threads and on review sites (labeled and counted at reduced weight); web-research estimates are never counted as reports.
+          Seen Grades aggregate applicant accounts and public hiring signals into a 0–100 score. They are community signals, not verified facts, and update hourly as new reports arrive. Grades and percentages appear only once at least {MIN_REPORTS_FOR_GRADE} applicants have reported outcomes. Report counts include outcomes shared publicly in discussion threads and on review sites (labeled and counted at reduced weight); web-research estimates are never counted as reports.
         </p>
       </div>
     </div>

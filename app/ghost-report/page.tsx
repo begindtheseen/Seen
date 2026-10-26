@@ -16,7 +16,7 @@ export const revalidate = 3600
 export const metadata: Metadata = pageMetadata({
   title: 'The Weekly Ghost Report — Which Companies Ghost Applicants',
   description:
-    'A weekly, auto-generated snapshot of hiring transparency from real applicant reports: the most-reported ghosters, the companies that actually reply, and the running staffing-agency ghost index. Real numbers only — companies with no reports show no score.',
+    'A weekly, auto-generated snapshot of hiring transparency from real applicant accounts: the most-reported ghosters, the companies that actually reply, and the running staffing-agency ghost index. Real numbers only — companies with no reports show no score.',
   path: '/ghost-report',
   ogTitle: 'The Weekly Ghost Report',
   ogDescription: 'The most-reported ghosters and the companies that actually reply — from real applicant outcomes.',
@@ -98,7 +98,7 @@ export default async function GhostReportPage() {
         {report.hasReported ? (
           <>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.6rem 2.2rem', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.2rem 1.4rem', margin: '1.2rem 0 2.4rem' }}>
-              <Stat value={h.reportsTotal.toLocaleString()} label="applicant reports" color="var(--white)" />
+              <Stat value={h.reportsTotal.toLocaleString()} label="applicant accounts" color="var(--white)" />
               <Stat value={String(h.companiesTracked)} label="companies with reports" color="var(--white)" />
               {h.avgGhostRatePct != null && <Stat value={`${h.avgGhostRatePct}%`} label="avg reported ghost rate" color="var(--red)" />}
               {h.avgWaitDays != null && <Stat value={`${h.avgWaitDays}d`} label="avg reported wait to silence" color="var(--amber)" />}
@@ -118,7 +118,7 @@ export default async function GhostReportPage() {
             {report.worstOffenders.length > 0 && (
               <section style={{ marginBottom: '2.4rem' }}>
                 <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Most-reported ghosters</h2>
-                <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 400 }}>Ranked by reported ghost rate among companies with real applicant reports. No reports, no number.</p>
+                <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 400 }}>Ranked by reported ghost rate among companies with real applicant accounts. No reports, no number.</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                 {report.worstOffenders.map((r, i) => (
                 <OffenderRow key={r.name} r={r} rank={i + 1} />

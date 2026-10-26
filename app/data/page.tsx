@@ -12,7 +12,7 @@ import {
   LICENSE_URL, LICENSE_NAME, MIN_REPORTS_FOR_RATES, FIELD_DESCRIPTIONS,
 } from '@/lib/openDataset'
 
-// Seen's open dataset: every graded company's response and ghost rates, from applicant reports, as a
+// Seen's open dataset: every graded company's response and ghost rates, from applicant accounts, as a
 // server-rendered table plus CSV and JSON files (CC BY 4.0). Numbers come from the snapshot in
 // lib/server/openDataRead.ts, mapped by the same helpers as the company page (lib/openDataset.ts).
 // Rendered per request from a 1-hour cached snapshot, so a failed read is never frozen into the page.
@@ -24,7 +24,7 @@ const SITE = 'https://seenjobs.io'
 export async function generateMetadata(): Promise<Metadata> {
   const d = await getOpenDataset()
   return pageMetadata({
-    title: 'Employer response rates, from applicant reports (open data)',
+    title: 'Employer response rates, from applicant accounts (open data)',
     description: d
       ? `${datasetSummary(d)} Free to download as CSV or JSON under ${LICENSE_NAME}.`
       : `Every company Seen grades, with the share of applicants who hear back and who never do. Free to download as CSV or JSON under ${LICENSE_NAME}.`,
@@ -42,7 +42,7 @@ function datasetJsonLd(d: Dataset) {
         '@type': 'Dataset',
         '@id': `${SITE}${DATA_PATH}#dataset`,
         name: DATASET_NAME,
-        description: `${datasetSummary(d)} For each graded company: Seen Grade, the share of applicants who heard back, the share who never did, and how many applicant reports stand behind them. Reports are self-reported claims, not verified facts.`,
+        description: `${datasetSummary(d)} For each graded company: Seen Grade, the share of applicants who heard back, the share who never did, and how many applicant accounts stand behind them. Reports are self-reported claims, not verified facts.`,
         url: `${SITE}${DATA_PATH}`,
         license: LICENSE_URL,
         isAccessibleForFree: true,
@@ -123,12 +123,12 @@ export default async function DataPage() {
         <section className={styles.section} aria-labelledby="src-h">
           <h2 id="src-h" className={styles.h2}>Where the reports come from</h2>
           <p className={styles.p}>
-            An applicant report is one hiring outcome (heard back, interviewed, rejected, hired, or never heard back) reported by the applicant: either submitted to Seen, or a first-hand account found in a public post such as a Reddit thread or a review site.
-            {t.publicReports != null ? ` Of the ${plural(t.reports, 'applicant report')} behind this table, ${t.publicReports.toLocaleString('en-US')} ${t.publicReports === 1 ? 'was' : 'were'} found in public posts; those count at reduced weight.` : ' Reports found in public posts count at reduced weight.'}
+            An applicant account is one hiring outcome (heard back, interviewed, rejected, hired, or never heard back) reported by the applicant: either submitted to Seen, or a first-hand account found in a public post such as a Reddit thread or a review site.
+            {t.publicReports != null ? ` Of the ${plural(t.reports, 'applicant account')} behind this table, ${t.publicReports.toLocaleString('en-US')} ${t.publicReports === 1 ? 'was' : 'were'} found in public posts; those count at reduced weight.` : ' Reports found in public posts count at reduced weight.'}
             {` Online mentions (${t.mentions.toLocaleString('en-US')} here) count half a report each. Estimates from web research are never counted as reports.`}
           </p>
           <p className={styles.p}>
-            Percentages appear only for companies with at least {MIN_REPORTS_FOR_RATES} applicant reports ({plural(t.withRates, 'company', 'companies')} here); the others show a grade only. Reports are self-reported claims, not verified facts. How grades are built: <Link href={METHODS_PATH}>methods</Link>. Rankings built from this table: <Link href="/lists">monthly lists</Link>.
+            Percentages appear only for companies with at least {MIN_REPORTS_FOR_RATES} applicant accounts ({plural(t.withRates, 'company', 'companies')} here); the others show a grade only. Reports are self-reported claims, not verified facts. How grades are built: <Link href={METHODS_PATH}>methods</Link>. Rankings built from this table: <Link href="/lists">monthly lists</Link>.
           </p>
         </section>
 

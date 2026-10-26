@@ -155,7 +155,7 @@ export default function PricingPage() {
           <p className={s.lede} style={{ marginBottom: '1.5rem' }}>{body}</p>
           <div style={{ display: 'grid', gap: '.6rem' }}>
             <button type="button" className={`${s.btn} ${s.btnLead}`} onClick={() => router.push(purchasedSku === 'credits20' ? '/resume' : '/tracker')}>
-              {purchasedSku === 'credits20' ? 'Open Résumé AI →' : 'Open my tracker →'}
+              {purchasedSku === 'credits20' ? 'Open Résumé →' : 'Open my tracker →'}
             </button>
             <button type="button" className={`${s.btn} ${s.btnFree}`} onClick={() => router.push('/jobs')}>Find jobs to apply to</button>
           </div>

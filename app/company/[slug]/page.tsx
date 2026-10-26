@@ -191,8 +191,8 @@ function computeVibes(sc: CompanyScore): { label: string; cls: string }[] {
   else if (wait > 21)     vibes.push({ label: `⏳ Slow response (${wait}d avg)`,   cls: 'v-y' })
   if (rounds >= 5)        vibes.push({ label: `📋 ${Math.round(rounds)} rounds avg`,       cls: 'v-b' })
   else if (rounds >= 3.5) vibes.push({ label: `📋 ${rounds.toFixed(1)} rounds avg`,        cls: 'v-b' })
-  if (waste > 70)         vibes.push({ label: '⚠ Very high waste risk',            cls: 'v-y' })
-  else if (waste > 50)    vibes.push({ label: '⚠ High waste risk',                 cls: 'v-y' })
+  if (waste > 70)         vibes.push({ label: '⚠ Very high wasted-effort risk',            cls: 'v-y' })
+  else if (waste > 50)    vibes.push({ label: '⚠ High wasted-effort risk',                 cls: 'v-y' })
   // Mutually exclusive with the ghost-surge banner (surge wins at ghost>=0.5): a company
   // can't be both "highly responsive" and in a ghost surge.
   if (rr > 0.75 && ghost < 0.5) vibes.push({ label: '✅ Highly responsive',           cls: 'v-g' })
@@ -313,8 +313,8 @@ function WebReviewsSection({ reviews, hidden }: { reviews: WebReview[]; hidden: 
 
 // ── Outcome distribution bar (for overview) ────────────────────────────────────
 
-// Fed the applicant reports WITH an outcome only — the same rows (and the same count) as the hero. It
-// used to be fed every hiring row and read "77 community reports" under a "48 applicant reports" hero.
+// Fed the applicant accounts WITH an outcome only — the same rows (and the same count) as the hero. It
+// used to be fed every hiring row and read "77 community reports" under a "48 applicant accounts" hero.
 function OutcomeDistribution({ reports, label }: { reports: Report[]; label: string }) {
   if (!reports || reports.length < 3) return null
   const dist: Record<string, number> = {}
@@ -685,7 +685,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const verdict = sum.verdict
 
   // The rows behind the counts. Employee reviews are shown but are NOT hiring outcomes (same rule as the
-  // score — lib/server/reportCounts.js); "applicant reports" are the hiring rows WITH an outcome.
+  // score — lib/server/reportCounts.js); "applicant accounts" are the hiring rows WITH an outcome.
   const hiringReports = reports.filter(r => !isEmployeeReview(r))
   const employeeN = sum.listed.employee
   const outcomeReports = hiringReports.filter(r => isResolvedOutcome(r.outcome))
@@ -893,7 +893,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                 <p className="co-verdict">
                   {fpReports > 0
                     ? `We have ${gradeBasisLabel(score)} for ${displayName} so far. A grade appears at ${MIN_REPORTS_FOR_GRADE} — each report counts 1, each thing people say online counts ½.`
-                    : `No applicant reports for ${displayName} yet. A grade appears once ${MIN_REPORTS_FOR_GRADE} real reports are in.`}
+                    : `No applicant accounts for ${displayName} yet. A grade appears once ${MIN_REPORTS_FOR_GRADE} real reports are in.`}
                 </p>
                 <div className="co-grade-meta">
                   <a href={reportHref} className="co-live" style={{ textDecoration: 'none' }}>+ Add yours to help grade it</a>
@@ -925,7 +925,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               <VibeTagList sc={score} />
 
               {/* A number the reports never gave (no wait or round counts on any row) is left out, never shown as "—".
-                  Response / ghost percentages need MIN_REPORTS_FOR_RATES applicant reports (Chipotle showed "77%"
+                  Response / ghost percentages need MIN_REPORTS_FOR_RATES applicant accounts (Chipotle showed "77%"
                   from 2 — audit 2026-10-23); below it the page says so instead. */}
               {(() => {
                 const tiles = [
@@ -933,7 +933,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                   sum.ratesShown && score.ghost_rate != null ? <MetBox key="g" label="Ghosted" value={pct(score.ghost_rate)} alarm={ghostHigh} color={ghostColor} /> : null,
                   score.avg_wait_days != null ? <MetBox key="w" label="Avg wait" value={`${score.avg_wait_days}d`} color={waitColor} /> : null,
                   score.avg_rounds != null ? <MetBox key="n" label="Rounds" value={score.avg_rounds.toFixed(1)} /> : null,
-                  score.waste != null ? <MetBox key="x" label="Waste risk" value={`${score.waste}%`} color={wasteColor} /> : null,
+                  score.waste != null ? <MetBox key="x" label="Wasted-effort risk" value={`${score.waste}%`} color={wasteColor} /> : null,
                 ].filter(Boolean)
                 return (
                   <>
@@ -944,7 +944,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                     )}
                     {!sum.ratesShown && (
                       <div className="co-dq" role="note" style={{ display: 'block', color: 'var(--muted)', marginTop: '.5rem', lineHeight: 1.6 }}>
-                        Response and ghost rates appear at {MIN_REPORTS_FOR_RATES} applicant reports — {fpReports} so far.
+                        Response and ghost rates appear at {MIN_REPORTS_FOR_RATES} applicant accounts — {fpReports} so far.
                       </div>
                     )}
                   </>
@@ -989,7 +989,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                     clean URL; visitors landing with ?sv= see the normal page. */}
                 <a
                   className="co-chip co-chip-reddit"
-                  href={`https://reddit.com/submit?url=${encodeURIComponent(`https://seenjobs.io/company/${slug}${graded ? `?sv=${score.overall_score}` : ''}`)}&title=${encodeURIComponent(graded ? `Is ${displayName} worth applying to? Seen score: ${score.overall_score}/100` : `Is ${displayName} worth applying to? Applicant reports on Seen`)}`}
+                  href={`https://reddit.com/submit?url=${encodeURIComponent(`https://seenjobs.io/company/${slug}${graded ? `?sv=${score.overall_score}` : ''}`)}&title=${encodeURIComponent(graded ? `Is ${displayName} worth applying to? Seen score: ${score.overall_score}/100` : `Is ${displayName} worth applying to? Applicant accounts on Seen`)}`}
                   target="_blank" rel="noopener noreferrer"
                 >🔴 Post to Reddit</a>
                 {graded && <button type="button" className="co-chip" onClick={() => setShowGradeCard(true)}>🖼 Grade card</button>}
@@ -1008,7 +1008,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                 response_rate: score.response_rate ?? 0,
                 avg_wait_days: score.avg_wait_days ?? 0,
                 waste: score.waste ?? 0,
-                // First-party only: the PNG renders "Based on N applicant reports" — feeding it
+                // First-party only: the PNG renders "Based on N applicant accounts" — feeding it
                 // the fused web claim published the phantom number to social. Its own zero-state
                 // ("Baseline estimate · share your experience") is the honest fallback.
                 report_count: fpReports,
@@ -1018,7 +1018,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                 tags: [
                   (score.ghost_rate ?? 0) >= 0.5 ? '👻 High ghost rate' : null,
                   (score.response_rate ?? 0) >= 0.5 ? '✅ Responsive' : null,
-                  (score.waste || 0) >= 50 ? '⚠ High waste risk' : null,
+                  (score.waste || 0) >= 50 ? '⚠ High wasted-effort risk' : null,
                   (score.avg_wait_days || 0) >= 30 ? '⏳ Long wait times' : null,
                 ].filter(Boolean) as string[],
               }}
@@ -1035,7 +1035,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
           <div className="co-secs">
             {graded && (
               <Section id="odds" icon="📅" title="Your odds here" open={open.odds} onToggle={toggle}
-                summary={`${timing.short} · ${sum.ratesShown ? `${respPct}% hear back` : `too few applicant reports for a rate (${fpReports} of ${MIN_REPORTS_FOR_RATES})`} · your response probability & industry rank`}>
+                summary={`${timing.short} · ${sum.ratesShown ? `${respPct}% hear back` : `too few applicant accounts for a rate (${fpReports} of ${MIN_REPORTS_FOR_RATES})`} · your response probability & industry rank`}>
                 <div className="co-card" style={{ marginBottom: '1rem' }}>
                   <div className="co-sec-lbl" style={{ marginBottom: '.45rem' }}>How long until they reply</div>
                   <p style={{ margin: 0, fontSize: 'var(--fs-ui)', color: 'var(--text)', lineHeight: 1.55 }}>{timing.line}</p>
@@ -1054,7 +1054,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
 
             {graded && (
               <Section id="breakdown" icon="📊" title="How the grade is built" open={open.breakdown} onToggle={toggle}
-                summary={`${sum.ratesShown ? `Response ${respPct}% · ghost ${ghostPct}% · ` : ''}waste ${score.waste ?? 0}% · ${sum.ratesShown ? 'where in the process they ghost' : `rates appear at ${MIN_REPORTS_FOR_RATES} applicant reports (${fpReports} so far)`}`}>
+                summary={`${sum.ratesShown ? `Response ${respPct}% · ghost ${ghostPct}% · ` : ''}waste ${score.waste ?? 0}% · ${sum.ratesShown ? 'where in the process they ghost' : `rates appear at ${MIN_REPORTS_FOR_RATES} applicant accounts (${fpReports} so far)`}`}>
                 <div className="co-two">
                   <div className="co-card">
                     <div className="co-sec-lbl" style={{ marginBottom: '.85rem' }}>Score breakdown</div>
@@ -1065,10 +1065,10 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                       </>
                     ) : (
                       <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.6, marginBottom: '.6rem' }}>
-                        Response and ghost rates are shown from {MIN_REPORTS_FOR_RATES} applicant reports — this grade stands on {sum.evidenceLine}.
+                        Response and ghost rates are shown from {MIN_REPORTS_FOR_RATES} applicant accounts — this grade stands on {sum.evidenceLine}.
                       </div>
                     )}
-                    <BarRow label="Waste risk" value={score.waste || 0} color={wasteColor} />
+                    <BarRow label="Wasted-effort risk" value={score.waste || 0} color={wasteColor} />
                     <div className="co-kv">
                       <span>Process score</span><b style={{ color: riskColor(risk) }}>{score.process_score ?? score.overall_score} / 100</b>
                     </div>
@@ -1088,13 +1088,13 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                     </div>
                   </div>) })()}
                 </div>
-                <OutcomeDistribution reports={outcomeReports} label={`Outcome distribution · ${outcomeReports.length} applicant report${outcomeReports.length === 1 ? '' : 's'} with an outcome${sum.listed.waiting > 0 ? ` · ${sum.listed.waiting} still waiting not counted` : ''}`} />
+                <OutcomeDistribution reports={outcomeReports} label={`Outcome distribution · ${outcomeReports.length} applicant account${outcomeReports.length === 1 ? '' : 's'} with an outcome${sum.listed.waiting > 0 ? ` · ${sum.listed.waiting} still waiting not counted` : ''}`} />
               </Section>
             )}
 
-            {/* The list holds applicant reports AND employee reviews, so the header names both and counts
-                each separately — it used to read "Applicant reports 100" for 15 accounts + 85 reviews. */}
-            <Section id="reports" icon="🗣" title={employeeN > 0 ? 'Applicant reports & employee reviews' : 'Applicant reports'} count={employeeN > 0 ? null : sum.listed.withOutcome} open={open.reports} onToggle={toggle}
+            {/* The list holds applicant accounts AND employee reviews, so the header names both and counts
+                each separately — it used to read "Applicant accounts 100" for 15 accounts + 85 reviews. */}
+            <Section id="reports" icon="🗣" title={employeeN > 0 ? 'Applicant accounts & employee reviews' : 'Applicant accounts'} count={employeeN > 0 ? null : sum.listed.withOutcome} open={open.reports} onToggle={toggle}
               summary={reports.length === 0 && reportsLoading ? 'Loading reports…' : reportsSectionSummary(sum)}>
               <div className="co-reports-tools">
                 <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.6, flex: 1, minWidth: 180 }}>
@@ -1217,7 +1217,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               {cityRows.length > 0 && (
                 <div style={{ marginBottom: '1.5rem' }}>
                   <div className="co-sec-lbl" style={{ marginBottom: '.35rem' }}>Reported outcomes by city</div>
-                  <div style={sectionNote}>From {reportsWithCity} applicant report{reportsWithCity !== 1 ? 's' : ''} that named a city</div>
+                  <div style={sectionNote}>From {reportsWithCity} applicant account{reportsWithCity !== 1 ? 's' : ''} that named a city</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
                     {cityRows.map(row => {
                       const ghostPctVal = Math.round(row.ghostRate * 100)
@@ -1255,7 +1255,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                 ) : hiringRows.length > 0 ? (
                   <>
                     <div style={sectionNote}>
-                      From {hiring.listings} current job listing{hiring.listings !== 1 ? 's' : ''}{capped ? ' (the top-scored open listings — there may be more)' : ''} · listing locations, not applicant reports
+                      From {hiring.listings} current job listing{hiring.listings !== 1 ? 's' : ''}{capped ? ' (the top-scored open listings — there may be more)' : ''} · listing locations, not applicant accounts
                       {hiring.abroad > 0 ? ` · ${hiring.abroad} outside the US not shown` : ''}
                       {hiring.withLocation + hiring.abroad < hiring.listings ? ` · ${hiring.listings - hiring.withLocation - hiring.abroad} without a stated location` : ''}
                     </div>
@@ -1289,7 +1289,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               </div>
               {cityRows.length === 0 && (
                 <div style={{ marginTop: '1.2rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>
-                  No applicant reports with a city yet.{' '}
+                  No applicant accounts with a city yet.{' '}
                   <a href={reportHref} style={{ color: 'var(--green)', textDecoration: 'none' }}>Report your experience →</a>
                 </div>
               )}
@@ -1422,7 +1422,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               {score && (
                 <div className="co-about-line">
                   <span>📊 {!graded
-                    ? `${ungradedLabel} — a grade needs ${MIN_REPORTS_FOR_GRADE}: each applicant report counts 1, each thing people say online counts ½; web estimates never count`
+                    ? `${ungradedLabel} — a grade needs ${MIN_REPORTS_FOR_GRADE}: each applicant account counts 1, each thing people say online counts ½; web estimates never count`
                     : `Based on ${gradeBasisLabel(score)}${webEst > 0 ? ' + public web research' : ''}`}</span>
                   <a href={reportHref} style={{ color: 'var(--green)', textDecoration: 'none' }}>+ Add your report →</a>
                 </div>

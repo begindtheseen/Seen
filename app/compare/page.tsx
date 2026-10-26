@@ -16,11 +16,11 @@ export const revalidate = 3600
 
 export const metadata: Metadata = pageMetadata({
   title: 'Compare Company Hiring: Ghost Rates Side by Side',
-  description: 'Compare any two companies side by side on hiring transparency — ghost rate, response rate, average wait, and Seen Grade — from applicant reports, with labeled estimates where reports are missing. Decide where to apply.',
+  description: 'Compare any two companies side by side on hiring transparency — ghost rate, response rate, average wait, and Seen Grade — from applicant accounts, with labeled estimates where reports are missing. Decide where to apply.',
   keywords: ['compare company hiring', 'ghost rate comparison', 'which company responds faster', 'company hiring comparison', 'compare ghost rates'],
   path: '/compare',
   ogTitle: 'Compare Company Hiring Side by Side',
-  ogDescription: 'Ghost rate, response rate, and Seen Grade for any two companies — from applicant reports, with labeled estimates where reports are missing.',
+  ogDescription: 'Ghost rate, response rate, and Seen Grade for any two companies — from applicant accounts, with labeled estimates where reports are missing.',
 })
 
 const wrap = { maxWidth: 760, margin: '0 auto', padding: '3.5rem 1.25rem 5rem', width: '100%', boxSizing: 'border-box' as const }
@@ -46,7 +46,7 @@ export default async function ComparePage() {
           Compare hiring, side by side
         </h1>
         <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-body)', lineHeight: 1.7, fontWeight: 400, margin: '0 0 2rem' }}>
-          Two companies, head to head — ghost rate, response rate, average wait, and Seen Grade, from applicant reports where we have them and clearly labeled public-data estimates where we don&apos;t. Pick where your application actually has a chance.
+          Two companies, head to head — ghost rate, response rate, average wait, and Seen Grade, from applicant accounts where we have them and clearly labeled public-data estimates where we don&apos;t. Pick where your application actually has a chance.
         </p>
 
         {/* useSearchParams lives in CompareQuery — the Suspense boundary keeps this page static. */}
@@ -68,7 +68,7 @@ export default async function ComparePage() {
         </div>
 
         <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '2.5rem', lineHeight: 1.7 }}>
-          Seen Grades are aggregated community signals from applicant reports, not verified facts. Browse all <Link href="/companies" style={{ color: 'var(--blue)' }}>companies</Link>.
+          Seen Grades are aggregated community signals from applicant accounts, not verified facts. Browse all <Link href="/companies" style={{ color: 'var(--blue)' }}>companies</Link>.
         </p>
       </div>
     </div>

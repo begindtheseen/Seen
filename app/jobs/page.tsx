@@ -128,7 +128,7 @@ export default function JobsPage() {
             tone="green"
             title="Open positions"
             crumbLabel="Jobs"
-            sub="Ranked by how well they match your search. Every listing shows waste risk, process score, and vibe tags — not just salary and location."
+            sub="Ranked by how well they match your search. Every listing shows how complete its posting is and how the employer treats applicants — not just pay and location."
             className="jpage-head"
           />
 
@@ -269,7 +269,7 @@ export default function JobsPage() {
             >
               <option value="best">Best match</option>
               <option value="transparency">By transparency</option>
-              <option value="waste">Lowest waste risk</option>
+              <option value="waste">Lowest wasted-effort risk</option>
               <option value="recent">Most recent</option>
             </select>
           </div>

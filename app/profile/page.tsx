@@ -87,7 +87,7 @@ export default function ProfilePage() {
   // customer exists, i.e. when a subscription summary came back.
   const [portalBusy, setPortalBusy] = useState(false)
 
-  // Résumé (add / replace lives here too — owner found "it's only in Résumé AI" confusing)
+  // Résumé (add / replace lives here too — owner found "it's only in Résumé" confusing)
   const [resumeMeta, setResumeMeta] = useState<{ fileName: string; wordCount: number } | null>(null)
   const [resumeBusy, setResumeBusy] = useState(false)
   const [resumeMsg, setResumeMsg] = useState('')
@@ -411,13 +411,13 @@ export default function ProfilePage() {
               {saveMsg && <div className={`${styles.msg} ${saveMsgOk ? styles.ok : styles.err}`}>{saveMsg}</div>}
             </section>
 
-            {/* ── Résumé — add / replace here, not only inside Résumé AI ── */}
+            {/* ── Résumé — add / replace here, not only inside Résumé ── */}
             <section id="resume" className={styles.card}>
               <div className={styles.cardHead}>
                 <div>
                   <div className={styles.eyebrow}>Résumé</div>
                   <h2 className={styles.cardT}>{resumeMeta ? 'On file' : 'Add your résumé'}</h2>
-                  <p className={styles.cardS}>One upload powers job matching, your fit score and rewrites in Résumé AI.</p>
+                  <p className={styles.cardS}>One upload powers job matching, your fit score and rewrites in Résumé.</p>
                 </div>
               </div>
               {resumeMeta && (
@@ -433,7 +433,7 @@ export default function ProfilePage() {
                 <button type="button" className={resumeMeta ? styles.ghost : styles.primary} onClick={() => resumeFileRef.current?.click()} disabled={resumeBusy}>
                   {resumeBusy ? 'Uploading…' : resumeMeta ? 'Replace résumé' : 'Upload résumé →'}
                 </button>
-                <button type="button" className={styles.ghost} onClick={() => router.push('/resume')}>Open Résumé AI →</button>
+                <button type="button" className={styles.ghost} onClick={() => router.push('/resume')}>Open Résumé →</button>
                 <button type="button" className={styles.ghost} onClick={() => router.push('/resume/studio')}>✦ Résumé Studio →</button>
               </div>
               <input

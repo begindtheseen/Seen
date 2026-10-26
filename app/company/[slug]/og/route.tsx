@@ -51,8 +51,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
   const respPct = pct(s?.response_rate)
   const wait = s?.avg_wait_days != null ? Math.round(s.avg_wait_days) : 0
 
-  // Only FIRST-PARTY rows may be published as "applicant reports" — the fused count once put
-  // the LLM's claimed web-mention number (e.g. "12,775 applicant reports") on every share unfurl.
+  // Only FIRST-PARTY rows may be published as "applicant accounts" — the fused count once put
+  // the LLM's claimed web-mention number (e.g. "12,775 applicant accounts") on every share unfurl.
   const fp = firstPartyReportCount(s)
   const updated = hasData ? lastUpdatedLabel(s?.updated_at) : ''
   const verdict = hasData ? companyVerdict({ ghostRate: s?.ghost_rate ?? 0, responseRate: s?.response_rate ?? 0 }) : ''

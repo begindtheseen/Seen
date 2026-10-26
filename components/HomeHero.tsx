@@ -34,7 +34,7 @@ const FEATURED_SEED: ProofScore = {
 // One-tap example companies for brand-new users — zero typing to first value.
 // Checked against the LIVE production leaderboard (2026-10-17): every entry has a score and the
 // grade spread shows instantly that Seen differentiates companies. NOTE: only Amazon's score is
-// backed by first-party applicant reports (23); Starbucks / Nike / McDonald's scores are
+// backed by first-party applicant accounts (23); Starbucks / Nike / McDonald's scores are
 // web-research ESTIMATES (their large fused counts — 11.5k / 2.2k / 12.7k — are web claims with
 // zero report rows), and their company pages label them as estimates.
 // Slugs are the exact stored names, so routing never depends on punctuation cleanup.

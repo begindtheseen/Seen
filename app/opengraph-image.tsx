@@ -55,7 +55,7 @@ export default function Image() {
             maxWidth: 920,
           }}
         >
-          Ghost rates, response times, and hiring grades for hundreds of companies — from real applicant reports.
+          Ghost rates, response times, and hiring grades for hundreds of companies — from real applicant accounts.
         </div>
 
         <div style={{ display: 'flex', gap: 16, marginTop: 44 }}>

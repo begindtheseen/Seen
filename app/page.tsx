@@ -44,7 +44,7 @@ export default function LandingPage() {
       {/* Redesigned hero: one consolidated company search + a live real-data proof card */}
       <HomeHero />
 
-      {/* Live pulse: the newest real applicant reports gliding by (components/home/LivePulse) */}
+      {/* Live pulse: the newest real applicant accounts gliding by (components/home/LivePulse) */}
       <LivePulse />
 
       {/* Value · How it works · Final CTA.

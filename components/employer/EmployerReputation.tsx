@@ -72,7 +72,7 @@ export function EmployerReputation() {
   // Grade gate (lib/gradeGate.ts): employers see exactly what candidates see — no grade/rates
   // until MIN_REPORTS_FOR_GRADE real reports back them.
   const hasData = isGradeableScore(s) && (s?.report_count ?? 0) > 0
-  // Honest split (migration 063): only first-party rows may render as "applicant reports" —
+  // Honest split (migration 063): only first-party rows may render as "applicant accounts" —
   // the web-research claimed count is an estimate, not applicants who reported this employer.
   const fpReports = s ? (s.first_party_report_count ?? (s.data_source === 'reports' ? (s.report_count ?? 0) : 0)) : 0
 
@@ -122,7 +122,7 @@ export function EmployerReputation() {
                 {reply != null && <Stat value={`${reply}%`} label="response rate" color="var(--green)" />}
                 {wait != null && <Stat value={`${wait}d`} label="avg wait" color="var(--amber)" />}
                 {fpReports > 0
-                  ? <Stat value={fpReports.toLocaleString()} label="applicant reports" color="var(--white)" />
+                  ? <Stat value={fpReports.toLocaleString()} label="applicant accounts" color="var(--white)" />
                   : <Stat value="Web est." label="no first-party reports yet" color="var(--dim)" />}
               </div>
             </div>
@@ -142,13 +142,13 @@ export function EmployerReputation() {
           <div style={{ paddingTop: '1.4rem', borderTop: '1px solid var(--line)' }}>
             <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', marginBottom: '.35rem' }}>{notEnoughReviewsLabel(s)}</div>
             <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.65, margin: '0 0 .9rem', maxWidth: 520 }}>
-              Candidates can read the {fpReports.toLocaleString()} applicant report{fpReports === 1 ? '' : 's'} about &ldquo;{checked}&rdquo;, but Seen doesn&apos;t grade a company or show ghost / response rates until at least {MIN_REPORTS_FOR_GRADE} real reports back it. Get Transparency Verified now so the first thing candidates see is your commitment to respond.
+              Candidates can read the {fpReports.toLocaleString()} applicant account{fpReports === 1 ? '' : 's'} about &ldquo;{checked}&rdquo;, but Seen doesn&apos;t grade a company or show ghost / response rates until at least {MIN_REPORTS_FOR_GRADE} real reports back it. Get Transparency Verified now so the first thing candidates see is your commitment to respond.
             </p>
             <a href="#promote" style={{ display: 'inline-block', background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 8, padding: '.55rem 1.1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-meta)', color: '#fff', textDecoration: 'none' }}>Get Transparency Verified →</a>
           </div>
         ) : (
           <div style={{ paddingTop: '1.4rem', borderTop: '1px solid var(--line)' }}>
-            <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', marginBottom: '.35rem' }}>No applicant reports for &ldquo;{checked}&rdquo; yet.</div>
+            <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', marginBottom: '.35rem' }}>No applicant accounts for &ldquo;{checked}&rdquo; yet.</div>
             <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.65, margin: '0 0 .9rem', maxWidth: 520 }}>
               You&apos;re a blank slate — which is an opportunity. Get Transparency Verified now and you signal &ldquo;we respond&rdquo; from day one, before a single ghost report can define you.
             </p>

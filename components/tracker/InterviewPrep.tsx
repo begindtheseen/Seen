@@ -254,7 +254,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
                 {rec.quotes.map((q, i) => (
                   <blockquote key={i} className={s.quote}>
                     “{q.text}”
-                    <span className={s.qsrc}>{q.role ? `${q.role} · ` : ''}{q.source || 'applicant report'}</span>
+                    <span className={s.qsrc}>{q.role ? `${q.role} · ` : ''}{q.source || 'applicant account'}</span>
                   </blockquote>
                 ))}
               </details>

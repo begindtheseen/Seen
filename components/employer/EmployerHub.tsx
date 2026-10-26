@@ -37,7 +37,7 @@ type Score = {
   ghost_rate: number | null
   response_rate: number | null
   avg_wait_days: number | null
-  report_count: number // FUSED (first-party + web claim) — never rendered as "applicant reports"
+  report_count: number // FUSED (first-party + web claim) — never rendered as "applicant accounts"
   first_party_report_count?: number
   web_report_count?: number
   data_source?: string
@@ -227,7 +227,7 @@ export function EmployerHub() {
   // ── Derived hero + overview numbers (same helpers as the old dashboard) ──────
   const recent = recentInteractions(reports, 5) as InteractionView[]
   const summary = summarizeInteractions(reports) as Summary
-  // "applicant reports": first-party rows only (migration 063) — the web-research claimed count is
+  // "applicant accounts": first-party rows only (migration 063) — the web-research claimed count is
   // an estimate input, not applicants who reported this employer.
   const fpReports = firstPartyReportCount(score)
   const totalReports = score ? fpReports : summary.total
@@ -370,7 +370,7 @@ export function EmployerHub() {
                 <GradeRing score={hasRep ? overall! : null} />
                 <div style={{ display: 'flex', gap: '1.6rem', flexWrap: 'wrap' }}>
                   <CountStat value={jobsState === 'ok' ? postings.length : null} label="live postings" color="var(--blue)" />
-                  <CountStat value={totalReports} label="applicant reports" color="var(--white)" />
+                  <CountStat value={totalReports} label="applicant accounts" color="var(--white)" />
                   <CountStat value={ghost} suffix="%" label="ghost rate" color="var(--red)" />
                   <CountStat value={reply} suffix="%" label="response rate" color="var(--green)" />
                 </div>
@@ -379,7 +379,7 @@ export function EmployerHub() {
                 {hasRep && fpReports > 0
                   ? 'Grade, ghost rate and response rate are your public Seen reputation — what candidates see before applying.'
                   : fpReports > 0
-                    ? `${notEnoughReviewsLabel(score)}. Candidates can read your ${fpReports} applicant report${fpReports === 1 ? '' : 's'}, but no grade or ghost / response rate is shown until there are enough.`
+                    ? `${notEnoughReviewsLabel(score)}. Candidates can read your ${fpReports} applicant account${fpReports === 1 ? '' : 's'}, but no grade or ghost / response rate is shown until there are enough.`
                     : `No applicant outcomes reported for ${company} yet — a clean slate. Your live postings still show below.`}
               </p>
             </section>

@@ -61,7 +61,7 @@ type Intel = { ghost_rate?: number; avg_wait_days?: number; report_count?: numbe
 type ScoreIntel = { ghost_rate: number; overall_score: number; report_count: number; avg_wait_days?: number; first_party_report_count?: number; data_source?: string | null }
 // Time-aware "is this normal?" verdict — the insight only Seen can give: compare how
 // long an application has been silent against how this company ACTUALLY responds.
-// Stated as fact ("they ghost 42%") ONLY when first-party applicant reports back it; a score
+// Stated as fact ("they ghost 42%") ONLY when first-party applicant accounts back it; a score
 // built from web research alone (fused report_count > 0, first-party 0) is worded as an estimate.
 function ghostWatch(days: number, intel?: Intel): Watch | null {
   if (!intel || !intel.report_count || !intel.avg_wait_days) return null

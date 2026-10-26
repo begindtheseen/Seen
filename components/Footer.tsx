@@ -13,7 +13,7 @@ const COLS: Array<{ title: string; links: Array<{ href: string; label: string }>
     { href: '/dashboard', label: 'Dashboard' },
     { href: '/jobs', label: 'Jobs' },
     { href: '/tracker', label: 'Application tracker' },
-    { href: '/resume', label: 'Résumé AI' },
+    { href: '/resume', label: 'Résumé' },
     { href: '/pricing', label: 'Pricing' },
   ] },
   { title: 'Intel', links: [

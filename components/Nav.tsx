@@ -240,7 +240,7 @@ export default function Nav() {
               <Link href="/jobs" className={linkCls('/jobs')}>Jobs</Link>
               <Link href="/companies" className={linkCls('/companies')}>Companies</Link>
               <Link href="/tracker" className={linkCls('/tracker')}>Track</Link>
-              <Link href="/resume" className={linkCls('/resume')}>Résumé AI</Link>
+              <Link href="/resume" className={linkCls('/resume')}>Résumé</Link>
             </>
           ) : (
             <>
@@ -443,7 +443,7 @@ export default function Nav() {
         {isSeeker && <Link href="/jobs" className={`side-menu-item${isActive('/jobs') ? ' active' : ''}`}><span className="side-menu-icon">💼</span>Jobs</Link>}
         {isSeeker && <Link href="/companies" className={`side-menu-item${isActive('/companies') ? ' active' : ''}`}><span className="side-menu-icon">🏢</span>Companies</Link>}
         {isSeeker && <Link href="/tracker" className={`side-menu-item${isActive('/tracker') ? ' active' : ''}`}><span className="side-menu-icon">✓</span>Track</Link>}
-        {isSeeker && <Link href="/resume" className={`side-menu-item${isActive('/resume') ? ' active' : ''}`}><span className="side-menu-icon">📄</span>Résumé AI</Link>}
+        {isSeeker && <Link href="/resume" className={`side-menu-item${isActive('/resume') ? ' active' : ''}`}><span className="side-menu-icon">📄</span>Résumé</Link>}
         {isSeeker && <Link href="/saved" className={`side-menu-item${isActive('/saved') ? ' active' : ''}`}><span className="side-menu-icon">♥</span>Saved jobs</Link>}
 
         <div className="side-menu-label">Explore</div>

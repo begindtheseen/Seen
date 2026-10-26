@@ -522,7 +522,7 @@ export default function DashboardPage() {
         <div className={styles.tools}>
           <Link href="/resume" className={`${styles.tool}`}>
             <span className={styles.sym}>🧠</span>
-            <b>Résumé AI</b>
+            <b>Résumé</b>
             <small>{hasResume ? `${profile?.resume_file_name || 'Résumé on file'} · Scan fit →` : 'Add your résumé →'}</small>
           </Link>
           <Link href="/tracker" className={`${styles.tool}`}>

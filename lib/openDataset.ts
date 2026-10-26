@@ -6,7 +6,7 @@
 // letter scale) and lib/companyFactLine.ts. So /data, /lists/*, llms.txt and /company/<slug> cannot disagree.
 //
 // Honesty rules (load-bearing):
-//   - "applicant reports" = first-party report rows with an outcome (first_party_report_count). They
+//   - "applicant accounts" = first-party report rows with an outcome (first_party_report_count). They
 //     include accounts found in public posts (Reddit threads, review sites); `publicReports` says how many.
 //     Nothing here ever calls a count "Seen users".
 //   - web_report_count (the web-research claim) is never published as reports.
@@ -23,7 +23,7 @@ import { MIN_REPORTS_FOR_RATES } from './companyPageSummary.ts'
 
 export { MIN_REPORTS_FOR_RATES }
 
-/** A company must have at least this many applicant reports to be RANKED on a monthly list. */
+/** A company must have at least this many applicant accounts to be RANKED on a monthly list. */
 export const LIST_MIN_REPORTS = 20
 /** Fewer ranked rows than this and a list says it is not yet a full ranking. */
 export const LIST_FULL_SIZE = 10
@@ -37,7 +37,7 @@ export const DATA_PATH = '/data'
 export const CSV_PATH = '/data/employer-response-rates.csv'
 export const JSON_PATH = '/data/employer-response-rates.json'
 export const METHODS_PATH = '/methods'
-export const DATASET_NAME = 'Employer response rates, from applicant reports'
+export const DATASET_NAME = 'Employer response rates, from applicant accounts'
 
 /** A score row as lib/growth.ts growthScoreFromRow returns it (only the fields read here). */
 export type ScoreInput = NonNullable<MetaScore> & {
@@ -61,7 +61,7 @@ export interface DatasetRow {
   responsePct: number | null
   /** Share of applicants who never hear back, as a whole percent; null when too few reports. */
   ghostPct: number | null
-  /** First-party applicant reports with an outcome (the company page's "N applicant reports"). */
+  /** First-party applicant accounts with an outcome (the company page's "N applicant accounts"). */
   reports: number
   /** Of `reports`, how many were found in public posts (Reddit threads, review sites); null when unknown. */
   publicReports: number | null
@@ -185,11 +185,11 @@ export function joinNames(names: string[]): string {
 /** The one-sentence summary at the top of /data (also the dataset description's first sentence). */
 export function datasetSummary(d: Dataset): string {
   const t = d.totals
-  if (t.companies === 0) return `As of ${d.asOfLabel}, no company on Seen has enough applicant reports for a grade.`
+  if (t.companies === 0) return `As of ${d.asOfLabel}, no company on Seen has enough applicant accounts for a grade.`
   const pub = t.publicReports != null && t.publicReports > 0
     ? `; ${t.publicReports.toLocaleString('en-US')} of those reports ${t.publicReports === 1 ? 'was' : 'were'} found in public posts such as Reddit threads and review sites, not submitted to Seen`
     : ''
-  return `As of ${d.asOfLabel}, Seen grades ${plural(t.companies, 'company', 'companies')} from ${plural(t.reports, 'applicant report')}${pub}.`
+  return `As of ${d.asOfLabel}, Seen grades ${plural(t.companies, 'company', 'companies')} from ${plural(t.reports, 'applicant account')}${pub}.`
 }
 
 // ── CSV / JSON ───────────────────────────────────────────────────────────────────────────────────
@@ -229,9 +229,9 @@ export const FIELD_DESCRIPTIONS: Record<(typeof CSV_COLUMNS)[number], string> = 
   company_page: 'The company page on Seen, with the reports behind the numbers.',
   seen_grade: 'Letter grade from seen_score: A 80+, B 65+, C 50+, D 35+, F below 35.',
   seen_score: 'Seen Grade score, 0 to 100, from applicant-reported outcomes.',
-  response_rate_pct: `Share of applicants who heard back from a person (a screen, interview, rejection or offer), whole percent. Empty below ${MIN_REPORTS_FOR_RATES} applicant reports.`,
-  ghost_rate_pct: `Share of applicants who never heard back, whole percent. Automated rejections count in neither rate. Empty below ${MIN_REPORTS_FOR_RATES} applicant reports.`,
-  applicant_reports: 'Applicant reports with an outcome behind the numbers: submitted to Seen, or first-hand accounts found in public posts.',
+  response_rate_pct: `Share of applicants who heard back from a person (a screen, interview, rejection or offer), whole percent. Empty below ${MIN_REPORTS_FOR_RATES} applicant accounts.`,
+  ghost_rate_pct: `Share of applicants who never heard back, whole percent. Automated rejections count in neither rate. Empty below ${MIN_REPORTS_FOR_RATES} applicant accounts.`,
+  applicant_reports: 'Applicant accounts with an outcome behind the numbers: submitted to Seen, or first-hand accounts found in public posts.',
   from_public_posts: 'Of applicant_reports, how many were found in public posts (Reddit threads, review sites) rather than submitted to Seen. Empty when unknown.',
   online_mentions: 'Quoted online accounts of a hiring outcome; each counts half a report in the rates.',
   typical_wait_days: 'Typical days until a first reply, when reported.',
@@ -251,8 +251,8 @@ export function datasetJson(d: Dataset) {
     attribution: d.attribution,
     as_of: d.asOf.toISOString(),
     as_of_date: d.asOfDate,
-    note: 'Applicant reports are self-reported claims, not verified facts. Rates are shown only for companies with at least '
-      + `${MIN_REPORTS_FOR_RATES} applicant reports.`,
+    note: 'Applicant accounts are self-reported claims, not verified facts. Rates are shown only for companies with at least '
+      + `${MIN_REPORTS_FOR_RATES} applicant accounts.`,
     totals: {
       companies: d.totals.companies,
       applicant_reports: d.totals.reports,
@@ -308,7 +308,7 @@ export interface RankedList {
   /** Rows with a rate but under the cutoff: shown for reference, never ranked. */
   below: DatasetRow[]
   belowSections: ListSection[]
-  /** "N applicant reports say 89% heard back" for one row. */
+  /** "N applicant accounts say 89% heard back" for one row. */
   rowSay: (r: DatasetRow) => string
   metricLabel: string
   metric: (r: DatasetRow) => number
@@ -363,14 +363,14 @@ export function buildList(slug: ListSlug, d: Dataset, cutoff = LIST_MIN_REPORTS)
   let lead: string
   let h1: string
   if (n === 0) {
-    lead = `No ${ent.one} has ${cutoff} or more applicant reports on Seen yet, so there is no ranking this month.`
+    lead = `No ${ent.one} has ${cutoff} or more applicant accounts on Seen yet, so there is no ranking this month.`
     h1 = respond ? 'Employers that respond to applicants' : 'Staffing agencies that ghost applicants'
   } else if (n === 1) {
     const r = ranked[0]
-    lead = `Only 1 ${ent.one} has ${cutoff} or more applicant reports on Seen: ${r.company}, where ${metric(r)}% of applicants ${unit} (${plural(r.reports, 'applicant report')}).`
+    lead = `Only 1 ${ent.one} has ${cutoff} or more applicant accounts on Seen: ${r.company}, where ${metric(r)}% of applicants ${unit} (${plural(r.reports, 'applicant account')}).`
     h1 = `${r.company}: ${metric(r)}% of applicants ${unit}`
   } else {
-    lead = `Of the ${plural(n, ent.one, ent.many)} with ${cutoff} or more applicant reports on Seen, ${joinNames(top)} ${verb(top)} the most applicants: ${topPct}% ${respond ? 'hear back' : 'never hear back'}.`
+    lead = `Of the ${plural(n, ent.one, ent.many)} with ${cutoff} or more applicant accounts on Seen, ${joinNames(top)} ${verb(top)} the most applicants: ${topPct}% ${respond ? 'hear back' : 'never hear back'}.`
     if (bottom.length && bottomPct !== topPct) lead += ` ${joinNames(bottom)} ${verb(bottom)} the fewest: ${bottomPct}%.`
     h1 = `${joinNames(top)} ${verb(top)} the most applicants: ${topPct}% ${unit}`
   }
@@ -381,8 +381,8 @@ export function buildList(slug: ListSlug, d: Dataset, cutoff = LIST_MIN_REPORTS)
     : `Only ${plural(n, ent.one, ent.many)} ${n === 1 ? 'meets' : 'meet'} the ${cutoff} report cutoff this month, fewer than ${LIST_FULL_SIZE}, so this is not yet a full ranking. ${n === 1 ? 'It is' : 'All of them are'} shown below.`
 
   const rowSay = (r: DatasetRow) => respond
-    ? `${plural(r.reports, 'applicant report')} say ${r.responsePct}% heard back`
-    : `${plural(r.reports, 'applicant report')} say ${r.ghostPct}% never heard back`
+    ? `${plural(r.reports, 'applicant account')} say ${r.responsePct}% heard back`
+    : `${plural(r.reports, 'applicant account')} say ${r.ghostPct}% never heard back`
 
   const title = respond ? `Employers that respond to applicants, ${d.month}` : `Staffing agencies that ghost applicants, ${d.month}`
   return {

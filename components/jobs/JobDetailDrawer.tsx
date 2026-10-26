@@ -308,7 +308,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
           {/* Stat grid */}
           <div className="jd-grid" style={{ marginBottom: '1rem' }}>
             <div className="jd-stat"><span className="jd-sn">{job.score ?? '–'}</span><span className="jd-sl">Listing score</span></div>
-            <div className="jd-stat"><span className="jd-sn" style={{ color: job.waste == null ? 'var(--dim)' : job.waste > 55 ? 'var(--red)' : job.waste > 35 ? 'var(--amber)' : 'var(--green)' }}>{job.waste == null ? '–' : `${job.waste}%`}</span><span className="jd-sl">Waste risk</span></div>
+            <div className="jd-stat"><span className="jd-sn" style={{ color: job.waste == null ? 'var(--dim)' : job.waste > 55 ? 'var(--red)' : job.waste > 35 ? 'var(--amber)' : 'var(--green)' }}>{job.waste == null ? '–' : `${job.waste}%`}</span><span className="jd-sl">Wasted-effort risk</span></div>
             <div className="jd-stat"><span className="jd-sn" style={{ fontSize: 'var(--fs-meta)' }}>{job.type || 'Full-time'}</span><span className="jd-sl">Type</span></div>
             <div className="jd-stat"><span className="jd-sn" style={{ fontSize: 'var(--fs-meta)' }}>{job.level || '—'}</span><span className="jd-sl">Level</span></div>
             <div className="jd-stat"><span className="jd-sn" style={{ color: 'var(--green)', fontSize: 'var(--fs-meta)' }}>{pay || '—'}</span><span className="jd-sl">{pay ? payLabel(pay) : 'Salary'}</span></div>

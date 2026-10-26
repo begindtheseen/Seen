@@ -43,10 +43,10 @@ export interface CompanyMetaFacts {
   gradeable: boolean
   score: number | null
   grade: string | null
-  /** First-party applicant reports with an outcome — the only count that may be published as "reports". */
+  /** First-party applicant accounts with an outcome — the only count that may be published as "reports". */
   reportCount: number
   mentions: number
-  /** Percentages are null below MIN_REPORTS_FOR_RATES applicant reports (same rule as the page). */
+  /** Percentages are null below MIN_REPORTS_FOR_RATES applicant accounts (same rule as the page). */
   ratesShown: boolean
   ghostPct: number | null
   respPct: number | null
@@ -60,7 +60,7 @@ export interface CompanyMetaFacts {
   title: string
   /** The <meta description>, answer first, built from these facts (lib/cardCopy.js pageDescription). */
   description: string
-  /** "48 applicant reports and 32 online mentions" — what the grade stands on. */
+  /** "48 applicant accounts and 32 online mentions" — what the grade stands on. */
   basis: string
 }
 
@@ -105,7 +105,7 @@ export function companyMetaFacts(name: string, s: MetaScore, summary: MetaSummar
   const waitDays = waitRaw != null && waitRaw > 0 ? waitRaw : null
   const verdictKind = ratesShown ? responseVerdict(s!.response_rate) : null
   const basis = reportCount > 0
-    ? `${plural(reportCount, 'applicant report')}${mentions > 0 ? ` and ${plural(mentions, 'online mention')}` : ''}`
+    ? `${plural(reportCount, 'applicant account')}${mentions > 0 ? ` and ${plural(mentions, 'online mention')}` : ''}`
     : 'aggregated hiring data'
   const summaryUsable = gradeable && summaryMatchesScore(summary, reportCount, score)
   const updatedMonth = gradeable && s!.updated_at ? formatPacific(s!.updated_at, { month: 'short', year: 'numeric' }) : ''
