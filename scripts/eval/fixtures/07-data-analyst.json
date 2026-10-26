@@ -1,0 +1,153 @@
+{
+  "id": "07-data-analyst",
+  "field": "Data analyst",
+  "resume": [
+    "Hannah Kim",
+    "Minneapolis, MN | hannah.kim.data@gmail.com | 612-555-0154",
+    "",
+    "SUMMARY",
+    "Data analyst with 4 years turning messy retail and banking data into weekly decisions. SQL every day, Tableau dashboards that store and branch managers actually open.",
+    "",
+    "EXPERIENCE",
+    "Data Analyst | North Loop Retail Co. | Minneapolis, MN | May 2022 – Present",
+    "• Own the weekly sales and labor dashboards in Tableau used by 40 store managers and the regional ops team",
+    "• Write SQL in Snowflake against 300M+ rows of POS and labor data; built the team's shared dbt-free view layer of 25 views",
+    "• Automated the Monday sales report with Python (pandas), saving the team 6 hours a week",
+    "• Found that 11 stores were over-scheduled on Tuesday mornings; the schedule change saved about $310K a year",
+    "",
+    "Reporting Analyst | Twin Lakes Credit Union | St. Paul, MN | Jun 2020 – Apr 2022",
+    "• Built monthly member-growth and loan-delinquency reports in Excel and SQL Server for the executive team",
+    "• Rebuilt 14 Excel reports with Power Query, cutting month-end reporting from 3 days to 1",
+    "",
+    "Marketing Intern | Lakeside Brewing Company | Duluth, MN | Summer 2019",
+    "• Pulled taproom sales by event and helped plan 6 promotional events",
+    "",
+    "EDUCATION",
+    "B.S. Statistics, minor in Economics — University of Minnesota, Twin Cities, 2020",
+    "",
+    "SKILLS",
+    "SQL (Snowflake, SQL Server), Tableau, Excel (Power Query, pivot tables), Python (pandas), A/B test analysis, data storytelling"
+  ],
+  "job": {
+    "title": "Data Analyst, Operations",
+    "company": "Riverbend Health Partners",
+    "location": "Minneapolis, MN (hybrid)",
+    "description": [
+      "Riverbend Health Partners runs 22 primary-care and urgent-care clinics across the Twin Cities. Our clinical systems run on Epic, and our operations analytics team turns that data into staffing and access decisions.",
+      "",
+      "What you'll do",
+      "- Build and maintain dashboards on clinic access, wait times and staffing",
+      "- Write SQL to pull, join and validate data from our data warehouse",
+      "- Answer ad hoc questions from clinic directors and present findings in plain language",
+      "- Partner with finance on monthly volume forecasts",
+      "",
+      "Required qualifications",
+      "- 2+ years of experience in a data or reporting analyst role",
+      "- Advanced SQL (joins, window functions, CTEs)",
+      "- Experience with Tableau or Power BI",
+      "- Strong Excel skills",
+      "- Ability to explain findings to non-technical stakeholders",
+      "",
+      "Preferred",
+      "- Python or R for analysis",
+      "- Experience with healthcare claims or scheduling data",
+      "",
+      "Work arrangement and pay",
+      "Hybrid: 2 days a week in our Minneapolis office. $78,000 – $92,000 per year plus annual bonus."
+    ]
+  },
+  "gold": {
+    "family": [
+      "data_analytics"
+    ],
+    "must_skills": [
+      {
+        "label": "SQL",
+        "match": "\\bsql\\b"
+      },
+      {
+        "label": "Tableau/Power BI",
+        "match": "tableau|power ?bi"
+      },
+      {
+        "label": "Excel",
+        "match": "excel"
+      }
+    ],
+    "alternatives": [
+      [
+        "Tableau",
+        "Power BI"
+      ],
+      [
+        "Python",
+        "R"
+      ]
+    ],
+    "years_min": 2,
+    "traps": [
+      {
+        "term": "Epic",
+        "match": "\\bepic\\b",
+        "scope": "candidate",
+        "why": "Epic is the clinics' system, not a requirement or her skill"
+      },
+      {
+        "term": "Healthcare data experience",
+        "match": "healthcare (?:claims|data)|claims data",
+        "scope": "candidate",
+        "why": "she has retail and banking data only"
+      },
+      {
+        "term": "Power BI (as her tool)",
+        "match": "power ?bi",
+        "scope": "candidate",
+        "why": "she uses Tableau"
+      },
+      {
+        "term": "R language",
+        "match": "\\bR\\b(?! ?&)",
+        "scope": "candidate",
+        "why": "not on her résumé",
+        "caseSensitive": true
+      },
+      {
+        "term": "Epic (as a requirement)",
+        "match": "\\bepic\\b",
+        "scope": "requirements",
+        "why": "Epic is the clinics' system, not a requirement"
+      }
+    ],
+    "resume_employers": [
+      "North Loop Retail Co.",
+      "Twin Lakes Credit Union",
+      "Lakeside Brewing Company"
+    ],
+    "resume_titles": [
+      "Data Analyst",
+      "Reporting Analyst",
+      "Marketing Intern"
+    ],
+    "resume_degrees": [
+      "B.S. Statistics"
+    ],
+    "resume_numbers": [
+      "612",
+      "555",
+      "0154",
+      "4",
+      "2022",
+      "40",
+      "300",
+      "25",
+      "6",
+      "11",
+      "310",
+      "2020",
+      "14",
+      "3",
+      "1",
+      "2019"
+    ]
+  }
+}

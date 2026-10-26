@@ -120,7 +120,7 @@ export function NotificationsFeed({
         <SummaryPill n={summary.postingsNearingStale} label="aging off" color="var(--amber)" />
         <SummaryPill n={summary.newApplicants} label={`new applicant${summary.newApplicants === 1 ? '' : 's'}`} color="var(--blue)" />
         {mounted && lastVisit != null && newCount > 0 && (
-          <span style={{ marginLeft: 'auto', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--green)', border: '1px solid rgba(16,185,129,.3)', borderRadius: 999, padding: '.28rem .7rem' }}>
+          <span style={{ marginLeft: 'auto', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', border: '1px solid rgba(16,185,129,.3)', borderRadius: 999, padding: '.28rem .7rem' }}>
             {newCount} new since your last visit
           </span>
         )}
@@ -146,34 +146,34 @@ export function NotificationsFeed({
                 padding: '1rem 1.15rem',
               }}
             >
-              <span style={{ fontSize: '1.15rem', lineHeight: 1.2, flexShrink: 0 }} aria-hidden>{meta.icon}</span>
+              <span style={{ fontSize: 'var(--fs-lead)', lineHeight: 1.2, flexShrink: 0 }} aria-hidden>{meta.icon}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '.6rem', flexWrap: 'wrap' }}>
-                  <span style={{ fontFamily: 'var(--display)', fontSize: '.88rem', fontWeight: 700, color: 'var(--white)' }}>{it.title}</span>
+                  <span style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-ui)', fontWeight: 700, color: 'var(--white)' }}>{it.title}</span>
                   {fresh && (
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--green)', border: '1px solid rgba(16,185,129,.35)', borderRadius: 4, padding: '.1rem .35rem' }}>New</span>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--green)', border: '1px solid rgba(16,185,129,.35)', borderRadius: 4, padding: '.1rem .35rem' }}>New</span>
                   )}
                 </div>
-                <p style={{ color: 'var(--sub)', fontSize: '.78rem', lineHeight: 1.6, margin: '.3rem 0 0' }}>{it.detail}</p>
+                <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-meta)', lineHeight: 1.6, margin: '.3rem 0 0' }}>{it.detail}</p>
                 {/* Actionable, not just informational: reposting/first-party posting is the one
                     thing an employer can actually DO about listing decay. Deep-links to the
                     dashboard's add-a-listing form prefilled from this listing. */}
                 {it.action && it.jobId && (
                   <a
                     href={`/employers/dashboard?prefill=${encodeURIComponent(it.jobId)}`}
-                    style={{ display: 'inline-block', marginTop: '.55rem', fontFamily: 'var(--mono)', fontSize: '.6rem', fontWeight: 700, color: 'var(--white)', border: '1px solid var(--line2)', borderRadius: 6, padding: '.3rem .7rem', textDecoration: 'none' }}
+                    style={{ display: 'inline-block', marginTop: '.55rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, color: 'var(--white)', border: '1px solid var(--line2)', borderRadius: 6, padding: '.3rem .7rem', textDecoration: 'none' }}
                   >
                     {it.action === 'repost' ? '↻ Repost this listing →' : '＋ Post this role yourself →'}
                   </a>
                 )}
                 <div style={{ display: 'flex', gap: '.7rem', marginTop: '.5rem', flexWrap: 'wrap' }}>
                   <span
-                    style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.08em', color: meta.color }}
+                    style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.08em', color: meta.color }}
                   >
                     {meta.label}
                   </span>
                   {it.at && (
-                    <span title={absDate(it.at)} style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>
+                    <span title={absDate(it.at)} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>
                       {rel ? rel : absDate(it.at)}
                     </span>
                   )}
@@ -185,7 +185,7 @@ export function NotificationsFeed({
       </div>
 
       {/* Honest footnote on the mechanism + the delivery follow-up */}
-      <p style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', lineHeight: 1.7, marginTop: '1.6rem' }}>
+      <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.7, marginTop: '1.6rem' }}>
         Computed live from your listings on Seen. Postings go stale after {thresholds.STALE_AFTER_DAYS} days without being seen on their source and expire after {thresholds.EXPIRE_AFTER_DAYS}; applicant counts cover the last {thresholds.APPLICANT_WINDOW_DAYS} days. Email and push delivery of these updates are coming next.
       </p>
     </div>
@@ -194,8 +194,8 @@ export function NotificationsFeed({
 
 function SummaryPill({ n, label, color }: { n: number; label: string; color: string }) {
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: '.35rem', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 999, padding: '.3rem .75rem' }}>
-      <b style={{ color, fontFamily: 'var(--display)', fontSize: '.8rem' }}>{n}</b> {label}
+    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: '.35rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 999, padding: '.3rem .75rem' }}>
+      <b style={{ color, fontFamily: 'var(--display)', fontSize: 'var(--fs-sm)' }}>{n}</b> {label}
     </span>
   )
 }

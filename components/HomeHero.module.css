@@ -22,8 +22,9 @@
   align-items: center;
   gap: 0.55rem;
   font-family: var(--mono);
-  font-size: 0.64rem;
-  letter-spacing: 0.12em;
+  font-size: var(--fs-meta);
+  font-weight: 500;
+  letter-spacing: var(--ls-meta);
   text-transform: uppercase;
   color: #c7d2fe;
   border: 1px solid rgba(129, 140, 248, 0.3);
@@ -49,9 +50,9 @@
 .title {
   font-family: var(--display);
   font-weight: 800;
-  letter-spacing: -0.04em;
-  line-height: 1.02;
-  font-size: clamp(2.4rem, 5.6vw, 4.3rem);
+  letter-spacing: var(--ls-display);
+  line-height: 1.04;
+  font-size: var(--fs-display);
   color: var(--white);
   margin: 1.3rem 0 0;
   max-width: 100%;
@@ -65,8 +66,8 @@
 }
 
 .lede {
-  color: var(--sub);
-  font-size: clamp(1rem, 2.1vw, 1.12rem);
+  color: var(--text-3);
+  font-size: var(--fs-lead);
   line-height: 1.6;
   margin: 1.25rem 0 1.9rem;
   max-width: 54ch;
@@ -80,15 +81,15 @@
   max-width: 680px;
   background: #0d1120;
   border: 1px solid var(--line2);
-  border-radius: 16px;
+  border-radius: var(--r-panel);
   padding: 0.5rem;
   text-align: left;
-  box-shadow: 0 24px 70px -24px rgba(0, 0, 0, 0.75), 0 0 60px -20px rgba(99, 102, 241, 0.35);
+  box-shadow: var(--sh-overlay);
   transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
 .search:focus-within {
   border-color: rgba(129, 140, 248, 0.6);
-  box-shadow: 0 20px 60px -24px rgba(0, 0, 0, 0.7), 0 0 0 3px rgba(99, 102, 241, 0.16), 0 0 50px rgba(99, 102, 241, 0.25);
+  box-shadow: var(--sh-overlay), var(--sh-focus);
 }
 .field { display: flex; align-items: center; gap: 0.55rem; padding: 0 0.75rem; flex: 1; min-width: 0; }
 .field:first-child { flex: 1.5; }
@@ -100,7 +101,7 @@
   background: transparent;
   color: var(--white);
   font-family: var(--body);
-  font-size: 0.95rem;
+  font-size: var(--fs-body);
   padding: 0.75rem 0;
   outline: none;
   caret-color: var(--blue);
@@ -110,43 +111,39 @@
   flex: none;
   padding: 0.75rem 1.25rem;
   border: none;
-  border-radius: 11px;
+  border-radius: var(--r-control);
   font-family: var(--body);
-  font-weight: 700;
-  font-size: 0.9rem;
+  font-weight: 600;
+  font-size: var(--fs-ui);
   color: #fff;
   cursor: pointer;
   white-space: nowrap;
-  background: linear-gradient(135deg, #1d4ed8 0%, #7c3aed 55%, #a855f7 100%);
-  box-shadow: 0 0 24px rgba(124, 58, 237, 0.35);
+  background: var(--cta-gradient);
+  box-shadow: var(--sh-control);
+  transition: background var(--dur-state) var(--ease-out), box-shadow var(--dur-state) var(--ease-out), transform var(--dur-press) var(--ease-out);
 }
-.go:hover { filter: brightness(1.08); }
+.go:hover { background: var(--cta-gradient-hover); box-shadow: 0 10px 28px -10px rgba(124, 58, 237, .7); }
+.go:active { transform: scale(.98); }
 
 /* ── "Try one" chips ── */
 .examples { display: flex; align-items: center; justify-content: center; gap: 0.5rem; flex-wrap: wrap; margin-top: 1.1rem; }
-.examplesLabel { font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); margin-right: 0.15rem; }
+.examplesLabel { font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); margin-right: 0.15rem; }
 .chip {
   font-family: var(--body);
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--sub);
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--line2);
   border-radius: 999px;
-  padding: 0.36rem 0.9rem;
+  min-height: 36px;
+  padding: 0 0.9rem;
   cursor: pointer;
-  transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease, transform 0.25s var(--ease-spring), box-shadow 0.22s ease;
+  transition: color var(--dur-state) var(--ease-out), border-color var(--dur-state) var(--ease-out), background var(--dur-state) var(--ease-out);
 }
-.chip:hover {
-  color: var(--white);
-  border-color: rgba(129, 140, 248, 0.5);
-  background: rgba(99, 102, 241, 0.1);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.18);
-}
-.chip:active { transform: scale(0.96); }
+.chip:hover { color: var(--white); border-color: var(--accent-line); background: var(--accent-tint); }
 
-.trust { display: flex; justify-content: center; gap: 1.4rem; margin-top: 1.4rem; flex-wrap: wrap; color: var(--dim); font-size: 0.82rem; }
+.trust { display: flex; justify-content: center; gap: 1.4rem; margin-top: 1.4rem; flex-wrap: wrap; color: var(--dim); font-size: var(--fs-sm); }
 .trust b { color: var(--sub); font-weight: 600; }
 
 /* ── Entrance choreography: stages rise from the first paint (CSS only). ── */
@@ -154,8 +151,8 @@
    the server HTML on, never hidden behind opacity:0 until the JS bundle hydrates. The old version
    waited for hydration + the font gate (useIntroGate), so the lede (the page's LCP element) painted
    at ~4.7 s on a throttled phone (conversion audit 2026-10-24). */
-@keyframes stageRise { from { transform: translateY(16px); } to { transform: none; } }
-.stage { animation: stageRise 0.7s var(--ease-out) both; }
+@keyframes stageRise { from { transform: translateY(12px); } to { transform: none; } }
+.stage { animation: stageRise var(--dur-hero) var(--ease-out) backwards; }
 .d1 { animation-delay: 0.02s; }
 .d3 { animation-delay: 0.42s; }
 .d4 { animation-delay: 0.52s; }
@@ -169,8 +166,8 @@
   .go { flex: 1 1 100%; padding: 0.8rem; }
   .examples { display: grid; grid-template-columns: repeat(2, 1fr); width: 100%; }
   .examplesLabel { grid-column: 1 / -1; margin: 0; }
-  .chip { padding: 0.6rem 0.5rem; font-size: 0.84rem; }
-  .trust { gap: 0.4rem 1.1rem; font-size: 0.78rem; }
+  .chip { min-height: 44px; padding: 0 0.5rem; font-size: var(--fs-sm); }
+  .trust { gap: 0.4rem 1.1rem; font-size: var(--fs-meta); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -181,11 +178,6 @@
 
 /* Phone floor (audit 2026-10-23): eyebrow and "Try one" label read at 12px. */
 @media (max-width: 768px) {
-  .eyebrow, .examplesLabel { font-size: 0.75rem; }
-  .eyebrow { letter-spacing: 0.06em; }
+  .eyebrow, .examplesLabel { font-size: var(--fs-meta); }
 }
 
-/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
-@media (max-width: 768px) {
-  .eyebrow, .examplesLabel { font-size: 0.75rem; }
-}

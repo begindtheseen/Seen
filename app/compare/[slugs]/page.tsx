@@ -28,7 +28,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slugs: st
   const aName = titleCase(parsed[0]), bName = titleCase(parsed[1])
   const url = `https://seenjobs.io/compare/${slugs}`
   const title = `${aName} vs ${bName} Hiring: Ghost Rate & Response Time Compared`
-  const description = `${aName} vs ${bName} — which treats applicants better? Compare ghost rate, response rate, average wait, and Seen Grade side by side — from applicant reports, with labeled estimates where reports are missing.`
+  const description = `${aName} vs ${bName} — which treats applicants better? Compare ghost rate, response rate, average wait, and Seen Grade side by side — from applicant accounts, with labeled estimates where reports are missing.`
   return pageMetadata({
     title, description, path: url, ogTitle: title,
     keywords: [`${aName} vs ${bName} hiring`, `${aName} or ${bName}`, `${aName} vs ${bName} ghost rate`, `which is better ${aName} ${bName}`, `${aName} ${bName} interview process`],
@@ -56,7 +56,7 @@ export default async function CompareSlugsPage({ params }: { params: Promise<{ s
   // Grade gate: only two GRADED companies (≥5 real reports each) get a comparison answer.
   const answer = (a && b && a.overall_score != null && b.overall_score != null)
     ? `${a.overall_score >= b.overall_score ? aName : bName} has the higher hiring transparency grade (${Math.max(a.overall_score, b.overall_score)}/100 vs ${Math.min(a.overall_score, b.overall_score)}/100).`
-    : `Not enough applicant reports yet to compare ${aName} and ${bName} fully.`
+    : `Not enough applicant accounts yet to compare ${aName} and ${bName} fully.`
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'FAQPage',
@@ -71,28 +71,28 @@ export default async function CompareSlugsPage({ params }: { params: Promise<{ s
     <div className="page-full">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }} />
       <div style={wrap}>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.2em', color: 'var(--blue)', marginBottom: '.7rem', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.2em', color: 'var(--blue)', marginBottom: '.7rem', display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ width: 20, height: 1, background: 'var(--blue)', display: 'inline-block' }} />
           Compare
         </div>
         <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.5rem,5vw,2.2rem)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', lineHeight: 1.1, margin: '0 0 .7rem' }}>
           {aName} vs {bName}: hiring transparency
         </h1>
-        <p style={{ color: 'var(--sub)', fontSize: '.92rem', lineHeight: 1.7, fontWeight: 300, margin: '0 0 2rem' }}>
+        <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-body)', lineHeight: 1.7, fontWeight: 400, margin: '0 0 2rem' }}>
           {answer} {(a && b && pct(a.ghost_rate) != null && pct(b.ghost_rate) != null) ? `Ghost rates: ${aName} ${pct(a.ghost_rate)}% vs ${bName} ${pct(b.ghost_rate)}%.` : 'Add your experience to fill the gaps.'}
         </p>
 
         <CompareView aName={aName} a={a} bName={bName} b={b} />
 
         <div style={{ marginTop: '2.5rem' }}>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--blue)', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--line)' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--blue)', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--line)' }}>
             Compare a different pair
           </div>
           <ComparePicker initialA={aName} initialB={bName} />
         </div>
 
-        <p style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', marginTop: '1.5rem', lineHeight: 1.7 }}>
-          Seen Grades are community signals from applicant reports, not verified facts. Track your application in the <Link href="/tracker" style={{ color: 'var(--blue)' }}>tracker</Link> or <Link href="/report" style={{ color: 'var(--blue)' }}>report an outcome</Link>.
+        <p style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '1.5rem', lineHeight: 1.7 }}>
+          Seen Grades are community signals from applicant accounts, not verified facts. Track your application in the <Link href="/tracker" style={{ color: 'var(--blue)' }}>tracker</Link> or <Link href="/report" style={{ color: 'var(--blue)' }}>report an outcome</Link>.
         </p>
       </div>
     </div>

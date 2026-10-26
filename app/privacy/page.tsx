@@ -13,8 +13,8 @@ import { LegalMeta, LegalFooter, LEGAL_CONTACT, LEGAL_OPERATOR } from '@/compone
 //   email or session id stored, held for review (api/reports.js submit) · Inbox Autopilot facts only
 //   (lib/server/inbox) · emails: outcome-followups + cron-job-matches with per-list unsubscribe ·
 //   deletion: api/user-sync.js delete_account (cancels billing first, deletes every user table, de-links
-//   reports) · admin access: api/admin-stats.js, audited in admin_audit_log · AI: Anthropic
-//   (api.anthropic.com) and an OpenAI-compatible provider, Groq by default (lib/server/llm.js) ·
+//   reports) · admin access: api/admin-stats.js, audited in admin_audit_log · AI: none — every résumé,
+//   interview and job tool runs on Seen's own servers (owner decision 2026-10-26: no model API) ·
 //   geocoding: OpenStreetMap Nominatim (lib/server/geo.js) · analytics: PostHog only when
 //   NEXT_PUBLIC_POSTHOG_KEY is set (lib/analytics.ts).
 
@@ -28,11 +28,11 @@ export const metadata: Metadata = pageMetadata({
 })
 
 const wrap = { maxWidth: 760, margin: '0 auto', padding: '4rem 2rem', width: '100%', boxSizing: 'border-box' as const }
-const h2 = { fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: '0 0 .65rem' } as const
-const h3 = { fontFamily: 'var(--body)', fontSize: '.85rem', fontWeight: 700, color: 'var(--white)', margin: '1rem 0 .4rem' } as const
-const p = { fontFamily: 'var(--body)', fontSize: '.82rem', color: 'var(--sub)', lineHeight: 1.8, margin: '0 0 .9rem' } as const
+const h2 = { fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: '0 0 .65rem' } as const
+const h3 = { fontFamily: 'var(--body)', fontSize: 'var(--fs-ui)', fontWeight: 700, color: 'var(--white)', margin: '1rem 0 .4rem' } as const
+const p = { fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.8, margin: '0 0 .9rem' } as const
 const quote = { ...p, borderLeft: '2px solid var(--line2)', paddingLeft: '1rem' } as const
-const li = { fontFamily: 'var(--body)', fontSize: '.82rem', color: 'var(--sub)', lineHeight: 1.8, marginBottom: '.35rem' } as const
+const li = { fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.8, marginBottom: '.35rem' } as const
 const ul = { margin: '0 0 .9rem', paddingLeft: '1.1rem' } as const
 const section = { marginBottom: '2rem', scrollMarginTop: 80 } as const
 const link = { color: 'var(--blue)', textDecoration: 'none' } as const
@@ -42,12 +42,12 @@ export default function PrivacyPage() {
   return (
     <div className="rise-in" style={{ minHeight: '100vh' }}>
       <div style={wrap}>
-        <h1 style={{ fontFamily: 'var(--display)', fontSize: '2rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', margin: '0 0 .35rem' }}>
+        <h1 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-h2)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', margin: '0 0 .35rem' }}>
           Privacy Policy
         </h1>
         <LegalMeta label="Privacy questions or requests:" />
 
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.65rem 1rem', marginBottom: '2rem', lineHeight: 1.6 }}>
+        <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.65rem 1rem', marginBottom: '2rem', lineHeight: 1.6 }}>
           The short version: we collect what we need to run Seen, we do not sell your data or use it for
           advertising, your résumé and tracker are private, and you can delete your account and data yourself
           in Settings at any time.
@@ -147,11 +147,14 @@ export default function PrivacyPage() {
             <li style={li}><strong>Vercel</strong> — website hosting, serverless functions and request logs.</li>
             <li style={li}><strong>Stripe</strong> — payments and subscriptions.</li>
             <li style={li}><strong>Resend</strong> — sending Seen&apos;s emails, and receiving email you forward to your Inbox Autopilot address.</li>
-            <li style={li}><strong>Anthropic</strong>, and where enabled <strong>Groq</strong> — AI processing for features you use, such as résumé analysis and tailoring and job insights. The text needed for the request (for example your résumé and the job posting) is sent to produce the result.</li>
             <li style={li}><strong>PostHog</strong> — product analytics, only where enabled.</li>
             <li style={li}><strong>OpenStreetMap (Nominatim)</strong> — turning a city name into map coordinates for nearby-job search. Only the place name is sent.</li>
             <li style={li}><strong>Google Fonts</strong> — the typefaces on every page load from Google&apos;s servers, so your browser sends Google its IP address and browser details, as with any font host.</li>
           </ul>
+          <p style={p}>
+            Seen&apos;s résumé, interview-prep and job tools run on Seen&apos;s own servers. Your résumé and the job
+            postings you work with are not sent to any outside AI provider.
+          </p>
           <p style={p}>
             Job-listing sources we search for you (such as Adzuna, USAJOBS and employers&apos; job boards) receive
             only search words and a location — never your name, email or résumé.

@@ -6,7 +6,7 @@ import { pageMetadata } from '@/lib/seo'
 // duplicate of /). Rendering is untouched.
 export const metadata: Metadata = pageMetadata({
   title: 'Company Scoreboard — Ghost Rates & Hiring Grades',
-  description: 'Every company Seen grades, ranked by real applicant reports: ghost rate, response rate, average wait and a letter grade. Look up any company before you apply.',
+  description: 'Every company Seen grades, ranked by real applicant accounts: ghost rate, response rate, average wait and a letter grade. Look up any company before you apply.',
   path: '/companies',
   ogTitle: 'Company Scoreboard',
 })

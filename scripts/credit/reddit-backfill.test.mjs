@@ -59,12 +59,6 @@ test('agency list is parsed from lib/agencies.ts and matches it exactly', () => 
   for (const a of AGENCIES) for (const al of a.aliases) assert.equal(al, al.trim().toLowerCase());
 });
 
-test('subreddit list matches ALL_SUBREDDITS in api/reports.js', () => {
-  const src = readFileSync(join(REPO_ROOT, 'api', 'reports.js'), 'utf8');
-  const block = /const ALL_SUBREDDITS = \[([\s\S]*?)\];/.exec(src)[1].replace(/\/\/.*$/gm, '');
-  assert.deepEqual(JOB_SUBREDDITS, [...block.matchAll(/'([^']+)'/g)].map((m) => m[1]));
-});
-
 test('buildTargets: agencies first, exact alias write names, spelling variants deduped', () => {
   const targets = buildTargets({
     agencies: AGENCIES,

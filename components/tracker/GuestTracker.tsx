@@ -23,9 +23,36 @@ import { hasPendingRef } from '@/lib/referralClient'
 import { loginHref } from '@/lib/safeHref.js'
 import AppliedWhen from '@/components/track/AppliedWhen'
 import CheckinEmailAsk from '@/components/track/CheckinEmailAsk'
+import InterviewPrep from '@/components/tracker/InterviewPrep'
 import s from '@/components/track/track.module.css'
+import Icon from '@/components/ui/Icon'
 
-export default function GuestTracker() {
+function GuestHeader() {
+  return (
+    <PageHeader
+      eyebrow="Application tracker"
+      title="Track your applications"
+      sub="Saved on this device. Add your email and Seen checks in with you on day 7, 14 and 30."
+      crumbLabel="Tracker"
+    />
+  )
+}
+
+/** The prerendered first frame of the guest tracker: the same column and header GuestTracker draws,
+ *  painted from the static HTML before the session (and the device's list) is read. /tracker shows it
+ *  while auth resolves so a guest's first paint is the page, not a spinner (audit: LCP 3.4–3.7 s). */
+export function GuestTrackerShell() {
+  return (
+    <div className="page-full">
+      <div className={s.guestWrap}>
+        <GuestHeader />
+      </div>
+    </div>
+  )
+}
+
+/** `still`: no page entrance — this replaces GuestTrackerShell, which already played it. */
+export default function GuestTracker({ still = false }: { still?: boolean } = {}) {
   const params = useSearchParams()
   const [apps, setApps] = useState<Application[]>([])
   const [loaded, setLoaded] = useState(false)
@@ -36,6 +63,9 @@ export default function GuestTracker() {
   const [pickedDay, setPickedDay] = useState('')
   const [error, setError] = useState('')
   const [invite, setInvite] = useState(false)
+  // ?stage=Interview (a company page's "Got an interview at X? Get your prep"): the card is saved at the
+  // Interview stage, so its free interview record and prep preview show at once.
+  const [asInterview, setAsInterview] = useState(false)
 
   useEffect(() => {
     setApps(AppStore.loadSync())
@@ -47,6 +77,7 @@ export default function GuestTracker() {
       setShowForm(true)
       const c = cleanCompany(params.get('company'))
       if (c) setCompany(c)
+      setAsInterview(params.get('stage') === 'Interview')
     }
   }, [params])
 
@@ -63,10 +94,25 @@ export default function GuestTracker() {
     const appliedAt = appliedAtFromChoice(choice, pickedDay)
     if (appliedAt == null) { setError('Pick the day you applied (today or earlier).'); return }
     setError('')
-    const res = await AppStore.add({ company: c, role: r, platform: 'Direct', status: 'active', stage: 'Applied', appliedAt }, false)
+    const res = await AppStore.add({ company: c, role: r, platform: 'Direct', status: 'active', stage: asInterview ? 'Interview' : 'Applied', appliedAt }, false)
     if (res.duplicate) setError(`${c} · ${r} is already on your list.`)
     setApps(AppStore.loadSync())
-    if (!res.duplicate) { setShowForm(false); setCompany(''); setRole(''); setChoice(null); setPickedDay('') }
+    if (!res.duplicate) { setShowForm(false); setCompany(''); setRole(''); setChoice(null); setPickedDay(''); setAsInterview(false) }
+  }
+
+  // "They called me in" — the guest card moves to Interview on this device (round 2: a guest could only
+  // Remove a card, so the "if they call you in…" promise had nowhere to land).
+  async function calledIn(id: string) {
+    await AppStore.update(id, { stage: 'Interview' }, false)
+    setApps(AppStore.loadSync())
+  }
+  async function schedule(id: string, iso: string) {
+    await AppStore.update(id, {}, false, { markers: [{ id: `ev_${Date.now()}`, type: 'interview_scheduled', date: Date.now(), source: 'user', confidence: 'high', data: { at: iso } }] })
+    setApps(AppStore.loadSync())
+  }
+  const scheduledAt = (a: Application) => {
+    const ev = [...(a.events || [])].reverse().find(e => e.type === 'interview_scheduled' && typeof e.data?.at === 'string')
+    return ev ? String(ev.data!.at) : ''
   }
 
   async function remove(id: string) {
@@ -75,18 +121,13 @@ export default function GuestTracker() {
   }
 
   return (
-    <div className="page-full">
-      <div style={{ maxWidth: 760, margin: '0 auto', padding: '2rem 16px 4rem', width: '100%', boxSizing: 'border-box' }} data-testid="guest-tracker">
-        <PageHeader
-          eyebrow="Application tracker"
-          title="Track your applications"
-          sub="Saved on this device. Add your email and Seen checks in with you on day 7, 14 and 30."
-          crumbLabel="Tracker"
-        />
+    <div className={still ? 'page-full page-still' : 'page-full'}>
+      <div className={s.guestWrap} data-testid="guest-tracker">
+        <GuestHeader />
 
         {loaded && (showForm || apps.length === 0) && (
           <section className={s.card} aria-label="Track an application">
-            <p className={s.title}>{apps.length ? 'Track another application' : 'Track your first application'}</p>
+            <p className={s.title}>{asInterview ? 'Track your interview' : apps.length ? 'Track another application' : 'Track your first application'}</p>
             <form onSubmit={e => { e.preventDefault(); void add() }}>
               <div className={s.field}>
                 <label className={s.label} htmlFor="gt-company">Company</label>
@@ -121,12 +162,20 @@ export default function GuestTracker() {
               {apps.map(a => (
                 <li key={a.id} className={`${s.card} ${s.quiet}`} style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '.75rem', flexWrap: 'wrap' }}>
                   <div style={{ flex: '1 1 14rem', minWidth: 0 }}>
-                    <p className={s.title} style={{ fontSize: '1rem', margin: 0 }}>{a.company}</p>
+                    <p className={s.title} style={{ fontSize: 'var(--fs-lead)', margin: 0 }}>{a.company}</p>
                     <p className={s.small} style={{ margin: '.15rem 0 0', color: 'var(--sub)' }}>
                       {a.role} · Day {daysSince(a.appliedAt)} · applied {shortDay(a.appliedAt)}{a.status !== 'active' ? ` · ${a.status}` : ''}
                     </p>
                   </div>
+                  {a.status === 'active' && a.stage === 'Applied' && (
+                    <button type="button" className={s.ghost} onClick={() => void calledIn(a.id)} data-testid="gt-called-in"><Icon name="calendar" size={15} /> They called me in</button>
+                  )}
                   <button type="button" className={s.ghost} onClick={() => void remove(a.id)} aria-label={`Remove ${a.company} ${a.role}`}>Remove</button>
+                  {a.status === 'active' && ['Phone Screen', 'Interview', 'Final Round'].includes(a.stage) && (
+                    <div style={{ flexBasis: '100%', minWidth: 0 }}>
+                      <InterviewPrep guest appId={a.id} company={a.company} role={a.role} interviewAt={scheduledAt(a)} isPro={false} stage={a.stage} onSchedule={iso => void schedule(a.id, iso)} />
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>

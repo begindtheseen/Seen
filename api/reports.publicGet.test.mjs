@@ -5,7 +5,6 @@ import assert from 'node:assert/strict';
 
 process.env.SUPABASE_URL = 'https://fake.supabase.co';
 process.env.SUPABASE_SERVICE_KEY = 'service-key';
-delete process.env.ANTHROPIC_KEY;
 
 const FUTURE = new Date(Date.now() + 7 * 86_400_000).toISOString();
 const REPORTS = [

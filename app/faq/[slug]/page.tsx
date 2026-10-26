@@ -10,10 +10,10 @@ import { jsonLdHtml } from '@/lib/jsonLd'
 // Evergreen long-tail FAQ pages: /faq/does-amazon-ghost-applicants, /faq/google-hiring-process, etc.
 // Server-rendered, factual, embedding the company's LIVE grade + ghost data. Targets the exact
 // phrasing people type into Google/Reddit. Never fabricates — if no data, honest "be the first".
-// "Reported"/"real data" wording is used ONLY when first-party applicant reports back the score
+// "Reported"/"real data" wording is used ONLY when first-party applicant accounts back the score
 // (firstPartyReportCount). A score built from web research alone is worded as Seen's estimate from
 // aggregated public data — the fused report_count includes the web pipeline's claimed mentions
-// and is never presented as applicant reports.
+// and is never presented as applicant accounts.
 //
 // SEARCH (plan 2026-10-24): these pages repeat the company page's numbers (grade, ghost / response
 // rate, wait) with a few template sentences, and the company page now answers the same questions
@@ -59,7 +59,7 @@ export async function generateMetadata(
 ): Promise<Metadata> {
   const { slug } = await params
   const parsed = parseSlug(slug)
-  if (!parsed) return { ...pageMetadata({ title: 'Hiring FAQ', description: 'Frequently asked questions about how companies hire, from real applicant reports.', path: `/faq/${slug}` }), robots: { index: false, follow: true } }
+  if (!parsed) return { ...pageMetadata({ title: 'Hiring FAQ', description: 'Frequently asked questions about how companies hire, from real applicant accounts.', path: `/faq/${slug}` }), robots: { index: false, follow: true } }
   const name = titleCase(parsed.company)
   const s = await getScore(parsed.company)
   const ghostPct = pct(s?.ghost_rate)
@@ -74,7 +74,7 @@ export async function generateMetadata(
     const description = ghostPct != null
       ? (reported
           ? `${name} ghosts roughly ${ghostPct}% of applicants based on real reported outcomes. See ${name}'s response rate, average wait time, and what Reddit says before you apply.`
-          : `Seen estimates ${name} ghosts roughly ${ghostPct}% of applicants, from aggregated public hiring data — no applicant reports yet. See the estimate and add your own experience.`)
+          : `Seen estimates ${name} ghosts roughly ${ghostPct}% of applicants, from aggregated public hiring data — no applicant accounts yet. See the estimate and add your own experience.`)
       : `Does ${name} ghost applicants? See real reported hiring outcomes, response rates, and wait times — and add your own experience.`
     return {
       ...pageMetadata({
@@ -85,7 +85,7 @@ export async function generateMetadata(
     }
   }
   const title = `${name} Hiring Process: Stages, Wait Time & Ghost Rate`
-  const description = `How ${name}'s hiring process works — stages, average wait time${ghostPct != null ? `, and a ${ghostPct}% ${reported ? '' : 'estimated '}ghost rate` : ''} — ${reported ? 'from real applicant reports' : 'estimated from aggregated public hiring data'}. What to expect before you apply.`
+  const description = `How ${name}'s hiring process works — stages, average wait time${ghostPct != null ? `, and a ${ghostPct}% ${reported ? '' : 'estimated '}ghost rate` : ''} — ${reported ? 'from real applicant accounts' : 'estimated from aggregated public hiring data'}. What to expect before you apply.`
   return {
     ...pageMetadata({
       title, description, path: url, ogTitle: title, type: 'article',
@@ -97,18 +97,18 @@ export async function generateMetadata(
 
 const S = {
   wrap: { maxWidth: 760, margin: '0 auto', padding: '3.5rem 1.25rem 5rem', width: '100%', boxSizing: 'border-box' as const },
-  eyebrow: { fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase' as const, letterSpacing: '.2em', color: 'var(--blue)', marginBottom: '.7rem', display: 'flex', alignItems: 'center', gap: 10 },
+  eyebrow: { fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase' as const, letterSpacing: '.2em', color: 'var(--blue)', marginBottom: '.7rem', display: 'flex', alignItems: 'center', gap: 10 },
   h1: { fontFamily: 'var(--display)', fontSize: 'clamp(1.6rem,5vw,2.3rem)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', lineHeight: 1.1, margin: '0 0 1rem' },
-  lead: { color: 'var(--sub)', fontSize: '.95rem', lineHeight: 1.7, fontWeight: 300, margin: '0 0 2rem' },
-  h2: { fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 700, color: 'var(--white)', margin: '2.2rem 0 .8rem', letterSpacing: '-.01em' },
-  p: { color: 'var(--sub)', fontSize: '.88rem', lineHeight: 1.75, margin: '0 0 1rem', fontWeight: 300 },
+  lead: { color: 'var(--sub)', fontSize: 'var(--fs-body)', lineHeight: 1.7, fontWeight: 300, margin: '0 0 2rem' },
+  h2: { fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', margin: '2.2rem 0 .8rem', letterSpacing: '-.01em' },
+  p: { color: 'var(--sub)', fontSize: 'var(--fs-ui)', lineHeight: 1.75, margin: '0 0 1rem', fontWeight: 300 },
 }
 
 function MetricCard({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div style={{ flex: '1 1 120px', minWidth: 0, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '.9rem 1rem' }}>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '1.4rem', fontWeight: 500, color, lineHeight: 1, letterSpacing: '-.02em' }}>{value}</div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', marginTop: '.45rem' }}>{label}</div>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-xl)', fontWeight: 500, color, lineHeight: 1, letterSpacing: '-.02em' }}>{value}</div>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', marginTop: '.45rem' }}>{label}</div>
     </div>
   )
 }
@@ -123,10 +123,10 @@ function DataPanel({ name, s }: { name: string; s: GrowthScore }) {
   return (
     <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderLeft: `3px solid ${accent}`, borderRadius: 12, padding: '1.2rem 1.25rem', margin: '0 0 1.8rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: '1rem' }}>
-        <div style={{ fontFamily: 'var(--display)', fontSize: '2.2rem', fontWeight: 800, color: accent, lineHeight: 1 }}>{grade(s.overall_score)}</div>
+        <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-h2)', fontWeight: 600, color: accent, lineHeight: 1 }}>{grade(s.overall_score)}</div>
         <div>
-          <div style={{ fontFamily: 'var(--display)', fontSize: '1rem', fontWeight: 700, color: 'var(--white)' }}>Seen Grade {s.overall_score}/100</div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', letterSpacing: '.1em', color: accent }}>{riskLabel(s.risk_level)}</div>
+          <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)' }}>Seen Grade {s.overall_score}/100</div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', letterSpacing: '.1em', color: accent }}>{riskLabel(s.risk_level)}</div>
         </div>
       </div>
       <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap' }}>
@@ -134,8 +134,8 @@ function DataPanel({ name, s }: { name: string; s: GrowthScore }) {
         {respPct != null && <MetricCard label="Response rate" value={`${respPct}%`} color="var(--green)" />}
         {wait != null && <MetricCard label="Avg wait" value={`${wait}d`} color="var(--amber)" />}
       </div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', marginTop: '.9rem' }}>
-        {`Based on ${fp.toLocaleString()} applicant report${fp === 1 ? '' : 's'}`} · A community signal, not a verified fact
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.9rem' }}>
+        {`Based on ${fp.toLocaleString()} applicant account${fp === 1 ? '' : 's'}`} · A community signal, not a verified fact
       </div>
     </div>
   )
@@ -176,13 +176,13 @@ export default async function FaqSlugPage({ params }: { params: Promise<{ slug: 
   const respPct = pct(s?.response_rate)
   const wait = s?.avg_wait_days != null ? Math.round(s.avg_wait_days) : null
   const year = new Date().getFullYear()
-  // true → first-party applicant reports back the numbers; false → web-research estimate.
+  // true → first-party applicant accounts back the numbers; false → web-research estimate.
   const reported = firstPartyReportCount(s) > 0
   // Grade gate: a grade/ghost% is shown only with ≥ MIN_REPORTS_FOR_GRADE real reports (getScore nulls
   // the verdict fields below that). `fp` reports may still exist and are mentioned, never graded.
   const fp = firstPartyReportCount(s)
   const graded = s != null && s.overall_score != null ? s : null
-  const notEnough = `${name} isn't graded yet — it has ${Math.min(fp, MIN_REPORTS_FOR_GRADE)} of the ${MIN_REPORTS_FOR_GRADE} applicant reports Seen needs before it shows a grade or ghost rate.`
+  const notEnough = `${name} isn't graded yet — it has ${Math.min(fp, MIN_REPORTS_FOR_GRADE)} of the ${MIN_REPORTS_FOR_GRADE} applicant accounts Seen needs before it shows a grade or ghost rate.`
 
   const isGhost = parsed.kind === 'ghost'
   const h1 = isGhost ? `Does ${name} ghost applicants?` : `${name} hiring process: what to expect`
@@ -198,7 +198,7 @@ export default async function FaqSlugPage({ params }: { params: Promise<{ slug: 
   } else if (fp > 0) {
     shortAnswer = `${notEnough} Read what applicants have reported so far, and add yours if you've applied.`
   } else {
-    shortAnswer = `We don't have enough applicant reports for ${name} yet. If you've applied, you can be the first to report what happened — and help the next person decide.`
+    shortAnswer = `We don't have enough applicant accounts for ${name} yet. If you've applied, you can be the first to report what happened — and help the next person decide.`
   }
 
   // FAQ JSON-LD (real Q&A) so this can win a rich result and be cited by AI answer engines.
@@ -211,8 +211,8 @@ export default async function FaqSlugPage({ params }: { params: Promise<{ slug: 
                 ? `${name} ghosts about ${ghostPct}% of applicants based on reported outcomes${respPct != null ? `, and responds to roughly ${respPct}%` : ''}.`
                 : `${name}'s reported average wait is ${wait != null ? `about ${wait} days` : 'variable'}, with a ${ghostPct}% ghost rate.`)
             : (isGhost
-                ? `Seen has no applicant reports for ${name} yet. Its estimate from aggregated public hiring data is a ghost rate of about ${ghostPct}%${respPct != null ? ` and a response rate of roughly ${respPct}%` : ''}.`
-                : `Seen has no applicant reports for ${name} yet. Its estimate from aggregated public hiring data is an average wait of ${wait != null ? `about ${wait} days` : 'unknown length'}, with a ${ghostPct}% ghost rate.`))
+                ? `Seen has no applicant accounts for ${name} yet. Its estimate from aggregated public hiring data is a ghost rate of about ${ghostPct}%${respPct != null ? ` and a response rate of roughly ${respPct}%` : ''}.`
+                : `Seen has no applicant accounts for ${name} yet. Its estimate from aggregated public hiring data is an average wait of ${wait != null ? `about ${wait} days` : 'unknown length'}, with a ${ghostPct}% ghost rate.`))
         : fp > 0 ? notEnough : `We don't have enough verified reports for ${name} yet. Reported outcomes update this answer in real time.`,
     },
     {
@@ -221,7 +221,7 @@ export default async function FaqSlugPage({ params }: { params: Promise<{ slug: 
     },
     {
       q: `Is ${name}'s ghost rate a verified fact?`,
-      a: `No. Seen scores are aggregated community signals from applicant reports, not verified facts. Treat them as a directional signal, not a verdict.`,
+      a: `No. Seen scores are aggregated community signals from applicant accounts, not verified facts. Treat them as a directional signal, not a verdict.`,
     },
   ]
   const jsonLd = {
@@ -243,8 +243,8 @@ export default async function FaqSlugPage({ params }: { params: Promise<{ slug: 
 
         {graded ? <DataPanel name={name} s={graded} /> : (
           <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderLeft: '3px solid var(--blue)', borderRadius: 12, padding: '1.2rem 1.25rem', margin: '0 0 1.8rem' }}>
-            <div style={{ fontFamily: 'var(--display)', fontWeight: 700, color: 'var(--white)', marginBottom: '.4rem' }}>{fp > 0 ? `Not enough reviews to grade ${name} yet (${Math.min(fp, MIN_REPORTS_FOR_GRADE)} of ${MIN_REPORTS_FOR_GRADE})` : `No reports yet for ${name}`}</div>
-            <p style={{ ...S.p, margin: 0 }}>{fp > 0 ? `Read the ${fp} applicant report${fp === 1 ? '' : 's'} on ${name}'s page — and add yours so it can be graded fairly.` : `Be the first to report how ${name} treated your application. Your report becomes the data the next applicant searches for tonight.`}</p>
+            <div style={{ fontFamily: 'var(--body)', fontWeight: 600, color: 'var(--white)', marginBottom: '.4rem' }}>{fp > 0 ? `${name} is not graded yet (${Math.min(fp, MIN_REPORTS_FOR_GRADE)} of ${MIN_REPORTS_FOR_GRADE} applicant accounts)` : `No reports yet for ${name}`}</div>
+            <p style={{ ...S.p, margin: 0 }}>{fp > 0 ? `Read the ${fp} applicant account${fp === 1 ? '' : 's'} on ${name}'s page — and add yours so it can be graded fairly.` : `Be the first to report how ${name} treated your application. Your report becomes the data the next applicant searches for tonight.`}</p>
           </div>
         )}
 
@@ -257,13 +257,13 @@ export default async function FaqSlugPage({ params }: { params: Promise<{ slug: 
 
         <h2 style={S.h2}>What you can do before you apply</h2>
         <p style={S.p}>
-          Check {name}&apos;s full hiring report for the latest grade, the city-by-city breakdown, and recent applicant reports. If you&apos;ve already applied, track it so you know exactly when to follow up — and report what happened so the data stays honest for everyone after you.
+          Check {name}&apos;s full hiring report for the latest grade, the city-by-city breakdown, and recent applicant accounts. If you&apos;ve already applied, track it so you know exactly when to follow up — and report what happened so the data stays honest for everyone after you.
         </p>
 
         <CTAs name={name} cslug={cslug} />
 
-        <p style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', marginTop: '2.5rem', lineHeight: 1.7 }}>
-          Seen aggregates real applicant reports into a 0–100 transparency grade. Scores are community signals, not verified facts, and update as new reports come in. Last refreshed hourly.
+        <p style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '2.5rem', lineHeight: 1.7 }}>
+          Seen aggregates real applicant accounts into a 0–100 transparency grade. Scores are community signals, not verified facts, and update as new reports come in. Last refreshed hourly.
         </p>
       </div>
     </div>

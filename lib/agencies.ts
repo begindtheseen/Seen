@@ -52,7 +52,7 @@ export function isStaffingAgency(name: string | null | undefined): boolean {
 }
 
 // Which company page an Index row links to. The matched company_scores row's stored name is used only
-// when it actually holds applicant reports (that page has the data) AND it makes a routable slug: a
+// when it actually holds applicant accounts (that page has the data) AND it makes a routable slug: a
 // stored name with "/" ("teksystems c/o allegis group") encodes to "%2F", which the client router
 // reads as a path separator → 404 (conversion audit 2026-10-24). Otherwise the agency's display name.
 // Slug scheme = CLAUDE.md: encodeURIComponent(name.toLowerCase().replace(/\s+/g, '-')).

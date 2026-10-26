@@ -1,0 +1,151 @@
+{
+  "id": "08-marketing-coordinator",
+  "field": "Entry-level marketing coordinator",
+  "pdf": true,
+  "resume": [
+    "Sofia Martinez",
+    "San Diego, CA | sofia.martinez.mktg@gmail.com | (619) 555-0109 | sofiamartinez.co",
+    "",
+    "EDUCATION",
+    "San Diego State University — B.A., Communication (Emphasis: Advertising), May 2024",
+    "Relevant coursework: Digital Marketing, Consumer Behavior, Media Writing",
+    "",
+    "EXPERIENCE",
+    "Marketing Intern — Coastal Coffee Roasters, San Diego, CA (Jun 2024 – Aug 2024)",
+    "• Grew the brand's Instagram from 3,100 to 5,400 followers in 10 weeks with a Reels series on how we roast",
+    "• Wrote 12 email newsletters in Mailchimp with a 41% average open rate",
+    "• Launched a monthly email newsletter for the coffee club members",
+    "  (1,800 subscribers).",
+    "• Pulled weekly social and email numbers into a one-page report for the owner",
+    "",
+    "Social Media Assistant (part-time) — SDSU Associated Students (Sep 2022 – May 2024)",
+    "• Planned and posted content for 3 accounts (Instagram, TikTok, X) for campus events",
+    "• Designed posters and story graphics in Canva for 25+ events a semester",
+    "",
+    "Barista — Coastal Coffee Roasters, San Diego, CA (Aug 2021 – May 2023)",
+    "• Made drinks for 300+ customers on weekend shifts and trained 4 new baristas",
+    "",
+    "SKILLS",
+    "Instagram, TikTok, Meta Business Suite, Mailchimp, Canva, Google Analytics (basic), copywriting, Spanish (fluent)"
+  ],
+  "job": {
+    "title": "Marketing Coordinator",
+    "company": "Mission Valley Medical Group",
+    "location": "San Diego, CA",
+    "description": [
+      "Mission Valley Medical Group cares for 90,000 patients across 9 clinics in San Diego County. Our marketing team helps patients find the right care and keeps our healthcare brand consistent everywhere they see it — from clinic signage to patient newsletters.",
+      "",
+      "About the role",
+      "The Marketing Coordinator supports campaigns for new clinic openings, flu-season and wellness programs, and patient communications. You'll work closely with our Marketing Manager and clinic leaders.",
+      "",
+      "Responsibilities",
+      "- Plan, write and schedule posts for our Instagram, Facebook and LinkedIn pages",
+      "- Build and send patient and community email campaigns",
+      "- Coordinate printed materials and signage with vendors and clinic staff",
+      "- Track campaign results and prepare a monthly report",
+      "- Help plan community health fairs and clinic open houses",
+      "",
+      "Qualifications",
+      "- Bachelor's degree in Marketing, Communications or a related field",
+      "- 0–2 years of marketing experience (internships count)",
+      "- Experience managing social media accounts for a brand or organization",
+      "- Experience with an email marketing platform (HubSpot, Mailchimp, or similar)",
+      "- Design skills in Canva or Adobe Creative Suite",
+      "- Strong writing and proofreading",
+      "",
+      "Nice to have",
+      "- Bilingual English/Spanish",
+      "- Experience in healthcare marketing",
+      "",
+      "Pay and schedule",
+      "$52,000 – $58,000 per year. Full-time, Monday – Friday, on-site in Mission Valley."
+    ]
+  },
+  "gold": {
+    "family": [
+      "marketing"
+    ],
+    "must_skills": [
+      {
+        "label": "social media",
+        "match": "social media|instagram|facebook"
+      },
+      {
+        "label": "email marketing",
+        "match": "email|hubspot|mailchimp"
+      },
+      {
+        "label": "Bachelor's degree",
+        "match": "bachelor'?s|degree"
+      }
+    ],
+    "alternatives": [
+      [
+        "HubSpot",
+        "Mailchimp"
+      ],
+      [
+        "Canva",
+        "Adobe Creative Suite"
+      ]
+    ],
+    "years_min": 0,
+    "traps": [
+      {
+        "term": "HubSpot",
+        "match": "hubspot",
+        "scope": "candidate",
+        "why": "she used Mailchimp"
+      },
+      {
+        "term": "Adobe",
+        "match": "adobe|photoshop|illustrator",
+        "scope": "candidate",
+        "why": "she used Canva"
+      },
+      {
+        "term": "HIPAA",
+        "match": "hipaa",
+        "scope": "any",
+        "why": "not in posting or résumé"
+      },
+      {
+        "term": "Healthcare marketing experience",
+        "match": "healthcare marketing experience|experience in healthcare",
+        "scope": "candidate",
+        "why": "she has none"
+      }
+    ],
+    "resume_employers": [
+      "Coastal Coffee Roasters",
+      "SDSU Associated Students"
+    ],
+    "resume_titles": [
+      "Marketing Intern",
+      "Social Media Assistant",
+      "Barista"
+    ],
+    "resume_degrees": [
+      "B.A., Communication"
+    ],
+    "resume_numbers": [
+      "619",
+      "555",
+      "0109",
+      "2024",
+      "3100",
+      "5400",
+      "10",
+      "12",
+      "41%",
+      "1800",
+      "2022",
+      "3",
+      "25",
+      "2021",
+      "2023",
+      "300",
+      "4"
+    ]
+  }
+}

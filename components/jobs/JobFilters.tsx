@@ -42,8 +42,6 @@ export default function JobFilters({
   jobType: TypeFilter; setJobType: (v: TypeFilter) => void
   posted: PostedFilter; setPosted: (v: PostedFilter) => void
   hasFilters: boolean; clearFilters: () => void
-  /** Kept for call-site compatibility; the panel styles its own controls. */
-  selectStyle?: React.CSSProperties
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -114,7 +112,7 @@ export default function JobFilters({
             </select>
           </label>
           <div className={styles.foot}>
-            <button type="button" className={styles.clear} onClick={clearFilters} disabled={!hasFilters} style={{ opacity: hasFilters ? 1 : 0.4 }}>Clear all</button>
+            <button type="button" className={styles.clear} onClick={clearFilters} disabled={!hasFilters}>Clear all</button>
             <button type="button" className={styles.done} onClick={() => setOpen(false)}>Done</button>
           </div>
         </div>

@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = pageMetadata({
   title: 'Monthly lists: which employers respond and which agencies ghost',
-  description: `Monthly rankings from applicant reports on Seen: employers that reply to the most applicants, and staffing agencies that ghost the most. Each ranks companies with ${LIST_MIN_REPORTS} or more applicant reports.`,
+  description: `Monthly rankings from applicant accounts on Seen: employers that reply to the most applicants, and staffing agencies that ghost the most. Each ranks companies with ${LIST_MIN_REPORTS} or more applicant accounts.`,
   path: '/lists',
 })
 
@@ -30,7 +30,7 @@ export default async function ListsIndex() {
           eyebrow={d ? `Monthly lists · Updated ${d.month}` : 'Monthly lists'}
           title="Who replies to applicants, and who ghosts them"
           crumbLabel="Lists"
-          sub={`Rankings rebuilt from applicant reports on Seen. A company is ranked only with ${LIST_MIN_REPORTS} or more applicant reports; every number links to the reports behind it.`}
+          sub={`Rankings rebuilt from applicant accounts on Seen. A company is ranked only with ${LIST_MIN_REPORTS} or more applicant accounts; every number links to the reports behind it.`}
         />
         <div className={styles.grid}>
           {LIST_SLUGS.map((slug) => {

@@ -14,20 +14,20 @@ import { parseResumeFile } from '@/lib/resumeUploadClient'
 import { countWords } from '@/lib/resume/engine-client'
 import type { SavedJob } from '@/lib/types'
 import UpgradeModal from '@/components/UpgradeModal'
-import { FREE_DAILY_CREDITS, WELCOME_CREDITS } from '@/lib/creditRules'
+import { WELCOME_CREDITS } from '@/lib/creditRules'
+import { LOCK_NOTE, PASS_AFTER_WIN } from '@/lib/pricing'
 import { signupHref } from '@/lib/signupIntent.js'
 import dynamic from 'next/dynamic'
 import { VerdictCard, WhyYouMatch, MissingList, Checklist, PaidPlanView, type Verdict, type ConstraintRow, type PaidPlan } from '@/components/optimizer/Verdict'
 import CreditConfirmDialog from '@/components/CreditConfirmDialog'
 import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
-import { RESUME_OPTIMIZE_COST, creditCostLabel } from '@/lib/creditRules'
+import { RESUME_OPTIMIZE_COST, creditCostLabel, priceLabel } from '@/lib/creditRules'
 import { markQuiet } from '@/lib/quietWindow'
 import { MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
 import PageHeader from '@/components/shell/PageHeader'
 
 const ResumeSurveyModal = dynamic(() => import('@/components/ResumeSurveyModal'), { ssr: false })
 
-const CREDIT_WORD = FREE_DAILY_CREDITS === 1 ? 'credit' : 'credits'
 
 type Tab = 'fit' | 'rewrite' | 'humanproof' | 'strategy' | 'export'
 const OPTIMIZE_PRICE = creditCostLabel(RESUME_OPTIMIZE_COST)
@@ -82,7 +82,7 @@ const realBulletsOf = (p: PaidOptimize | null) => (p?.optimized_bullets || []).f
 interface HpConfirm { text: string; reason: string; placeholder: string }
 interface HpItem { original: string; humanized_text: string; human_signal: number; confirm_before_using?: HpConfirm[]; interview_risk_warnings?: { phrase: string; warning: string }[] }
 interface HpPackage { bullets: HpItem[]; application_message: HpItem | null; carried_warnings: { phrase: string; warning: string }[] }
-interface HumanProofResult { package: HpPackage; humanproof_score: number; before_score: number; after_score: number; ai_slop_risk: 'low' | 'medium' | 'high'; run_id?: string | null }
+interface HumanProofResult { package: HpPackage; humanproof_score: number; before_score: number; after_score: number; ai_slop_risk: 'low' | 'medium' | 'high'; run_id?: string | null; integrity?: { numbers_preserved: boolean; unsupported_claims: number; grounded: boolean } }
 
 interface Insights {
   what_they_want: string[]
@@ -225,12 +225,12 @@ function FitView({ out, intel, jobCompany, insights }: { out: OptimizerOutput; i
 }
 
 // ═══ REWRITE TAB — the PAID deliverables (plan, moves, questions, availability, summary, bullets) ═══
-function RewriteView({ out, copy, copied }: { out: PaidOptimize; copy: (t: string, k: string) => void; copied: string | null }) {
+function RewriteView({ out, copy, copied, onRerun, pro }: { out: PaidOptimize; copy: (t: string, k: string) => void; copied: string | null; onRerun?: () => void; pro?: boolean | null }) {
   const real = realBulletsOf(out)
   const guidance = (out.optimized_bullets || []).filter(b => isGuidance(b.original) || isGuidance(b.optimized))
   return (
     <div style={{ animation: 'fadeUp .3s ease both' }} className="ai-stack">
-      {out.cached && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', color: 'var(--green)' }}>No credit used — you built this plan for this job and résumé in the last 7 days.</div>}
+      {out.cached && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', color: 'var(--green)' }}>No credit used — you built this plan for this job and résumé in the last 7 days.{onRerun && <> <button type="button" data-testid="resume-rerun" onClick={onRerun} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--green)', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit' }}>Re-run with the latest engine{pro === true ? '' : ` · ${OPTIMIZE_PRICE}`} →</button></>}</div>}
       <PaidPlanView plan={out} />
 
       {real.length > 0 && (
@@ -486,6 +486,13 @@ function ResumePageInner() {
     fetchIntel(co)
   }
 
+  // When Seen first saw the picked saved listing (its snapshot's posted_at), or null.
+  function savedPostedAt(): string | null {
+    if (!savedId) return null
+    const s = savedJobs.find(j => String(j.job_id) === savedId)
+    return (s?.snapshot as { posted_at?: string | null } | undefined)?.posted_at || null
+  }
+
   // Stable jobId for optimizer/job-insights caching (saved id if present, else a manual key).
   function jobIdFor(): string {
     if (savedId) return savedId
@@ -573,13 +580,13 @@ function ResumePageInner() {
   // PAID: only on a press of the price-tagged button; the first paid action is confirmed once.
   function pressPaid() {
     if (!isLoggedIn) { setGuestGate('your rewrite plan'); return }
-    if (hasConfirmedCreditUse(user?.id)) runPaid()
+    if (pro === true || hasConfirmedCreditUse(user?.id)) runPaid()
     else setConfirmPaid(true)
   }
-  async function runPaid() {
+  async function runPaid(fresh = false) {
     setConfirmPaid(false); setPaidState('loading'); setError('')
     try {
-      const res = await fetch('/api/resume', { method: 'POST', headers: await aiHeaders(), body: JSON.stringify({ tool: 'optimize', resume: resumeText, job: jobTitle, company: jobCompany, ...postingBody() }) })
+      const res = await fetch('/api/resume', { method: 'POST', headers: await aiHeaders(), body: JSON.stringify({ tool: 'optimize', resume: resumeText, job: jobTitle, company: jobCompany, ...postingBody(), ...(fresh ? { fresh: true } : {}) }) })
       const data = await res.json().catch(() => ({})) as PaidOptimize & { error?: string; message?: string; credits_required?: boolean; pro_required?: boolean }
       if (res.status === 402 || data.credits_required) { setUpgradeReason('credits'); setUpgradeFeature(undefined); setShowUpgrade(true); setPaidState('idle'); return }
       if (data.error === 'preview_only') { setPaidState('preview'); return }
@@ -609,7 +616,9 @@ function ResumePageInner() {
 
   async function runHumanProof() {
     const real = realBulletsOf(paid)
-    if (!real.length) { setError('Build your rewrite plan first — HumanProof works on your improved bullets.'); return }
+    // Nothing to humanize is said IN the tab (the old top-of-page error was off screen, so the
+    // button looked dead — 2026-10-25). The idle card already hides the button in that case.
+    if (!real.length) return
     setHpState('loading'); setError('')
     try {
       const res = await fetch('/api/optimizer', {
@@ -638,9 +647,12 @@ function ResumePageInner() {
     try {
       const res = await fetch('/api/resume', {
         method: 'POST', headers: await aiHeaders(),
-        body: JSON.stringify({ tool: 'advantage', resume: resumeText, job: jobTitle, company: jobCompany, jobDescription: jobJD, background, companyIntel }),
+        // postedAt: when Seen first saw a saved listing, so the timing advice uses its real age
+        body: JSON.stringify({ tool: 'advantage', resume: resumeText, job: jobTitle, company: jobCompany, jobDescription: jobJD, background, companyIntel, jobId: jobIdFor(), postedAt: savedPostedAt() }),
       })
-      const data = await res.json().catch(() => ({})) as { credits_required?: boolean } & CombinedResult
+      const data = await res.json().catch(() => ({})) as { credits_required?: boolean; error?: string; message?: string } & CombinedResult
+      // a posting that states no requirements: nothing to build on, nothing charged
+      if (res.status === 422 && data.error === 'no_requirements') { setError(data.message || "This listing doesn't state what it requires — no credit used."); setAdvState('idle'); return }
       if (data.credits_required) {
         if (isLoggedIn) { setUpgradeReason('credits'); setUpgradeFeature(undefined); setShowUpgrade(true); setAdvState('idle') }
         else { setGuestGate('your application strategy'); setAdvState('idle') }
@@ -778,6 +790,12 @@ function ResumePageInner() {
           actions={<Link href="/resume/studio" className="tap" style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem', background: 'var(--idim)', border: '1px solid var(--imid)', color: '#c7d2fe', borderRadius: 999, padding: '.4rem .85rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', textDecoration: 'none', whiteSpace: 'nowrap' }}>✦ Résumé Studio →</Link>}
         />
 
+        {params?.get('back') === 'tracker' && (
+          <Link href="/tracker" className="tap" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, marginBottom: '.75rem', color: 'var(--green)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-72)', textDecoration: 'none' }}>
+            {resumeText ? '✓ Résumé on file — back to your interview prep →' : '← Back to your interview prep (add your résumé first)'}
+          </Link>
+        )}
+
         {guestGate && !isLoggedIn && (
           <div role="status" style={{ background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.3)', borderRadius: 10, padding: '.9rem 1rem', marginBottom: '1rem' }}>
             <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.95rem', color: 'var(--white)', marginBottom: '.25rem' }}>Make a free account to build {guestGate}</div>
@@ -892,7 +910,7 @@ function ResumePageInner() {
                   : paidState === 'preview' || fitState === 'preview' ? <ResultEmpty icon="📄" text={'This listing only has a summary. Paste the full posting to optimize for it — no credit is used for a preview.'} />
                   : paidState === 'no_requirements' ? <ResultEmpty icon="📄" text={paidNote || NO_REQUIREMENTS_NOTE} />
                   : paidState === 'loading' ? <ResultEmpty icon="✍️" text={'Building your rewrite plan…'} />
-                  : paidState === 'done' && paid ? <RewriteView out={paid} copy={copy} copied={copied} />
+                  : paidState === 'done' && paid ? <RewriteView out={paid} copy={copy} copied={copied} pro={pro} onRerun={() => { void runPaid(true) }} />
                   : fitOut ? (
                     <Card>
                       <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '.95rem', marginBottom: '.3rem' }}>Your rewrite plan for this job</div>
@@ -900,7 +918,7 @@ function ResumePageInner() {
                         Which bullet should lead each job, number questions that write a bullet from your answer, an availability line from this posting&apos;s schedule, a summary built only from your own facts, and wording proposals you accept one by one. Kept for 7 days — reopening it is free.
                       </p>
                       {paidState === 'error' && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--red)', marginBottom: '.6rem' }}>Could not build the plan — no credit was used if it failed. Try again.</div>}
-                      <button style={btnPrimary} data-testid="resume-paid-btn" onClick={pressPaid}>Build my rewrite plan →<span style={{ marginLeft: '.5rem', fontSize: 'var(--fs-55)', opacity: .65, fontFamily: 'var(--mono)', fontWeight: 400 }}>· {OPTIMIZE_PRICE}</span></button>
+                      <button style={btnPrimary} data-testid="resume-paid-btn" onClick={pressPaid}>Build my rewrite plan →<span style={{ marginLeft: '.5rem', fontSize: 'var(--fs-55)', opacity: .65, fontFamily: 'var(--mono)', fontWeight: 400 }}>· {priceLabel(RESUME_OPTIMIZE_COST, pro)}</span></button>
                     </Card>
                   ) : <ResultEmpty icon="✍️" text={'Run the analysis first — then build the rewrite plan for this job.'} />
                 )}
@@ -912,9 +930,18 @@ function ResumePageInner() {
                       <Card>
                         <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '.95rem', marginBottom: '.3rem' }}>HumanProof</div>
                         <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-65)', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.9rem' }}>
-                          Make your optimized bullets read real — remove generic AI tone and keep them specific, natural, and interview-defensible. Nothing invented.
+                          Make your rewritten bullets read real — remove generic AI tone and keep them specific, natural, and interview-defensible. Every number stays exactly as you wrote it.
                         </p>
-                        <button style={{ ...btnPrimary, background: 'linear-gradient(135deg,#10b981 0%,#3b82f6 100%)' }} onClick={runHumanProof}>Run HumanProof →</button>
+                        {!paid ? (
+                          <>
+                            <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--amber)', lineHeight: 1.6, marginBottom: '.75rem' }} data-testid="hp-needs-plan">HumanProof works on the bullets your rewrite plan improves — build the plan first.</p>
+                            <button style={btnPrimary} onClick={() => setTab('rewrite')}>Go to the rewrite plan →</button>
+                          </>
+                        ) : realBulletsOf(paid).length === 0 ? (
+                          <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--amber)', lineHeight: 1.6, margin: 0 }} data-testid="hp-nothing">Your rewrite plan for this job has no rewritten bullets yet — only bullets for you to write. There is nothing for HumanProof to polish; write those bullets from real work, then come back.</p>
+                        ) : (
+                          <button style={{ ...btnPrimary, background: 'linear-gradient(135deg,#10b981 0%,#3b82f6 100%)' }} onClick={runHumanProof}>Run HumanProof on {realBulletsOf(paid).length} bullet{realBulletsOf(paid).length === 1 ? '' : 's'} →</button>
+                        )}
                       </Card>
                     )}
                     {hpState === 'loading' && <ResultEmpty icon="🗣" text={'Making it sound real…'} />}
@@ -925,6 +952,7 @@ function ResumePageInner() {
                         <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '1rem', marginBottom: '.5rem' }}>Your application is optimized. Now make it sound real.</div>
                         <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-66)', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1.1rem' }}>Unlock HumanProof so it sounds specific &amp; natural, stays interview-defensible, and carries no unsupported claims.</p>
                         <button onClick={() => { setUpgradeReason('pro'); setUpgradeFeature('HumanProof'); setShowUpgrade(true) }} style={{ background: 'linear-gradient(135deg,#10b981 0%,#3b82f6 100%)', color: '#fff', border: 'none', borderRadius: 10, padding: '.75rem 1.5rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', cursor: 'pointer' }}>Unlock HumanProof</button>
+                        <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--muted)', lineHeight: 1.6, margin: '.65rem 0 0' }}>{LOCK_NOTE}</p>
                       </Card>
                     )}
                     {hpState === 'done' && hp && (
@@ -942,6 +970,7 @@ function ResumePageInner() {
                         </Card>
                         <Card>
                           {kicker('Humanized bullets', 'var(--green)')}
+                          {hp.integrity?.grounded && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--green)', marginBottom: '.55rem' }}>✓ Every number kept exactly as you wrote it — nothing added.</div>}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
                             {hp.package.bullets.map((b, i) => (
                               <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.7rem .85rem', display: 'flex', gap: '.6rem', alignItems: 'flex-start' }}>
@@ -998,7 +1027,7 @@ function ResumePageInner() {
                       <Card>
                         <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '.95rem', marginBottom: '.3rem' }}>Advantage playbook + 30/60/90 plan</div>
                         <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-65)', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.9rem' }}>Hiring-manager outreach, timing, referral tactics and a 30/60/90-day plan, tuned with Seen&apos;s company data.</p>
-                        <button style={btnPrimary} onClick={runAdvantage}>Build my advantage →<span style={{ marginLeft: '.5rem', fontSize: 'var(--fs-55)', opacity: .65, fontFamily: 'var(--mono)', fontWeight: 400 }}>· 1 credit</span></button>
+                        <button style={btnPrimary} onClick={runAdvantage}>Build my advantage →<span style={{ marginLeft: '.5rem', fontSize: 'var(--fs-55)', opacity: .65, fontFamily: 'var(--mono)', fontWeight: 400 }}>· {priceLabel(RESUME_OPTIMIZE_COST, pro)}</span></button>
                       </Card>
                     )}
                     {advState === 'loading' && <ResultEmpty icon="🧠" text={'Building your advantage…'} />}
@@ -1053,7 +1082,7 @@ function ResumePageInner() {
                 {pro === false && !upsellDismissed && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 8, padding: '.5rem .6rem .5rem .85rem', marginTop: '.5rem' }}>
                     <button onClick={() => { setUpgradeReason('generic'); setUpgradeFeature(undefined); setShowUpgrade(true) }} style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--body)', fontSize: 'var(--fs-68)', color: 'var(--sub)', lineHeight: 1.5 }}>
-                      Free gives you {FREE_DAILY_CREDITS} AI {CREDIT_WORD}/day · <span style={{ color: '#a5b4fc', fontWeight: 700 }}>Go Pro for unlimited →</span>
+                      <span style={{ color: '#a5b4fc', fontWeight: 700 }}>{PASS_AFTER_WIN}</span>
                     </button>
                     <button onClick={() => setUpsellDismissed(true)} aria-label="Dismiss" style={{ background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontSize: '.85rem', lineHeight: 1, padding: '.1rem .2rem', flexShrink: 0 }}>✕</button>
                   </div>

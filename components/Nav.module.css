@@ -25,7 +25,7 @@
   padding: 0.42rem 0.62rem;
   border-radius: 8px;
   font-family: var(--body);
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   font-weight: 500;
   line-height: 1;
   color: rgba(255, 255, 255, 0.55);
@@ -133,7 +133,7 @@
 
 .menuLabel {
   font-family: var(--mono);
-  font-size: 0.5rem;
+  font-size: var(--fs-meta);
   text-transform: uppercase;
   letter-spacing: 0.14em;
   color: var(--dim);
@@ -148,7 +148,7 @@
   padding: 0.5rem 0.6rem;
   border-radius: 8px;
   font-family: var(--body);
-  font-size: 0.78rem;
+  font-size: var(--fs-meta);
   font-weight: 500;
   color: var(--sub);
   text-decoration: none;
@@ -202,8 +202,8 @@
   border-radius: 8px;
   background: var(--bdim);
   border: 1px solid var(--bmid);
-  font-family: var(--mono);
-  font-size: 0.58rem;
+  font-family: var(--body);
+  font-size: var(--fs-meta);
   line-height: 1.5;
   color: var(--blue);
 }
@@ -219,7 +219,7 @@
   border: none;
   background: none;
   font-family: var(--mono);
-  font-size: 0.66rem;
+  font-size: var(--fs-meta);
   font-weight: 500;
   line-height: 1;
   color: var(--sub);
@@ -260,8 +260,8 @@
   display: inline-flex;
   align-items: center;
   font-family: var(--mono);
-  font-size: 0.62rem;
-  font-weight: 700;
+  font-size: var(--fs-meta);
+  font-weight: 500;
   letter-spacing: 0.03em;
   line-height: 1;
   color: var(--green);
@@ -298,14 +298,17 @@
   display: inline-flex; align-items: center; gap: 0.45rem;
   height: 34px; padding: 0 0.55rem 0 0.65rem; border-radius: 9px;
   border: 1px solid var(--line); background: rgba(255, 255, 255, 0.025);
-  color: var(--dim); font-family: var(--body); font-size: 0.76rem; cursor: pointer;
+  color: var(--dim); font-family: var(--body); font-size: var(--fs-meta); cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
 .cmdk:hover { color: var(--sub); border-color: var(--line2); background: rgba(255, 255, 255, 0.05); }
 .cmdk svg { width: 15px; height: 15px; flex: none; }
 .cmdkLabel { white-space: nowrap; }
+/* Fixed width: the label flips "⌘K" → "CtrlK" after the platform check, and a width change there
+   shifted the whole right cluster (CLS 0.19 on desktop, audit #11). */
 .cmdkKey {
-  font-family: var(--mono); font-size: 0.56rem; letter-spacing: 0.04em; color: var(--sub);
+  display: inline-block; width: 4.6em; box-sizing: border-box; white-space: nowrap; text-align: center;
+  font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.04em; color: var(--sub);
   border: 1px solid var(--line2); border-bottom-width: 2px; border-radius: 4px; padding: 0.08rem 0.32rem;
 }
 @media (max-width: 1024px) { .cmdkLabel { display: none; } .cmdk { padding: 0 0.5rem; } }
@@ -333,8 +336,8 @@
   background: linear-gradient(135deg, var(--g-start) 0%, var(--g-mid) 55%, var(--g-end) 100%);
   color: #fff;
   font-family: var(--body);
-  font-size: 0.78rem;
-  font-weight: 700;
+  font-size: var(--fs-meta);
+  font-weight: 600;
   line-height: 1;
   transition: transform 0.3s var(--ease-spring), box-shadow 0.25s ease;
 }
@@ -380,7 +383,10 @@ div.drawer {
   box-shadow: -20px 0 60px rgba(0, 0, 0, 0.5);
   padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
 }
-div.drawer.drawerOpen { transform: translateX(0); }
+/* Closed = not painted at all (it was only translated off-canvas, so its CTA still counted as a
+   second primary in the first view); visibility flips after the slide-out finishes. */
+div.drawer { visibility: hidden; transition: transform .25s ease, visibility 0s linear .25s; }
+div.drawer.drawerOpen { transform: translateX(0); visibility: visible; transition: transform .25s ease, visibility 0s; }
 .drawerClose {
   margin-left: auto;
   width: 44px;
@@ -401,11 +407,11 @@ div.drawer.drawerOpen { transform: translateX(0); }
 .drawerClose:hover, .drawerClose:focus-visible { color: var(--white); background: rgba(255, 255, 255, 0.07); outline: none; }
 .drawerClose:focus-visible { box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.6); }
 /* Every control in the drawer's foot is a real thumb target (≥44px). */
-.drawerCta { width: 100%; justify-content: center; min-height: 44px; font-size: 0.84rem; }
+.drawerCta { width: 100%; justify-content: center; min-height: 44px; font-size: var(--fs-sm); }
 .drawerGhost, .drawerDanger {
   display: flex; align-items: center; justify-content: center; width: 100%; min-height: 44px;
   border-radius: 10px; padding: 0.5rem 1rem; cursor: pointer; text-decoration: none;
-  font-family: var(--body); font-size: 0.84rem; font-weight: 600;
+  font-family: var(--body); font-size: var(--fs-sm); font-weight: 600;
 }
 .drawerGhost { background: none; border: 1px solid var(--line2); color: var(--sub); }
 .drawerDanger { background: rgba(239, 68, 68, 0.07); border: 1px solid rgba(239, 68, 68, 0.25); color: var(--red); }
@@ -414,7 +420,22 @@ div.drawer.drawerOpen { transform: translateX(0); }
 }
 div.drawer :global(.side-menu-item) { min-height: 44px; }
 
-/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
-@media (max-width: 768px) {
-  .menuLabel, .menuNote, .chip, .pro, .cmdkKey { font-size: 0.75rem; }
+
+/* ── Drawer pieces (were inline styles) ── */
+.chipWrap { position: relative; display: inline-flex; }
+.drawerWord { font-family: var(--body); font-weight: 600; font-size: var(--fs-lead); color: var(--text-1); letter-spacing: -0.02em; }
+.drawerCredit {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2);
+  width: calc(100% - 2rem); margin: 0.25rem 1rem 0.6rem; padding: 0 var(--sp-4); min-height: 48px;
+  border-radius: var(--r-control); border: 1px solid var(--accent-line); background: var(--accent-tint);
+  color: var(--text-1); font-family: var(--body); font-size: var(--fs-sm); font-weight: 600; text-align: left; text-decoration: none; cursor: pointer;
 }
+.drawerCredit > span:last-child { color: var(--accent); }
+.drawerCredit > span { display: inline-flex; align-items: center; gap: 6px; }
+.drawerCreditPro { border-color: var(--good-line); background: var(--good-tint); }
+.drawerCreditPro > span:last-child { color: var(--good-text); }
+.drawerCreditEmpty { border-color: var(--bad-line); background: var(--bad-tint); }
+.drawerCreditEmpty > span { color: var(--bad-text); }
+.drawerCreditEmpty > span:last-child { color: var(--bad-text); }
+.drawerFoot { margin-top: auto; padding: 1rem 1.25rem 1.25rem; border-top: 1px solid var(--border-1); display: flex; flex-direction: column; gap: var(--sp-2); }
+.drawerGhost { display: inline-flex; align-items: center; gap: var(--sp-2); }

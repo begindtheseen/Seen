@@ -78,6 +78,7 @@ function StudioInner() {
   const [busy, setBusy] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState<null | 'credits' | 'pro' | 'generic'>(null)
+  const [upgradeFeature, setUpgradeFeature] = useState<string | undefined>(undefined)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle')
   const saveTimer = useRef<number | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -237,7 +238,7 @@ function StudioInner() {
 
   return (
     <div className="page-full">
-      {showUpgrade && <UpgradeModal reason={showUpgrade} featureName={showUpgrade === 'pro' ? 'AI polish' : undefined} onClose={() => setShowUpgrade(null)} />}
+      {showUpgrade && <UpgradeModal reason={showUpgrade} featureName={showUpgrade === 'pro' ? upgradeFeature : undefined} onClose={() => setShowUpgrade(null)} />}
       <div className={s.wrap}>
         <PageHeader
           eyebrow="Résumé Studio"
@@ -329,8 +330,8 @@ function StudioInner() {
                   )}
                   {panelTab === 'health' && fixPreview && fixAll && <FixPreview log={fixAll.log} onApply={applyFixes} onCancel={() => setFixPreview(false)} />}
                   {panelTab === 'health' && health && <HealthPanel health={health} doc={doc} onJump={jump} onApplyRewrite={applyRewrite} onApplyVerb={applyVerb} onFixAll={fixAllNow} fixAllCount={fixAllCount} />}
-                  {panelTab === 'tailor' && <TailorPanel doc={doc} isLoggedIn={isLoggedIn} pro={pro} savedJobs={savedJobs} initialJob={initialJob} onNeed={(r) => { if (r === 'signin') { setError('Sign in to tailor your résumé (1 credit).'); router.push('/login?next=/resume/studio?tab=tailor') } else setShowUpgrade(r) }} onUseVariant={useVariant} />}
-                  {panelTab === 'export' && <ExportPanel doc={doc} pro={pro} isLoggedIn={isLoggedIn} onNeedPro={() => setShowUpgrade(isLoggedIn ? 'pro' : 'generic')} role={active?.role} />}
+                  {panelTab === 'tailor' && <TailorPanel doc={doc} isLoggedIn={isLoggedIn} pro={pro} savedJobs={savedJobs} initialJob={initialJob} onNeed={(r) => { if (r === 'signin') { setError('Sign in to tailor your résumé (1 credit).'); router.push('/login?next=/resume/studio?tab=tailor') } else { setUpgradeFeature(undefined); setShowUpgrade(r) } }} onUseVariant={useVariant} />}
+                  {panelTab === 'export' && <ExportPanel doc={doc} pro={pro} isLoggedIn={isLoggedIn} onNeedPro={() => { setUpgradeFeature('unbranded downloads'); setShowUpgrade('pro') }} role={active?.role} />}
                 </div>
               )}
             </div>

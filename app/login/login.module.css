@@ -9,7 +9,7 @@
   padding: 80px 1.5rem 1.5rem;
   box-sizing: border-box;
 }
-.card { width: 100%; max-width: 420px; animation: fadeUp 0.4s ease both; }
+.card { width: 100%; max-width: 420px; animation: fadeUp 0.4s ease backwards; }
 @media (max-width: 768px) {
   .wrap { align-items: flex-start; min-height: 0; padding: calc(64px + 1.25rem) 1.25rem 2rem; }
 }
@@ -19,17 +19,17 @@
   display: inline-flex; align-items: center; gap: 0.35rem;
   min-height: 44px; padding: 0 0.5rem; margin: 0 -0.5rem;
   background: none; border: none; cursor: pointer; border-radius: 8px;
-  font-family: var(--mono); font-size: 0.72rem; color: var(--dim);
+  font-family: var(--mono); font-size: var(--fs-meta); color: var(--dim);
 }
 .textBtn:hover, .textBtn:focus-visible { color: var(--white); outline: none; }
 .textBtn:focus-visible { box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.6); }
 .linkBtn {
   display: inline-flex; align-items: center; min-height: 44px; padding: 0 0.4rem; margin: 0 -0.4rem;
   background: none; border: none; cursor: pointer; border-radius: 8px;
-  font-family: var(--body); font-size: 0.82rem; color: var(--blue); text-decoration: underline;
+  font-family: var(--body); font-size: var(--fs-sm); color: var(--blue); text-decoration: underline;
 }
 .linkBtn:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.6); }
-.linkDim { color: var(--muted); font-family: var(--mono); font-size: 0.72rem; }
+.linkDim { color: var(--muted); font-family: var(--mono); font-size: var(--fs-meta); }
 
 /* Password field with a show/hide toggle inside it. */
 .pwWrap { position: relative; }
@@ -39,7 +39,7 @@
   min-width: 44px; height: 44px; padding: 0 0.6rem;
   display: inline-flex; align-items: center; justify-content: center;
   background: none; border: none; cursor: pointer; border-radius: 8px;
-  color: var(--dim); font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.04em;
+  color: var(--dim); font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.04em;
 }
 .pwToggle:hover, .pwToggle:focus-visible { color: var(--white); outline: none; }
 .pwToggle:focus-visible { box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.6); }
@@ -47,17 +47,16 @@
 .notice {
   background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px;
   padding: 0.72rem 1rem; margin-bottom: 1rem; text-align: center;
-  font-family: var(--mono); font-size: 0.72rem; color: var(--amber);
+  font-family: var(--mono); font-size: var(--fs-meta); color: var(--amber);
 }
-.auto { font-family: var(--mono); font-size: 0.62rem; color: var(--dim); margin-bottom: 0.9rem; }
-.auto::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin-right: 0.4rem; animation: pulse 1.6s infinite; }
+.auto { font-family: var(--mono); font-size: var(--fs-meta); color: var(--dim); margin-bottom: 0.9rem; }
+.auto::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin-right: 0.4rem; }
 
 @media (prefers-reduced-motion: reduce) {
   .card { animation: none; }
   .auto::before { animation: none; }
 }
 
-/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
-@media (max-width: 768px) {
-  .textBtn, .linkDim, .pwToggle, .notice, .auto { font-size: 0.75rem; }
-}
+
+/* Check-your-email screen: the icon above the heading (was a mailbox emoji). */
+.mailIcon { display: inline-grid; place-items: center; width: 64px; height: 64px; border-radius: var(--r-card); background: var(--accent-tint); border: 1px solid var(--accent-line); color: var(--accent); margin-bottom: var(--sp-4); }

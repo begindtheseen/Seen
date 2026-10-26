@@ -16,7 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const l = d ? buildList(SLUG, d) : null
   return pageMetadata({
     title: l ? l.title : 'Staffing agencies that ghost applicants',
-    description: l ? l.description : 'A monthly ranking from applicant reports on Seen.',
+    description: l ? l.description : 'A monthly ranking from applicant accounts on Seen.',
     path: `/lists/${SLUG}`,
   })
 }

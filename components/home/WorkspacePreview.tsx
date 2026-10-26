@@ -5,7 +5,7 @@
 //   Dashboard   → app/dashboard (Command Center: health, pills, next best move, pipeline)
 //   Tracker     → app/tracker (stage pipe, ghost tags, the inline day-N check-in)
 //   Company     → app/company/[slug] — REAL, live-refreshed data (HomeHero passes the Amazon score)
-//   Résumé AI   → app/resume (SeenFit score before/after tailoring)
+//   Résumé   → app/resume (SeenFit score before/after tailoring)
 // Dashboard / Tracker / Résumé use EXAMPLE data and say so on screen. No visitor counts or
 // community-size claims: Seen does not have them (brain: seen:growth state_2026_10_18).
 //
@@ -18,6 +18,8 @@ import { gradeLetter } from '@/lib/companyDisplay'
 import Link from 'next/link'
 import Odometer from '@/components/motion/Odometer'
 import styles from './WorkspacePreview.module.css'
+import Icon, { type IconName } from '@/components/ui/Icon'
+import { PASS } from '@/lib/pricing'
 
 export interface ProofScore {
   name: string
@@ -29,16 +31,16 @@ export interface ProofScore {
   waste: number
   /** FUSED total (first-party + web-research claim) — never rendered as "reports". */
   report_count: number
-  /** Real applicant-report rows — the only count the card may call "applicant reports". */
+  /** Real applicant-report rows — the only count the card may call "applicant accounts". */
   first_party_report_count: number
 }
 
 type Tab = 'dashboard' | 'tracker' | 'company' | 'resume'
-const TABS: Array<{ id: Tab; label: string; icon: string; title: string; sub: string }> = [
-  { id: 'dashboard', label: 'Dashboard', icon: '◫', title: 'Hey, Alex.', sub: '6 open applications · 2 check-ins due' },
-  { id: 'tracker', label: 'Tracker', icon: '▤', title: 'My applications', sub: 'Every application, with the next thing to do on each one.' },
-  { id: 'company', label: 'Company intel', icon: '◈', title: 'Check before you apply', sub: 'Real data, live from Seen.' },
-  { id: 'resume', label: 'Résumé AI', icon: '✧', title: 'SeenFit', sub: 'Your résumé, scored against one exact role.' },
+const TABS: Array<{ id: Tab; label: string; icon: IconName; title: string; sub: string }> = [
+  { id: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard', title: 'Hey, Alex.', sub: '6 open applications · 2 check-ins due' },
+  { id: 'tracker', label: 'Tracker', icon: 'list-checks', title: 'My applications', sub: 'Every application, with the next thing to do on each one.' },
+  { id: 'company', label: 'Company intel', icon: 'briefcase-business', title: 'Check before you apply', sub: 'Real data, live from Seen.' },
+  { id: 'resume', label: 'Résumé', icon: 'file-text', title: 'SeenFit', sub: 'Your résumé, scored against one exact role.' },
 ]
 const CYCLE_MS = 6500
 
@@ -102,7 +104,7 @@ export default function WorkspacePreview({ proof, live = false }: { proof: Proof
                   className={`${styles.tab}${tab === t.id ? ' ' + styles.tabOn : ''}`}
                   onClick={() => pick(t.id)}
                 >
-                  <span className={styles.tabIco} aria-hidden="true">{t.icon}</span>
+                  <span className={styles.tabIco} aria-hidden="true"><Icon name={t.icon} size={15} /></span>
                   {t.label}
                   {tab === t.id && cycling && (
                     <span className={styles.timer} style={{ '--cycle': `${CYCLE_MS}ms` } as CSSProperties} aria-hidden="true" />
@@ -111,8 +113,8 @@ export default function WorkspacePreview({ proof, live = false }: { proof: Proof
               ))}
             </div>
             <div className={styles.pro}>
-              <b>★ Seen Pro</b>
-              Unlimited AI credits and Human Voice.
+              <b>Job Search Pass</b>
+              Every interview prepped, {PASS.pro_days} days.
             </div>
           </div>
 
@@ -164,14 +166,14 @@ function DashboardTab({ start, onTracker }: { start: boolean; onTracker: () => v
         </div>
         <div className={styles.panel}>
           <div className={styles.panelHd}>Next best move</div>
-          <Move icon="⏰" t="Follow up with Atlas Robotics" s="Past its typical response window" />
-          <Move icon="📮" t="Report 2 outcomes" s="Unlocks your real response & ghost rates" />
-          <Move icon="🔎" t="Find more roles like Northwind" s="Keep your pipeline full" />
+          <Move icon="clock" t="Follow up with Atlas Robotics" s="Past its typical response window" />
+          <Move icon="flag" t="Report 2 outcomes" s="Unlocks your real response & ghost rates" />
+          <Move icon="search" t="Find more roles like Northwind" s="Keep your pipeline full" />
         </div>
       </div>
       <div className={styles.insight}>
         <div>
-          <b>✦ Northwind usually replies in about 6 days.</b>
+          <b>Northwind usually replies in about 6 days.</b>
           <p>You&apos;re on day 4. Hold the follow-up; Harbor Logistics is the one going quiet.</p>
         </div>
         <button type="button" onClick={onTracker}>Open tracker →</button>
@@ -193,7 +195,7 @@ function TrackerTab() {
         <div className={styles.check}>
           <div className={styles.checkTag}><span className={styles.checkDot} />Day 12 check-in</div>
           {answer ? (
-            <div className={styles.checkDone}>✓ Logged “{answer}”. It adds to Harbor Logistics&apos; public record, so the next applicant knows.</div>
+            <div className={styles.checkDone}><Icon name="circle-check" size={14} /> Logged “{answer}”. It adds to Harbor Logistics&apos; public record, so the next applicant knows.</div>
           ) : (
             <>
               <div className={styles.checkQ}>Did they respond to your application?</div>
@@ -260,7 +262,7 @@ function CompanyTab({ proof }: { proof: ProofScore }) {
           <div className={styles.coName}>{proof.name}</div>
           <div className={styles.rowRole}>
             {proof.first_party_report_count > 0
-              ? `${proof.first_party_report_count.toLocaleString()} applicant report${proof.first_party_report_count === 1 ? '' : 's'}`
+              ? `${proof.first_party_report_count.toLocaleString()} applicant account${proof.first_party_report_count === 1 ? '' : 's'}`
               : 'Estimated from public web data'}
           </div>
         </div>
@@ -283,14 +285,14 @@ function CompanyTab({ proof }: { proof: ProofScore }) {
         </div>
       </div>
       <div className={styles.coFoot}>
-        <span>Seen grade {proof.overall_score}/100 · from {proof.first_party_report_count} applicant reports</span>
+        <span>Seen grade {proof.overall_score}/100 · from {proof.first_party_report_count} applicant accounts</span>
         <Link href="/company/amazon">Full report →</Link>
       </div>
     </div>
   )
 }
 
-/* ── Résumé AI (app/resume SeenFit) ──────────────────────────────────────────────────── */
+/* ── Résumé (app/resume SeenFit) ──────────────────────────────────────────────────── */
 function ResumeTab() {
   return (
     <div className={styles.resume}>
@@ -312,7 +314,7 @@ function ResumeTab() {
         <div className={styles.panelHd}>Keywords this role screens for</div>
         <div className={styles.kws}>
           {['Patient intake', 'Vitals', 'EHR (Epic)', 'BLS certified'].map((k, i) => (
-            <span key={k} className={styles.kwOk} style={{ animationDelay: `${0.15 + i * 0.07}s` }}>✓ {k}</span>
+            <span key={k} className={styles.kwOk} style={{ animationDelay: `${0.15 + i * 0.07}s` }}><Icon name="check" size={12} /> {k}</span>
           ))}
           {['Phlebotomy', 'HIPAA'].map((k, i) => (
             <span key={k} className={styles.kwAdd} style={{ animationDelay: `${0.45 + i * 0.07}s` }}>+ {k}</span>
@@ -350,10 +352,10 @@ function Row({ logo, co, role, ghost, pill }: { logo: string; co: string; role: 
     </div>
   )
 }
-function Move({ icon, t, s }: { icon: string; t: string; s: string }) {
+function Move({ icon, t, s }: { icon: IconName; t: string; s: string }) {
   return (
     <div className={styles.move}>
-      <span className={styles.moveIco}>{icon}</span>
+      <span className={styles.moveIco}><Icon name={icon} size={16} /></span>
       <div style={{ minWidth: 0 }}>
         <div className={styles.rowCo}>{t}</div>
         <div className={styles.rowRole}>{s}</div>

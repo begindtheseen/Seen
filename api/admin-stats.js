@@ -1401,7 +1401,6 @@ async function _handler(req, res) {
     if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
     const defaultFlags = [
       { flag_name: 'ai_credit_system_enabled', status: 'fully_on', percentage: 0, description: 'Enables the daily AI credit system. When off, all users get unlimited AI.' },
-      { flag_name: 'reddit_import_enabled',    status: 'off',      percentage: 0, description: 'Enables automatic Reddit report import via cron.' },
       { flag_name: 'job_refresh_enabled',      status: 'fully_on', percentage: 0, description: 'Enables the Adzuna job refresh cron job.' },
     ];
     let created = 0;

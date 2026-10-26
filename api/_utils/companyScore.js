@@ -1,3 +1,4 @@
+import { gradeRisk } from '../../lib/gradeScale.js';
 // Company scoring engine — the single source of truth for how a company score is
 // computed from fused signals, with confidence gating. See SCORING.md.
 //
@@ -40,7 +41,7 @@ export function calcWaste(ghostRate, avgRounds, unpaidRate) {
 }
 
 export function riskLevel(score) {
-  return score >= 70 ? 'safe' : score >= 40 ? 'warn' : 'danger';
+  return gradeRisk(score) || 'danger';
 }
 
 // ── Stale-listing penalty (owner decision 2026-07-10) ─────────────────────────

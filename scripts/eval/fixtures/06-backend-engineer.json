@@ -1,0 +1,156 @@
+{
+  "id": "06-backend-engineer",
+  "field": "Backend software engineer (Go/Python)",
+  "resume": [
+    "Daniel Okafor",
+    "Austin, TX · daniel.okafor.dev@gmail.com · (512) 555-0118 · github.com/dokafor",
+    "",
+    "Experience",
+    "",
+    "Software Engineer II, Fieldline — Austin, TX                                  Mar 2021 – Present",
+    "- Built the shipment-tracking event service in Go; it handles 4,000 requests/sec at peak with 99.95% uptime",
+    "- Cut p99 latency of the tracking API from 850 ms to 210 ms by adding a Redis read-through cache and batching Postgres writes",
+    "- Moved 3 legacy cron jobs onto Kubernetes CronJobs and wrote the runbooks the on-call rotation uses",
+    "- Designed the Kafka topic layout for carrier webhooks (40+ carriers) and wrote the consumer in Go",
+    "- Review 6–10 pull requests a week and mentor 2 junior engineers",
+    "",
+    "Software Engineer, Cobalt Payments — Dallas, TX                               Jul 2019 – Feb 2021",
+    "- Maintained the merchant onboarding API in Python (Django) and PostgreSQL",
+    "- Wrote the retry and idempotency layer for payout webhooks, ending duplicate payouts (previously 30+ a month)",
+    "- Added integration tests that took coverage of the onboarding service from 41% to 78%",
+    "",
+    "Software Engineering Intern, Texas Grid Analytics — Richardson, TX            Summer 2018",
+    "- Wrote Python scripts to clean 2 years of smart-meter data for the forecasting team",
+    "",
+    "Skills",
+    "Languages: Go, Python, SQL, Bash",
+    "Data & infra: PostgreSQL, Redis, Kafka, AWS (ECS, SQS, S3), Docker, Kubernetes, Terraform, gRPC, GitHub Actions",
+    "",
+    "Education",
+    "B.S. Computer Science, The University of Texas at Dallas, 2019"
+  ],
+  "job": {
+    "title": "Backend Engineer, Payments Platform",
+    "company": "Tallgrass Financial",
+    "location": "Remote (US)",
+    "description": [
+      "Tallgrass Financial builds payment infrastructure for community banks and credit unions. Our risk team uses machine learning to block fraud in real time; this role is on the Payments Platform team that moves the money.",
+      "",
+      "What you'll do",
+      "• Design, build and operate the services that authorize, settle and reconcile payments",
+      "• Own features end to end: design doc, code, tests, rollout and on-call",
+      "• Improve the reliability and latency of our ledger and settlement services",
+      "• Work with product and compliance to ship new payment types safely",
+      "",
+      "What we're looking for",
+      "• 3+ years building and operating backend services in production",
+      "• Proficiency in Go, Java, or Python (most of our services are written in Go)",
+      "• Strong SQL and relational database skills (PostgreSQL preferred)",
+      "• Experience with distributed systems and message queues (Kafka, RabbitMQ, or SQS)",
+      "• Comfort joining an on-call rotation (one week in six)",
+      "",
+      "Nice to have",
+      "• Payments, ledger or PCI-DSS experience",
+      "• Infrastructure as code (Terraform)",
+      "",
+      "Compensation",
+      "$150,000 – $185,000 base salary plus equity. Fully remote in the US with quarterly team weeks."
+    ]
+  },
+  "gold": {
+    "family": [
+      "software_engineering"
+    ],
+    "must_skills": [
+      {
+        "label": "backend services",
+        "match": "backend|services|distributed"
+      },
+      {
+        "label": "Go/Java/Python",
+        "match": "\\bgo\\b|golang|java\\b|python"
+      },
+      {
+        "label": "SQL / PostgreSQL",
+        "match": "\\bsql\\b|postgres"
+      },
+      {
+        "label": "message queues",
+        "match": "kafka|rabbitmq|sqs|message queue|queue"
+      }
+    ],
+    "alternatives": [
+      [
+        "Go",
+        "Java",
+        "Python"
+      ],
+      [
+        "Kafka",
+        "RabbitMQ",
+        "SQS"
+      ]
+    ],
+    "years_min": 3,
+    "traps": [
+      {
+        "term": "Machine Learning",
+        "match": "machine learning|\\bml\\b",
+        "scope": "any",
+        "why": "only in the company blurb (risk team)"
+      },
+      {
+        "term": "Java (as his skill)",
+        "match": "\\bjava\\b(?!script)",
+        "scope": "candidate",
+        "why": "he writes Go and Python, not Java"
+      },
+      {
+        "term": "PCI-DSS",
+        "match": "\\bpci\\b",
+        "scope": "candidate",
+        "why": "not in the résumé"
+      },
+      {
+        "term": "RabbitMQ",
+        "match": "rabbitmq",
+        "scope": "candidate",
+        "why": "he used Kafka and SQS"
+      }
+    ],
+    "resume_employers": [
+      "Fieldline",
+      "Cobalt Payments",
+      "Texas Grid Analytics"
+    ],
+    "resume_titles": [
+      "Software Engineer II",
+      "Software Engineer",
+      "Software Engineering Intern"
+    ],
+    "resume_degrees": [
+      "B.S. Computer Science"
+    ],
+    "resume_numbers": [
+      "512",
+      "555",
+      "0118",
+      "2021",
+      "4000",
+      "99.95%",
+      "99",
+      "850",
+      "210",
+      "3",
+      "40",
+      "6",
+      "10",
+      "2",
+      "2019",
+      "30",
+      "41%",
+      "78%",
+      "2018"
+    ]
+  }
+}

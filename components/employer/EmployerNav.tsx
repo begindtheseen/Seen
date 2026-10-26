@@ -106,7 +106,7 @@ export function EmployerNav() {
         <Link href="/" className="logo" title="Back to Seen home">
           <span className="logo-pulse" />
           Seen
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.12em', marginLeft: '.15rem', fontWeight: 500 }}>for employers</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.12em', marginLeft: '.15rem', fontWeight: 500 }}>for employers</span>
         </Link>
 
         {/* Primary employer destinations (hidden on mobile via .primary — the drawer takes over). */}
@@ -178,10 +178,10 @@ export function EmployerNav() {
       >
         <div className="side-menu-logo">
           <span className="logo-pulse" />
-          <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.2rem', color: 'var(--white)', letterSpacing: '-.02em' }}>Seen</span>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.12em' }}>employers</span>
+          <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-h3)', color: 'var(--white)', letterSpacing: '-.02em' }}>Seen</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.12em' }}>employers</span>
           {/* 44×44 hit area by box size (the glyph stays 1rem); negative block margins keep the row height. */}
-          <button ref={drawerCloseRef} type="button" onClick={() => setMenuOpen(false)} style={{ marginLeft: 'auto', width: 44, height: 44, marginTop: -10, marginBottom: -10, marginRight: '-.5rem', display: 'grid', placeItems: 'center', background: 'none', border: 'none', borderRadius: 10, color: 'var(--muted)', cursor: 'pointer', fontSize: '1rem' }} aria-label="Close menu">✕</button>
+          <button ref={drawerCloseRef} type="button" onClick={() => setMenuOpen(false)} style={{ marginLeft: 'auto', width: 44, height: 44, marginTop: -10, marginBottom: -10, marginRight: '-.5rem', display: 'grid', placeItems: 'center', background: 'none', border: 'none', borderRadius: 10, color: 'var(--muted)', cursor: 'pointer', fontSize: 'var(--fs-lead)' }} aria-label="Close menu">✕</button>
         </div>
 
         <div className="side-menu-label">For employers</div>
@@ -198,7 +198,7 @@ export function EmployerNav() {
 
         <div style={{ marginTop: 'auto', padding: '1rem 1.25rem 1.25rem', borderTop: '1px solid var(--line)', display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
           {ready && isLoggedIn ? (
-            <button onClick={handleSignOut} style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.25)', color: 'var(--red)', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--mono)', fontSize: '.65rem', fontWeight: 600, cursor: 'pointer', width: '100%' }}>Sign out</button>
+            <button onClick={handleSignOut} style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.25)', color: 'var(--red)', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, cursor: 'pointer', width: '100%' }}>Sign out</button>
           ) : (
             <>
               <Link href="/login?type=employer" className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setMenuOpen(false)}>Sign in</Link>
@@ -217,12 +217,12 @@ export function EmployerFooter() {
   return (
     <footer style={{ borderTop: '1px solid var(--line)', padding: '1.4rem 1.5rem' }}>
       <div style={{ maxWidth: 960, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.6rem', width: '100%', boxSizing: 'border-box' }}>
-        <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)' }}>© 2026 Seen · for employers</span>
+        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>© 2026 Seen · for employers</span>
         <div style={{ display: 'flex', gap: '1.1rem', flexWrap: 'wrap' }}>
-          <Link href="/employers#promote" style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', textDecoration: 'none' }}>Pricing</Link>
-          <Link href="/employers/verified" style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', textDecoration: 'none' }}>Get Verified</Link>
-          <Link href="/legal" style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', textDecoration: 'none' }}>Legal</Link>
-          <Link href="/" style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', textDecoration: 'none' }}>For job seekers →</Link>
+          <Link href="/employers#promote" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', textDecoration: 'none' }}>Pricing</Link>
+          <Link href="/employers/verified" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', textDecoration: 'none' }}>Get Verified</Link>
+          <Link href="/legal" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', textDecoration: 'none' }}>Legal</Link>
+          <Link href="/" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', textDecoration: 'none' }}>For job seekers →</Link>
         </div>
       </div>
     </footer>

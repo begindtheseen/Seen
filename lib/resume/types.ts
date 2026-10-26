@@ -57,11 +57,11 @@ export interface TailorDecision {
   reasons: string[]; overridable: boolean
 }
 export interface TailorPrompt { id: string; itemId: string; roleTitle: string; company: string; kind: 'dates' | 'metric'; question: string; unit: string | null; why: string }
-export interface TailorAdded { kind: 'transferable_bullet'; itemId: string; bulletId: string; text: string; competency: string; basis: string; confirm: boolean; reason: string }
+export interface TailorAdded { kind: 'transferable_bullet' | 'transferable_suggestion'; itemId: string; key?: string; bulletId: string | null; text: string; competency: string; basis: string; confirm: boolean; confirmed?: boolean; reason: string }
 export interface TailorObjective { total: number; match: number; keywordCoverage: number; health: number; relevanceDensity: number; lengthFit: number; completeness: number; lines: number; penalty: number }
 export interface TailorRewrite { bulletId: string; itemId: string; from: string; to: string; rules: string[]; tense?: 'past' | 'present' }
 /** rewrites: true = accept every wording proposal, string[] = accepted bulletIds, absent = plan.applyRewrites (false). */
-export interface TailorOverrides { decisions?: Record<string, TailorDecision['decision']>; transferable?: boolean; excludeAdded?: string[]; summary?: boolean; skills?: boolean; terminology?: boolean; rewrites?: boolean | string[]; layout?: 'chronological' | 'relevance'; prompts?: TailorPrompt[]; answers?: Record<string, string> }
+export interface TailorOverrides { decisions?: Record<string, TailorDecision['decision']>; transferable?: boolean; excludeAdded?: string[]; includeAdded?: string[]; summary?: boolean; skills?: boolean; terminology?: boolean; rewrites?: boolean | string[]; layout?: 'chronological' | 'relevance'; prompts?: TailorPrompt[]; answers?: Record<string, string> }
 export interface TailorPlan {
   version: string
   optimizer?: string
@@ -88,8 +88,7 @@ export interface TailorPlan {
   transferable: Array<{ requirement: string; evidence: string; explanation: string }>
   provenance: Array<Record<string, unknown> & { kind: string }>
 }
-export interface PolishResult { available: boolean; reason?: string; applied?: number; changes: Array<{ id: string; from: string; text: string; reason: string }>; rejected: Array<{ id: string; reason: string }> }
-export interface TailorResponse { ok: boolean; plan: TailorPlan; variant: ResumeDoc; health: Health; polish: PolishResult | null; balance?: number; pro?: boolean; error?: string; credits_required?: boolean; pro_required?: boolean }
+export interface TailorResponse { ok: boolean; plan: TailorPlan; variant: ResumeDoc; health: Health; balance?: number; pro?: boolean; error?: string; credits_required?: boolean; pro_required?: boolean }
 
 export interface AtsCheck {
   version: string; format: string; template: string | null; score: number; grade: string

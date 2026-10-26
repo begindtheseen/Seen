@@ -1,0 +1,91 @@
+/* /pricing — one clear menu: Free, Interview Prep (the lead), the Job Search Pass.
+   Phone first: the hero is short and the Interview Prep card (price + button) sits in the first screen
+   at 390px. Every text size here is ≥ .75rem and every control ≥ 44px (CLAUDE.md phone floors).
+   One primary per view: the Interview Prep button carries the CTA gradient; the pass is secondary,
+   Free is ghost. Green is reserved for success states (the "included" status). */
+
+.wrap { max-width: var(--w-mid); margin: 0 auto; padding: 3rem 1.5rem 4.5rem; width: 100%; box-sizing: border-box; }
+.hero { text-align: center; margin-bottom: 2.25rem; }
+.eyebrow { font-family: var(--mono); font-size: var(--fs-meta); text-transform: uppercase; letter-spacing: .14em; color: var(--accent); margin-bottom: var(--sp-2); }
+.h1 { font-family: var(--display); font-size: clamp(var(--fs-h2), 4.6vw, var(--fs-fig-m)); font-weight: 800; color: var(--text-1); letter-spacing: -.03em; line-height: 1.1; margin: 0 auto .65rem; max-width: 22ch; }
+.lede { color: var(--text-3); font-family: var(--body); font-size: var(--fs-ui); line-height: 1.6; max-width: 520px; margin: 0 auto; }
+.lede b { color: var(--text-1); font-weight: 600; }
+
+.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-4); align-items: start; margin-bottom: 2.5rem; }
+.card { background: var(--surface-1); border: 1px solid var(--border-1); border-radius: var(--r-card); padding: var(--sp-6); min-width: 0; position: relative; }
+.lead { border: 1.5px solid var(--accent-line); background: linear-gradient(160deg, var(--accent-tint), transparent 70%), var(--surface-1); }
+.tag { position: absolute; top: -11px; left: 1.25rem; background: var(--surface-2); border: 1px solid var(--accent-line); color: var(--accent); font-family: var(--mono); font-size: var(--fs-meta); font-weight: 500; letter-spacing: .04em; padding: .15rem .6rem; border-radius: var(--r-pill); white-space: nowrap; }
+.name { font-family: var(--mono); font-size: var(--fs-meta); text-transform: uppercase; letter-spacing: .14em; color: var(--text-4); margin-bottom: .45rem; }
+.lead .name { color: var(--accent); }
+.priceRow { display: flex; align-items: baseline; gap: .45rem; flex-wrap: wrap; margin-bottom: .35rem; }
+.price { font-family: var(--body); font-size: var(--fs-h2); font-weight: 600; color: var(--text-1); line-height: 1; font-variant-numeric: tabular-nums; }
+.per { font-family: var(--body); font-size: var(--fs-sm); color: var(--text-3); }
+.pitch { font-family: var(--body); font-size: var(--fs-ui); color: var(--text-2); line-height: 1.55; margin: .35rem 0 1rem; }
+
+.btn { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 48px; box-sizing: border-box; border-radius: var(--r-control); padding: .75rem 1rem; font-family: var(--body); font-weight: 600; font-size: var(--fs-ui); cursor: pointer; text-decoration: none; text-align: center; border: 1px solid transparent; transition: background var(--dur-state) ease, border-color var(--dur-state) ease, transform var(--dur-press) ease; }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { background: var(--surface-2); border-color: var(--border-1); color: var(--text-4); cursor: default; }
+.btnLead { background: var(--cta-gradient); color: #fff; box-shadow: var(--sh-control); }
+.btnLead:hover:not(:disabled) { background: var(--cta-gradient-hover, var(--cta-gradient)); }
+.btnPass { background: var(--surface-2); border-color: var(--border-2); color: var(--text-1); }
+.btnPass:hover:not(:disabled) { border-color: var(--border-3, var(--border-2)); background: var(--surface-3, var(--surface-2)); }
+.btnFree { background: none; border-color: var(--border-2); color: var(--text-2); }
+.btnFree:hover:not(:disabled) { color: var(--text-1); border-color: var(--border-3, var(--border-2)); }
+.note { font-family: var(--body); font-size: var(--fs-meta); color: var(--text-3); text-align: center; margin: .5rem 0 0; }
+.status { font-family: var(--body); font-size: var(--fs-ui); color: var(--good-text); background: var(--good-tint); border: 1px solid var(--good-line); border-radius: var(--r-control); padding: .7rem .85rem; line-height: 1.5; }
+
+.list { list-style: none; margin: 1.1rem 0 0; padding: 0; }
+.list li { display: flex; gap: .5rem; margin-bottom: .45rem; font-family: var(--body); font-size: var(--fs-sm); color: var(--text-3); line-height: 1.45; }
+.list li::before { content: '✓'; color: var(--text-4); flex-shrink: 0; }
+.lead .list li::before { color: var(--accent); }
+.small { font-family: var(--body); font-size: var(--fs-meta); color: var(--text-4); line-height: 1.5; margin: .65rem 0 0; }
+
+.err { background: var(--bad-tint); border: 1px solid var(--bad-line); border-radius: var(--r-control); padding: .6rem .85rem; margin: 0 auto 1.25rem; max-width: 640px; font-family: var(--body); font-size: var(--fs-sm); color: var(--bad-text); line-height: 1.5; text-align: center; }
+
+.manage { max-width: 640px; margin: 0 auto 2rem; background: var(--surface-1); border: 1px solid var(--border-1); border-radius: var(--r-card); padding: 1.1rem 1.25rem; }
+.manageT { font-family: var(--body); font-size: var(--fs-lead); font-weight: 600; color: var(--text-1); margin: 0 0 .3rem; }
+.manageS { font-family: var(--body); font-size: var(--fs-sm); color: var(--text-3); line-height: 1.6; margin: 0 0 .75rem; }
+.manageS:last-child { margin: 0; }
+.ghostBtn { min-height: 44px; background: none; border: 1px solid var(--border-2); border-radius: var(--r-control); padding: .55rem 1rem; font-family: var(--body); font-weight: 500; font-size: var(--fs-sm); color: var(--text-2); cursor: pointer; }
+.ghostBtn.danger { border-color: var(--bad-line); color: var(--bad-text); }
+
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-3); margin: 0 0 2.5rem; padding: 0; list-style: none; counter-reset: step; }
+.steps li { counter-increment: step; background: var(--surface-1); border: 1px solid var(--border-1); border-radius: var(--r-card); padding: 1rem 1.1rem; font-family: var(--body); font-size: var(--fs-sm); color: var(--text-3); line-height: 1.55; min-width: 0; }
+.steps li::before { content: counter(step); display: inline-grid; place-items: center; width: 1.6rem; height: 1.6rem; border-radius: 50%; background: var(--accent-tint); color: var(--accent); font-family: var(--mono); font-size: var(--fs-meta); margin-bottom: .45rem; font-variant-numeric: tabular-nums; }
+.steps b { color: var(--text-1); font-weight: 600; display: block; margin-bottom: .2rem; }
+
+.promise { text-align: center; font-family: var(--body); font-size: var(--fs-sm); color: var(--text-3); line-height: 1.7; margin: 0 0 2.75rem; }
+.promise span { white-space: nowrap; }
+
+.h2 { font-family: var(--display); font-size: var(--fs-h3); font-weight: 700; color: var(--text-1); margin: 0 0 .9rem; }
+.faq { margin-bottom: var(--sp-2); background: var(--surface-1); border: 1px solid var(--border-1); border-radius: var(--r-control); scroll-margin-top: 5rem; }
+.faq summary { padding: .8rem 1.1rem; min-height: 44px; box-sizing: border-box; font-family: var(--body); font-size: var(--fs-ui); font-weight: 600; color: var(--text-1); cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+.faq summary::-webkit-details-marker { display: none; }
+.chev { color: var(--text-4); flex-shrink: 0; transition: transform var(--dur-state) var(--ease-out, ease); }
+.faq[open] .chev { transform: rotate(180deg); }
+.faqA { padding: 0 1.1rem .85rem; font-family: var(--body); font-size: var(--fs-sm); color: var(--text-3); line-height: 1.7; }
+
+/* Purchase confirmation */
+.done { display: flex; align-items: center; justify-content: center; min-height: 70vh; }
+.doneIn { text-align: center; max-width: 440px; padding: 2rem 16px; }
+.doneIn .lede { margin-bottom: var(--sp-6); }
+.doneBtns { display: grid; gap: var(--sp-2); }
+
+/* Phones and narrow tablets: one column, Interview Prep first (the lead), then the pass, then Free. */
+@media (max-width: 860px) {
+  .cards { grid-template-columns: minmax(0, 1fr); gap: 1.4rem; }
+  .cards .lead { order: 1; }
+  .cards .pass { order: 2; }
+  .cards .free { order: 3; }
+  .steps { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 480px) {
+  .wrap { padding: 1.25rem 16px 3.5rem; }
+  .hero { margin-bottom: 1.6rem; }
+  .h1 { font-size: var(--fs-xl); margin-bottom: .5rem; }
+  .card { padding: 1.25rem 1.1rem; }
+  .pitch { margin-bottom: .85rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn, .chev { transition: none; }
+}

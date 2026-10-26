@@ -10,8 +10,18 @@ import ReferralHost from '@/components/growth/ReferralHost'
 import TabBar from '@/components/shell/TabBar'
 import CommandPalette from '@/components/shell/CommandPalette'
 import RouteProgress from '@/components/shell/RouteProgress'
+import { Syne, Instrument_Sans, DM_Mono } from 'next/font/google'
 import './globals.css'
+import '@/components/ui/ui.css'
 import './motion.css'
+
+// Exactly the faces the type scale uses (app/globals.css tokens) — self-hosted by next/font, so no
+// render-blocking Google Fonts stylesheet and no faux bold: a weight that is not listed here must not
+// be rendered (the type codemod capped every rule to these). Fallback metrics stay hand-tuned per
+// weight in globals.css (Syne 800 is 176% of Arial's width), hence adjustFontFallback: false.
+const syne = Syne({ subsets: ['latin'], weight: ['700', '800'], display: 'swap', variable: '--font-syne', adjustFontFallback: false })
+const instrument = Instrument_Sans({ subsets: ['latin'], weight: ['400', '500', '600'], display: 'swap', variable: '--font-instrument', adjustFontFallback: false })
+const dmMono = DM_Mono({ subsets: ['latin'], weight: ['400', '500'], display: 'swap', variable: '--font-dm-mono', adjustFontFallback: false })
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://seenjobs.io'),
@@ -22,7 +32,7 @@ export const metadata: Metadata = {
   // Sources named here must be ones Seen actually reads: Reddit (public discussion) and reports submitted
   // to Seen. Glassdoor is an excluded source (owner decision 2026-10-20, lib/reports/excludedSources.js).
   description: 'Check any company’s ghost rate, response time, and real applicant outcomes before you apply. Hiring transparency aggregated from Reddit and verified job-seeker reports.',
-  keywords: ['company ghost rate', 'does company ghost applicants', 'hiring reviews reddit', 'interview process reviews', 'job application tracker', 'company response rate', 'glassdoor alternative'],
+  keywords: ['company ghost rate', 'does company ghost applicants', 'hiring reviews reddit', 'interview process reviews', 'job application tracker', 'company response rate'],
   applicationName: 'Seen',
   // Google Search Console ownership tag. Set GOOGLE_SITE_VERIFICATION in Vercel to the content value
   // Search Console shows for the "HTML tag" method; unset renders nothing.
@@ -62,16 +72,18 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className={`${syne.variable} ${instrument.variable} ${dmMono.variable}`} suppressHydrationWarning>
       <head>
         {/* The opening: on the FIRST load of a session the nav wordmark rises letter by letter and the
             nav hairline draws (app/motion.css `html.seen-first`). Marked before first paint so the pure-CSS
             animation starts on the server-rendered frame, with no hydration flash. There is no blocking
             splash any more — the page is the intro. (Class added before React, hence suppressHydrationWarning.) */}
         <script dangerouslySetInnerHTML={{ __html: "try{if(!sessionStorage.getItem('seen_opened')){document.documentElement.classList.add('seen-first');sessionStorage.setItem('seen_opened','1')}}catch(e){}" }} />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Instrument+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap" rel="stylesheet" />
+        {/* A HINT, not auth: `html.has-session` when this browser holds a stored Supabase session, so a
+            prerendered page can paint the right first frame (guest form vs. "loading your account")
+            before React knows who is signed in (globals.css `.guest-first` / `.session-first`). Every
+            decision is still made by useAuth() once the session resolves. */}
+        <script dangerouslySetInnerHTML={{ __html: "try{for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&/^sb-.+-auth-token$/.test(k)){document.documentElement.classList.add('has-session');break}}}catch(e){}" }} />
       </head>
       <body>
         <AuthProvider>
@@ -90,7 +102,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Footer />
           <TabBar />
           <CommandPalette />
-          <div id="toast" />
           <ToastHost />
           <MicroSurveyHost />
           {/* Invite links: keeps ?ref= and claims it once an account signs in (lib/referralClient.ts). */}

@@ -1,0 +1,166 @@
+{
+  "id": "04-customer-service",
+  "field": "Customer service / call center",
+  "resume": [
+    "PRIYA RAMAN",
+    "Tampa, FL | (813) 555-0177 | priya.raman.cs@outlook.com | linkedin.com/in/priyaraman-cx",
+    "",
+    "PROFESSIONAL SUMMARY",
+    "Customer care representative with 5+ years on phones, chat and email in insurance and telecom. Calm with upset callers, accurate with documentation, consistently above team CSAT.",
+    "",
+    "EXPERIENCE",
+    "",
+    "BayShore Insurance Group — Tampa, FL",
+    "Customer Care Representative II | Feb 2021 – Present",
+    "• Handle 60–70 inbound calls a day on billing, coverage and claim-status questions for 30,000+ policyholders",
+    "• Keep a 94% CSAT score against a team average of 88% (2024)",
+    "• Average handle time 6:10 against a 7:30 target while keeping notes complete in Salesforce Service Cloud",
+    "• Mentor 5 new reps during their first 30 days on the phones and review their call notes weekly",
+    "",
+    "SunCoast Telecom — Clearwater, FL",
+    "Customer Service Representative | Jul 2019 – Jan 2021",
+    "• Answered 50+ calls and chats a day on billing, outages and plan changes in Zendesk and Five9",
+    "• Saved 1 in 4 cancellation calls with retention offers, above the 18% team goal",
+    "• Wrote 12 macros for common billing questions that the whole team adopted",
+    "",
+    "Harbor Grill — Tampa, FL",
+    "Server | 2016 – 2019",
+    "• Served 40+ guests a shift in a 120-seat restaurant and trained new servers on the menu",
+    "",
+    "EDUCATION",
+    "B.A., Communication — University of South Florida, 2016",
+    "",
+    "SKILLS",
+    "Salesforce Service Cloud, Zendesk, Five9, Microsoft Teams, de-escalation, typing 62 WPM, call documentation"
+  ],
+  "job": {
+    "title": "Customer Support Specialist (Remote)",
+    "company": "Lumen Ridge Software",
+    "location": "Remote (US)",
+    "description": [
+      "About us: Lumen Ridge makes scheduling and billing software for 4,000 independent clinics. Our engineers build in Python and Go, and our support team is the voice of the company.",
+      "",
+      "What you will do",
+      "- Answer customer questions by phone, email and chat about billing, scheduling and account access",
+      "- Troubleshoot common product issues and escalate bugs to our technical support tier with clear notes",
+      "- Document every interaction in our ticketing system",
+      "- Meet goals for response time, resolution time and customer satisfaction",
+      "- Suggest help-center articles when you see the same question three times",
+      "",
+      "What we're looking for",
+      "- 2+ years of phone and email customer support, ideally in a contact center",
+      "- Experience with a ticketing system such as Zendesk, Freshdesk, or ServiceNow",
+      "- Type at least 45 WPM with accuracy",
+      "- Clear, friendly writing and a calm phone voice",
+      "- Available 10:00 AM – 7:00 PM Eastern, Monday through Friday",
+      "- High school diploma or equivalent",
+      "",
+      "Nice to have",
+      "- Salesforce experience",
+      "- Experience supporting software (SaaS) customers",
+      "",
+      "Compensation",
+      "$19 – $22 per hour, full-time, fully remote in the US. Company laptop and headset provided. Health, dental and vision from day one."
+    ]
+  },
+  "gold": {
+    "family": [
+      "customer_service"
+    ],
+    "must_skills": [
+      {
+        "label": "phone/email support",
+        "match": "support|customer service|phone"
+      },
+      {
+        "label": "ticketing system",
+        "match": "ticket|zendesk|freshdesk|servicenow"
+      },
+      {
+        "label": "45 WPM typing",
+        "match": "wpm|typ"
+      }
+    ],
+    "alternatives": [
+      [
+        "Zendesk",
+        "Freshdesk",
+        "ServiceNow"
+      ]
+    ],
+    "years_min": 2,
+    "traps": [
+      {
+        "term": "Python",
+        "match": "\\bpython\\b",
+        "scope": "any",
+        "why": "only the engineers' stack in the About us blurb"
+      },
+      {
+        "term": "Go",
+        "match": "\\bgolang\\b|\\bGo\\b(?= *(?:,|and|or) *(?:python|java))",
+        "scope": "any",
+        "why": "only the engineers' stack in the About us blurb"
+      },
+      {
+        "term": "Freshdesk",
+        "match": "freshdesk",
+        "scope": "candidate",
+        "why": "she used Zendesk, not Freshdesk"
+      },
+      {
+        "term": "ServiceNow",
+        "match": "servicenow",
+        "scope": "candidate",
+        "why": "she used Zendesk, not ServiceNow"
+      },
+      {
+        "term": "SaaS experience",
+        "match": "saas",
+        "scope": "candidate",
+        "why": "insurance and telecom, not software"
+      }
+    ],
+    "resume_employers": [
+      "BayShore Insurance Group",
+      "SunCoast Telecom",
+      "Harbor Grill"
+    ],
+    "resume_titles": [
+      "Customer Care Representative II",
+      "Customer Service Representative",
+      "Server"
+    ],
+    "resume_degrees": [
+      "B.A., Communication"
+    ],
+    "resume_numbers": [
+      "813",
+      "555",
+      "0177",
+      "5",
+      "2021",
+      "60",
+      "70",
+      "30000",
+      "94%",
+      "88%",
+      "2024",
+      "6",
+      "10",
+      "7",
+      "30",
+      "2019",
+      "50",
+      "9",
+      "1",
+      "4",
+      "18%",
+      "12",
+      "2016",
+      "40",
+      "120",
+      "62"
+    ]
+  }
+}

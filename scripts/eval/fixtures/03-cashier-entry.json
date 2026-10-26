@@ -1,0 +1,131 @@
+{
+  "id": "03-cashier-entry",
+  "field": "Cashier / entry-level retail",
+  "resume": [
+    "Aaliyah Grant",
+    "Charlotte, NC 28205",
+    "704-555-0161 | aaliyahgrant05@gmail.com",
+    "",
+    "OBJECTIVE",
+    "Friendly, dependable cashier looking for more hours at a grocery store close to home. Available weekends.",
+    "",
+    "EXPERIENCE",
+    "Cashier",
+    "QuickFuel Market, Charlotte, NC | June 2024 - Present",
+    "- Ring up 200+ transactions a shift, including lottery, fuel prepay and EBT",
+    "- Balanced my drawer to within $1 every shift for 10 months",
+    "- Restock the cooler and coffee station and keep the counter clean between rushes",
+    "",
+    "Crew Member",
+    "Burger Barn, Charlotte, NC | May 2023 - May 2024",
+    "- Took orders at the counter and drive-thru and worked the fry station",
+    "- Picked up extra closing shifts during summer and was named Crew Member of the Month (Aug 2023)",
+    "",
+    "Volunteer",
+    "Hope Street Food Pantry | 2022 - 2023",
+    "- Sorted donations and helped families check in on Saturday distribution days",
+    "",
+    "EDUCATION",
+    "Garinger High School, Charlotte, NC — High School Diploma, 2023",
+    "",
+    "SKILLS",
+    "Cash handling, Square POS, customer service, teamwork, Spanish (conversational)"
+  ],
+  "job": {
+    "title": "Front End Cashier (Part-Time)",
+    "company": "Piedmont Fresh Market",
+    "location": "Charlotte, NC",
+    "description": [
+      "Piedmont Fresh Market is a neighborhood grocery store with a full-service deli, bakery and in-store pharmacy. We're hiring part-time Front End Cashiers for our Plaza Midwood store.",
+      "",
+      "What you'll do",
+      "* Greet every customer and ring up orders quickly and accurately",
+      "* Handle cash, cards, SNAP/EBT and coupons, and balance your till at the end of each shift",
+      "* Bag groceries carefully and offer carry-out help",
+      "* Keep your lane and the front end clean, stocked and safe",
+      "* Help with returns and price checks and call a supervisor when needed",
+      "",
+      "What we're looking for",
+      "* Customer service experience preferred (retail, restaurant or volunteer all count)",
+      "* Cash handling experience",
+      "* Must be 18 or older",
+      "* Able to stand for up to 8 hours and lift 25 lbs",
+      "* Flexible availability, including weekends and some holidays",
+      "",
+      "Bonus points",
+      "* Bilingual in English and Spanish",
+      "",
+      "Schedule and pay",
+      "Part-time, 20–30 hours per week. Shifts between 7 AM and 10 PM. $15.00 per hour, 10% employee discount."
+    ]
+  },
+  "gold": {
+    "family": [
+      "retail",
+      "food_service",
+      "customer_service"
+    ],
+    "must_skills": [
+      {
+        "label": "cash handling",
+        "match": "cash"
+      },
+      {
+        "label": "customer service",
+        "match": "customer service"
+      },
+      {
+        "label": "weekend availability",
+        "match": "weekend|availability|holiday"
+      }
+    ],
+    "alternatives": [],
+    "years_min": null,
+    "traps": [
+      {
+        "term": "Pharmacy",
+        "match": "pharmac",
+        "scope": "any",
+        "why": "the pharmacy is only part of the store description"
+      },
+      {
+        "term": "Supervisor experience",
+        "match": "supervis(?:ed|ing|or at)|managed (?:a |the )?(?:team|staff|crew|store)",
+        "scope": "candidate",
+        "why": "she has never supervised"
+      },
+      {
+        "term": "Grocery experience",
+        "match": "grocery (?:store )?experience",
+        "scope": "candidate",
+        "why": "QuickFuel is a convenience store"
+      }
+    ],
+    "resume_employers": [
+      "QuickFuel Market",
+      "Burger Barn",
+      "Hope Street Food Pantry"
+    ],
+    "resume_titles": [
+      "Cashier",
+      "Crew Member",
+      "Volunteer"
+    ],
+    "resume_degrees": [
+      "High School Diploma"
+    ],
+    "resume_numbers": [
+      "28205",
+      "704",
+      "555",
+      "0161",
+      "05",
+      "2024",
+      "200",
+      "1",
+      "10",
+      "2023",
+      "2022"
+    ]
+  }
+}

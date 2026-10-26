@@ -6,6 +6,7 @@
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import styles from './openData.module.css'
+import { gradeTone } from '@/lib/ui/tone.js'
 
 export type TableRow = {
   /** company (display) */ c: string
@@ -14,7 +15,7 @@ export type TableRow = {
   /** score 0–100 */ s: number
   /** response % or null */ r: number | null
   /** ghost % or null */ gh: number | null
-  /** applicant reports */ n: number
+  /** applicant accounts */ n: number
   /** of n, from public posts (null = unknown) */ pub: number | null
   /** staffing agency */ a: boolean
   /** last updated YYYY-MM-DD */ u: string | null
@@ -26,11 +27,12 @@ const COLS: { key: Key; label: string; num: boolean; first: 'asc' | 'desc' }[] =
   { key: 's', label: 'Grade', num: true, first: 'desc' },
   { key: 'r', label: 'Hear back', num: true, first: 'desc' },
   { key: 'gh', label: 'Never hear back', num: true, first: 'desc' },
-  { key: 'n', label: 'Applicant reports', num: true, first: 'desc' },
+  { key: 'n', label: 'Applicant accounts', num: true, first: 'desc' },
   { key: 'u', label: 'Last updated', num: true, first: 'desc' },
 ]
 
-const gradeClass = (s: number) => (s >= 70 ? styles.gGood : s >= 40 ? styles.gMid : styles.gBad)
+// The letter's own tone (lib/gradeScale gradeRisk via lib/ui/tone.js) — one map with every other surface.
+const gradeClass = (s: number) => { const t = gradeTone(s); return t === 'good' ? styles.gGood : t === 'caution' ? styles.gMid : styles.gBad }
 
 function cmp(a: TableRow, b: TableRow, key: Key): number {
   const va = a[key], vb = b[key]
@@ -104,12 +106,12 @@ export default function DataTable({ rows }: { rows: TableRow[] }) {
             {shown.map((r) => (
               <tr key={r.p}>
                 <td className={styles.colCo}>
-                  <Link href={r.p} className={styles.coLink}>{r.c}</Link>
+                  <Link href={r.p} prefetch={false} className={styles.coLink}>{r.c}</Link>
                   {r.a && <span className={styles.tag}>agency</span>}
                 </td>
                 <td className={styles.num}><span className={`${styles.grade} ${gradeClass(r.s)}`}>{r.g}</span> <span className={styles.dash}>{r.s}</span></td>
-                <td className={styles.num}>{r.r == null ? <span className={styles.dash} title="Too few applicant reports for a rate">n/a</span> : `${r.r}%`}</td>
-                <td className={styles.num}>{r.gh == null ? <span className={styles.dash} title="Too few applicant reports for a rate">n/a</span> : `${r.gh}%`}</td>
+                <td className={styles.num}>{r.r == null ? <span className={styles.dash} title="Too few applicant accounts for a rate">n/a</span> : `${r.r}%`}</td>
+                <td className={styles.num}>{r.gh == null ? <span className={styles.dash} title="Too few applicant accounts for a rate">n/a</span> : `${r.gh}%`}</td>
                 <td className={styles.num}>
                   {r.n.toLocaleString('en-US')}
                   {r.pub != null && r.pub > 0 && <span className={styles.tag} title="Found in public posts (Reddit threads, review sites)">{r.pub === r.n ? 'all public posts' : `${r.pub.toLocaleString('en-US')} public`}</span>}
@@ -119,7 +121,7 @@ export default function DataTable({ rows }: { rows: TableRow[] }) {
             ))}
           </tbody>
         </table>
-        {shown.length === 0 && <p className={styles.p} style={{ padding: '1rem' }}>No graded company matches “{q}”. Its page may still have reports: <Link href={`/companies`}>search all companies</Link>.</p>}
+        {shown.length === 0 && <p className={styles.p} style={{ padding: '1rem' }}>No graded company matches “{q}”. Its page may still have reports: <Link href={`/companies`} prefetch={false}>search all companies</Link>.</p>}
       </div>
     </div>
   )

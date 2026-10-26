@@ -16,11 +16,11 @@ export const revalidate = 3600
 
 export const metadata: Metadata = pageMetadata({
   title: 'Compare Company Hiring: Ghost Rates Side by Side',
-  description: 'Compare any two companies side by side on hiring transparency — ghost rate, response rate, average wait, and Seen Grade — from applicant reports, with labeled estimates where reports are missing. Decide where to apply.',
+  description: 'Compare any two companies side by side on hiring transparency — ghost rate, response rate, average wait, and Seen Grade — from applicant accounts, with labeled estimates where reports are missing. Decide where to apply.',
   keywords: ['compare company hiring', 'ghost rate comparison', 'which company responds faster', 'company hiring comparison', 'compare ghost rates'],
   path: '/compare',
   ogTitle: 'Compare Company Hiring Side by Side',
-  ogDescription: 'Ghost rate, response rate, and Seen Grade for any two companies — from applicant reports, with labeled estimates where reports are missing.',
+  ogDescription: 'Ghost rate, response rate, and Seen Grade for any two companies — from applicant accounts, with labeled estimates where reports are missing.',
 })
 
 const wrap = { maxWidth: 760, margin: '0 auto', padding: '3.5rem 1.25rem 5rem', width: '100%', boxSizing: 'border-box' as const }
@@ -38,15 +38,15 @@ export default async function ComparePage() {
   return (
     <div className="page-full">
       <div style={wrap}>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.2em', color: 'var(--blue)', marginBottom: '.7rem', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.2em', color: 'var(--blue)', marginBottom: '.7rem', display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ width: 20, height: 1, background: 'var(--blue)', display: 'inline-block' }} />
           Compare
         </div>
         <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.6rem,5vw,2.3rem)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', lineHeight: 1.1, margin: '0 0 .7rem' }}>
           Compare hiring, side by side
         </h1>
-        <p style={{ color: 'var(--sub)', fontSize: '.95rem', lineHeight: 1.7, fontWeight: 300, margin: '0 0 2rem' }}>
-          Two companies, head to head — ghost rate, response rate, average wait, and Seen Grade, from applicant reports where we have them and clearly labeled public-data estimates where we don&apos;t. Pick where your application actually has a chance.
+        <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-body)', lineHeight: 1.7, fontWeight: 400, margin: '0 0 2rem' }}>
+          Two companies, head to head — ghost rate, response rate, average wait, and Seen Grade, from applicant accounts where we have them and clearly labeled public-data estimates where we don&apos;t. Pick where your application actually has a chance.
         </p>
 
         {/* useSearchParams lives in CompareQuery — the Suspense boundary keeps this page static. */}
@@ -55,20 +55,20 @@ export default async function ComparePage() {
         </Suspense>
 
         <div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--blue)', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--line)' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--blue)', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--line)' }}>
             Popular matchups
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.6rem' }}>
             {matchups.map(([x, y]) => (
-              <Link key={`${x}-${y}`} href={`/compare/${slugify(x)}-vs-${slugify(y)}`} className="btn btn-ghost" style={{ fontSize: '.74rem', padding: '.55rem .9rem' }}>
+              <Link key={`${x}-${y}`} href={`/compare/${slugify(x)}-vs-${slugify(y)}`} className="btn btn-ghost" style={{ fontSize: 'var(--fs-meta)', padding: '.55rem .9rem' }}>
                 {x} vs {y}
               </Link>
             ))}
           </div>
         </div>
 
-        <p style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', marginTop: '2.5rem', lineHeight: 1.7 }}>
-          Seen Grades are aggregated community signals from applicant reports, not verified facts. Browse all <Link href="/companies" style={{ color: 'var(--blue)' }}>companies</Link>.
+        <p style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '2.5rem', lineHeight: 1.7 }}>
+          Seen Grades are aggregated community signals from applicant accounts, not verified facts. Browse all <Link href="/companies" style={{ color: 'var(--blue)' }}>companies</Link>.
         </p>
       </div>
     </div>

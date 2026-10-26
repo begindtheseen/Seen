@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import s from './studio.module.css'
 import { aiHeaders } from '@/lib/aiHeaders'
-import type { ResumeDoc, TailorPlan, TailorResponse, PolishResult, TailorDecision, TailorOverrides } from '@/lib/resume/types'
+import type { ResumeDoc, TailorPlan, TailorResponse, TailorDecision, TailorOverrides } from '@/lib/resume/types'
 import type { SavedJob } from '@/lib/types'
 import { applyTailorPlan } from '@/lib/resume/engine-client'
 import { scoreColor } from './HealthPanel'
@@ -16,7 +16,7 @@ import { useAuth } from '@/lib/auth'
 import CreditConfirmDialog from '@/components/CreditConfirmDialog'
 import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
 import { markQuiet } from '@/lib/quietWindow'
-import { RESUME_OPTIMIZE_COST, creditCostLabel } from '@/lib/creditRules'
+import { RESUME_OPTIMIZE_COST, priceLabel } from '@/lib/creditRules'
 
 export interface TailorJob { title: string; company: string; description: string; jobId: string; url?: string }
 type Props = {
@@ -42,16 +42,12 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
   // 2026-10-24 audits found the Tailor charging with no dialog while every other paid button asked.
   const [confirming, setConfirming] = useState(false)
   const [savedId, setSavedId] = useState('')
-  const [polish, setPolish] = useState(false)
   const [state, setState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
   const [error, setError] = useState('')
   const [plan, setPlan] = useState<TailorPlan | null>(null)
   const [baseDoc, setBaseDoc] = useState<ResumeDoc | null>(null) // the doc the plan was built for
-  const [serverVariant, setServerVariant] = useState<ResumeDoc | null>(null)
-  const [polishRes, setPolishRes] = useState<PolishResult | null>(null)
   const [overrides, setOverrides] = useState<TailorOverrides>({})
   const [answers, setAnswers] = useState<Record<string, string>>({})
-  const [rejectedPolish, setRejectedPolish] = useState<Set<string>>(new Set())
   const [showAll, setShowAll] = useState(false)
 
   useEffect(() => { if (initialJob) setJob(initialJob) }, [initialJob])
@@ -67,7 +63,7 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
   function run() {
     if (!job.title.trim() && !job.description.trim()) { setError('Add the job title or paste the job description.'); return }
     if (!isLoggedIn) { onNeed('signin'); return }
-    if (!hasConfirmedCreditUse(user?.id)) { setConfirming(true); return }
+    if (pro !== true && !hasConfirmedCreditUse(user?.id)) { setConfirming(true); return }
     void doRun()
   }
   async function doRun() {
@@ -76,7 +72,7 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
     try {
       const res = await fetch('/api/resume', {
         method: 'POST', headers: await aiHeaders(),
-        body: JSON.stringify({ action: 'tailor', doc, jobTitle: job.title, company: job.company, jobDescription: job.description, jobId: job.jobId || undefined, polish: polish && pro === true }),
+        body: JSON.stringify({ action: 'tailor', doc, jobTitle: job.title, company: job.company, jobDescription: job.description, jobId: job.jobId || undefined }),
       })
       const data = (await res.json().catch(() => ({}))) as TailorResponse & { message?: string }
       if (res.status === 401 || res.status === 402 || data.credits_required || data.pro_required) { setState('idle'); onNeed(data.pro_required ? 'pro' : 'credits'); return }
@@ -85,31 +81,28 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
       if (res.status === 422 && data.error === 'preview_only') { setError(data.message || 'This listing only has a summary. Paste the full posting to optimize for it.'); setState('idle'); return }
       if (!res.ok || !data.plan) { setError(data.error || 'Could not tailor this résumé. Try again.'); setState('error'); return }
       window.dispatchEvent(new Event('seen:credits-updated'))
-      setPlan(data.plan); setBaseDoc(clone(doc)); setServerVariant(data.variant); setPolishRes(data.polish); setOverrides({}); setAnswers({}); setRejectedPolish(new Set())
+      setPlan(data.plan); setBaseDoc(clone(doc)); setOverrides({}); setAnswers({})
       setState('done')
       markQuiet() // nothing optional pops over a result the person just paid for
     } catch { setError('Network error — try again.'); setState('error') }
   }
 
-  // The variant the user will take: the plan re-applied with their overrides (+ polish accepted).
+  // The variant the user will take: the plan re-applied with their overrides.
   const finalVariant = useMemo(() => {
     if (!plan || !baseDoc) return null
     const prompts = plan.prompts || []
-    const live = applyTailorPlan(baseDoc, plan, { ...overrides, prompts, answers })
-    if (polishRes && serverVariant) {
-      for (const ch of polishRes.changes) {
-        if (rejectedPolish.has(ch.id)) continue
-        for (const e of live.experience) { const b = e.bullets.find((x) => x.id === ch.id); if (b && b.text === ch.from) { b.text = ch.text; live.meta.provenance.push({ kind: 'polish', bulletId: b.id, from: ch.from, to: ch.text, reason: ch.reason }) } }
-      }
-    }
-    return live
-  }, [plan, baseDoc, overrides, answers, polishRes, serverVariant, rejectedPolish])
+    return applyTailorPlan(baseDoc, plan, { ...overrides, prompts, answers })
+  }, [plan, baseDoc, overrides, answers])
 
   const setDecision = (itemId: string, decision: TailorDecision['decision']) => setOverrides((o) => ({ ...o, decisions: { ...(o.decisions || {}), [itemId]: decision } }))
-  const excludeAdded = (key: string) => setOverrides((o) => ({ ...o, excludeAdded: [...(o.excludeAdded || []), key] }))
+  // Lines written from what a title implies are suggestions: added only when the person says so.
+  const toggleAdded = (key: string) => setOverrides((o) => { const cur = new Set(o.includeAdded || []); if (cur.has(key)) cur.delete(key); else cur.add(key); return { ...o, includeAdded: [...cur] } })
   const decisions = plan?.decisions || []
   const visibleDecisions = showAll ? decisions : decisions.slice(0, 8)
-  const added = finalVariant ? finalVariant.meta.provenance.filter((p) => p.kind === 'transferable_bullet') : []
+  const added = finalVariant ? finalVariant.meta.provenance.filter((p) => p.kind === 'transferable_bullet' || p.kind === 'transferable_suggestion') : []
+  // What the export will actually carry for a role — never a guess ("Keep in full · 5 of 5" while
+  // the PDF had 3, Dev 2026-10-25).
+  const shownBullets = (itemId: string) => finalVariant ? (finalVariant.experience.find((e) => e.id === itemId)?.bullets.length ?? 0) : 0
   const summaryOn = overrides.summary !== false
   const layout = overrides.layout || plan?.strategy?.layout || 'chronological'
   const rewrites = plan?.rewrites || []
@@ -141,13 +134,9 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
         </div>
         <span className={s.label}>Job description</span>
         <textarea autoComplete="off" className={`${s.input} ${s.area}`} rows={5} value={job.description} onChange={(e) => setJob({ ...job, description: e.target.value })} placeholder="Paste the posting — requirements, responsibilities, the lot." />
-        <div className={s.opts} style={{ marginTop: '.6rem', justifyContent: 'space-between' }}>
-          <label className={s.dim} style={{ display: 'flex', alignItems: 'center', gap: '.4rem', cursor: pro ? 'pointer' : 'default' }}>
-            <input type="checkbox" checked={polish && pro === true} disabled={pro !== true} onChange={(e) => { if (pro !== true) { onNeed('pro'); return } setPolish(e.target.checked) }} />
-            Polish wording with AI {pro === true ? '' : '· Pro'}
-          </label>
+        <div className={s.opts} style={{ marginTop: '.6rem', justifyContent: 'flex-end' }}>
           <button type="button" className={s.btnPrimary} onClick={run} disabled={state === 'loading'}>
-            {state === 'loading' ? 'Optimizing…' : plan ? 'Re-run for this job →' : 'Optimize for this job →'}<span style={{ marginLeft: '.45rem', fontSize: '.55rem', opacity: .7, fontFamily: 'var(--mono)', fontWeight: 400 }}>· {creditCostLabel(RESUME_OPTIMIZE_COST)}</span>
+            {state === 'loading' ? 'Optimizing…' : plan ? 'Re-run for this job →' : 'Optimize for this job →'}<span style={{ marginLeft: '.45rem', fontSize: '.55rem', opacity: .7, fontFamily: 'var(--mono)', fontWeight: 400 }}>· {priceLabel(RESUME_OPTIMIZE_COST, pro)}</span>
           </button>
         </div>
         {error && <div className={s.err} style={{ marginTop: '.6rem', marginBottom: 0 }}>{error}</div>}
@@ -215,7 +204,7 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
                         <select className={s.input} style={{ maxWidth: 300, padding: '.3rem .5rem', fontSize: '.72rem' }} value={current} onChange={(e) => setDecision(d.itemId, e.target.value as TailorDecision['decision'])}>
                           {(['keep', 'trim', 'condense', 'drop'] as const).map((k) => <option key={k} value={k} disabled={k === 'drop' && d.current}>{DECISION_LABEL[k]}{k === d.decision ? ' (suggested)' : ''}</option>)}
                         </select>
-                        {d.bullets > 0 && (current === 'keep' || current === 'trim') && <span className={s.muted}>{current === 'trim' ? 'top bullets only' : `${Math.min(d.bullets, 6)} of ${d.bullets} bullets`}</span>}
+                        {d.bullets > 0 && (current === 'keep' || current === 'trim') && <span className={s.muted} data-testid="tailor-bullet-count">{shownBullets(d.itemId)} of {d.bullets} bullets on this version{current === 'keep' && shownBullets(d.itemId) < d.bullets ? ' (page budget — choose “Keep in full” bullets by editing the role)' : ''}</span>}
                       </div>
                     </div>
                   )
@@ -257,18 +246,22 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
 
           {added.length > 0 && (
             <div className={s.card}>
-              <span className={s.secTitle} style={{ color: 'var(--amber)' }}>Written from what your titles involve — confirm each</span>
-              <div className={s.dim} style={{ margin: '.35rem 0 .5rem' }}>These lines describe duties a job like yours inherently includes. Keep only the ones that are true for you; remove the rest.</div>
-              {added.map((a) => (
-                <div key={String(a.bulletId)} className={s.finding}>
-                  <span className={s.findingIcon} style={{ color: 'var(--amber)' }}>?</span>
-                  <div className={s.findingBody}>
-                    <div className={s.findingMsg}>{String(a.text)}</div>
-                    <div className={s.muted}>{String(a.basis)}</div>
-                    <div className={s.findingActions}><button type="button" className={s.tiny} onClick={() => excludeAdded(`${String(a.itemId)}:${String(a.competency)}`)}>Not true for me — remove</button></div>
+              <span className={s.secTitle} style={{ color: 'var(--amber)' }}>Suggested lines — not on your résumé until you add them</span>
+              <div className={s.dim} style={{ margin: '.35rem 0 .5rem' }}>Written from what a job like yours usually involves, not from anything you wrote. Add a line only if it is true for you; nothing here is exported unless you add it.</div>
+              {added.map((a) => {
+                const key = String(a.key || `${String(a.itemId)}:${String(a.competency)}`)
+                const on = (overrides.includeAdded || []).includes(key)
+                return (
+                  <div key={key} className={s.finding}>
+                    <span className={s.findingIcon} style={{ color: on ? 'var(--green)' : 'var(--amber)' }}>{on ? '✓' : '?'}</span>
+                    <div className={s.findingBody}>
+                      <div className={s.findingMsg}>{String(a.text)}</div>
+                      <div className={s.muted}>{String(a.basis)}</div>
+                      <div className={s.findingActions}><button type="button" className={`${s.tiny}${on ? ` ${s.chipGreen}` : ''}`} data-testid="tailor-added-toggle" onClick={() => toggleAdded(key)}>{on ? '✓ Added — remove' : 'True for me — add it'}</button></div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
 
@@ -291,22 +284,6 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
               )}
               <p className={s.dim} style={{ margin: '.25rem 0 .5rem' }}>{plan.skills.added.length ? 'Each term is already written in your résumé — listing it under Skills makes keyword scans find it.' : ''}{plan.skills.reordered ? ' The skills this posting asks for lead each list.' : ''}</p>
               <label className={s.dim} style={{ display: 'flex', gap: '.4rem', alignItems: 'center', cursor: 'pointer' }}><input type="checkbox" checked={overrides.skills !== false} onChange={(e) => setOverrides((o) => ({ ...o, skills: e.target.checked }))} />Apply these skills edits</label>
-            </div>
-          )}
-
-          {polishRes && (
-            <div className={s.card}>
-              <span className={s.secTitle}>AI polish {polishRes.available ? `· ${polishRes.changes.length} bullet${polishRes.changes.length === 1 ? '' : 's'}` : ''}</span>
-              {!polishRes.available ? (
-                <div className={s.dim} style={{ marginTop: '.4rem' }}>{polishRes.reason === 'pro_required' ? 'Polish is a Pro feature.' : 'The AI polish is not available right now — the optimization above is complete without it.'}</div>
-              ) : polishRes.changes.length === 0 ? (
-                <div className={s.dim} style={{ marginTop: '.4rem' }}>No wording changes passed the fabrication check — your bullets were already tight.</div>
-              ) : polishRes.changes.map((ch) => (
-                <div key={ch.id} style={{ marginTop: '.5rem', borderTop: '1px solid var(--line)', paddingTop: '.5rem' }}>
-                  <div className={s.diff}><span className={s.del}>{ch.from}</span><br /><span className={s.ins}>{ch.text}</span></div>
-                  <div className={s.findingActions}><button type="button" className={`${s.tiny}${rejectedPolish.has(ch.id) ? '' : ` ${s.chipGreen}`}`} onClick={() => setRejectedPolish((r) => { const n = new Set(r); if (n.has(ch.id)) n.delete(ch.id); else n.add(ch.id); return n })}>{rejectedPolish.has(ch.id) ? 'Rejected — keep original' : '✓ Accepted'}</button>{ch.reason && <span className={s.muted} style={{ alignSelf: 'center' }}>{ch.reason}</span>}</div>
-                </div>
-              ))}
             </div>
           )}
 

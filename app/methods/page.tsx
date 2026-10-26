@@ -4,7 +4,7 @@ import PageHeader from '@/components/shell/PageHeader'
 import { pageMetadata } from '@/lib/seo'
 import { MIN_REPORTS_FOR_RATES } from '@/lib/companyPageSummary'
 import {
-  BASE_FORMULA, VERDICT_THRESHOLDS, SUBMIT_HOLDS, TENURE_POINTS_MAX, TRUST, PRIOR_STRENGTH, MIN_TENURE_SAMPLE,
+  BASE_FORMULA, VERDICT_THRESHOLDS, SUBMIT_HOLDS, TENURE_POINTS_MAX, TRUST, PRIOR_STRENGTH, POPULATION_PRIOR, POPULATION_PRIOR_STRENGTH, MIN_TENURE_SAMPLE,
   FULL_TENURE_SAMPLE, EMPLOYEE_REVIEW_POINTS_MAX, MIN_EMPLOYEE_REVIEWS, FULL_EMPLOYEE_REVIEWS,
   STALE_LISTING_POINTS, STALE_LISTING_PENALTY_MAX, MIN_REPORTS_FOR_GRADE, MIN_REAL_REPORTS_FOR_GRADE,
   MENTION_WEIGHT, GRADE_BANDS, weightLabel,
@@ -18,7 +18,7 @@ import styles from './methods.module.css'
 
 export const metadata: Metadata = pageMetadata({
   title: 'How Seen grades companies',
-  description: `How a Seen Grade is computed from applicant reports: what counts as a report, how each source is weighted, the ${MIN_REPORTS_FOR_GRADE} pieces of evidence a grade needs, and how an employer can respond. Money never changes a score.`,
+  description: `How a Seen Grade is computed from applicant accounts: what counts as a report, how each source is weighted, the ${MIN_REPORTS_FOR_GRADE} applicant accounts a grade needs, and how an employer can respond. Money never changes a score.`,
   path: '/methods',
   ogTitle: 'How Seen grades companies',
 })
@@ -104,12 +104,12 @@ export default function MethodsPage() {
         <section className={styles.card} aria-labelledby="m-min">
           <h2 id="m-min" className={styles.h2}>When a company gets a grade</h2>
           <p className={styles.p}>
-            A grade needs at least {MIN_REAL_REPORTS_FOR_GRADE} real applicant report and {MIN_REPORTS_FOR_GRADE} pieces of evidence in total, where
+            A grade needs at least {MIN_REAL_REPORTS_FOR_GRADE} real applicant account and {MIN_REPORTS_FOR_GRADE} in total, where
             each report counts 1 and each online mention counts {half}. Mentions alone never grade a company. Below that bar the page shows no letter,
-            no score and no rates, only what Seen holds so far, as &ldquo;Not enough reviews to grade yet (2 of {MIN_REPORTS_FOR_GRADE})&rdquo;.
+            no score and no rates, only what Seen holds so far, as &ldquo;Not graded yet (2 of {MIN_REPORTS_FOR_GRADE} applicant accounts)&rdquo;.
           </p>
           <p className={styles.p}>
-            Response and ghost percentages need {MIN_REPORTS_FOR_RATES} applicant reports of their own. A company graded with fewer shows its grade
+            Response and ghost percentages need {MIN_REPORTS_FOR_RATES} applicant accounts of their own. A company graded with fewer shows its grade
             and says there are too few reports for a rate yet.
           </p>
         </section>
@@ -130,8 +130,14 @@ export default function MethodsPage() {
             <li><b>Dead listings.</b> Minus {STALE_LISTING_POINTS} for each job listing that applicants reported and Seen confirmed was no longer open, up to minus {STALE_LISTING_PENALTY_MAX}.</li>
           </ul>
           <p className={styles.p}>
+            A few reports should not make a company look perfect or terrible. So until a company has enough evidence, its rates lean toward a
+            typical company on Seen ({pct(POPULATION_PRIOR.response_rate)} hear back, {pct(POPULATION_PRIOR.ghost_rate)} never do): the typical
+            company counts as {POPULATION_PRIOR_STRENGTH} weighted reports, so two public posts barely move a score, two reports from Seen users
+            move it half-way, and thirty Seen reports are almost entirely the company&rsquo;s own.
+          </p>
+          <p className={styles.p}>
             The result is kept between 0 and 100. Some older scores started from a research estimate made before any reports existed; reports are blended
-            with it, count equally with it at {PRIOR_STRENGTH} weighted reports, and outweigh it beyond that.
+            with it instead, count equally with it at {PRIOR_STRENGTH} weighted reports, and outweigh it beyond that.
           </p>
           <p className={styles.p}>A company&rsquo;s score is recomputed whenever a new report about it is saved, and the page shows the date of the last recompute.</p>
         </section>
@@ -139,7 +145,7 @@ export default function MethodsPage() {
         <section className={styles.card} aria-labelledby="m-claims">
           <h2 id="m-claims" className={styles.h2}>Reports are claims</h2>
           <p className={styles.p}>
-            Seen does not check each account with the company, so every number is worded as what applicant reports say, never as a fact about the
+            Seen does not check each account with the company, so every number is worded as what applicant accounts say, never as a fact about the
             employer. To keep one person from moving a grade, a report is held for review and does not count until someone at Seen approves it when it
             is sent without signing in, when the same person already reported the same company in the last {SUBMIT_HOLDS.dupDays} days, or when one
             account sends {SUBMIT_HOLDS.dailyCap} or more in a day. Reports an admin rejects, and second copies of a report Seen already holds, are kept

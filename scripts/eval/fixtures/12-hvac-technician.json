@@ -1,0 +1,142 @@
+{
+  "id": "12-hvac-technician",
+  "field": "HVAC technician (trades)",
+  "resume": [
+    "Jose Alvarez",
+    "Mesa, AZ | 480-555-0119 | jalvarez.hvac@gmail.com",
+    "",
+    "HVAC service technician — 9 years installing and servicing residential systems in the Phoenix heat.",
+    "",
+    "CERTIFICATIONS",
+    "EPA Section 608 Universal · NATE Core + Air Conditioning Service · OSHA 10 · Valid Arizona driver's license (clean MVR)",
+    "",
+    "EXPERIENCE",
+    "HVAC Service Technician — Desert Air Comfort, Mesa, AZ (2020 – Present)",
+    "- Run 5–7 service calls a day on residential split systems, heat pumps and package units",
+    "- Diagnose and repair refrigerant leaks, failed compressors, capacitors and control boards",
+    "- Sold $180K in maintenance agreements and replacement leads in 2023, #2 of 11 techs",
+    "- Keep a 4.9-star average across 600+ customer reviews",
+    "",
+    "HVAC Installer — Valley Climate Systems, Phoenix, AZ (2017 – 2020)",
+    "- Installed 300+ residential systems with a two-person crew, including ductwork and line sets",
+    "- Brazed, pressure-tested and evacuated systems to manufacturer specs",
+    "",
+    "Warehouse Associate — Copper State Supply, Tempe, AZ (2015 – 2017)",
+    "- Pulled and staged HVAC parts and equipment orders for contractors",
+    "",
+    "EDUCATION",
+    "HVAC Technician Certificate — GateWay Community College, Phoenix, AZ, 2017",
+    "",
+    "TOOLS",
+    "Digital manifold gauges, vacuum pump, recovery machine, brazing torch, multimeter, ServiceTitan"
+  ],
+  "job": {
+    "title": "Commercial HVAC Service Technician",
+    "company": "Sonoran Mechanical",
+    "location": "Phoenix, AZ",
+    "description": [
+      "Sonoran Mechanical services commercial buildings across the Valley — offices, schools, hospitals and data centers. Our electrical division also hires licensed journeyman electricians (separate posting).",
+      "",
+      "What you'll do",
+      "- Diagnose, repair and maintain commercial HVAC equipment: rooftop units (RTUs), split systems, VAV boxes and chillers",
+      "- Perform preventive maintenance on service-agreement customers",
+      "- Troubleshoot electrical and control problems, including building automation systems",
+      "- Write clear service reports and quote repairs to customers",
+      "- Take after-hours on-call shifts on a rotation",
+      "",
+      "Requirements",
+      "- 4+ years of HVAC service experience; commercial RTU and chiller experience strongly preferred",
+      "- EPA 608 Universal certification (required)",
+      "- Valid driver's license with a clean driving record",
+      "- Able to work on roofs and ladders in Arizona heat and lift 75 lbs",
+      "- Your own hand tools",
+      "",
+      "Preferred",
+      "- NATE certification",
+      "- Building automation (BAS) experience",
+      "",
+      "Pay and perks",
+      "$30 – $40 per hour depending on experience, company van and fuel card, paid on-call, tool allowance, medical/dental/vision and 401(k)."
+    ]
+  },
+  "gold": {
+    "family": [
+      "skilled_trades"
+    ],
+    "must_skills": [
+      {
+        "label": "HVAC service experience",
+        "match": "hvac|service"
+      },
+      {
+        "label": "EPA 608",
+        "match": "epa"
+      },
+      {
+        "label": "driver's license",
+        "match": "driver'?s licen[cs]e|driving record"
+      }
+    ],
+    "alternatives": [],
+    "years_min": 4,
+    "traps": [
+      {
+        "term": "Journeyman electrician license",
+        "match": "journeyman",
+        "scope": "any",
+        "why": "the electrical division's separate posting"
+      },
+      {
+        "term": "Chillers (as his experience)",
+        "match": "(?:serviced|repaired|worked on|maintained|installed|experience (?:with|on)|work on) [^.]{0,30}chillers?",
+        "scope": "candidate",
+        "why": "he has residential experience only"
+      },
+      {
+        "term": "Commercial experience",
+        "match": "(?:my|have|with|years of|in) commercial (?:hvac )?(?:experience|work|service)|(?:serviced|repaired|worked on|maintained|installed) (?:commercial|rtus?\\b)",
+        "scope": "candidate",
+        "why": "residential only"
+      },
+      {
+        "term": "Building automation",
+        "match": "building automation|\\bbas\\b",
+        "scope": "candidate",
+        "why": "not in the résumé"
+      }
+    ],
+    "resume_employers": [
+      "Desert Air Comfort",
+      "Valley Climate Systems",
+      "Copper State Supply"
+    ],
+    "resume_titles": [
+      "HVAC Service Technician",
+      "HVAC Installer",
+      "Warehouse Associate"
+    ],
+    "resume_degrees": [
+      "HVAC Technician Certificate"
+    ],
+    "resume_numbers": [
+      "480",
+      "555",
+      "0119",
+      "9",
+      "608",
+      "10",
+      "2020",
+      "5",
+      "7",
+      "180",
+      "2023",
+      "2",
+      "11",
+      "4.9",
+      "600",
+      "2017",
+      "300",
+      "2015"
+    ]
+  }
+}

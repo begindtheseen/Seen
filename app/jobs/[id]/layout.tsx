@@ -12,7 +12,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id } = await params
   return {
     ...pageMetadata({
-      title: 'Job Listing',
+      title: 'Job listing',
       description: 'A job listing with the company’s applicant response record next to it.',
       path: `/jobs/${encodeURIComponent(id)}`,
     }),

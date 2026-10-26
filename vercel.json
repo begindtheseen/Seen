@@ -117,7 +117,10 @@
       "maxDuration": 300
     },
     "api/interview-prep.js": {
-      "maxDuration": 60
+      "maxDuration": 150
+    },
+    "api/optimize.js": {
+      "maxDuration": 30
     }
   },
   "crons": [

@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Reveal from '@/components/Reveal'
+import PriceLine from '@/components/home/PriceLine'
 import styles from './LandingMarketingSections.module.css'
 
 // Below the workspace window: the four things only Seen does, each linking to the real page,
@@ -13,7 +14,7 @@ const FEATURES = [
     href: '/companies',
     tag: 'Company intel',
     title: 'Ghost rates and grades',
-    desc: 'Every company gets a ghost rate, response time and grade from applicant outcomes. No grade until there is enough evidence — at least one real applicant report and five pieces in total — and estimates are labeled as estimates.',
+    desc: 'Every company gets a ghost rate, response time and grade from applicant outcomes. No grade until there is enough evidence — at least one real applicant account and five pieces in total — and estimates are labeled as estimates.',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         <path d="M9 10h.01M15 10h.01" />
@@ -35,7 +36,7 @@ const FEATURES = [
   },
   {
     href: '/resume',
-    tag: 'Résumé AI',
+    tag: 'Résumé',
     title: 'Tailored for the exact role',
     desc: 'SeenFit scores your résumé against one job and rewrites it in your voice, so you know your fit before you spend an hour applying.',
     icon: (
@@ -76,7 +77,7 @@ export default function LandingMarketingSections() {
           <div className={styles.grid}>
             {FEATURES.map((f, i) => (
               <Reveal key={f.href} delay={i * 80}>
-                <Link href={f.href} className={`${styles.card} spot`}>
+                <Link href={f.href} className={`${styles.card}`}>
                   <div className={styles.cardTop}>
                     <span className={styles.ico}>{f.icon}</span>
                     <span className={styles.tag}>{f.tag}</span>
@@ -111,6 +112,7 @@ export default function LandingMarketingSections() {
                     Start tracking free
                   </button>
                 </div>
+                <PriceLine />
               </div>
             </div>
           </Reveal>

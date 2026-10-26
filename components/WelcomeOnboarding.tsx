@@ -74,11 +74,11 @@ export default function WelcomeOnboarding({
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '.75rem', marginBottom: '.35rem' }}>
         <div style={{ minWidth: 0 }}>
           <div className="deyebrow" style={{ color: 'var(--indigo)' }}>✦ Getting started</div>
-          <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.15rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: '.35rem 0 .2rem' }}>
+          <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: '.35rem 0 .2rem' }}>
             {/* Sign-up no longer asks a name first (it is asked later, in Settings): no "Welcome to Seen, there". */}
             {name && name !== 'there' ? <>Welcome to Seen, {name} 👋</> : <>Welcome to Seen 👋</>}
           </h2>
-          <p style={{ fontSize: '.8rem', color: 'var(--sub)', lineHeight: 1.55, margin: 0 }}>
+          <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.55, margin: 0 }}>
             Seen shows you which companies actually respond — so you stop wasting applications. Three quick steps to set you up:
           </p>
         </div>
@@ -86,7 +86,7 @@ export default function WelcomeOnboarding({
           onClick={onDismiss}
           title="Hide getting started"
           aria-label="Hide getting started"
-          style={{ flexShrink: 0, background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontSize: '.95rem', lineHeight: 1, minWidth: 44, minHeight: 44, margin: '-.6rem -.6rem 0 0', borderRadius: 10 }}
+          style={{ flexShrink: 0, background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontSize: 'var(--fs-body)', lineHeight: 1, minWidth: 44, minHeight: 44, margin: '-.6rem -.6rem 0 0', borderRadius: 10 }}
         >✕</button>
       </div>
 
@@ -95,7 +95,7 @@ export default function WelcomeOnboarding({
         <div style={{ flex: 1, height: 5, background: 'var(--line2)', borderRadius: 4, overflow: 'hidden' }}>
           <div style={{ height: '100%', width: `${(doneCount / steps.length) * 100}%`, background: 'linear-gradient(90deg,var(--blue),var(--indigo))', borderRadius: 4, transition: 'width .4s ease' }} />
         </div>
-        <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)', flexShrink: 0, fontWeight: 700 }}>{doneCount}/{steps.length} done</span>
+        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', flexShrink: 0, fontWeight: 500 }}>{doneCount}/{steps.length} done</span>
       </div>
 
       {/* Steps */}
@@ -117,7 +117,7 @@ export default function WelcomeOnboarding({
                 style={{
                   flexShrink: 0, width: 26, height: 26, borderRadius: '50%',
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '.8rem',
+                  fontSize: 'var(--fs-sm)',
                   background: s.done ? 'rgba(16,185,129,.15)' : 'var(--raised)',
                   border: `1px solid ${s.done ? 'rgba(16,185,129,.4)' : 'var(--line2)'}`,
                   color: s.done ? 'var(--green)' : 'var(--sub)',
@@ -125,17 +125,17 @@ export default function WelcomeOnboarding({
               >{s.done ? '✓' : s.icon}</span>
               {/* The text keeps ≥180px; on a phone the CTA wraps under it instead of squeezing the title. */}
               <div style={{ minWidth: 0, flex: '1 1 180px' }}>
-                <div style={{ fontFamily: 'var(--display)', fontSize: '.8rem', fontWeight: 700, color: s.done ? 'var(--sub)' : 'var(--white)', textDecoration: s.done ? 'line-through' : 'none' }}>{s.title}</div>
-                {!s.done && <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--muted)', marginTop: '.15rem', lineHeight: 1.45 }}>{s.sub}</div>}
+                <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', fontWeight: 600, color: s.done ? 'var(--sub)' : 'var(--white)', textDecoration: s.done ? 'line-through' : 'none' }}>{s.title}</div>
+                {!s.done && <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.15rem', lineHeight: 1.45 }}>{s.sub}</div>}
                 {!s.done && 'alt' in s && s.alt && (
-                  <a href={s.alt.href} onClick={e => { e.preventDefault(); router.push(s.alt!.href) }} style={{ display: 'inline-flex', alignItems: 'center', minHeight: 40, fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--blue)', textDecoration: 'none', marginTop: '-.2rem', marginBottom: '-.5rem' }}>{s.alt.label}</a>
+                  <a href={s.alt.href} onClick={e => { e.preventDefault(); router.push(s.alt!.href) }} style={{ display: 'inline-flex', alignItems: 'center', minHeight: 40, fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none', marginTop: '-.2rem', marginBottom: '-.5rem' }}>{s.alt.label}</a>
                 )}
               </div>
               {!s.done && (
                 <button
                   onClick={s.go}
                   className={isNext ? 'dbtn dbtn-primary' : 'dbtn dbtn-ghost'}
-                  style={{ flex: '0 1 auto', marginLeft: 'auto', minHeight: 44, padding: '.42rem .8rem', fontSize: '.66rem' }}
+                  style={{ flex: '0 1 auto', marginLeft: 'auto', minHeight: 44, padding: '.42rem .8rem', fontSize: 'var(--fs-meta)' }}
                 >{s.cta} →</button>
               )}
             </div>

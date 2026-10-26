@@ -21,7 +21,7 @@
   background: rgba(255, 255, 255, 0.035);
   color: var(--sub);
   font-family: var(--body);
-  font-size: 0.78rem;
+  font-size: var(--fs-meta);
   font-weight: 600;
   line-height: 1;
   cursor: pointer;
@@ -42,14 +42,12 @@
   height: 18px;
   padding: 0 0.3rem;
   border-radius: 999px;
-  background: linear-gradient(135deg, var(--indigo), var(--blue));
+  background: var(--accent-strong);
   color: #fff;
-  font-family: var(--mono);
-  font-size: 0.6rem;
-  font-weight: 700;
-  animation: countIn 0.35s var(--ease-spring) both;
+  font-family: var(--body);
+  font-size: var(--fs-meta);
+  font-weight: 500;
 }
-@keyframes countIn { from { transform: scale(0.4); opacity: 0; } to { transform: none; opacity: 1; } }
 
 /* Active-filter chips — each one clears itself. */
 .chip {
@@ -62,22 +60,21 @@
   background: rgba(99, 102, 241, 0.1);
   color: #c7d2fe;
   font-family: var(--mono);
-  font-size: 0.62rem;
+  font-size: var(--fs-meta);
   line-height: 1;
   cursor: pointer;
   white-space: nowrap;
-  animation: riseIn 0.35s var(--ease-out) both;
   transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
 .chip:hover { border-color: rgba(239, 68, 68, 0.45); background: rgba(239, 68, 68, 0.1); color: #fca5a5; }
-.chip b { font-weight: 400; opacity: 0.7; }
+.chip b { font-weight: 400; color: var(--text-3); }
 
 .clear {
   background: none;
   border: none;
   color: var(--muted);
   font-family: var(--mono);
-  font-size: 0.62rem;
+  font-size: var(--fs-meta);
   cursor: pointer;
   padding: 0.3rem 0.4rem;
   transition: color 0.15s ease;
@@ -117,7 +114,7 @@
 .row:nth-child(4) { animation-delay: 0.12s; }
 .label {
   font-family: var(--mono);
-  font-size: 0.58rem;
+  font-size: var(--fs-meta);
   text-transform: uppercase;
   letter-spacing: 0.12em;
   color: var(--dim);
@@ -130,7 +127,7 @@
   padding: 0.5rem 0.65rem;
   color: var(--white);
   font-family: var(--body);
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   outline: none;
   cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease;
@@ -154,8 +151,8 @@
   background: linear-gradient(135deg, #1d4ed8 0%, #7c3aed 55%, #a855f7 100%);
   color: #fff;
   font-family: var(--body);
-  font-size: 0.78rem;
-  font-weight: 700;
+  font-size: var(--fs-meta);
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -167,13 +164,9 @@
 /* Phone floor (audit 2026-10-23): 12px labels and chips; the Filters button, chips and Clear get the
    44px hit area that app/globals.css gives every button on phones. */
 @media (max-width: 768px) {
-  .count, .chip, .clear, .label { font-size: 0.75rem; }
+  .count, .chip, .clear, .label { font-size: var(--fs-meta); }
   .count { min-width: 20px; height: 20px; }
   .btn, .chip, .clear, .done { min-height: 44px; }
   .label { letter-spacing: 0.06em; }
 }
 
-/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
-@media (max-width: 768px) {
-  .count, .chip, .clear, .label { font-size: 0.75rem; }
-}

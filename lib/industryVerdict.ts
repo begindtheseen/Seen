@@ -36,7 +36,8 @@ export function industryVerdict(b: BenchmarkLike, name: string): IndustryVerdict
   const diff = you - avg
   const kind: IndustryVerdict['kind'] = diff >= SAME_BAND_PTS ? 'above' : diff <= -SAME_BAND_PTS ? 'below' : 'same'
   const grade = typeof b.company.score === 'number' && Number.isFinite(b.company.score) ? gradeLetter(b.company.score) : null
-  if ((grade === 'A' && kind !== 'above') || ((grade === 'D' || grade === 'F') && kind !== 'below')) return neutral
+  const base = grade ? grade.charAt(0) : null
+  if ((base === 'A' && kind !== 'above') || ((base === 'D' || base === 'F') && kind !== 'below')) return neutral
   const nums = `(${you}% vs ${avg}%)`
   if (kind === 'above') return { tone: 'good', kind, headline: `${name} replies to more applicants than the average ${peer} ${nums}`, detail: 'Better odds of hearing back than at the typical employer in its industry.' }
   if (kind === 'below') return { tone: 'bad', kind, headline: `${name} replies to fewer applicants than the average ${peer} ${nums}`, detail: 'The typical employer in its industry responds more often — factor that into your effort.' }

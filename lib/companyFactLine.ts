@@ -2,10 +2,10 @@
 // dataset (/data) and the monthly lists (/lists/*) print, and what the company page can adopt, so an AI
 // answer engine or a journalist quoting any of them quotes the same numbers:
 //
-//   "Walmart: 87% of applicants hear back, 13% never do (48 applicant reports and 32 online mentions, Oct 2026)"
+//   "Walmart: 87% of applicants hear back, 13% never do (48 applicant accounts and 32 online mentions, Oct 2026)"
 //
 // Built ONLY from lib/companyMeta.ts companyMetaFacts output (the same facts the company page's metadata,
-// H1 paragraph, FAQ and OG card use): first-party applicant report count, rates only when the page shows
+// H1 paragraph, FAQ and OG card use): first-party applicant account count, rates only when the page shows
 // them (MIN_REPORTS_FOR_RATES), the one letter scale. Nothing is invented: an ungraded company has no line.
 //
 // Copy rules (owner 2026-10-24, lib/cardCopy.js): no em/en dashes, natural plurals, neutral wording.
@@ -27,11 +27,11 @@ export interface FactLine {
   url: string
   /** The finding without the name: "87% of applicants hear back, 13% never do". */
   claim: string
-  /** What it stands on: "48 applicant reports and 32 online mentions". */
+  /** What it stands on: "48 applicant accounts and 32 online mentions". */
   basis: string
   /** "Oct 2026" (California time). */
   month: string
-  /** The quotable sentence: "Walmart: 87% of applicants hear back, 13% never do (48 applicant reports …, Oct 2026)". */
+  /** The quotable sentence: "Walmart: 87% of applicants hear back, 13% never do (48 applicant accounts …, Oct 2026)". */
   sentence: string
   /** sentence + " " + url — the form printed in plain-text files. */
   line: string
@@ -49,7 +49,7 @@ export function longMonth(asOf: Date = new Date()): string {
 
 /** The attribution every reuse of Seen's data carries (CC BY 4.0). */
 export function attributionLine(asOf: Date = new Date()): string {
-  return `Source: Seen (seenjobs.io), applicant reports, ${longMonth(asOf)}`
+  return `Source: Seen (seenjobs.io), applicant accounts, ${longMonth(asOf)}`
 }
 
 /** Canonical company page URL from a stored or display name (the ONE slug scheme, lib/cardCopy.js). */
@@ -82,8 +82,8 @@ export function companyFactLine(
       ? `${facts.respPct}% of applicants hear back, none report being ghosted`
       : `${facts.respPct}% of applicants hear back, ${facts.ghostPct}% never do`
   } else {
-    // Graded, but too few applicant reports for a percentage (the company page shows none either).
-    claim = `Seen Grade ${facts.grade} (${facts.score}/100), too few applicant reports for a response rate`
+    // Graded, but too few applicant accounts for a percentage (the company page shows none either).
+    claim = `Seen Grade ${facts.grade} (${facts.score}/100), too few applicant accounts for a response rate`
   }
   const basis = facts.basis
   const sentence = `${label}: ${claim} (${basis}, ${month})`

@@ -4,6 +4,7 @@
 // exactly what happens — a Delete files nothing anywhere — so a mistaken entry can be removed
 // without passing through any review prompt.
 
+import Icon from '@/components/ui/Icon'
 import { useEffect, useState } from 'react'
 import ModalPortal from '@/components/ModalPortal'
 import s from './tracker.module.css'
@@ -37,10 +38,10 @@ export default function ConfirmDialog({ title, body, confirmLabel, busyLabel = '
         <div role="alertdialog" aria-modal="true" aria-label={title} className={s.dialog}>
           <div className={s.dialogHead}>
             <span className={s.dialogTitle}>{title}</span>
-            <button type="button" className={s.close} onClick={onClose} aria-label="Close" disabled={busy}>✕</button>
+            <button type="button" className={s.close} onClick={onClose} aria-label="Close" disabled={busy}><Icon name="x" size={20} /></button>
           </div>
           <div className={s.dialogBody}>
-            <p className={s.hint} style={{ color: 'var(--sub)', fontSize: '.84rem' }}>{body}</p>
+            <p className={s.hint} style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)' }}>{body}</p>
             {err && <div role="alert" className={s.err}>{err}</div>}
             <div className={s.dialogBtns}>
               <button type="button" className={s.act} onClick={onClose} disabled={busy}>Keep it</button>

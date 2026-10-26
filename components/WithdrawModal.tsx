@@ -85,16 +85,16 @@ export default function WithdrawModal({ app, onClose, onWithdrawn }: {
     } catch { setErr('Could not save — please try again') } finally { setBusy(false) }
   }
 
-  const label: React.CSSProperties = { fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.09em', color: 'var(--dim)', margin: '.9rem 0 .4rem' }
-  const area: React.CSSProperties = { width: '100%', boxSizing: 'border-box', minHeight: 84, resize: 'vertical', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.6rem .7rem', color: 'var(--white)', fontFamily: 'var(--body)', fontSize: '.82rem', lineHeight: 1.5 }
-  const primary: React.CSSProperties = { flex: 1, minHeight: 44, padding: '.65rem 1rem', borderRadius: 9, border: 'none', background: 'var(--blue)', color: '#fff', fontWeight: 700, fontSize: '.82rem', cursor: busy ? 'wait' : 'pointer', opacity: busy ? .7 : 1 }
-  const ghost: React.CSSProperties = { minHeight: 44, padding: '.65rem 1rem', borderRadius: 9, border: '1px solid var(--line2)', background: 'none', color: 'var(--sub)', fontSize: '.82rem', cursor: 'pointer' }
+  const label: React.CSSProperties = { fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.09em', color: 'var(--dim)', margin: '.9rem 0 .4rem' }
+  const area: React.CSSProperties = { width: '100%', boxSizing: 'border-box', minHeight: 84, resize: 'vertical', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.6rem .7rem', color: 'var(--white)', fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', lineHeight: 1.5 }
+  const primary: React.CSSProperties = { flex: 1, minHeight: 44, padding: '.65rem 1rem', borderRadius: 9, border: 'none', background: 'var(--blue)', color: '#fff', fontWeight: 700, fontSize: 'var(--fs-sm)', cursor: busy ? 'wait' : 'pointer', opacity: busy ? .7 : 1 }
+  const ghost: React.CSSProperties = { minHeight: 44, padding: '.65rem 1rem', borderRadius: 9, border: '1px solid var(--line2)', background: 'none', color: 'var(--sub)', fontSize: 'var(--fs-sm)', cursor: 'pointer' }
 
   let content
   if (step === 'confirm') {
     content = (
       <>
-        <p style={{ fontSize: '.84rem', color: 'var(--sub)', lineHeight: 1.6, margin: '.6rem 0 0' }}>
+        <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.6, margin: '.6rem 0 0' }}>
           Your tracker will show this application as withdrawn.{isSeen ? ` ${app.company} will be told you withdrew.` : ''}
         </p>
         {canNote && (
@@ -103,7 +103,7 @@ export default function WithdrawModal({ app, onClose, onWithdrawn }: {
             <textarea autoComplete="off" value={message} onChange={e => setMessage(e.target.value)} maxLength={MESSAGE_MAX} placeholder="A reason, or a quick thank-you — they’ll see it with your application." style={area} />
           </>
         )}
-        {err && <div role="alert" style={{ color: 'var(--red)', fontSize: '.75rem', marginTop: '.6rem' }}>{err}</div>}
+        {err && <div role="alert" style={{ color: 'var(--red)', fontSize: 'var(--fs-meta)', marginTop: '.6rem' }}>{err}</div>}
         <div style={{ display: 'flex', gap: '.5rem', marginTop: '1rem' }}>
           <button type="button" onClick={onClose} style={ghost} disabled={busy}>Keep it</button>
           <button type="button" onClick={withdraw} style={{ ...primary, background: 'var(--red)' }} disabled={busy}>{busy ? 'Withdrawing…' : 'Withdraw application'}</button>
@@ -113,23 +113,23 @@ export default function WithdrawModal({ app, onClose, onWithdrawn }: {
   } else if (step === 'why') {
     content = (
       <>
-        <p style={{ fontSize: '.84rem', color: 'var(--sub)', lineHeight: 1.6, margin: '.6rem 0 0' }}>
+        <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.6, margin: '.6rem 0 0' }}>
           Withdrawn{notified ? ` — ${app.company} has been told` : ''}. Why did you withdraw? <span style={{ color: 'var(--muted)' }}>Optional.</span>
         </p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.35rem', marginTop: '.7rem' }}>
           {REASONS.map(([code, text]) => (
             <button key={code} type="button" aria-pressed={reason === code} onClick={() => setReason(r => (r === code ? '' : code))}
-              style={{ minHeight: 40, padding: '.38rem .7rem', borderRadius: 999, fontSize: '.72rem', cursor: 'pointer', border: `1px solid ${reason === code ? 'var(--blue)' : 'var(--line2)'}`, background: reason === code ? 'rgba(59,130,246,.12)' : 'none', color: reason === code ? 'var(--white)' : 'var(--sub)' }}>
+              style={{ minHeight: 40, padding: '.38rem .7rem', borderRadius: 999, fontSize: 'var(--fs-meta)', cursor: 'pointer', border: `1px solid ${reason === code ? 'var(--blue)' : 'var(--line2)'}`, background: reason === code ? 'rgba(59,130,246,.12)' : 'none', color: reason === code ? 'var(--white)' : 'var(--sub)' }}>
               {text}
             </button>
           ))}
         </div>
         <div style={label}>Review {app.company} (optional)</div>
         <textarea autoComplete="off" value={review} onChange={e => setReview(e.target.value)} maxLength={REVIEW_MAX} placeholder="How was their hiring process? Did they reply, how fast, how were you treated?" style={area} />
-        <div style={{ fontSize: '.68rem', color: 'var(--muted)', lineHeight: 1.5, marginTop: '.4rem' }}>
+        <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.5, marginTop: '.4rem' }}>
           Shared anonymously on {app.company}’s Seen page and counted in their hiring score, along with what your tracker shows happened.
         </div>
-        {err && <div role="alert" style={{ color: 'var(--red)', fontSize: '.75rem', marginTop: '.6rem' }}>{err}</div>}
+        {err && <div role="alert" style={{ color: 'var(--red)', fontSize: 'var(--fs-meta)', marginTop: '.6rem' }}>{err}</div>}
         <div style={{ display: 'flex', gap: '.5rem', marginTop: '1rem' }}>
           <button type="button" onClick={onClose} style={ghost} disabled={busy}>Skip</button>
           <button type="button" onClick={sendReview} style={primary} disabled={busy || (!reason && !review.trim())}>{busy ? 'Saving…' : 'Share'}</button>
@@ -139,7 +139,7 @@ export default function WithdrawModal({ app, onClose, onWithdrawn }: {
   } else {
     content = (
       <>
-        <p style={{ fontSize: '.86rem', color: 'var(--sub)', lineHeight: 1.6, margin: '.6rem 0 0' }}>
+        <p style={{ fontSize: 'var(--fs-ui)', color: 'var(--sub)', lineHeight: 1.6, margin: '.6rem 0 0' }}>
           {counted === null
             ? `Withdrawn${notified ? ` — ${app.company} has been told` : ''}. Nothing was filed about ${app.company}; the card stays in your tracker as withdrawn.`
             : counted ? `Thanks — it now counts toward ${app.company}’s Seen score.` : 'Thanks — it’s saved. It will count once it clears our duplicate check.'}
@@ -157,9 +157,9 @@ export default function WithdrawModal({ app, onClose, onWithdrawn }: {
         <div role="dialog" aria-modal="true" aria-label={`Withdraw from ${app.role} at ${app.company}`} onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 460, background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 16, padding: '1.25rem 1.25rem 1.4rem', boxShadow: '0 30px 90px rgba(0,0,0,.6)' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.75rem' }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--red)' }}>{step === 'confirm' ? 'Withdraw application' : 'Withdrawn'}</div>
-              <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.05rem', color: 'var(--white)', marginTop: '.2rem' }}>{app.role}</div>
-              <div style={{ fontSize: '.78rem', color: 'var(--sub)' }}>{app.company}</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--red)' }}>{step === 'confirm' ? 'Withdraw application' : 'Withdrawn'}</div>
+              <div style={{ fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-lead)', color: 'var(--white)', marginTop: '.2rem' }}>{app.role}</div>
+              <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)' }}>{app.company}</div>
             </div>
             <button type="button" onClick={onClose} disabled={busy} aria-label="Close" style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, width: 44, height: 44, color: 'var(--muted)', cursor: 'pointer', flexShrink: 0 }}>✕</button>
           </div>

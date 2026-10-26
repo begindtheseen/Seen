@@ -131,11 +131,11 @@ export function JobRefreshButton({ token, onDone, stale, idle }: { token: string
   )
 }
 
-const REDDIT_SUBS = ['recruitinghell', 'jobs', 'cscareerquestions', 'careerguidance']
+// Applicant reports from public discussion are collected by the rule-based crons (cron-archive-reports
+// hourly, enrich-companies every 15 min); the old model-classified "Reddit import" job was removed.
 const JOB_DEFS = [
   { key: 'refresh_jobs', name: 'Refresh job listings', desc: 'Pulls new openings from job boards · runs 6×/day', green: false },
   { key: 'refresh_demand', name: 'Refresh demand data', desc: 'Pulls BLS JOLTS + CES, updates demand index · runs monthly', green: false },
-  { key: 'reddit_import', name: 'Reddit import', desc: 'Classifies hiring posts from r/recruitinghell + 3 others · runs nightly', green: true },
 ] as const
 
 export function JobRunner({ token }: { token: string }) {
@@ -150,32 +150,15 @@ export function JobRunner({ token }: { token: string }) {
     setLabel(l => ({ ...l, [job]: '⏳ Running…' }))
     setResult('')
     try {
-      if (job === 'reddit_import') {
-        let totalImported = 0
-        const subResults: string[] = []
-        setResult('Running…')
-        for (const sub of REDDIT_SUBS) {
-          const r = await fetch('/api/reports', { method: 'POST', headers: hdrs(), body: JSON.stringify({ action: 'reddit_import', subreddit: sub }) })
-          const d = await r.json().catch(() => ({}))
-          const n = d.results ? Object.values(d.results).reduce((s: number, v) => s + ((v as { imported?: number }).imported || 0), 0) : 0
-          const posts = d.debug?.subreddits?.[sub]?.posts ?? d.debug?.subreddits?.[sub]?.error ?? '?'
-          totalImported += n
-          subResults.push(`${sub}:${posts}(+${n})`)
-          setResult(`Running… ${subResults.join(' ')}`)
-        }
-        setLabel(l => ({ ...l, [job]: '✓ Done' }))
-        setResult(`✓ Reddit: ${totalImported} imported | ${subResults.join(' ')}`)
-      } else {
-        const url = job === 'refresh_jobs' ? '/api/refresh-jobs' : '/api/demand'
-        const res = await fetch(url, { method: 'POST', headers: hdrs(), body: JSON.stringify({}) })
-        const d = await res.json().catch(() => ({}))
-        if (!res.ok) throw new Error(d.error || String(res.status))
-        let msg = `✓ ${job} complete`
-        if (job === 'refresh_jobs' && d.inserted != null) msg = `✓ Jobs: ${d.inserted} inserted, ${d.updated ?? 0} updated`
-        else if (job === 'refresh_demand' && d.rows_upserted != null) msg = `✓ Demand: ${d.rows_upserted} rows updated`
-        setLabel(l => ({ ...l, [job]: '✓ Done' }))
-        setResult(msg)
-      }
+      const url = job === 'refresh_jobs' ? '/api/refresh-jobs' : '/api/demand'
+      const res = await fetch(url, { method: 'POST', headers: hdrs(), body: JSON.stringify({}) })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(d.error || String(res.status))
+      let msg = `✓ ${job} complete`
+      if (job === 'refresh_jobs' && d.inserted != null) msg = `✓ Jobs: ${d.inserted} inserted, ${d.updated ?? 0} updated`
+      else if (job === 'refresh_demand' && d.rows_upserted != null) msg = `✓ Demand: ${d.rows_upserted} rows updated`
+      setLabel(l => ({ ...l, [job]: '✓ Done' }))
+      setResult(msg)
     } catch (e) {
       setLabel(l => ({ ...l, [job]: '✗ Error' }))
       setResult('✗ ' + (e as Error).message.slice(0, 80))
@@ -1312,17 +1295,19 @@ const FLAG_STATUSES = ['off', 'admin_only', 'beta_users', 'percentage_rollout', 
 
 // Curated admin toggle layout. Internal batch cursors / tuning values are HIDDEN — they
 // aren't on/off product toggles and were the main source of confusion. Real toggles are
-// grouped, with one Reddit toggle and one credit toggle. Anything unrecognized and not
+// grouped, with one credit toggle and one job-refresh toggle. Anything unrecognized and not
 // hidden still shows under "Other" so nothing silently disappears.
 const HIDDEN_FLAGS = new Set([
   'reddit_offset_recruitinghell', 'reddit_offset_jobs', 'reddit_offset_cscareerquestions',
   'reddit_offset_careerguidance', 'reddit_offset_antiwork', 'reddit_offset_askhr',
   'reddit_offset_interviews', 'reddit_offset_experienceddevs', 'reddit_offset_ExperiencedDevs',
   'reddit_offset_AskHR', 'job_search_target',
+  // Gated only the removed model-API paths (owner decision 2026-10-26: no model API) — a toggle here
+  // would do nothing, so it is not shown. The rows can be deleted from feature_flags.
+  'anthropic_enabled', 'reddit_import_enabled',
 ])
 const FLAG_FRIENDLY: Record<string, string> = {
   ai_credit_system_enabled: 'AI credit system',
-  reddit_import_enabled: 'Reddit import',
   job_refresh_enabled: 'Job refresh',
   admin_panel_enabled: 'Admin panel',
   duplicate_detection_enabled: 'Duplicate detection',
@@ -1333,7 +1318,7 @@ const FLAG_FRIENDLY: Record<string, string> = {
 }
 const FLAG_GROUPS: { group: string; flags: string[] }[] = [
   { group: 'Credits', flags: ['ai_credit_system_enabled'] },
-  { group: 'Data ingestion', flags: ['reddit_import_enabled', 'job_refresh_enabled'] },
+  { group: 'Data ingestion', flags: ['job_refresh_enabled'] },
   { group: 'Features', flags: ['admin_panel_enabled', 'duplicate_detection_enabled', 'hiring_forecast_enabled', 'company_confidence_matching_enabled', 'outcome_cards_v2_enabled', 'resume_question_engine_enabled'] },
 ]
 

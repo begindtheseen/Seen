@@ -17,7 +17,7 @@ import s from '@/components/track/track.module.css'
 
 /** sessionStorage: closed for this tab session (it comes back on the next visit while the invite waits). */
 export const INVITE_BANNER_CLOSED_KEY = 'seen_invite_banner_closed'
-const HIDE_ON = ['/login', '/reset', '/signup', '/employers', '/admin', '/trial']
+const HIDE_ON = ['/login', '/reset', '/signup', '/employers', '/admin']
 
 export default function InviteBanner({ pending }: { pending: boolean }) {
   const pathname = usePathname() || '/'

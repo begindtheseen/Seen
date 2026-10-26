@@ -87,10 +87,20 @@ export function snoozedUntilFromEvents(events: readonly HiringEvent[] | undefine
  *   "Did they respond?" (audit M7 — "DAY 399 CHECK-IN — Did they respond?").
  * - A snoozed check holds the application; a later check never jumps the queue.
  */
+const STAGE_ANSWERS: Record<string, string[]> = {
+  'Phone Screen': ['response_check', 'interview_check'],
+  'Interview': ['response_check', 'interview_check'],
+  'Final Round': ['response_check', 'interview_check'],
+  'Offer': ['response_check', 'interview_check'],
+}
+
 export function pickDueCheck(app: Application, answered: ReadonlySet<string>, snoozedUntil: (type: CheckType) => number | null, now = Date.now()): DueCheck | null {
   if (app.status !== 'active') return null
   const days = daysSince(app.appliedAt, now)
-  const chk = checksInPlay(app.appliedAt, now).find(c => days >= c.day && !answered.has(c.type))
+  // A card already at a screen or interview has answered "did they respond?" and "any interview?" by its
+  // stage — asking them anyway put "Day 7 · Did they respond?" under an Interview Prep panel (round-2 test).
+  const implied = STAGE_ANSWERS[app.stage] || []
+  const chk = checksInPlay(app.appliedAt, now).find(c => days >= c.day && !answered.has(c.type) && !implied.includes(c.type))
   if (!chk) return null
   const until = snoozedUntil(chk.type)
   if (until != null && until > now) return null

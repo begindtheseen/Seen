@@ -5,7 +5,6 @@ import assert from 'node:assert/strict';
 
 process.env.SUPABASE_URL = 'https://fake.supabase.co';
 process.env.SUPABASE_SERVICE_KEY = 'service-key';
-delete process.env.ANTHROPIC_KEY;
 
 // Real /feed rows from the 2026-10-23 audit (text trimmed to the stored excerpt), newest first.
 const RAW = [

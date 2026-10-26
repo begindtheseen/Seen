@@ -13,7 +13,7 @@ const COLS: Array<{ title: string; links: Array<{ href: string; label: string }>
     { href: '/dashboard', label: 'Dashboard' },
     { href: '/jobs', label: 'Jobs' },
     { href: '/tracker', label: 'Application tracker' },
-    { href: '/resume', label: 'Résumé AI' },
+    { href: '/resume', label: 'Résumé' },
     { href: '/pricing', label: 'Pricing' },
   ] },
   { title: 'Intel', links: [
@@ -48,7 +48,7 @@ export default function Footer() {
     <footer className={styles.footer}>
       <div className={styles.wrap}>
         <div className={styles.brand}>
-          <Link href="/" className={styles.logo} aria-label="Seen — home">
+          <Link href="/" prefetch={false} className={styles.logo} aria-label="Seen — home" data-wordmark>
             <span className={styles.dot} />Seen
           </Link>
           <p className={styles.tag}>Know before you apply. Real ghost rates, response times and applicant outcomes — and a tracker that turns your search into data.</p>
@@ -59,7 +59,8 @@ export default function Footer() {
         {COLS.map(col => (
           <div key={col.title} className={styles.col}>
             <div className={styles.colT}>{col.title}</div>
-            {col.links.map(l => <Link key={l.href} href={l.href} className={styles.link}>{l.label}</Link>)}
+            {/* prefetch off: 21 footer links prefetched on every page (~760KB a page, audit #13). */}
+            {col.links.map(l => <Link key={l.href} href={l.href} prefetch={false} className={styles.link}>{l.label}</Link>)}
           </div>
         ))}
       </div>

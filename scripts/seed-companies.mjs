@@ -1,19 +1,13 @@
 #!/usr/bin/env node
 // Pre-warm the company_scores cache so launch-day pages are instant and non-empty.
 //
-// WHY: per-visitor scoring is now LLM-free — it serves cached rows or aggregates real reports,
-// and shows "be the first to report" when there's no data. This script fills the cache AHEAD of
-// launch for the companies real traffic will search, so those pages are rich and instant ($0 per
-// visit thereafter). It just calls the live /api/reports endpoint per company; the server decides
-// the data source:
-//   • company already cached            -> skipped (fast)
-//   • company has reports               -> aggregated grade, cached (no LLM)
-//   • no reports + `anthropic_enabled` ON -> web-researched grade, cached (one-time bounded cost)
-//   • no reports + flag OFF             -> stays "no data" (re-run after enabling the flag)
-//
-// To richly seed companies that have no reports yet, an admin flips the `anthropic_enabled`
-// feature flag ON, runs this once, then flips it OFF — Anthropic as a bounded launch-prep tool,
-// never a per-visitor dependency.
+// WHY: scoring calls no model (owner decision 2026-10-26) — it serves cached rows or aggregates
+// real reports, and shows "be the first to report" when there's no data. This script fills the
+// cache AHEAD of launch for the companies real traffic will search, so those pages are instant. It
+// just calls the live /api/reports endpoint per company; the server decides the data source:
+//   • company already cached -> skipped (fast)
+//   • company has reports    -> aggregated grade, cached
+//   • no reports             -> stays "no data" and is queued for the self-filling enrichment cron
 //
 // Usage:
 //   SEED_BASE_URL=https://seenjobs.io node scripts/seed-companies.mjs
@@ -148,12 +142,10 @@ async function main() {
     if (i + CONCURRENCY < todo.length) await sleep(DELAY_MS);
   }
 
-  // The ONLY spend is companies that were actually web-researched (src not cache/reports).
-  const paid   = results.filter(r => r.src && r.src !== 'cache' && r.src !== 'reports').length;
   const free   = results.filter(r => r.src === 'cache' || r.src === 'reports').length;
   const noData = results.filter(r => r.status === 'no_data').length;
   const errors = results.filter(r => r.status === 'error' || (r.status || '').startsWith('http_')).length;
-  console.log(`\nDone. ${skipped} already had ($0) · ${free} free aggregate/cache · ${paid} newly web-researched (the ONLY $) · ${noData} no-data · ${errors} errors`);
+  console.log(`\nDone. ${skipped} already had · ${free} aggregate/cache · ${noData} no-data · ${errors} errors`);
 }
 
 main();

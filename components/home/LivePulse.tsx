@@ -10,20 +10,21 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import styles from './LivePulse.module.css'
+import Icon, { type IconName } from '@/components/ui/Icon'
 import { displayCompanyName } from '@/lib/companyDisplay'
 
 type Row = { id: string; company_name?: string; role?: string; outcome: string; created_at: string }
 
-const OUTCOME: Record<string, { icon: string; label: string; cls: string }> = {
-  ghosted: { icon: '👻', label: 'ghosted', cls: 'red' },
-  autoreject: { icon: '🤖', label: 'auto-rejected', cls: 'amber' },
-  rejected: { icon: '✕', label: 'rejected', cls: 'amber' },
-  human: { icon: '💬', label: 'got a response', cls: 'blue' },
-  interview: { icon: '📅', label: 'interviewing', cls: 'blue' },
-  interviewing: { icon: '📅', label: 'interviewing', cls: 'blue' },
-  offer: { icon: '🎉', label: 'got an offer', cls: 'green' },
-  hired: { icon: '🎉', label: 'hired', cls: 'green' },
-  waiting: { icon: '⏳', label: 'still waiting', cls: 'dim' },
+const OUTCOME: Record<string, { icon: IconName; label: string; cls: string }> = {
+  ghosted: { icon: 'ghost', label: 'ghosted', cls: 'red' },
+  autoreject: { icon: 'bot', label: 'auto-rejected', cls: 'amber' },
+  rejected: { icon: 'circle-x', label: 'rejected', cls: 'amber' },
+  human: { icon: 'message-square', label: 'got a response', cls: 'blue' },
+  interview: { icon: 'calendar', label: 'interviewing', cls: 'blue' },
+  interviewing: { icon: 'calendar', label: 'interviewing', cls: 'blue' },
+  offer: { icon: 'trophy', label: 'got an offer', cls: 'green' },
+  hired: { icon: 'trophy', label: 'hired', cls: 'green' },
+  waiting: { icon: 'hourglass', label: 'still waiting', cls: 'dim' },
 }
 
 const slug = (name: string) => encodeURIComponent(name.toLowerCase().replace(/\s+/g, '-'))
@@ -72,7 +73,7 @@ export default function LivePulse() {
     const o = OUTCOME[r.outcome]
     return (
       <Link key={(hidden ? 'b' : 'a') + r.id} href={`/company/${slug(r.company_name!)}`} className={`${styles.chip} ${styles[o.cls]}`} tabIndex={hidden ? -1 : 0} aria-hidden={hidden || undefined}>
-        <span className={styles.ico} aria-hidden>{o.icon}</span>
+        <span className={styles.ico} aria-hidden><Icon name={o.icon} size={14} /></span>
         <b>{displayCompanyName(r.company_name)}</b>
         <span className={styles.what}>{o.label}{r.role ? ` · ${r.role}` : ''}</span>
         <time className={styles.when} dateTime={r.created_at}>{ago(r.created_at)}</time>

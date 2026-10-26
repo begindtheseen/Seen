@@ -25,9 +25,9 @@ export const Score = {
   },
   wasteLabel(w: number): { cls: string; txt: string } {
     return w >= 65
-      ? { cls: 'waste-high', txt: `${w}% waste risk` }
+      ? { cls: 'waste-high', txt: `${w}% wasted-effort risk` }
       : w >= 35
-      ? { cls: 'waste-mid', txt: `${w}% waste risk` }
-      : { cls: 'waste-low', txt: `${w}% waste risk` }
+      ? { cls: 'waste-mid', txt: `${w}% wasted-effort risk` }
+      : { cls: 'waste-low', txt: `${w}% wasted-effort risk` }
   },
 }

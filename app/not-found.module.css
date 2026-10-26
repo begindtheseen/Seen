@@ -1,19 +1,16 @@
 .wrap { max-width: 560px; margin: 0 auto; padding: 5rem 1.25rem 4rem; text-align: center; width: 100%; box-sizing: border-box; }
-.code { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.3em; color: var(--dim); }
-.title { font-family: var(--display); font-weight: 800; font-size: clamp(1.7rem, 6vw, 2.4rem); letter-spacing: -0.03em; color: var(--white); margin: 0.6rem 0 0.5rem; }
-.sub { font-size: 0.9rem; color: var(--sub); line-height: 1.65; margin: 0 auto; max-width: 40ch; }
+.code { font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.3em; color: var(--dim); }
+.title { font-family: var(--display); font-weight: 800; font-size: var(--fs-h2); line-height: var(--lh-tight); letter-spacing: var(--ls-display); color: var(--white); margin: 0.6rem 0 0.75rem; text-wrap: balance; }
+.sub { font-size: var(--fs-ui); color: var(--sub); line-height: 1.65; margin: 0 auto; max-width: 40ch; }
 .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.6rem; margin-top: 1.6rem; }
 .primary, .ghost {
   display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 1.15rem;
-  border-radius: 12px; font-family: var(--body); font-weight: 700; font-size: 0.86rem; text-decoration: none;
+  border-radius: var(--r-control); font-family: var(--body); font-weight: 600; font-size: var(--fs-ui); text-decoration: none;
 }
-.primary { color: #fff; background: linear-gradient(110deg, #315bfa, #a33bf2); box-shadow: 0 8px 30px rgba(97, 64, 227, 0.3); }
-.ghost { color: var(--white); border: 1px solid var(--line2); background: rgba(255, 255, 255, 0.04); }
+.primary { color: #fff; background: var(--cta-gradient); box-shadow: var(--sh-control); }
+.primary:hover { background: var(--cta-gradient-hover); }
+.ghost { color: var(--text-2); border: 1px solid var(--border-2); background: transparent; }
 .ghost:hover { border-color: rgba(129, 140, 248, 0.5); }
-.fine { font-family: var(--mono); font-size: 0.62rem; color: var(--dim); margin-top: 1.6rem; }
+.fine { font-family: var(--body); font-size: var(--fs-sm); color: var(--text-3); margin-top: 1.6rem; }
 .fine a { color: var(--sub); }
 
-/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
-@media (max-width: 768px) {
-  .code, .fine { font-size: 0.75rem; }
-}

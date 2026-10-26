@@ -5,7 +5,7 @@ import { pageMetadata } from '@/lib/seo'
 // title, description and canonical (audit 2026-10-24: it inherited the homepage's and declared itself a
 // duplicate of /). Rendering is untouched.
 export const metadata: Metadata = pageMetadata({
-  title: 'Live Feed — Latest Applicant Reports',
+  title: 'Live Feed — Latest Applicant Accounts',
   description: 'The newest hiring outcomes applicants have reported to Seen, company by company, as they come in.',
   path: '/feed',
 })

@@ -22,6 +22,10 @@ import { resultsView } from '@/lib/searchView.js'
 import bar from '@/components/jobs/JobSearchBar.module.css'
 import { groupListings } from '@/lib/jobs/groupListings.js'
 import { isMatch } from '@/lib/server/jobPriority.js'
+import Button from '@/components/ui/Button'
+import { Chip } from '@/components/ui/Badge'
+import Icon from '@/components/ui/Icon'
+import j from './jobs.module.css'
 
 // Empty-state suggestions, most-held first. Live corpus counts by title (prod, read-only,
 // 2026-10-23): software engineer 3,960 · nurse 1,360 · sales associate 648 · customer service 489 ·
@@ -87,18 +91,6 @@ export default function JobsPage() {
     setSaveVersion(v => v + 1)
   }
 
-  const selectStyle: React.CSSProperties = {
-    background: 'var(--card)',
-    border: '1px solid var(--line2)',
-    borderRadius: 6,
-    padding: '.33rem .68rem',
-    fontFamily: 'var(--mono)',
-    fontSize: '.68rem',
-    color: 'var(--sub)',
-    outline: 'none',
-    cursor: 'pointer',
-  }
-
   const hasCity = location.trim().length > 0
   // The résumé rail: with ≥1 real match (same role family, near the person's city — the profile's,
   // else the résumé's own), and never once a search has been typed — the search is the page's job.
@@ -112,6 +104,9 @@ export default function JobsPage() {
   // Matches first, then — under a divider — openings that only share a word with the search. The
   // hook's sort already puts every match first (lib/server/jobPriority.js), so one index splits them.
   const firstOther = typed ? grouped.findIndex(g => !isMatch(g.lead)) : -1
+  // After a search with results, phones get a sticky one-line query bar (audit #25: the first card sat
+  // ~700px down under a three-row form). The location row reappears while the bar has focus.
+  const searched = status === 'done' && filtered.length > 0
   const [copied, setCopied] = useState(false)
   async function copySearchLink() {
     try { await navigator.clipboard.writeText(window.location.href); setCopied(true); setTimeout(() => setCopied(false), 1800) }
@@ -128,12 +123,12 @@ export default function JobsPage() {
             tone="green"
             title="Open positions"
             crumbLabel="Jobs"
-            sub="Ranked by how well they match your search. Every listing shows waste risk, process score, and vibe tags — not just salary and location."
-            className="jpage-head"
+            sub="Ranked by how well they match your search. Every listing shows how complete its posting is and how the employer treats applicants — not just pay and location."
+            className={`jpage-head${searched ? ' ' + j.searchedHead : ''}`}
           />
 
           {/* Search bar — job titles AND company names in the same box. No autofill: Enter / Search runs it. */}
-          <div className={bar.wrap}>
+          <div className={`${bar.wrap}${searched ? ' ' + bar.compact : ''}`} role="search">
             <div className={bar.query}>
             <input
               type="text"
@@ -150,6 +145,10 @@ export default function JobsPage() {
               onChange={e => setQuery(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') searchJobs() }}
             />
+            {/* Compact (phone, after a search): the one-line bar's own Search button. */}
+            <button type="button" className={bar.goIcon} onClick={() => searchJobs()} disabled={status === 'loading'} aria-label="Search">
+              <Icon name="search" size={18} />
+            </button>
             </div>
             <div className={bar.row}>
               <div className={bar.loc}>
@@ -175,7 +174,7 @@ export default function JobsPage() {
                   disabled={gpsLoading || hasCity}
                   className={`${bar.pin}${gpsLoading ? ' ' + bar.pinBusy : ''}${hasCity ? ' ' + bar.pinOff : ''}`}
                 >
-                  {gpsLoading ? '⏳' : '📍'}
+                  <Icon name={gpsLoading ? 'loader-circle' : 'map-pin'} size={16} className={gpsLoading ? bar.spin : undefined} />
                 </button>
               </div>
               {/* A radius only means something next to a place: with no city the select reads
@@ -204,7 +203,7 @@ export default function JobsPage() {
                 onClick={() => searchJobs()}
                 disabled={status === 'loading'}
               >
-                {status === 'loading' ? 'Searching...' : 'Search →'}
+                {status === 'loading' ? 'Searching…' : 'Search'}
               </button>
             </div>
           </div>
@@ -216,7 +215,6 @@ export default function JobsPage() {
             jobType={jobType} setJobType={setJobType}
             posted={posted} setPosted={setPosted}
             hasFilters={hasFilters} clearFilters={clearFilters}
-            selectStyle={selectStyle}
           />
         </div>
 
@@ -238,42 +236,31 @@ export default function JobsPage() {
         {/* The search names a company → its card (grade only when it has enough reviews) */}
         {status === 'done' && <CompanyResultCard items={coSuggs} searched={committedQuery} />}
 
-        {/* Results header */}
-        <div className="jtb">
-          <div className="jct">{statusMsg}</div>
-          <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-            {status === 'done' && typed && (
-              <button type="button" className={bar.share} onClick={copySearchLink} data-testid="copy-search-link" title="Copy a link to this search">
-                {copied ? '✓ Copied' : '🔗 Copy link'}
-              </button>
-            )}
-            {filtered.length > 0 && (
-              <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--line2)', background: 'var(--card)' }}>
-                <button
-                  onClick={() => setSwipeMode(false)}
-                  title="List view"
-                  style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', fontWeight: swipeMode ? 400 : 600, padding: '.35rem .75rem', background: swipeMode ? 'transparent' : 'var(--surface)', color: swipeMode ? 'var(--dim)' : 'var(--white)', border: 'none', borderRight: '1px solid var(--line2)', cursor: 'pointer', transition: 'background .12s,color .12s' }}
-                >☰ List</button>
-                <button
-                  onClick={() => setSwipeMode(true)}
-                  title="Swipe mode — drag right to save, left to pass"
-                  style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', fontWeight: swipeMode ? 600 : 400, padding: '.35rem .75rem', background: swipeMode ? 'var(--surface)' : 'transparent', color: swipeMode ? 'var(--white)' : 'var(--dim)', border: 'none', cursor: 'pointer', transition: 'background .12s,color .12s' }}
-                >⚡ Swipe</button>
+        {/* Results header — only over results: a failed or empty search shows its own state, never this
+            toolbar on top of an error (audit #30). */}
+        {filtered.length > 0 && (
+          <div className={j.toolbar}>
+            <p className={j.count} aria-live="polite">{statusMsg}</p>
+            <div className={j.tools}>
+              {status === 'done' && typed && (
+                <Button size="sm" variant="ghost" onClick={copySearchLink} data-testid="copy-search-link" title="Copy a link to this search" icon={copied ? 'check' : 'link'}>
+                  <span className={j.hideSm}>{copied ? 'Copied' : 'Copy link'}</span>
+                </Button>
+              )}
+              <div className={j.seg} role="group" aria-label="View">
+                <Chip selected={!swipeMode} onClick={() => setSwipeMode(false)} icon="list" title="List view">List</Chip>
+                <Chip selected={swipeMode} onClick={() => setSwipeMode(true)} icon="layers" title="Swipe mode — drag right to save, left to pass">Swipe</Chip>
               </div>
-            )}
-            <select
-              className="jss"
-              aria-label="Sort results"
-              value={sort}
-              onChange={e => setSort(e.target.value as SortMode)}
-            >
-              <option value="best">Best match</option>
-              <option value="transparency">By transparency</option>
-              <option value="waste">Lowest waste risk</option>
-              <option value="recent">Most recent</option>
-            </select>
+              <label htmlFor="jobs-sort" className="sr-only">Sort results</label>
+              <select id="jobs-sort" className={`ui-input ${j.sort}`} value={sort} onChange={e => setSort(e.target.value as SortMode)}>
+                <option value="best">Best match</option>
+                <option value="transparency">Best posting score</option>
+                <option value="waste">Lowest wasted-effort risk</option>
+                <option value="recent">Most recent</option>
+              </select>
+            </div>
           </div>
-        </div>
+        )}
         {notice && filtered.length > 0 && <div className={bar.notice} role="status">{notice}</div>}
 
         {/* Results — swipe deck or list */}
@@ -302,58 +289,57 @@ export default function JobsPage() {
             ))}
           </div>
           {hasMore && (
-            <button type="button" className={bar.more} onClick={() => loadMore()} disabled={loadingMore} data-testid="show-more">
+            <Button variant="secondary" full onClick={() => loadMore()} loading={loadingMore} data-testid="show-more" className={j.more}>
               {loadingMore ? 'Loading…' : 'Show 60 more'}
-            </button>
+            </Button>
           )}
           </>
         ) : view === 'error' ? (
           /* A failed search is an error with a Retry — never the "No matches" empty state (R-3). */
-          <div style={{ padding: '1.5rem 0 3rem' }}>
+          <div className={j.state}>
             <LoadError what="job listings" detail="The search request did not get through. Your title and location are kept — try again." onRetry={retrySearch} />
           </div>
         ) : view === 'idle' ? (
-          <div style={{ textAlign: 'center', padding: '2.75rem 1.5rem 3.25rem' }}>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '.16em', marginBottom: '.5rem' }}>Start a search</div>
-            <div style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', letterSpacing: '-.02em', marginBottom: '.4rem' }}>What role are you hunting?</div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)', marginBottom: '1.15rem' }}>Every result is transparency-scored before you waste a single application.</div>
-            <div style={{ display: 'flex', gap: '.45rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <div className={j.idle}>
+            <p className="ui-eyebrow">Start a search</p>
+            <h2 className={j.idleTitle}>What role are you looking for?</h2>
+            <p className={j.idleSub}>Every result shows how complete its posting is and how the employer treats applicants.</p>
+            <div className={j.suggest}>
               {SUGGESTED_ROLES.map(role => (
-                <button key={role} className="sugg-chip" onClick={() => { setQuery(role); searchJobs(role) }}>{role}</button>
+                <Chip key={role} onClick={() => { setQuery(role); searchJobs(role) }}>{role}</Chip>
               ))}
             </div>
             {/* Only when the ACCOUNT has no résumé on file (the rail says so) — never because the rail is empty. */}
             {isLoggedIn && recStatus === 'done' && recommended.length === 0 && recHasResume === false && (
-              <div style={{ marginTop: '1.5rem', padding: '.85rem 1.1rem', background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: 10, maxWidth: 340, margin: '1.5rem auto 0', textAlign: 'left' }}>
-                <div style={{ fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.22rem' }}>Get personalized matches</div>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.65rem' }}>Upload your resume and we&apos;ll surface jobs that match your skills and experience level automatically.</div>
-                <a href="/resume" style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: '#a78bfa', textDecoration: 'none' }}>Upload resume →</a>
+              <div className={j.resumeAsk}>
+                <p className={j.resumeTitle}>Get matches from your résumé</p>
+                <p className={j.idleSub}>Upload it once and Seen surfaces jobs that match your skills and experience level.</p>
+                <Button size="sm" variant="secondary" href="/resume" iconRight="arrow-right">Upload résumé</Button>
               </div>
             )}
             {isLoggedIn && recStatus === 'done' && recommended.length === 0 && recHasResume === true && recReason !== 'no_city' && (
-              <div style={{ marginTop: '1.25rem', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)' }}>Nothing near {recCity || 'you'} matched your résumé&apos;s roles yet — search by title above.</div>
+              <p className={j.idleSub}>Nothing near {recCity || 'you'} matched your résumé&apos;s roles yet — search by title above.</p>
             )}
           </div>
         ) : view === 'loading' ? (
-          <div className="jlist">
+          <div className="jlist" role="status" aria-label="Searching">
             {[0, 1, 2, 3, 4].map(i => (
-              <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1rem 1.1rem', display: 'flex', gap: '.75rem', alignItems: 'flex-start' }}>
-                <div style={{ width: 46, height: 46, borderRadius: 9, background: 'var(--raised)', flexShrink: 0, animation: `pulse 1.4s ${i * 0.12}s ease infinite` }} />
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
-                  <div style={{ height: 14, borderRadius: 4, background: 'var(--raised)', width: `${55 + (i % 3) * 15}%`, animation: `pulse 1.4s ${i * 0.12}s ease infinite` }} />
-                  <div style={{ height: 11, borderRadius: 4, background: 'var(--raised)', width: '40%', animation: `pulse 1.4s ${i * 0.12}s ease infinite` }} />
-                  <div style={{ display: 'flex', gap: '.35rem' }}>
-                    {[0, 1, 2].map(j => <div key={j} style={{ height: 20, width: 60, borderRadius: 5, background: 'var(--raised)', animation: `pulse 1.4s ${(i + j) * 0.09}s ease infinite` }} />)}
-                  </div>
+              <div key={i} className={j.skRow}>
+                <div className={`sk ${j.skLogo}`} />
+                <div className={j.skBody}>
+                  <div className="sk" style={{ height: 14, width: `${55 + (i % 3) * 15}%` }} />
+                  <div className="sk" style={{ height: 12, width: '40%' }} />
+                  <div className="sk" style={{ height: 22, width: '30%' }} />
                 </div>
               </div>
             ))}
           </div>
         ) : view === 'empty' ? (
-          <div style={{ textAlign: 'center', padding: '4rem 2rem' }}>
-            <div style={{ fontSize: '2rem', marginBottom: '.75rem' }}>🔍</div>
-            <div style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.4rem' }}>No matches for this search</div>
-            <div style={{ color: 'var(--sub)', fontFamily: 'var(--body)', fontSize: '.82rem', fontWeight: 300, maxWidth: 360, margin: '0 auto', lineHeight: 1.6 }}>Try a broader job title, widen the radius, or clear a filter — new roles are indexed continuously.</div>
+          <div className={j.idle}>
+            <Icon name="search" size={28} className={j.emptyIcon} />
+            <h2 className={j.idleTitle}>No matches for this search</h2>
+            <p className={j.idleSub}>Try a broader job title, widen the radius, or clear a filter — new roles are indexed continuously.</p>
+            {hasFilters && <Button size="sm" variant="secondary" onClick={clearFilters}>Clear filters</Button>}
           </div>
         ) : null}
       </div>

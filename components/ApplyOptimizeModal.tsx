@@ -8,7 +8,8 @@ import { aiHeaders } from '@/lib/aiHeaders'
 import { ResumeStore } from '@/lib/stores/ResumeStore'
 import UpgradeModal from './UpgradeModal'
 import CreditConfirmDialog from './CreditConfirmDialog'
-import { RESUME_OPTIMIZE_COST, creditCostLabel, dailyResetLabel } from '@/lib/creditRules'
+import { LOCK_NOTE, PASS_AFTER_WIN } from '@/lib/pricing'
+import { RESUME_OPTIMIZE_COST, creditCostLabel, dailyResetLabel, priceLabel } from '@/lib/creditRules'
 import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
 import { trackApplyClick } from '@/lib/trackApply'
 import type { Job } from '@/lib/types'
@@ -305,7 +306,8 @@ export default function ApplyOptimizeModal({
 
   // The price-tagged button: the first paid action on this account/device is confirmed once.
   function pressOptimize() {
-    if (hasConfirmedCreditUse(user?.id)) runOptimize()
+    // a Pro account is never charged, so it is never asked to confirm a credit
+    if (pro === true || hasConfirmedCreditUse(user?.id)) runOptimize()
     else setStep('confirm')
   }
 
@@ -343,7 +345,7 @@ export default function ApplyOptimizeModal({
   const wordingNotes = (result?.wording_notes || []).slice(0, 3)
   const fitScore = result?.verdict ? result.verdict.score : (result?._seenfit_score ?? null)
 
-  async function runOptimize(resumeOverride?: string) {
+  async function runOptimize(resumeOverride?: string, fresh = false) {
     const text = resumeOverride ?? resumeText
     setStep('optimizing')
     setError('')
@@ -360,6 +362,8 @@ export default function ApplyOptimizeModal({
           company: job.company,
           resume: text,
           ...postingBody(posting),
+          // "Re-run": skip the 7-day cache and build the package with the current engine
+          ...(fresh ? { fresh: true } : {}),
         }),
       })
       if (!r.ok) {
@@ -792,7 +796,7 @@ export default function ApplyOptimizeModal({
                 </div>
               )}
               <div style={{ background: 'rgba(99,102,241,.07)', border: '1px solid rgba(99,102,241,.18)', borderRadius: 10, padding: '.8rem .95rem', marginBottom: '1rem' }}>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-52)', textTransform: 'uppercase', letterSpacing: '.1em', color: '#818cf8', fontWeight: 700, marginBottom: '.45rem' }}>What {OPTIMIZE_PRICE} adds — kept for 7 days</div>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-52)', textTransform: 'uppercase', letterSpacing: '.1em', color: '#818cf8', fontWeight: 700, marginBottom: '.45rem' }}>What {pro === true ? 'the optimize' : OPTIMIZE_PRICE} adds — kept for 7 days</div>
                 {[
                   'Which of your bullets should lead each job for this posting',
                   'Number questions — your answer writes the bullet',
@@ -812,7 +816,7 @@ export default function ApplyOptimizeModal({
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                 <button style={btnPrimary} data-testid="modal-optimize-btn" onClick={pressOptimize}>
-                  Optimize for this job · {OPTIMIZE_PRICE}
+                  Optimize for this job · {priceLabel(RESUME_OPTIMIZE_COST, pro)}
                 </button>
                 <button style={btnGhost} onClick={applyWithoutOptimize}>
                   Apply ↗ without optimizing · free
@@ -846,7 +850,7 @@ export default function ApplyOptimizeModal({
               {/* ONE verdict (score or none, band, one sentence; the hard gate first). */}
               {result.verdict && (
                 <VerdictCard verdict={result.verdict} cached={!!result.cached}
-                  note={result.stealth ? 'Human Voice applied' : 'grounded in your real résumé — nothing invented'} />
+                  note={hpState === 'done' && (hp?.package?.bullets?.length || 0) > 0 ? 'your rewritten bullets, checked for your own voice' : realBullets.length > 0 ? 'grounded in your real résumé — nothing invented' : 'no bullet of yours was rewritten for this job'} />
               )}
 
               {/* Why you match — from the matched requirements and their evidence (E7). */}
@@ -946,6 +950,7 @@ export default function ApplyOptimizeModal({
                     >
                       Unlock HumanProof
                     </button>
+                    <p style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--muted)', lineHeight: 1.6, margin: '.6rem 0 0' }}>{LOCK_NOTE}</p>
                   </div>
                 )}
 
@@ -986,7 +991,8 @@ export default function ApplyOptimizeModal({
               {/* Post-win ledger line — the REAL balance, the real reset, then the upsell. */}
               {result.cached && (
                 <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', color: 'var(--green)', lineHeight: 1.5 }}>
-                  No credit used — you optimized this job with this résumé in the last 7 days. A new résumé or a new posting costs {OPTIMIZE_PRICE}.
+                  No credit used — you optimized this job with this résumé in the last 7 days. {pro === true ? 'Re-running is unlimited with Pro.' : `A new résumé, a new posting or a re-run costs ${OPTIMIZE_PRICE}.`}
+                  {' '}<button type="button" data-testid="modal-rerun" onClick={() => { void runOptimize(undefined, true) }} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--green)', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit' }}>Re-run with the latest engine →</button>
                 </div>
               )}
               {pro === false && !upsellDismissed && result.charged && (
@@ -995,7 +1001,7 @@ export default function ApplyOptimizeModal({
                     onClick={() => { setUpgradeReason('generic'); setUpgradeFeature(undefined); setShowUpgrade(true) }}
                     style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--body)', fontSize: '.66rem', color: 'var(--sub)', lineHeight: 1.5 }}
                   >
-                    {OPTIMIZE_PRICE} used{balance != null ? ` · ${balance} left` : ''} · {dailyResetLabel()} · <span style={{ color: '#a5b4fc', fontWeight: 700 }}>Pro removes the cap →</span>
+                    {OPTIMIZE_PRICE} used{balance != null ? ` · ${balance} left` : ''} · {dailyResetLabel()} · <span style={{ color: '#a5b4fc', fontWeight: 700 }}>{PASS_AFTER_WIN}</span>
                   </button>
                   <button
                     onClick={() => setUpsellDismissed(true)}

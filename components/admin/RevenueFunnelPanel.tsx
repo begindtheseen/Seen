@@ -10,11 +10,20 @@ import { Panel } from './primitives'
 import s from './SignupSourcesPanel.module.css'
 
 type Step = { key: string; label: string; n: number | null }
+type Surface = { surface: string; shown: number | null; clicked: number | null }
 type Report = {
-  ok: boolean; error?: string; days: number; recording: boolean; steps: Step[]
-  rates: { email: number | null; activation: number | null; offer_click: number | null; checkout: number | null }
-  revenue: { interview_prep: number | null; credit_pack: number | null; credit_pack_count: number | null; paying_subscribers_now: number | null; monthly_price: number }
+  ok: boolean; error?: string; days: number; recording: boolean; recording_steps: boolean; steps: Step[]; surfaces: Surface[]
+  rates: { email: number | null; activation: number | null; offer_click: number | null; checkout: number | null; checkout_completion: number | null }
+  revenue: {
+    interview_prep: number | null; job_search_pass: number | null; pass_count: number | null
+    credit_pack: number | null; credit_pack_count: number | null; total: number | null
+    paying_customers: number | null; legacy_subscriptions_marked_pro: number | null
+  }
   implied: { interviews_per_month: number; take_rate_pct: number; dollars: number } | null
+}
+const SURFACE_LABEL: Record<string, string> = {
+  tracker_prep: 'Tracker card (interview)', company_page: 'Company page', pricing: '/pricing',
+  upgrade_modal: 'Upgrade sheet', lock_card: 'Lock card', homepage: 'Homepage',
 }
 const WINDOWS = [7, 30, 90]
 const show = (n: number | null) => (n == null ? '—' : n.toLocaleString())
@@ -57,11 +66,19 @@ export function RevenueFunnelPanel({ token }: { token: string }) {
           {!data.recording && (
             <div className={s.empty}>Offer and email steps are not recording yet — apply migration 20261025120000_interview_prep_funnel.sql. The other steps are live.</div>
           )}
+          {data.recording && !data.recording_steps && (
+            <div className={s.empty}>Pricing views, offers by page, previews and checkouts are not recording yet — apply migration 20261025160000_funnel_steps.sql. The tracker card&apos;s offer is still counted.</div>
+          )}
           <div className={s.totals}>
+            <span><b>{usd(data.revenue.total)}</b> revenue</span>
             <span><b>{usd(data.revenue.interview_prep)}</b> Interview Prep</span>
-            <span><b>{usd(data.revenue.credit_pack)}</b> credit packs ({show(data.revenue.credit_pack_count)})</span>
-            <span><b>{show(data.revenue.paying_subscribers_now)}</b> paying Pro now</span>
+            <span><b>{usd(data.revenue.job_search_pass)}</b> Job Search Pass ({show(data.revenue.pass_count)})</span>
+            {!!data.revenue.credit_pack_count && <span><b>{usd(data.revenue.credit_pack)}</b> old credit packs ({show(data.revenue.credit_pack_count)})</span>}
+            <span title="Distinct accounts with a purchase in this window. Comped accounts and no-card trials never buy, so they are not counted."><b>{show(data.revenue.paying_customers)}</b> paying customers</span>
           </div>
+          {!!data.revenue.legacy_subscriptions_marked_pro && (
+            <div className={s.empty}>{show(data.revenue.legacy_subscriptions_marked_pro)} account{data.revenue.legacy_subscriptions_marked_pro === 1 ? '' : 's'} still on a subscription or trial started before 2026-10-25 (Stripe decides which pay; not counted above).</div>
+          )}
           <div className={s.table} role="table">
             <div className={`${s.row} ${s.noPaid} ${s.head}`} role="row" style={{ gridTemplateColumns: 'minmax(0,1fr) minmax(0,5rem)' }}>
               <span role="columnheader">Step · last {data.days} days</span>
@@ -74,12 +91,30 @@ export function RevenueFunnelPanel({ token }: { token: string }) {
               </div>
             ))}
           </div>
+          <div className={s.sub}>Offers by page</div>
+          <div className={s.table} role="table">
+            <div className={`${s.row} ${s.head}`} role="row" style={{ gridTemplateColumns: 'minmax(0,1fr) minmax(0,4rem) minmax(0,4rem) minmax(0,3.5rem)' }}>
+              <span role="columnheader">Page</span>
+              <span role="columnheader">Shown</span>
+              <span role="columnheader">Pressed</span>
+              <span role="columnheader">Rate</span>
+            </div>
+            {data.surfaces.map((x) => (
+              <div key={x.surface} className={s.row} role="row" style={{ gridTemplateColumns: 'minmax(0,1fr) minmax(0,4rem) minmax(0,4rem) minmax(0,3.5rem)' }}>
+                <span className={s.name} role="cell">{SURFACE_LABEL[x.surface] || x.surface}</span>
+                <span className={s.n} role="cell">{show(x.shown)}</span>
+                <span className={s.n} role="cell">{show(x.clicked)}</span>
+                <span className={s.n} role="cell">{pct(x.shown && x.clicked != null ? Math.round((x.clicked / x.shown) * 100) : null)}</span>
+              </div>
+            ))}
+          </div>
           <div className={s.sub}>Rates</div>
           <div className={s.totals}>
             <span>email given <b>{pct(data.rates.email)}</b></span>
             <span>sign-up → tracked <b>{pct(data.rates.activation)}</b></span>
-            <span>offer → pressed <b>{pct(data.rates.offer_click)}</b></span>
-            <span>pressed → bought <b>{pct(data.rates.checkout)}</b></span>
+            <span>card offer → pressed <b>{pct(data.rates.offer_click)}</b></span>
+            <span>pressed → bought prep <b>{pct(data.rates.checkout)}</b></span>
+            <span>checkout opened → paid <b>{pct(data.rates.checkout_completion)}</b></span>
           </div>
           <div className={s.empty}>
             {data.implied
