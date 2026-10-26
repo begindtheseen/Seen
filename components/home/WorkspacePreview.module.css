@@ -107,7 +107,7 @@
   transition: color 0.15s ease, background 0.15s ease;
 }
 .tab:hover { color: var(--white); background: rgba(255, 255, 255, 0.04); }
-.tabOn { color: #e0e7ff; font-weight: 600; background: linear-gradient(90deg, rgba(99, 102, 241, 0.22), rgba(99, 102, 241, 0.06)); }
+.tabOn { color: #e0e7ff; font-weight: 600; background: var(--accent-tint); }
 .tabOn::before {
   content: '';
   position: absolute;
