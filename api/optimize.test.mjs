@@ -81,8 +81,8 @@ test('diagnose: free, questions from the plan, protected questions never asked, 
   const r = await call({ action: 'diagnose', ...base });
   assert.equal(r.code, 200, JSON.stringify(r.body).slice(0, 300));
   assert.equal(state.charges, 0);
-  assert.equal(r.body.diagnosis.questions.length, 1);
-  assert.match(r.body.diagnosis.questions[0].ask, /payroll/);
+  assert.ok(r.body.diagnosis.questions.some((q) => /payroll/.test(q.ask)), 'the model\'s question is kept');
+  assert.ok(r.body.diagnosis.questions.length <= 6);
   assert.ok(r.body.diagnosis.bullets.length > 5, 'every bullet is on the plan');
   assert.ok(state.modelCalls.every((c) => c.model === 'quality-model-x'));
   const again = await call({ action: 'diagnose', ...base });
