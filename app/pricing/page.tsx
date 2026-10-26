@@ -19,6 +19,7 @@ import { PREP, PASS, PREP_PRICE, PASS_PRICE, ONE_TIME_NOTE, FREE_FOREVER, FREE_L
 import { useCheckout } from '@/lib/useCheckout'
 import { funnelEvent } from '@/lib/funnel'
 import { formatPacific } from '@/lib/time/pacific.js'
+import Icon from '@/components/ui/Icon'
 import s from './pricing.module.css'
 
 const CREDIT_WORD = FREE_DAILY_CREDITS === 1 ? 'credit' : 'credits'
@@ -149,11 +150,11 @@ export default function PricingPage() {
       ? `${ONE_TIME_SKUS.credits20.credits} AI credits are on your account. Purchased credits never expire. Nothing renews.`
       : 'Your Seen Pro access is active.'
     return (
-      <div className="page-full" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '70vh' }}>
-        <div style={{ textAlign: 'center', maxWidth: 440, padding: '2rem 16px' }}>
+      <div className={`page-full ${s.done}`}>
+        <div className={s.doneIn}>
           <h1 className={s.h1}>{title}</h1>
-          <p className={s.lede} style={{ marginBottom: '1.5rem' }}>{body}</p>
-          <div style={{ display: 'grid', gap: '.6rem' }}>
+          <p className={s.lede}>{body}</p>
+          <div className={s.doneBtns}>
             <button type="button" className={`${s.btn} ${s.btnLead}`} onClick={() => router.push(purchasedSku === 'credits20' ? '/resume' : '/tracker')}>
               {purchasedSku === 'credits20' ? 'Open Résumé →' : 'Open my tracker →'}
             </button>
@@ -204,7 +205,7 @@ export default function PricingPage() {
                 </button>
               </>
             ) : (
-              <p className={s.manageS} style={{ margin: 0 }}>
+              <p className={s.manageS}>
                 {until ? `Everything is unlocked until ${until}, including ${PREP.name} for every interview. Nothing renews.` : `Everything is unlocked, including ${PREP.name} for every interview.`}
               </p>
             )}
@@ -261,7 +262,7 @@ export default function PricingPage() {
         <h2 className={s.h2}>Questions</h2>
         {FAQ.map(item => (
           <details key={item.q} id={item.id} className={s.faq}>
-            <summary><span>{item.q}</span><span className="dt-chev" style={{ color: 'var(--dim)', fontWeight: 400, flexShrink: 0 }}>▾</span></summary>
+            <summary><span>{item.q}</span><Icon name="chevron-down" size={18} className={s.chev} /></summary>
             <div className={s.faqA}>{item.a}</div>
           </details>
         ))}

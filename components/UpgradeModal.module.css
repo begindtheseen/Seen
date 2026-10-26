@@ -1,0 +1,16 @@
+/* The upgrade sheet (components/UpgradeModal.tsx) inside THE dialog — tokens only. */
+.pass { background: var(--accent-tint); border: 1px solid var(--accent-line); border-radius: var(--r-card); padding: var(--sp-4); }
+.passHead { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); flex-wrap: wrap; }
+.passName { font-family: var(--body); font-weight: 600; font-size: var(--fs-body); color: var(--text-1); }
+.passPrice { font-family: var(--body); font-size: var(--fs-sm); color: var(--text-2); font-variant-numeric: tabular-nums; }
+.list { list-style: none; margin: var(--sp-2) 0 var(--sp-3); padding: 0; }
+.list li { display: flex; align-items: flex-start; gap: var(--sp-2); font-family: var(--body); font-size: var(--fs-sm); color: var(--text-3); line-height: 1.45; margin-bottom: .3rem; }
+.tick { color: var(--accent); flex-shrink: 0; margin-top: .15em; }
+.note { font-family: var(--body); font-size: var(--fs-meta); color: var(--text-3); text-align: center; margin: var(--sp-2) 0 0; }
+.prep { border: 1px solid var(--border-2); border-radius: var(--r-card); padding: var(--sp-4); margin-top: var(--sp-3); }
+.prepText { font-family: var(--body); font-size: var(--fs-sm); color: var(--text-2); line-height: 1.5; margin: 0 0 var(--sp-3); }
+.prepText b { color: var(--text-1); font-weight: 600; }
+.err { background: var(--bad-tint); border: 1px solid var(--bad-line); border-radius: var(--r-control); padding: .55rem .85rem; margin-top: var(--sp-3); font-family: var(--body); font-size: var(--fs-sm); color: var(--bad-text); line-height: 1.5; }
+.foot { font-family: var(--body); font-size: var(--fs-meta); color: var(--text-3); text-align: center; margin: var(--sp-4) 0 0; }
+.foot a { color: var(--accent); display: inline-block; padding: .7rem .15rem; }
+.earn { display: flex; justify-content: center; margin-top: var(--sp-2); }
