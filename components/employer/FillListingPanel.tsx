@@ -30,7 +30,7 @@ export function DeclineMessagePicker({ templates, value, onChange, allowNone }: 
   const [mode, setMode] = useState<string>(match ? match.id : value ? 'custom' : allowNone ? 'none' : templates[0]?.id || 'custom')
   const chip = (id: string, label: string, onPick: () => void) => (
     <button key={id} type="button" aria-pressed={mode === id} onClick={() => { setMode(id); onPick() }}
-      style={{ padding: '.32rem .65rem', borderRadius: 999, fontSize: '.7rem', cursor: 'pointer', border: `1px solid ${mode === id ? 'var(--blue)' : 'var(--line2)'}`, background: mode === id ? 'rgba(59,130,246,.12)' : 'none', color: mode === id ? 'var(--white)' : 'var(--sub)' }}>
+      style={{ padding: '.32rem .65rem', borderRadius: 999, fontSize: 'var(--fs-meta)', cursor: 'pointer', border: `1px solid ${mode === id ? 'var(--blue)' : 'var(--line2)'}`, background: mode === id ? 'rgba(59,130,246,.12)' : 'none', color: mode === id ? 'var(--white)' : 'var(--sub)' }}>
       {label}
     </button>
   )
@@ -45,7 +45,7 @@ export function DeclineMessagePicker({ templates, value, onChange, allowNone }: 
       {mode !== 'none' && (
         <textarea autoComplete="off" value={value} onChange={e => { onChange(e.target.value); if (mode !== 'custom') setMode('custom') }} maxLength={DECLINE_MESSAGE_MAX} rows={4}
           aria-label="Decline message" placeholder={mode === 'custom' ? 'Write your message — it goes to the applicant as written.' : undefined}
-          style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical', background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 8, padding: '.55rem .65rem', color: 'var(--white)', fontSize: '.78rem', lineHeight: 1.5, fontFamily: 'var(--body)' }} />
+          style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical', background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 8, padding: '.55rem .65rem', color: 'var(--white)', fontSize: 'var(--fs-meta)', lineHeight: 1.5, fontFamily: 'var(--body)' }} />
       )}
       <div style={{ ...mono('.52rem', 'var(--muted)'), marginTop: '.3rem' }}>
         {mode === 'none' ? 'They’ll see “Not selected” on their tracker and get the standard update email.' : 'It shows on their Seen tracker and is emailed to them. They can’t reply.'}
@@ -56,7 +56,7 @@ export function DeclineMessagePicker({ templates, value, onChange, allowNone }: 
 type Result = { hired: number; declined: number; skipped: number; closed: boolean }
 
 const mono = (size: string, color: string): React.CSSProperties => ({ fontFamily: 'var(--mono)', fontSize: size, color })
-const btn: React.CSSProperties = { borderRadius: 9, padding: '.6rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.8rem', cursor: 'pointer' }
+const btn: React.CSSProperties = { borderRadius: 9, padding: '.6rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)', cursor: 'pointer' }
 
 export default function FillListingPanel({ listing, apps, call, onDone, onCancel, initialPicked }: {
   listing: { id: string; title: string; company: string }
@@ -105,7 +105,7 @@ export default function FillListingPanel({ listing, apps, call, onDone, onCancel
     return (
       <div>
         <div style={{ ...mono('.55rem', 'var(--green)'), textTransform: 'uppercase', letterSpacing: '.1em' }}>Step 1 of 2</div>
-        <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1rem', color: 'var(--white)', margin: '.2rem 0 .3rem' }}>Who did you hire?</div>
+        <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-lead)', color: 'var(--white)', margin: '.2rem 0 .3rem' }}>Who did you hire?</div>
         <div style={{ ...mono('.6rem', 'var(--sub)'), lineHeight: 1.6, marginBottom: '.8rem' }}>
           Tick everyone you hired for this role. Everyone you don’t tick who is still waiting will get a decline message in the next step.
         </div>
@@ -117,7 +117,7 @@ export default function FillListingPanel({ listing, apps, call, onDone, onCancel
             return (
               <label key={a.id} style={{ ...box, display: 'flex', alignItems: 'center', gap: '.6rem', cursor: locked ? 'default' : 'pointer', borderColor: on ? 'var(--green)' : 'var(--line2)' }}>
                 <input type="checkbox" checked={on} disabled={locked} onChange={() => toggle(a.id)} style={{ width: 16, height: 16, accentColor: 'var(--green)' }} />
-                <span style={{ flex: 1, fontSize: '.85rem', color: 'var(--white)' }}>{a.name || 'Applicant'}</span>
+                <span style={{ flex: 1, fontSize: 'var(--fs-ui)', color: 'var(--white)' }}>{a.name || 'Applicant'}</span>
                 <span style={mono('.55rem', locked ? 'var(--green)' : a.status === 'rejected' ? 'var(--muted)' : 'var(--sub)')}>
                   {locked ? 'Hired' : a.status === 'rejected' ? 'Already declined' : a.status === 'interviewing' ? 'Interviewing' : a.status === 'reviewed' ? 'Reviewed' : 'New'}
                 </span>
@@ -137,19 +137,19 @@ export default function FillListingPanel({ listing, apps, call, onDone, onCancel
   return (
     <div>
       <div style={{ ...mono('.55rem', 'var(--green)'), textTransform: 'uppercase', letterSpacing: '.1em' }}>Step 2 of 2</div>
-      <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1rem', color: 'var(--white)', margin: '.2rem 0 .8rem' }}>Review before anything is sent</div>
+      <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-lead)', color: 'var(--white)', margin: '.2rem 0 .8rem' }}>Review before anything is sent</div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
         <div style={box}>
           <div style={mono('.58rem', 'var(--green)')}>✓ Marked hired · no message</div>
-          <div style={{ fontSize: '.8rem', color: 'var(--white)', marginTop: '.25rem' }}>{groups.hired.length ? names(groups.hired) : 'Nobody from Seen'}</div>
+          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--white)', marginTop: '.25rem' }}>{groups.hired.length ? names(groups.hired) : 'Nobody from Seen'}</div>
         </div>
 
         <div style={{ ...box, borderColor: n ? 'rgba(239,68,68,.35)' : 'var(--line2)' }}>
           <div style={mono('.58rem', n ? 'var(--red)' : 'var(--muted)')}>✉ {n ? `${n} applicant${n === 1 ? '' : 's'} will get this message and be marked “not selected”` : 'Nobody is waiting — no message will be sent'}</div>
           {n > 0 && (
             <>
-              <div style={{ fontSize: '.8rem', color: 'var(--white)', margin: '.25rem 0 .6rem' }}>{names(groups.decline)}</div>
+              <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--white)', margin: '.25rem 0 .6rem' }}>{names(groups.decline)}</div>
               <DeclineMessagePicker templates={templates} value={message} onChange={setMessage} />
             </>
           )}
@@ -167,7 +167,7 @@ export default function FillListingPanel({ listing, apps, call, onDone, onCancel
 
         <label style={{ display: 'flex', alignItems: 'flex-start', gap: '.55rem', cursor: 'pointer', ...box, borderColor: confirmed ? 'var(--green)' : 'var(--amber)' }}>
           <input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} style={{ width: 16, height: 16, marginTop: 2, accentColor: 'var(--green)' }} />
-          <span style={{ fontSize: '.8rem', color: 'var(--white)', lineHeight: 1.5 }}>
+          <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--white)', lineHeight: 1.5 }}>
             I’ve selected everyone I hired. {n ? `The ${n} other${n === 1 ? '' : 's'} listed above will get the message.` : ''}
           </span>
         </label>

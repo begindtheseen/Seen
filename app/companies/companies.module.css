@@ -1,0 +1,43 @@
+/* Company scoreboard (/companies): one search box, sort chips, equal-height left-aligned cards. */
+.page { max-width: var(--w-mid); margin: 0 auto; padding: var(--sp-10) var(--sp-6) var(--sp-12); width: 100%; box-sizing: border-box; }
+@media (max-width: 560px) { .page { padding: var(--sp-6) var(--sp-4) var(--sp-10); } }
+
+.field { position: relative; flex: 1 1 16rem; min-width: 0; }
+.search { display: flex; gap: var(--sp-2); align-items: stretch; }
+.searchIcon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-4); pointer-events: none; }
+.searchInput { min-height: 48px; padding-left: 42px; font-size: var(--fs-body); }
+.searchBtn { min-height: 48px; flex-shrink: 0; }
+.hint { margin: var(--sp-2) 0 0; font-size: var(--fs-sm); color: var(--text-3); line-height: 1.5; }
+
+.controls { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; margin: var(--sp-6) 0 var(--sp-4); }
+.total { margin-left: auto; font-size: var(--fs-sm); color: var(--text-3); font-variant-numeric: tabular-nums; }
+
+.grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr)); gap: var(--sp-3); align-items: stretch; }
+.item { display: flex; min-width: 0; }
+.skCard { height: 168px; border-radius: var(--r-card); }
+.divider { grid-column: 1 / -1; margin-top: var(--sp-4); padding-top: var(--sp-4); border-top: 1px solid var(--border-1); font-family: var(--body); font-size: var(--fs-sm); font-weight: 600; color: var(--text-3); }
+
+.card { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-4) var(--sp-5); border-radius: var(--r-card); background: var(--surface-1); border: 1px solid var(--border-1); color: inherit; text-decoration: none; transition: border-color var(--dur-state) var(--ease-out), background var(--dur-state) var(--ease-out); }
+.card:hover { border-color: var(--border-3); background: var(--surface-2); }
+.cardTop { display: flex; align-items: flex-start; gap: var(--sp-3); min-width: 0; }
+.letter { flex-shrink: 0; min-width: 2.2ch; font-size: var(--fs-fig); font-weight: 600; line-height: 1; letter-spacing: -.03em; }
+.who { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.name { font-size: var(--fs-lead); font-weight: 600; color: var(--text-1); line-height: 1.25; overflow-wrap: anywhere; }
+.industry { font-size: var(--fs-sm); color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank { flex-shrink: 0; font-size: var(--fs-meta); font-weight: 500; color: var(--text-4); font-variant-numeric: tabular-nums; }
+.badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.foot { margin-top: auto; display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3); flex-wrap: wrap; }
+.score { font-size: var(--fs-sm); color: var(--text-3); }
+.score b { font-size: var(--fs-lead); font-weight: 600; color: var(--text-1); }
+.basis { font-size: var(--fs-meta); color: var(--text-3); }
+.bar { height: 4px; border-radius: var(--r-pill); background: var(--border-1); overflow: hidden; }
+.bar > div { height: 100%; border-radius: var(--r-pill); }
+
+.empty { padding: var(--sp-10) var(--sp-4); text-align: center; color: var(--text-3); font-size: var(--fs-body); display: flex; flex-direction: column; align-items: center; gap: var(--sp-3); border: 1px dashed var(--border-2); border-radius: var(--r-card); }
+.empty p { margin: 0; }
+
+@media (max-width: 480px) {
+  .search { flex-wrap: wrap; }
+  .searchBtn { flex: 1 1 100%; }
+  .total { margin-left: 0; flex-basis: 100%; }
+}

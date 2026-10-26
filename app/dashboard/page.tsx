@@ -22,6 +22,15 @@ import { isGradeableScore } from '@/lib/gradeGate'
 import Odometer from '@/components/motion/Odometer'
 import { LoadError, PageSkeleton } from '@/components/shell/LoadStates'
 import styles from './dashboard.module.css'
+import Icon, { type IconName } from '@/components/ui/Icon'
+
+// BadgeStore's ids drawn with the shared icon set (the store's emoji stay for share cards).
+const BADGE_ICON: Record<string, IconName> = {
+  first_offer: 'trophy', offer_streak: 'trending-up', fast_hire: 'zap', consistent_tracker: 'chart-column',
+  transparency_contributor: 'shield-check', high_interview_rate: 'calendar', strong_conversion: 'award',
+  early_responder: 'timer', ghost_hunter: 'ghost', interview_survivor: 'calendar', data_champion: 'database',
+  hiring_detective: 'search',
+}
 
 function companySlug(name: string) {
   return encodeURIComponent(name.toLowerCase().replace(/\s+/g, '-'))
@@ -290,21 +299,21 @@ export default function DashboardPage() {
     : 'No open applications right now'
 
   // Next best move
-  type Move = { icon: string; title: string; sub: string; go: () => void }
+  type Move = { icon: IconName; title: string; sub: string; go: () => void }
   const moves: Move[] = []
   if (apps.length > 0) {
     const stale = staleApps[0]
     // Straight to that card (#app_<id>), like the Signals row — not the top of the tracker (M3).
-    if (stale) moves.push({ icon: '⏰', title: `Follow up with ${stale.company}`, sub: windowOf(stale).reference ? `Past the ${REFERENCE_WINDOW_DAYS}-day reference window` : 'Past its usual response window', go: () => router.push(`/tracker#app_${pathSegment(stale.id)}`) })
-    if (dueChecks.length) moves.push({ icon: '📮', title: `Report ${dueChecks.length} outcome${dueChecks.length > 1 ? 's' : ''}`, sub: 'Unlocks your real response & ghost rates', go: () => router.push(`/tracker#app_${pathSegment(dueChecks[0].app.id)}`) })
+    if (stale) moves.push({ icon: 'clock', title: `Follow up with ${stale.company}`, sub: windowOf(stale).reference ? `Past the ${REFERENCE_WINDOW_DAYS}-day reference window` : 'Past its usual response window', go: () => router.push(`/tracker#app_${pathSegment(stale.id)}`) })
+    if (dueChecks.length) moves.push({ icon: 'flag', title: `Report ${dueChecks.length} outcome${dueChecks.length > 1 ? 's' : ''}`, sub: 'Unlocks your real response & ghost rates', go: () => router.push(`/tracker#app_${pathSegment(dueChecks[0].app.id)}`) })
     // The open application that has got furthest (then the newest), searched as its role in its city (M4).
     const like = [...active].filter(a => a.role).sort((a, b) => (STAGES.indexOf(b.stage as typeof STAGES[number]) - STAGES.indexOf(a.stage as typeof STAGES[number])) || (b.appliedAt - a.appliedAt))[0]
     if (like) {
       const q = new URLSearchParams({ q: like.role.slice(0, 120) })
       if (like.location && !/^remote$/i.test(like.location.trim())) q.set('loc', like.location.slice(0, 80))
-      moves.push({ icon: '🔎', title: `Find more roles like ${like.role}`, sub: like.location ? `Searches “${like.role}” near ${like.location}` : `Searches “${like.role}”`, go: () => router.push(`/jobs?${q.toString()}`) })
+      moves.push({ icon: 'search', title: `Find more roles like ${like.role}`, sub: like.location ? `Searches “${like.role}” near ${like.location}` : `Searches “${like.role}”`, go: () => router.push(`/jobs?${q.toString()}`) })
     }
-    if (!moves.length) moves.push({ icon: '🔎', title: 'Find your next role', sub: 'Jobs sorted by transparency', go: () => router.push('/jobs') })
+    if (!moves.length) moves.push({ icon: 'search', title: 'Find your next role', sub: 'Jobs sorted by transparency', go: () => router.push('/jobs') })
   }
   const topMoves = moves.slice(0, 3)
 
@@ -348,7 +357,7 @@ export default function DashboardPage() {
             nav's account menu; Pro shows in the nav.) ── */}
         <header className={styles.intro}>
           <div style={{ minWidth: 0 }}>
-            <div className={styles.eyebrow}>✦ Command Center · {today}</div>
+            <div className={styles.eyebrow}>Command Center · {today}</div>
             <h1 className={styles.hello}>{greeting}, {name}<span className={styles.dot}>.</span></h1>
             <p className={styles.status}>
               {loadFailed
@@ -356,7 +365,7 @@ export default function DashboardPage() {
                 : <>{statusLine}{apps.length ? <span className={styles.statusDim}> · {apps.length} tracked total</span> : null}</>}
             </p>
           </div>
-          <Link href="/tracker?add=1" className={`${styles.primary} btn-shine`}>+ Track application</Link>
+          <Link href="/tracker?add=1" className={`${styles.primary}`}>+ Track application</Link>
         </header>
 
         {loadFailed && (
@@ -372,7 +381,7 @@ export default function DashboardPage() {
 
         {/* ── Row 1: search health | next best move ── */}
         <div className={styles.row}>
-          <section className={`${styles.card} ${styles.health} spot`}>
+          <section className={`${styles.card} ${styles.health}`}>
             <div className={styles.cardHead}>
               <span className={styles.eyebrow}>Job search health</span>
               <span className={`${styles.badge} ${styles[healthHead.tone]}`}>● {healthHead.badge}</span>
@@ -396,7 +405,7 @@ export default function DashboardPage() {
             {ratedCount > 0 && <p className={styles.caption}>Based on {ratedCount} tracked application{ratedCount !== 1 ? 's' : ''}{apps.length > ratedCount ? ` · ${apps.length - ratedCount} withdrawn not counted` : ''}</p>}
           </section>
 
-          <section className={`${styles.card} spot`}>
+          <section className={`${styles.card}`}>
             <div className={styles.cardHead}>
               <h2 className={styles.cardT}>Next best move</h2>
               {topMoves.length > 0 && <span className={styles.eyebrow}>{topMoves.length} action{topMoves.length !== 1 ? 's' : ''}</span>}
@@ -405,7 +414,7 @@ export default function DashboardPage() {
               <p className={styles.allClear}>Not loaded — use Retry above.</p>
             ) : topMoves.length ? topMoves.map((m, i) => (
               <button key={i} type="button" className={styles.move} onClick={m.go}>
-                <span className={styles.sym}>{m.icon}</span>
+                <span className={styles.sym}><Icon name={m.icon} size={18} /></span>
                 <span style={{ minWidth: 0, flex: 1 }}>
                   <b>{m.title}</b>
                   <small>{m.sub}</small>
@@ -417,7 +426,7 @@ export default function DashboardPage() {
                 <b>Start tracking applications</b>
                 <p>Your real response rate, ghost rate and company benchmarks fill in from here.</p>
                 <div className={styles.emptyBtns}>
-                  <Link href="/jobs" className={`${styles.primary} btn-shine`}>Find jobs</Link>
+                  <Link href="/jobs" className={`${styles.primary}`}>Find jobs</Link>
                   <Link href="/tracker?add=1" className={styles.ghostBtn}>Add one I applied to</Link>
                 </div>
               </div>
@@ -467,7 +476,7 @@ export default function DashboardPage() {
             {signalCount === 0 && <p className={styles.allClear}>All clear. Nothing needs you right now.</p>}
             {surveyInsight && (
               <div className={styles.signal}>
-                <span style={{ color: 'var(--green)' }}>✓</span>
+                <span style={{ color: 'var(--good-text)' }}><Icon name="circle-check" size={16} /></span>
                 <span><b>{surveyInsight.label}</b><small>{surveyInsight.desc}</small></span>
               </div>
             )}
@@ -475,8 +484,8 @@ export default function DashboardPage() {
               const base = typeof sg.ghost_rate === 'number' ? `${Math.round(sg.ghost_rate * 100)}% ghost rate overall` : null
               return (
                 <button key={`surge-${sg.name}`} type="button" className={styles.signal} onClick={() => router.push(`/company/${companySlug(sg.name)}`)}>
-                  <span>👻</span>
-                  <span><b style={{ color: '#fca5a5' }}>{sg.name}: {sg.ghosted_7d} ghost report{sg.ghosted_7d === 1 ? '' : 's'} this week</b><small>{base ? `Still ${base}. ` : ''}Check before you follow up.</small></span>
+                  <span style={{ color: 'var(--bad-text)' }}><Icon name="ghost" size={16} /></span>
+                  <span><b style={{ color: 'var(--bad-text)' }}>{sg.name}: {sg.ghosted_7d} ghost report{sg.ghosted_7d === 1 ? '' : 's'} this week</b><small>{base ? `Still ${base}. ` : ''}Check before you follow up.</small></span>
                 </button>
               )
             })}
@@ -484,7 +493,7 @@ export default function DashboardPage() {
               const days = daysSince(a.appliedAt)
               return (
                 <button key={`stale-${a.id}`} type="button" className={styles.signal} onClick={() => router.push(`/tracker#app_${pathSegment(a.id)}`)}>
-                  <span style={{ color: 'var(--amber)' }}>⚠</span>
+                  <span style={{ color: 'var(--caution-text)' }}><Icon name="triangle-alert" size={16} /></span>
                   <span><b>{a.company} has been quiet for {days} days</b><small>{staleSub(a)} Follow up or update the outcome.</small></span>
                 </button>
               )
@@ -520,30 +529,30 @@ export default function DashboardPage() {
           <h2 className={styles.secT}>Your toolkit</h2>
         </div>
         <div className={styles.tools}>
-          <Link href="/resume" className={`${styles.tool} spot`}>
-            <span className={styles.sym}>🧠</span>
-            <b>Résumé AI</b>
+          <Link href="/resume" className={`${styles.tool}`}>
+            <span className={styles.sym}><Icon name="file-text" size={18} /></span>
+            <b>Résumé</b>
             <small>{hasResume ? `${profile?.resume_file_name || 'Résumé on file'} · Scan fit →` : 'Add your résumé →'}</small>
           </Link>
-          <Link href="/tracker" className={`${styles.tool} spot`}>
-            <span className={styles.sym}>📋</span>
+          <Link href="/tracker" className={`${styles.tool}`}>
+            <span className={styles.sym}><Icon name="list-checks" size={18} /></span>
             <b>Applications</b>
             <small>{dueChecks.length ? `${dueChecks.length} check-in${dueChecks.length > 1 ? 's' : ''} waiting →` : 'Manage your pipeline →'}</small>
           </Link>
           {inbox?.ready && (
-            <Link href="/tracker#autopilot" className={`${styles.tool} spot`}>
-              <span className={styles.sym}>✉️</span>
+            <Link href="/tracker#autopilot" className={`${styles.tool}`}>
+              <span className={styles.sym}><Icon name="mail" size={18} /></span>
               <b>Inbox Autopilot</b>
               <small>{inbox.enabled ? `On · ${inbox.received_count || 0} email${inbox.received_count === 1 ? '' : 's'} read →` : 'Forward job emails — tracking fills itself →'}</small>
             </Link>
           )}
-          <Link href="/companies" className={`${styles.tool} spot`}>
-            <span className={styles.sym}>🏢</span>
+          <Link href="/companies" className={`${styles.tool}`}>
+            <span className={styles.sym}><Icon name="briefcase-business" size={18} /></span>
             <b>Company intel</b>
             <small>See who actually responds →</small>
           </Link>
-          <Link href="/report" className={`${styles.tool} spot`}>
-            <span className={styles.sym}>📣</span>
+          <Link href="/report" className={`${styles.tool}`}>
+            <span className={styles.sym}><Icon name="megaphone" size={18} /></span>
             <b>Report an outcome</b>
             <small>Warn the next applicant →</small>
           </Link>
@@ -567,7 +576,7 @@ export default function DashboardPage() {
               <div className={styles.quietRow}>
                 <span className={styles.eyebrow}>Badges</span>
                 <div className={styles.chips}>
-                  {badges.map(b => <span key={b.id} className={styles.badgeChip} title={b.desc}>{b.icon} {b.label}</span>)}
+                  {badges.map(b => <span key={b.id} className={styles.badgeChip} title={b.desc}><Icon name={BADGE_ICON[b.id] || 'award'} size={14} /> {b.label}</span>)}
                 </div>
               </div>
             )}

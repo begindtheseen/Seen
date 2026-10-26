@@ -1,0 +1,18 @@
+/* The job drawer on /jobs: a solid right-side sheet (pieces of its content share app/jobs/[id]/detail.module.css). */
+.scrim { position: fixed; inset: 0; z-index: 9800; background: rgba(2, 4, 10, 0); transition: background var(--dur-enter) var(--ease-out); }
+.scrimOn { background: rgba(2, 4, 10, .72); }
+.panel { position: fixed; top: 0; right: 0; bottom: 0; z-index: 9900; width: min(560px, 100vw); display: flex; flex-direction: column; overflow: hidden; background: var(--surface-overlay); border-left: 1px solid var(--border-2); box-shadow: var(--sh-overlay); transform: translateX(100%); transition: transform var(--dur-enter) var(--ease-out); }
+.panelOn { transform: none; }
+.bar { flex-shrink: 0; display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); border-bottom: 1px solid var(--border-1); }
+.barText { flex: 1; min-width: 0; }
+.barTitle { font-size: var(--fs-ui); font-weight: 600; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.barCo { font-size: var(--fs-meta); color: var(--text-3); }
+.barIcon { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: var(--r-control); border: 0; background: transparent; color: var(--text-3); cursor: pointer; text-decoration: none; }
+.barIcon:hover { color: var(--text-1); background: rgba(255, 255, 255, .06); }
+.scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: var(--sp-4); }
+.postingLink { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; margin-top: var(--sp-1); font-size: var(--fs-sm); font-weight: 600; color: var(--accent); text-decoration: none; }
+.h3 { margin: 0 0 var(--sp-2); font-size: var(--fs-lead); font-weight: 600; color: var(--text-1); }
+.foot { flex-shrink: 0; display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4) calc(var(--sp-3) + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--border-2); background: var(--surface-overlay); }
+.check { align-self: flex-start; }
+@media (prefers-reduced-motion: reduce) { .scrim, .panel { transition: none; } }
+@media (max-width: 768px) { .postingLink { min-height: 44px; } }

@@ -47,12 +47,12 @@ export default function DeleteAccountDialog({ email, subscription, onConfirm, on
       onConfirm={go}
       onCancel={onClose}
     >
-      <p style={{ fontSize: '.78rem', color: 'var(--sub)', lineHeight: 1.6, margin: '0 0 .5rem' }}>This removes, with no undo:</p>
+      <p style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6, margin: '0 0 .5rem' }}>This removes, with no undo:</p>
       <ul style={{ margin: '0 0 .8rem', paddingLeft: '1.1rem' }}>
-        {DELETE_CONSEQUENCES.map(c => <li key={c} style={{ fontSize: '.76rem', color: 'var(--sub)', lineHeight: 1.55, marginBottom: '.25rem' }}>{c}</li>)}
+        {DELETE_CONSEQUENCES.map(c => <li key={c} style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.55, marginBottom: '.25rem' }}>{c}</li>)}
       </ul>
       {cancelsSubscription && (
-        <div role="note" style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.3)', borderRadius: 10, padding: '.7rem .85rem', marginBottom: '.9rem', fontSize: '.76rem', color: 'var(--sub)', lineHeight: 1.55 }}>
+        <div role="note" style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.3)', borderRadius: 10, padding: '.7rem .85rem', marginBottom: '.9rem', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.55 }}>
           {SUBSCRIPTION_CANCEL_NOTICE}
         </div>
       )}

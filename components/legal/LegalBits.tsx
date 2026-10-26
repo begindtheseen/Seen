@@ -14,7 +14,7 @@ export const LEGAL_STATE = 'California'
 /** California date the current versions took effect. */
 export const LEGAL_EFFECTIVE = 'October 25, 2026'
 
-const meta = { color: 'var(--sub)', fontSize: '.82rem', margin: '0 0 2rem', lineHeight: 1.7 } as const
+const meta = { color: 'var(--sub)', fontSize: 'var(--fs-sm)', margin: '0 0 2rem', lineHeight: 1.7 } as const
 
 /** The line under each document's title: effective date + how to reach us. */
 export function LegalMeta({ label = 'Questions?' }: { label?: string }) {
@@ -29,7 +29,7 @@ export function LegalMeta({ label = 'Questions?' }: { label?: string }) {
 /** The short footer every document ends with. */
 export function LegalFooter() {
   return (
-    <p style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', marginTop: '2rem', lineHeight: 1.7 }}>
+    <p style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '2rem', lineHeight: 1.7 }}>
       Effective {LEGAL_EFFECTIVE}. Questions about this document:{' '}
       <a href={`mailto:${LEGAL_CONTACT}`} style={{ color: 'var(--sub)' }}>{LEGAL_CONTACT}</a>.
     </p>

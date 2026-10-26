@@ -6,7 +6,7 @@ import { getLeaderboard, titleCase, slugify, grade, riskColor, riskLabel } from 
 // Reddit landing: "Real hiring outcomes from Reddit." Surfaces the worst ghosters and fastest
 // responders from real leaderboard data, in Reddit-native voice, with tight internal links.
 //
-// HONESTY: every list and every "N reports" here uses FIRST-PARTY applicant reports
+// HONESTY: every list and every "N reports" here uses FIRST-PARTY applicant accounts
 // (score.first_party_report_count) — never the fused report_count, which adds the web-research
 // pipeline's *claimed* mention count (live: McDonald's "12,775 reports" with zero report rows).
 // Companies scored only from web research never appear in these "reported" lists.
@@ -19,7 +19,7 @@ export const metadata: Metadata = pageMetadata({
   keywords: ['reddit hiring', 'does anyone know if they ghost', 'reddit job application ghosted', 'companies that ghost applicants reddit', 'reddit recruiting', 'r/recruitinghell'],
   path: '/reddit',
   ogTitle: 'Real Hiring Outcomes from Reddit',
-  ogDescription: 'Ghost rates and response times from real applicant reports — the data Reddit threads are missing.',
+  ogDescription: 'Ghost rates and response times from real applicant accounts — the data Reddit threads are missing.',
 })
 
 const wrap = { maxWidth: 760, margin: '0 auto', padding: '3.5rem 1.25rem 5rem', width: '100%', boxSizing: 'border-box' as const }
@@ -28,14 +28,14 @@ function CompanyRow({ name, score, ghostRate, responseRate, sub }: { name: strin
   const accent = riskColor(score >= 70 ? 'safe' : score >= 40 ? 'warn' : 'danger')
   return (
     <Link href={`/company/${slugify(name)}`} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '.85rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '.85rem 1rem', marginBottom: '.55rem' }}>
-      <div style={{ fontFamily: 'var(--display)', fontSize: '1.5rem', fontWeight: 800, color: accent, width: 30, textAlign: 'center', flexShrink: 0 }}>{grade(score)}</div>
+      <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-xl)', fontWeight: 600, color: accent, width: 30, textAlign: 'center', flexShrink: 0 }}>{grade(score)}</div>
       <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ fontFamily: 'var(--display)', fontSize: '.92rem', fontWeight: 700, color: 'var(--white)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{titleCase(name)}</div>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', marginTop: '.15rem' }}>{sub}</div>
+        <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-body)', fontWeight: 600, color: 'var(--white)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{titleCase(name)}</div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.15rem' }}>{sub}</div>
       </div>
       <div style={{ textAlign: 'right', flexShrink: 0 }}>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--red)' }}>{Math.round(ghostRate * 100)}% ghost</div>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--green)' }}>{Math.round(responseRate * 100)}% reply</div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--red)' }}>{Math.round(ghostRate * 100)}% ghost</div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)' }}>{Math.round(responseRate * 100)}% reply</div>
       </div>
     </Link>
   )
@@ -65,14 +65,14 @@ export default async function RedditPage() {
   return (
     <div className="page-full">
       <div style={wrap}>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.2em', color: 'var(--blue)', marginBottom: '.7rem', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.2em', color: 'var(--blue)', marginBottom: '.7rem', display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ width: 20, height: 1, background: 'var(--blue)', display: 'inline-block' }} />
           From the threads
         </div>
         <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.7rem,5.5vw,2.5rem)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', lineHeight: 1.08, margin: '0 0 .9rem' }}>
           Real hiring outcomes from Reddit
         </h1>
-        <p style={{ color: 'var(--sub)', fontSize: '.95rem', lineHeight: 1.75, fontWeight: 300, margin: '0 0 1.4rem' }}>
+        <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-body)', lineHeight: 1.75, fontWeight: 400, margin: '0 0 1.4rem' }}>
           You&apos;ve seen the threads: &ldquo;applied 3 weeks ago, total silence — does anyone know if they ghost?&rdquo; The problem is the answer is buried across a thousand comments. Seen turns those scattered reports into one number per company: a ghost rate, a response rate, and a Seen Grade. No login, no scraping your inbox — just what applicants actually reported.
         </p>
         <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', margin: '0 0 2.6rem' }}>
@@ -82,8 +82,8 @@ export default async function RedditPage() {
 
         {ghosters.length > 0 && (
           <section style={{ marginBottom: '2.6rem' }}>
-            <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>The ghosters (apply with your eyes open)</h2>
-            <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 300 }}>Highest reported ghost rates among companies with real report volume. Not a verdict — a heads-up.</p>
+            <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>The ghosters (apply with your eyes open)</h2>
+            <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 400 }}>Highest reported ghost rates among companies with real report volume. Not a verdict — a heads-up.</p>
             {ghosters.map(c => (
               <CompanyRow key={c.name} name={c.name} score={c.score.overall_score!} ghostRate={c.score.ghost_rate!} responseRate={c.score.response_rate!} sub={`${reportsOf(c).toLocaleString()} reports · ${riskLabel(c.score.risk_level)}`} />
             ))}
@@ -92,7 +92,7 @@ export default async function RedditPage() {
 
         {ghosters.length === 0 && responders.length === 0 && (
           <section style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.2rem 1.4rem', marginBottom: '2.6rem' }}>
-            <p style={{ color: 'var(--sub)', fontSize: '.85rem', lineHeight: 1.7, margin: 0, fontWeight: 300 }}>
+            <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-ui)', lineHeight: 1.7, margin: 0, fontWeight: 400 }}>
               No company has enough applicant-reported outcomes yet to rank here — we only list ghosters and responders backed by real report volume, never web estimates. <Link href="/report" style={{ color: 'var(--blue)' }}>Your report</Link> is how these lists fill in.
             </p>
           </section>
@@ -100,8 +100,8 @@ export default async function RedditPage() {
 
         {responders.length > 0 && (
           <section style={{ marginBottom: '2.6rem' }}>
-            <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>The fast responders (where applying pays off)</h2>
-            <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 300 }}>Shortest reported wait times among companies that actually reply. These are worth your time.</p>
+            <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>The fast responders (where applying pays off)</h2>
+            <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 400 }}>Shortest reported wait times among companies that actually reply. These are worth your time.</p>
             {responders.map(c => (
               <CompanyRow key={c.name} name={c.name} score={c.score.overall_score!} ghostRate={c.score.ghost_rate!} responseRate={c.score.response_rate!} sub={`avg ${Math.round(c.score.avg_wait_days ?? 0)}d wait · ${reportsOf(c).toLocaleString()} reports`} />
             ))}
@@ -109,8 +109,8 @@ export default async function RedditPage() {
         )}
 
         <section style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.4rem 1.4rem' }}>
-          <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .6rem' }}>Next time you&apos;d post a thread, do this instead</h2>
-          <ul style={{ color: 'var(--sub)', fontSize: '.85rem', lineHeight: 1.8, fontWeight: 300, margin: 0, paddingLeft: '1.1rem' }}>
+          <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', margin: '0 0 .6rem' }}>Next time you&apos;d post a thread, do this instead</h2>
+          <ul style={{ color: 'var(--sub)', fontSize: 'var(--fs-ui)', lineHeight: 1.8, fontWeight: 400, margin: 0, paddingLeft: '1.1rem' }}>
             <li><Link href="/companies" style={{ color: 'var(--blue)' }}>Search the company</Link> before you apply — see the ghost rate up front.</li>
             <li><Link href="/compare" style={{ color: 'var(--blue)' }}>Compare two companies</Link> head to head when you&apos;re deciding where to spend the effort.</li>
             <li><Link href="/tracker" style={{ color: 'var(--blue)' }}>Track your applications</Link> so you know exactly when silence becomes a ghost.</li>
@@ -118,8 +118,8 @@ export default async function RedditPage() {
           </ul>
         </section>
 
-        <p style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', marginTop: '2rem', lineHeight: 1.7 }}>
-          Seen Grades aggregate real applicant reports into a 0–100 signal. They&apos;re community signals, not verified facts, and update hourly as new reports come in.
+        <p style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '2rem', lineHeight: 1.7 }}>
+          Seen Grades aggregate real applicant accounts into a 0–100 signal. They&apos;re community signals, not verified facts, and update hourly as new reports come in.
         </p>
       </div>
     </div>

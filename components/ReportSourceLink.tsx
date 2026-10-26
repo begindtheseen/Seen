@@ -11,7 +11,7 @@ export default function ReportSourceLink({ url, host, posted, style, className }
       rel="nofollow ugc noopener noreferrer"
       title={`Open the original public post on ${host}`}
       className={className}
-      style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--blue)', textDecoration: 'none', ...style }}
+      style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none', ...style }}
     >
       Source: {host}{posted ? ` · posted ${posted}` : ''} ↗
     </a>

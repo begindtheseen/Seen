@@ -208,7 +208,7 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
     borderRadius: 20,
     border: '1px solid var(--line2)',
     padding: '0 0 env(safe-area-inset-bottom, 16px)',
-    animation: 'fadeUp .25s ease both',
+    animation: 'fadeUp .25s ease backwards',
     position: 'relative',
   }
 
@@ -247,7 +247,7 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
 
   const headingStyle: React.CSSProperties = {
     fontFamily: 'var(--display)',
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: 800,
     color: 'var(--white)',
     lineHeight: 1.15,
@@ -469,11 +469,11 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
         {/* ── LISTING GONE (couldn't apply — flag for admin review) ── */}
         {step === 'listing_gone' && (
           <div style={innerStyle}>
-            <div style={{ ...confirmedCheckStyle, fontSize: 36 }}>
+            <div style={{ ...confirmedCheckStyle, fontSize: 40 }}>
               {reportedGone === 'signin' ? 'Thanks for flagging.' : 'Flagged for review.'}
             </div>
             <div style={{
-              fontFamily: 'var(--mono)',
+              fontFamily: 'var(--body)',
               fontSize: 14,
               color: 'var(--sub)',
               lineHeight: 1.6,
@@ -523,9 +523,9 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
         {/* ── NOT YET CONFIRMED ── */}
         {step === 'not_yet_confirmed' && (
           <div style={innerStyle}>
-            <div style={{ ...confirmedCheckStyle, fontSize: 36 }}>Got it.</div>
+            <div style={{ ...confirmedCheckStyle, fontSize: 40 }}>Got it.</div>
             <div style={{
-              fontFamily: 'var(--mono)',
+              fontFamily: 'var(--body)',
               fontSize: 14,
               color: 'var(--sub)',
               lineHeight: 1.6,
@@ -589,7 +589,7 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
               <div style={{
                 background: 'rgba(16,185,129,.1)', border: '1px solid rgba(16,185,129,.25)',
                 borderRadius: 8, padding: '.5rem .85rem', marginBottom: '.75rem',
-                fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--green)',
+                fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)',
                 display: 'flex', alignItems: 'center', gap: '.4rem',
               }}>
                 +1 AI credit earned for tracking
@@ -597,13 +597,13 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
             )}
 
             {responsePct != null && (
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--text)', lineHeight: 1.6, marginBottom: 10 }} data-testid="checkpoint-reply-rate">
+              <div style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--text)', lineHeight: 1.6, marginBottom: 10 }} data-testid="checkpoint-reply-rate">
                 {companyName} usually replies to {responsePct}% of applicants.
               </div>
             )}
 
             {isLoggedIn ? (
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 14, color: 'var(--sub)', lineHeight: 1.6, marginBottom: 22 }} data-testid="checkpoint-signed-in">
+              <div style={{ fontFamily: 'var(--body)', fontSize: 14, color: 'var(--sub)', lineHeight: 1.6, marginBottom: 22 }} data-testid="checkpoint-signed-in">
                 {checkinPlan.length
                   ? <>We&apos;ll email you on {joinDays(checkinPlan)} to ask what happened, unless you update it first.</>
                   : <>Update it in your tracker when you hear back.</>}

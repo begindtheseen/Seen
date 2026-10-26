@@ -48,7 +48,7 @@ function DataQuality({ s }: { s: Score }) {
       s.employee_review_count ? `${s.employee_review_count} employee review${s.employee_review_count === 1 ? '' : 's'}` : '',
       s.mention_count ? `${s.mention_count} online mention${s.mention_count === 1 ? '' : 's'}` : '',
     ].filter(Boolean)
-    return <span className={styles.dq} style={{ color: 'var(--green)' }}>🟢 {[`${fp} applicant report${fp === 1 ? '' : 's'}`, ...extra].join(' · ')}</span>
+    return <span className={styles.dq} style={{ color: 'var(--green)' }}>🟢 {[`${fp} applicant account${fp === 1 ? '' : 's'}`, ...extra].join(' · ')}</span>
   }
   return <span className={styles.dq} style={{ color: 'var(--amber)' }}>🌐 Web-research estimate — no first-party reports yet</span>
 }
@@ -137,7 +137,7 @@ export default function CompanyScoreModal({ companyName, onClose }: { companyNam
           </div>
         ) : notFound || !s ? (
           <div style={{ padding: '0.5rem 0 1.25rem', textAlign: 'center' }}>
-            <p style={{ color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: '.72rem', lineHeight: 1.7, marginBottom: '1.25rem' }}>
+            <p style={{ color: 'var(--sub)', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', lineHeight: 1.7, marginBottom: '1.25rem' }}>
               No score yet for “{shownName}”. Open the full report to research it.
             </p>
             <a href={`/company/${slugify(companyName)}`} className={styles.full}>Open full report →</a>
@@ -148,7 +148,7 @@ export default function CompanyScoreModal({ companyName, onClose }: { companyNam
               <div className={styles.gradeMeta}>
                 <div className={styles.gradeVerdict}>{notEnoughReviewsLabel(s)}</div>
                 <span className={styles.dq} style={{ color: 'var(--muted)' }}>
-                  We grade a company only once {MIN_REPORTS_FOR_GRADE} real applicant reports are in — open the full report to read what we have.
+                  We grade a company only once {MIN_REPORTS_FOR_GRADE} real applicant accounts are in — open the full report to read what we have.
                 </span>
               </div>
             </div>

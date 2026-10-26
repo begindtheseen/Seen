@@ -25,8 +25,34 @@ import AppliedWhen from '@/components/track/AppliedWhen'
 import CheckinEmailAsk from '@/components/track/CheckinEmailAsk'
 import InterviewPrep from '@/components/tracker/InterviewPrep'
 import s from '@/components/track/track.module.css'
+import Icon from '@/components/ui/Icon'
 
-export default function GuestTracker() {
+function GuestHeader() {
+  return (
+    <PageHeader
+      eyebrow="Application tracker"
+      title="Track your applications"
+      sub="Saved on this device. Add your email and Seen checks in with you on day 7, 14 and 30."
+      crumbLabel="Tracker"
+    />
+  )
+}
+
+/** The prerendered first frame of the guest tracker: the same column and header GuestTracker draws,
+ *  painted from the static HTML before the session (and the device's list) is read. /tracker shows it
+ *  while auth resolves so a guest's first paint is the page, not a spinner (audit: LCP 3.4–3.7 s). */
+export function GuestTrackerShell() {
+  return (
+    <div className="page-full">
+      <div className={s.guestWrap}>
+        <GuestHeader />
+      </div>
+    </div>
+  )
+}
+
+/** `still`: no page entrance — this replaces GuestTrackerShell, which already played it. */
+export default function GuestTracker({ still = false }: { still?: boolean } = {}) {
   const params = useSearchParams()
   const [apps, setApps] = useState<Application[]>([])
   const [loaded, setLoaded] = useState(false)
@@ -95,14 +121,9 @@ export default function GuestTracker() {
   }
 
   return (
-    <div className="page-full">
-      <div style={{ maxWidth: 760, margin: '0 auto', padding: '2rem 16px 4rem', width: '100%', boxSizing: 'border-box' }} data-testid="guest-tracker">
-        <PageHeader
-          eyebrow="Application tracker"
-          title="Track your applications"
-          sub="Saved on this device. Add your email and Seen checks in with you on day 7, 14 and 30."
-          crumbLabel="Tracker"
-        />
+    <div className={still ? 'page-full page-still' : 'page-full'}>
+      <div className={s.guestWrap} data-testid="guest-tracker">
+        <GuestHeader />
 
         {loaded && (showForm || apps.length === 0) && (
           <section className={s.card} aria-label="Track an application">
@@ -141,13 +162,13 @@ export default function GuestTracker() {
               {apps.map(a => (
                 <li key={a.id} className={`${s.card} ${s.quiet}`} style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '.75rem', flexWrap: 'wrap' }}>
                   <div style={{ flex: '1 1 14rem', minWidth: 0 }}>
-                    <p className={s.title} style={{ fontSize: '1rem', margin: 0 }}>{a.company}</p>
+                    <p className={s.title} style={{ fontSize: 'var(--fs-lead)', margin: 0 }}>{a.company}</p>
                     <p className={s.small} style={{ margin: '.15rem 0 0', color: 'var(--sub)' }}>
                       {a.role} · Day {daysSince(a.appliedAt)} · applied {shortDay(a.appliedAt)}{a.status !== 'active' ? ` · ${a.status}` : ''}
                     </p>
                   </div>
                   {a.status === 'active' && a.stage === 'Applied' && (
-                    <button type="button" className={s.ghost} onClick={() => void calledIn(a.id)} data-testid="gt-called-in">📅 They called me in</button>
+                    <button type="button" className={s.ghost} onClick={() => void calledIn(a.id)} data-testid="gt-called-in"><Icon name="calendar" size={15} /> They called me in</button>
                   )}
                   <button type="button" className={s.ghost} onClick={() => void remove(a.id)} aria-label={`Remove ${a.company} ${a.role}`}>Remove</button>
                   {a.status === 'active' && ['Phone Screen', 'Interview', 'Final Round'].includes(a.stage) && (

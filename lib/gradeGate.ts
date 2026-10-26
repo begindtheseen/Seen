@@ -37,19 +37,20 @@ function progress(s: MaybeScore): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1)
 }
 
-/** "Not enough reviews to grade yet (2 of 5)" — the one wording every surface uses. */
+/** "Not graded yet (2 of 5 applicant accounts)" — the one wording every surface uses. (The function keeps
+ *  its old name; a grade is built from applicant accounts, never "reviews" — lib/glossary.js.) */
 export function notEnoughReviewsLabel(s: MaybeScore): string {
-  return `Not enough reviews to grade yet (${progress(s)} of ${MIN_REPORTS_FOR_GRADE})`
+  return `Not graded yet (${progress(s)} of ${MIN_REPORTS_FOR_GRADE} applicant accounts)`
 }
 
-/** Short form for tight spaces (cards, chips): "2 of 5 reviews". */
+/** Short form for tight spaces (cards, chips): "2 of 5 accounts". */
 export function notEnoughReviewsShort(s: MaybeScore): string {
-  return `${progress(s)} of ${MIN_REPORTS_FOR_GRADE} reviews`
+  return `${progress(s)} of ${MIN_REPORTS_FOR_GRADE} accounts`
 }
 
-/** "12 reports + 6 online mentions" — what a score stands on (mentions count half each). */
+/** "12 applicant accounts + 6 online mentions" — what a score stands on (mentions count half each). */
 export function gradeBasisLabel(s: MaybeScore): string {
   const r = realReportCount(s), m = mentionCount(s ?? null)
-  const reports = `${r} report${r === 1 ? '' : 's'}`
+  const reports = `${r} applicant account${r === 1 ? '' : 's'}`
   return m > 0 ? `${reports} + ${m} online mention${m === 1 ? '' : 's'} (count half)` : reports
 }

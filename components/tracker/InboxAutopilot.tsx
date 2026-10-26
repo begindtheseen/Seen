@@ -157,7 +157,7 @@ export default function InboxAutopilot({ apps, token, onAppsChanged, status }: {
 
       <div className={s.addrRow}>
         <code className={s.addr}>{st.address}</code>
-        <button className="btn btn-ghost" style={{ fontSize: '.72rem' }} onClick={() => copy(st.address || '', 'address')}>{copied === 'address' ? 'Copied ✓' : 'Copy address'}</button>
+        <button className="btn btn-ghost" style={{ fontSize: 'var(--fs-meta)' }} onClick={() => copy(st.address || '', 'address')}>{copied === 'address' ? 'Copied ✓' : 'Copy address'}</button>
       </div>
 
       {fc && (fc.code || fc.url) && (
@@ -185,8 +185,8 @@ export default function InboxAutopilot({ apps, token, onAppsChanged, status }: {
             <div key={ev.id} className={s.ask}>
               <span>Seen read {ev.kind === 'interview' ? 'an interview invite' : ev.kind === 'offer' ? 'an offer' : 'a rejection'} from <b>{ev.company}</b>. Add it to {ev.company}’s grade? <span className={s.muted}>Anonymous — it warns the next applicant.</span></span>
               <span className={s.btns}>
-                <button className="btn btn-green" style={{ fontSize: '.7rem' }} disabled={busy} onClick={() => share(ev, true)}>Yes</button>
-                <button className="btn btn-ghost" style={{ fontSize: '.7rem' }} disabled={busy} onClick={() => share(ev, false)}>No</button>
+                <button className="btn btn-green" style={{ fontSize: 'var(--fs-meta)' }} disabled={busy} onClick={() => share(ev, true)}>Yes</button>
+                <button className="btn btn-ghost" style={{ fontSize: 'var(--fs-meta)' }} disabled={busy} onClick={() => share(ev, false)}>No</button>
               </span>
             </div>
           ))}
@@ -203,7 +203,7 @@ export default function InboxAutopilot({ apps, token, onAppsChanged, status }: {
                   <option value="">Choose…</option>
                   {activeApps.map(a => <option key={a.id} value={a.id}>{a.company}{a.role ? ` — ${a.role}` : ''}</option>)}
                 </select>
-                <button className="btn btn-ghost" style={{ fontSize: '.7rem' }} disabled={busy || !pick[ev.id]} onClick={() => assign(ev)}>Put it there</button>
+                <button className="btn btn-ghost" style={{ fontSize: 'var(--fs-meta)' }} disabled={busy || !pick[ev.id]} onClick={() => assign(ev)}>Put it there</button>
               </span>
             </div>
           ))}

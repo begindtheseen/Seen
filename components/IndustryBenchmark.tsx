@@ -1,7 +1,7 @@
 'use client'
 
 // IndustryBenchmark — "you vs your industry on Seen". The never-empty reputation layer: even a
-// company with zero first-party applicant reports has a web-researched score and an industry, so we
+// company with zero first-party applicant accounts has a web-researched score and an industry, so we
 // can always show how it compares to its sector. Used on the employer hub + analytics (second-person,
 // with the cost-of-gap callout) and the consumer company page (third-person ranking).
 

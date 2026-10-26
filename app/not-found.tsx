@@ -1,6 +1,10 @@
 import Link from 'next/link'
 import styles from './not-found.module.css'
 import NotFoundMarker from '@/components/NotFoundMarker'
+import type { Metadata } from 'next'
+
+// Its own title (it used to carry the homepage's) and kept out of the index.
+export const metadata: Metadata = { title: 'Page not found', robots: { index: false, follow: true } }
 
 // Branded 404 on the dark shell (the default was Next's white page — the only unbranded screen
 // on the site). Two ways out that match what people come here for.
@@ -13,7 +17,7 @@ export default function NotFound() {
         <h1 className={styles.title}>This page got ghosted.</h1>
         <p className={styles.sub}>The link is broken or the page moved. Everything that matters is one tap away.</p>
         <div className={styles.actions}>
-          <Link href="/companies" className={styles.primary}>Check a company →</Link>
+          <Link href="/companies" className={styles.primary}>Check a company</Link>
           <Link href="/dashboard" className={styles.ghost}>Dashboard</Link>
           <Link href="/" className={styles.ghost}>Home</Link>
         </div>

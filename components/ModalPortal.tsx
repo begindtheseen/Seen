@@ -32,7 +32,10 @@ function lockScroll() {
   // behind a modal needs to move, and every animating frame under a full-screen overlay made Safari
   // recomposite the stacked glass blurs — the background flickered constantly.
   body.classList.add('modal-open')
-  if (scrollbar > 0) body.style.paddingRight = `${scrollbar}px`
+  // globals.css reserves the gutter (`html{scrollbar-gutter:stable}`), so the layout does not move
+  // when the scrollbar goes; padding on top of the reserved gutter would shift the page left.
+  const gutterKept = (getComputedStyle(html) as CSSStyleDeclaration & { scrollbarGutter?: string }).scrollbarGutter?.includes('stable')
+  if (scrollbar > 0 && !gutterKept) body.style.paddingRight = `${scrollbar}px`
 }
 
 function unlockScroll() {

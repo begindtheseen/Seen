@@ -60,8 +60,11 @@ export type LeaderboardRow = {
     avg_wait_days: number | null
     /** FUSED total (first-party + web claim) — ordering/scoring only, NEVER label it "reports". */
     report_count: number
-    /** Real applicant-report rows behind the score — the only count that may render as "reports". */
+    /** Applicant-account rows behind the score: public posts + reports filed by Seen users. Shown as
+     *  "applicant accounts" (lib/glossary.js) — the field keeps its old name for API compatibility. */
     first_party_report_count: number
+    /** Of those, how many a Seen user filed (api/reports.js leaderboard; null/absent = unknown). */
+    seen_user_report_count?: number | null
     /** "What people are saying" accounts — each counts half a report toward the grade bar. */
     mention_count?: number
     /** Web-research claimed mention count — an estimate input, never applicant reports. */

@@ -156,16 +156,16 @@ export default function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply,
   if (stack.length === 0) {
     return (
       <div style={{ textAlign: 'center', padding: '1.5rem 1rem', background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.18)', borderRadius: 14 }}>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '.4rem' }}>Deck cleared</div>
-        <div style={{ fontFamily: 'var(--display)', fontSize: '1rem', fontWeight: 700, color: 'var(--white)', letterSpacing: '-.02em', marginBottom: '.3rem' }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '.4rem' }}>Deck cleared</div>
+        <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', letterSpacing: '-.02em', marginBottom: '.3rem' }}>
           You matched {savedCount} job{savedCount !== 1 ? 's' : ''}
         </div>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', marginBottom: '1rem' }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '1rem' }}>
           Right-swiped jobs are in your Saved list
         </div>
         <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-          <a href="/resume" style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', padding: '.35rem .8rem', background: 'rgba(99,102,241,.15)', border: '1px solid rgba(99,102,241,.35)', borderRadius: 7, color: 'var(--indigo)', textDecoration: 'none' }}>See all matches →</a>
-          <button onClick={() => setStack([...jobs])} style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', padding: '.35rem .8rem', background: 'none', border: '1px solid var(--line2)', borderRadius: 7, color: 'var(--dim)', cursor: 'pointer' }}>Replay deck</button>
+          <a href="/resume" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.35rem .8rem', background: 'rgba(99,102,241,.15)', border: '1px solid rgba(99,102,241,.35)', borderRadius: 7, color: 'var(--indigo)', textDecoration: 'none' }}>See all matches →</a>
+          <button onClick={() => setStack([...jobs])} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.35rem .8rem', background: 'none', border: '1px solid var(--line2)', borderRadius: 7, color: 'var(--dim)', cursor: 'pointer' }}>Replay deck</button>
         </div>
       </div>
     )
@@ -240,7 +240,7 @@ export default function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply,
         {/* APPLY badge (up swipe) */}
         <span style={{
           position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
-          fontFamily: 'var(--mono)', fontSize: '.75rem', fontWeight: 700,
+          fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500,
           color: 'var(--blue)', background: 'rgba(59,130,246,.15)',
           border: '1.5px solid rgba(59,130,246,.5)', borderRadius: 7,
           padding: '.3rem .7rem', pointerEvents: 'none',
@@ -254,28 +254,28 @@ export default function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply,
             background: `linear-gradient(135deg, ${scoreHsl(topJob.score, .25)}, rgba(255,255,255,.06))`,
             border: `1px solid ${scoreBorder(topJob.score)}`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.05rem',
+            fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-lead)',
             color: scoreHsl(topJob.score, 1), flexShrink: 0,
           }}>
             {(displayCompanyName(topJob.company) || '?')[0].toUpperCase()}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: 'var(--display)', fontSize: '.92rem', fontWeight: 700, color: 'var(--white)', letterSpacing: '-.02em', lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topJob.title}</div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', marginTop: '.12rem' }}>{displayCompanyName(topJob.company)}{topJob.location ? ` · ${topJob.location}` : ''}</div>
+            <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-body)', fontWeight: 600, color: 'var(--white)', letterSpacing: '-.02em', lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topJob.title}</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.12rem' }}>{displayCompanyName(topJob.company)}{topJob.location ? ` · ${topJob.location}` : ''}</div>
           </div>
           <ListingScoreRing score={topJob.score} size={40} />
         </div>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.3rem', marginBottom: '.55rem' }}>
-          {displayPay(topJob) && <span style={{ background: 'rgba(16,185,129,.12)', border: '1px solid rgba(16,185,129,.3)', borderRadius: 5, padding: '.17rem .5rem', fontSize: '.6rem', fontFamily: 'var(--mono)', color: 'var(--green)', fontWeight: 600 }}>{displayPay(topJob)}</span>}
-          {topJob.type && <span style={{ background: 'rgba(99,102,241,.1)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 5, padding: '.17rem .5rem', fontSize: '.6rem', fontFamily: 'var(--mono)', color: '#a5b4fc' }}>{topJob.type}</span>}
-          {topJob.level && <span style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 5, padding: '.17rem .5rem', fontSize: '.6rem', fontFamily: 'var(--mono)', color: 'var(--sub)' }}>{topJob.level}</span>}
+          {displayPay(topJob) && <span style={{ background: 'rgba(16,185,129,.12)', border: '1px solid rgba(16,185,129,.3)', borderRadius: 5, padding: '.17rem .5rem', fontSize: 'var(--fs-meta)', fontFamily: 'var(--mono)', color: 'var(--green)', fontWeight: 500 }}>{displayPay(topJob)}</span>}
+          {topJob.type && <span style={{ background: 'rgba(99,102,241,.1)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 5, padding: '.17rem .5rem', fontSize: 'var(--fs-meta)', fontFamily: 'var(--mono)', color: '#a5b4fc' }}>{topJob.type}</span>}
+          {topJob.level && <span style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 5, padding: '.17rem .5rem', fontSize: 'var(--fs-meta)', fontFamily: 'var(--mono)', color: 'var(--sub)' }}>{topJob.level}</span>}
         </div>
 
         {/* The first thing the posting says about the ROLE — not the employer's mission paragraph
             that 302 SpaceX rows share (lib/jobs/descriptionText.js roleSnippet). */}
         {topJob.description && (
-          <div style={{ fontFamily: 'var(--body)', fontSize: '.7rem', color: 'var(--muted)', lineHeight: 1.55, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+          <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.55, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
             {roleSnippet(topJob.description, topJob.company, topJob.title, 220)}
             {isDescriptionPreview(topJob) && <span style={{ color: 'var(--dim)' }}> (preview — full posting on the employer&apos;s site)</span>}
           </div>
@@ -288,7 +288,7 @@ export default function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply,
           const isHigh = sc.ghost_rate > 0.55
           return (
             <div style={{ marginTop: '.45rem', display: 'flex', alignItems: 'center', gap: '.3rem' }}>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: isHigh ? 'var(--red)' : 'var(--amber)', background: isHigh ? 'rgba(239,68,68,.1)' : 'rgba(245,158,11,.1)', border: `1px solid ${isHigh ? 'rgba(239,68,68,.25)' : 'rgba(245,158,11,.25)'}`, borderRadius: 5, padding: '.12rem .4rem' }}>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: isHigh ? 'var(--red)' : 'var(--amber)', background: isHigh ? 'rgba(239,68,68,.1)' : 'rgba(245,158,11,.1)', border: `1px solid ${isHigh ? 'rgba(239,68,68,.25)' : 'rgba(245,158,11,.25)'}`, borderRadius: 5, padding: '.12rem .4rem' }}>
                 {isHigh ? '👻' : '⚠'} {ghostPct}% of applicants never hear back
               </span>
             </div>
@@ -309,8 +309,8 @@ export default function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply,
         })()}
 
         <div style={{ position: 'absolute', bottom: '.9rem', left: '1.15rem', right: '1.15rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>{topJob.source || 'Job board'}</span>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>{stack.length} left{savedCount > 0 ? ` · ♡ ${savedCount} saved` : ''}</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>{topJob.source || 'Job board'}</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>{stack.length} left{savedCount > 0 ? ` · ♡ ${savedCount} saved` : ''}</span>
         </div>
       </div>
     </div>
@@ -320,20 +320,20 @@ export default function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply,
       <button
         onClick={() => advance('left')}
         title="Skip"
-        style={{ width: 50, height: 50, borderRadius: '50%', border: '1px solid var(--line2)', background: 'var(--card)', color: 'var(--dim)', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--mono)' }}
+        style={{ width: 50, height: 50, borderRadius: '50%', border: '1px solid var(--line2)', background: 'var(--card)', color: 'var(--dim)', fontSize: 'var(--fs-lead)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--mono)' }}
       >✕</button>
       <button
         onClick={() => advance('up')}
         title="Apply now"
-        style={{ width: 62, height: 62, borderRadius: '50%', border: '1px solid rgba(59,130,246,.45)', background: 'rgba(59,130,246,.12)', color: 'var(--blue)', fontSize: '1.35rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}
+        style={{ width: 62, height: 62, borderRadius: '50%', border: '1px solid rgba(59,130,246,.45)', background: 'rgba(59,130,246,.12)', color: 'var(--blue)', fontSize: 'var(--fs-h3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}
       >↑</button>
       <button
         onClick={() => advance('right')}
         title="Save"
-        style={{ width: 50, height: 50, borderRadius: '50%', border: '1px solid rgba(16,185,129,.45)', background: 'rgba(16,185,129,.12)', color: 'var(--green)', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        style={{ width: 50, height: 50, borderRadius: '50%', border: '1px solid rgba(16,185,129,.45)', background: 'rgba(16,185,129,.12)', color: 'var(--green)', fontSize: 'var(--fs-lead)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       >♡</button>
     </div>
-    <div style={{ textAlign: 'center', marginTop: '.4rem', fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)', letterSpacing: '.04em' }}>
+    <div style={{ textAlign: 'center', marginTop: '.4rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', letterSpacing: '.04em' }}>
       drag or tap the buttons to decide
     </div>
   </div>

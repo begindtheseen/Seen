@@ -359,7 +359,7 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
   }
 
   const questionTextStyle: React.CSSProperties = {
-    fontSize: 18,
+    fontSize: 17,
     fontFamily: 'var(--display)',
     fontWeight: 700,
     color: 'var(--white)',
@@ -415,7 +415,7 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
           border: 1px solid var(--line);
           border-radius: 9px;
           font-family: var(--body);
-          font-size: 14px;
+          font-size: var(--fs-ui);
           color: var(--white);
           cursor: pointer;
           margin-bottom: 8px;
@@ -447,11 +447,11 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
           {phase === 'credit-pop' && (
             <div style={creditPopStyle}>
               <div style={creditPopInnerStyle}>
-                <div style={{ fontSize: 36, marginBottom: 4 }}>✦</div>
+                <div style={{ fontSize: 40, marginBottom: 4 }}>✦</div>
                 <div style={{
-                  fontSize: 26,
-                  fontFamily: 'var(--display)',
-                  fontWeight: 700,
+                  fontSize: 28,
+                  fontFamily: 'var(--body)',
+                  fontWeight: 600,
                   color: '#a5b4fc',
                   lineHeight: 1,
                 }}>
@@ -491,8 +491,8 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
                 <div>
                   <div style={{
                     fontSize: 20,
-                    fontFamily: 'var(--display)',
-                    fontWeight: 700,
+                    fontFamily: 'var(--body)',
+                    fontWeight: 600,
                     color: 'var(--white)',
                     lineHeight: 1.2,
                   }}>
@@ -532,16 +532,16 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
                 ].map(({ value, label }) => (
                   <div key={label}>
                     <div style={{
-                      fontSize: 22,
-                      fontFamily: 'var(--display)',
-                      fontWeight: 700,
+                      fontSize: 24,
+                      fontFamily: 'var(--body)',
+                      fontWeight: 600,
                       color: 'var(--indigo)',
                       lineHeight: 1,
                     }}>
                       {value}
                     </div>
                     <div style={{
-                      fontSize: 11,
+                      fontSize: 12,
                       fontFamily: 'var(--mono)',
                       color: 'var(--muted)',
                       marginTop: 3,
@@ -641,12 +641,12 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
           {/* ── NO SURVEYS ── */}
           {phase === 'no-surveys' && (
             <div style={{ padding: '2rem 1.5rem', textAlign: 'center' }}>
-              <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>✓</div>
-              <div style={{ fontFamily: 'var(--display)', fontSize: '.95rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.5rem' }}>All caught up!</div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1.5rem' }}>
+              <div style={{ fontSize: 'var(--fs-h2)', marginBottom: '1rem' }}>✓</div>
+              <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-body)', fontWeight: 600, color: 'var(--white)', marginBottom: '.5rem' }}>All caught up!</div>
+              <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1.5rem' }}>
                 You've answered all available questions for your applications.<br/>Check back after new applications are added.
               </div>
-              <button onClick={onClose} style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: '.72rem', borderRadius: 8, padding: '.6rem 1.25rem', cursor: 'pointer' }}>
+              <button onClick={onClose} style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', borderRadius: 8, padding: '.6rem 1.25rem', cursor: 'pointer' }}>
                 Close
               </button>
             </div>
@@ -655,18 +655,18 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
           {/* ── ERROR ── */}
           {phase === 'error' && (
             <div style={{ padding: '2rem 1.5rem', textAlign: 'center' }}>
-              <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⚠️</div>
-              <div style={{ fontFamily: 'var(--display)', fontSize: '.95rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.5rem' }}>Couldn't load survey</div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1.5rem' }}>
+              <div style={{ fontSize: 'var(--fs-h2)', marginBottom: '1rem' }}>⚠️</div>
+              <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-body)', fontWeight: 600, color: 'var(--white)', marginBottom: '.5rem' }}>Couldn't load survey</div>
+              <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1.5rem' }}>
                 Something went wrong — tap retry to try again.
               </div>
               <button
                 onClick={() => targetApp && loadSurvey(targetApp)}
-                style={{ background: 'var(--indigo)', border: 'none', color: '#fff', fontFamily: 'var(--body)', fontWeight: 600, fontSize: '.8rem', borderRadius: 8, padding: '.6rem 1.25rem', cursor: 'pointer', marginBottom: '0.5rem', width: '100%' }}
+                style={{ background: 'var(--indigo)', border: 'none', color: '#fff', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', borderRadius: 8, padding: '.6rem 1.25rem', cursor: 'pointer', marginBottom: '0.5rem', width: '100%' }}
               >
                 Retry →
               </button>
-              <button onClick={onClose} style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: '.72rem', borderRadius: 8, padding: '.6rem 1.25rem', cursor: 'pointer', width: '100%' }}>
+              <button onClick={onClose} style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', borderRadius: 8, padding: '.6rem 1.25rem', cursor: 'pointer', width: '100%' }}>
                 Close
               </button>
             </div>
@@ -675,12 +675,12 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
           {/* ── DONE ── */}
           {phase === 'done' && (
             <div style={{ ...paddingBox, textAlign: 'center' }} className="survey-modal-animate">
-              <div style={{ fontSize: 48, marginBottom: 12, lineHeight: 1 }}>✦</div>
+              <div style={{ fontSize: 56, marginBottom: 12, lineHeight: 1 }}>✦</div>
 
               <div style={{
-                fontSize: 26,
-                fontFamily: 'var(--display)',
-                fontWeight: 700,
+                fontSize: 28,
+                fontFamily: 'var(--body)',
+                fontWeight: 600,
                 color: 'var(--white)',
                 marginBottom: 6,
               }}>
@@ -708,7 +708,7 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
                 color: 'var(--green)',
                 fontSize: 13,
                 fontFamily: 'var(--mono)',
-                fontWeight: 600,
+                fontWeight: 500,
                 marginBottom: 20,
               }}>
                 ✓ You're a Seen contributor

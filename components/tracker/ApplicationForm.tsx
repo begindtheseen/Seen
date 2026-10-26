@@ -4,6 +4,7 @@
 // and the day it was applied (California calendar, defaults to today). Validation and the
 // appliedAt arithmetic live in lib/stores/applicationEdit.ts so they are unit-tested.
 
+import Icon from '@/components/ui/Icon'
 import { useEffect, useState } from 'react'
 import ModalPortal from '@/components/ModalPortal'
 import { PLATFORM_OPTIONS, todayPacific, validateForm, COMPANY_MAX, ROLE_MAX, LOCATION_MAX, type ApplicationForm as FormValues } from '@/lib/stores/applicationEdit'
@@ -53,7 +54,7 @@ export default function ApplicationForm({ title, initial, notice, submitLabel, b
         <form role="dialog" aria-modal="true" aria-label={title} className={s.dialog} onSubmit={submit}>
           <div className={s.dialogHead}>
             <span className={s.dialogTitle}>{title}</span>
-            <button type="button" className={s.close} onClick={onClose} aria-label="Close" disabled={busy}>✕</button>
+            <button type="button" className={s.close} onClick={onClose} aria-label="Close" disabled={busy}><Icon name="x" size={20} /></button>
           </div>
           <div className={s.dialogBody}>
             {notice && <div role="status" className={s.notice}>{notice}</div>}

@@ -1,20 +1,24 @@
 import type { Metadata } from 'next'
 import { pageMetadata } from '@/lib/seo'
 import Link from 'next/link'
-import { getScoresByNames, slugify, grade, riskColor, riskLabel, pct, MIN_REPORTS_FOR_GRADE, type LeaderboardRow } from '@/lib/growth'
+import { getScoresByNames, slugify, grade, pct, MIN_REPORTS_FOR_GRADE, type LeaderboardRow } from '@/lib/growth'
 import { publicDiscussionCountPath, parseExactCount, publicDiscussionShare } from '@/lib/server/reportCounts'
 import { STAFFING_AGENCIES, agencyPageSlug, type StaffingAgency } from '@/lib/agencies'
 import { pickActiveSponsor } from '@/lib/server/sponsorSlot'
 import { jsonLdHtml } from '@/lib/jsonLd'
 import { notEnoughReviewsLabel } from '@/lib/gradeGate'
 import PageHeader from '@/components/shell/PageHeader'
+import Badge from '@/components/ui/Badge'
+import Button from '@/components/ui/Button'
+import { gradeTone, toneText, ghostRateTone, ghostRateWord, responseRateTone, responseRateWord } from '@/lib/ui/tone.js'
+import st from './agencies.module.css'
 
 // The Staffing Agency Ghost Index: a ranked, living page of major staffing agencies by
 // ghosting/transparency signals. Server component + ISR, reading cached scores DIRECTLY from
 // Supabase via lib/growth (never a self-fetch of the live API — see the warning in lib/growth.ts).
 //
 // HONESTY RULES (load-bearing — do not soften):
-// - Ghost/response percentages are shown ONLY for agencies with actual applicant reports
+// - Ghost/response percentages are shown ONLY for agencies with actual applicant accounts
 //   (first_party_report_count > 0 — NEVER the fused report_count, which adds the web-research
 //   pipeline's *claimed* mention count: live, Robert Half showed "3,085 reports" with zero report
 //   rows behind it).
@@ -46,14 +50,11 @@ export const metadata: Metadata = pageMetadata({
   ogDescription: 'Major staffing agencies ranked by applicant-reported ghost and response rates — no reports, no number.',
 })
 
-const wrap = { maxWidth: 760, margin: '0 auto', padding: '3.5rem 1.25rem 5rem', width: '100%', boxSizing: 'border-box' as const }
-const mono = (size: string, color: string): React.CSSProperties => ({ fontFamily: 'var(--mono)', fontSize: size, color })
-
 type Ranked = {
   agency: StaffingAgency
-  row: LeaderboardRow | null // matched company_scores row (may have 0 applicant reports)
+  row: LeaderboardRow | null // matched company_scores row (may have 0 applicant accounts)
   slug: string // slug of the matched stored name when scored, else of the display name
-  reports: number // FIRST-PARTY applicant reports behind the row (0 when none / no row)
+  reports: number // FIRST-PARTY applicant accounts behind the row (0 when none / no row)
   publicDiscussion: number | null // of `reports`, how many came from public discussion threads / review sites; null = unknown
 }
 
@@ -62,40 +63,39 @@ function reportHref(agencyName: string) {
 }
 
 function ReportCta({ agencyName }: { agencyName: string }) {
-  return (
-    <Link href={reportHref(agencyName)} className="tap" style={{ ...mono('var(--fs-60)', 'var(--blue)'), textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>
-      Report →
-    </Link>
-  )
+  return <Link href={reportHref(agencyName)} prefetch={false} className={st.cta}>Report →</Link>
 }
 
-// Row for an agency WITH first-party applicant reports: grade + honest percentages + count, and how
-// much of that count is attributed public discussion / review-site content.
+// Row for an agency WITH first-party applicant accounts: grade + honest percentages + count, and how
+// much of that count is attributed public discussion / review-site content. Colour comes from the
+// numbers themselves (lib/ui/tone.js) and always travels with an icon and a word — the stored
+// risk_level word ("SAFE") used to sit next to a 40% ghost rate.
 function ReportedRow({ r, rank }: { r: Ranked; rank: number }) {
   const s = r.row!.score
   if (s.overall_score == null) return null // only gradeable rows reach here
-  const accent = riskColor(s.risk_level)
+  const letterTone = gradeTone(s.overall_score)
   const ghost = pct(s.ghost_rate)
   const reply = pct(s.response_rate)
+  const gTone = ghostRateTone(s.ghost_rate)
+  const rTone = responseRateTone(s.response_rate)
   const n = r.reports
   const thin = n < 10
   const pub = r.publicDiscussion
   // Rates sit under the name (not in a right-hand column) so the name keeps the row's width on a phone
   // — the audit saw "Robert / Half" squeezed to 8 characters at 390px.
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '.85rem 1rem', marginBottom: '.55rem' }}>
-      <div style={{ ...mono('var(--fs-62)', 'var(--muted)'), width: 18, textAlign: 'right', flexShrink: 0 }}>{rank}</div>
-      <div style={{ fontFamily: 'var(--display)', fontSize: '1.5rem', fontWeight: 800, color: accent, width: 30, textAlign: 'center', flexShrink: 0 }}>{grade(s.overall_score)}</div>
-      <div style={{ minWidth: 0, flex: 1 }}>
-        <Link href={`/company/${r.slug}`} className="tap" style={{ fontFamily: 'var(--display)', fontSize: '.92rem', fontWeight: 700, color: 'var(--white)', textDecoration: 'none' }}>{r.agency.name}</Link>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.15rem .7rem', marginTop: '.2rem' }}>
-          {ghost != null && <span style={mono('var(--fs-62)', 'var(--red)')}>{ghost}% ghost</span>}
-          {reply != null && <span style={mono('var(--fs-62)', 'var(--green)')}>{reply}% reply</span>}
+    <div className={st.row}>
+      <div className={st.rank}>{rank}</div>
+      <div className={st.letter} style={{ color: toneText(letterTone) }}>{grade(s.overall_score)}</div>
+      <div className={st.main}>
+        <Link href={`/company/${r.slug}`} prefetch={false} className={st.name}>{r.agency.name}</Link>
+        <div className={st.rates}>
+          {ghost != null && gTone && <Badge tone={gTone}>{ghost}% ghost · {ghostRateWord(gTone).toLowerCase()}</Badge>}
+          {reply != null && rTone && <Badge tone={rTone}>{reply}% reply · {responseRateWord(rTone).toLowerCase()}</Badge>}
         </div>
-        <div style={{ ...mono('var(--fs-60)', 'var(--dim)'), marginTop: '.15rem', lineHeight: 1.5 }}>
-          {n.toLocaleString()} report{n !== 1 ? 's' : ''}
+        <div className={st.meta}>
+          {n.toLocaleString()} account{n !== 1 ? 's' : ''}
           {pub ? (pub >= n ? ', all from public posts' : ` · ${pub.toLocaleString()} from public posts`) : ''}
-          {` · ${riskLabel(s.risk_level)}`}
           {thin ? ' · early signal, low confidence' : ''}
         </div>
       </div>
@@ -104,16 +104,15 @@ function ReportedRow({ r, rank }: { r: Ranked; rank: number }) {
   )
 }
 
-// Row for an agency with SOME applicant reports but fewer than the grade bar: the reports are
+// Row for an agency with SOME applicant accounts but fewer than the grade bar: the reports are
 // readable on its page, but no grade or percentage is shown until it has enough of them.
 function BuildingRow({ r }: { r: Ranked }) {
-  const n = r.reports
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '.85rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '.85rem 1rem', marginBottom: '.55rem', opacity: 0.92 }}>
-      <div style={{ fontFamily: 'var(--display)', fontSize: '1.5rem', fontWeight: 800, color: 'var(--muted)', width: 30, textAlign: 'center', flexShrink: 0 }}>—</div>
-      <div style={{ minWidth: 0, flex: 1 }}>
-        <Link href={`/company/${r.slug}`} className="tap" style={{ fontFamily: 'var(--display)', fontSize: '.92rem', fontWeight: 700, color: 'var(--white)', textDecoration: 'none' }}>{r.agency.name}</Link>
-        <div style={{ ...mono('var(--fs-60)', 'var(--dim)'), marginTop: '.15rem' }}>
+    <div className={`${st.row} ${st.rowQuiet}`}>
+      <div className={`${st.letter} ${st.letterNone}`}>—</div>
+      <div className={st.main}>
+        <Link href={`/company/${r.slug}`} prefetch={false} className={st.name}>{r.agency.name}</Link>
+        <div className={st.meta}>
           {/* The one wording every surface uses — reports plus half of each online mention, like the company page. */}
           {notEnoughReviewsLabel(r.row?.score ?? null)}
           {r.publicDiscussion ? ` · ${r.publicDiscussion.toLocaleString()} from public threads & review sites` : ''}
@@ -128,15 +127,15 @@ function BuildingRow({ r }: { r: Ranked }) {
 // that reads like half the index is empty (conversion audit 2026-10-24), and never a made-up number.
 function NoDataList({ rows }: { rows: Ranked[] }) {
   return (
-    <div style={{ background: 'var(--surface)', border: '1px dashed var(--line2)', borderRadius: 10, padding: '.9rem 1rem' }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.1rem .9rem' }}>
+    <div className={st.none}>
+      <div className={st.noneNames}>
         {rows.map(r => (
-          <Link key={r.agency.name} href={`/company/${r.slug}`} className="tap" style={{ ...mono('var(--fs-62)', 'var(--sub)'), textDecoration: 'none' }}>{r.agency.name}</Link>
+          <Link key={r.agency.name} href={`/company/${r.slug}`} prefetch={false} className={st.noneName}>{r.agency.name}</Link>
         ))}
       </div>
-      <div style={{ ...mono('var(--fs-60)', 'var(--muted)'), marginTop: '.5rem', lineHeight: 1.6 }}>
-        Applied through one? <Link href="/report?outcome=ghosted" className="tap" style={{ color: 'var(--blue)', textDecoration: 'none' }}>Report what happened →</Link> Your report is its first data point.
-      </div>
+      <p className={st.noneNote}>
+        Applied through one? <Link href="/report?outcome=ghosted" prefetch={false} className={st.inline}>Report what happened →</Link> Your report is its first data point.
+      </p>
     </div>
   )
 }
@@ -190,7 +189,7 @@ export default async function AgenciesPage() {
   const sponsor = await fetchActiveSponsor()
 
   const matched = STAFFING_AGENCIES.map(agency => {
-    // Best match across aliases: prefer the row with the most FIRST-PARTY applicant reports, then
+    // Best match across aliases: prefer the row with the most FIRST-PARTY applicant accounts, then
     // the larger fused total (more evidence behind the estimate), then alias order.
     let row: LeaderboardRow | null = null
     for (const alias of agency.aliases) {
@@ -243,7 +242,7 @@ export default async function AgenciesPage() {
     },
     {
       q: 'Are these ghost rates verified facts?',
-      a: 'No. They are aggregated community signals from applicant reports and public hiring data, with confidence labels where data is thin. Agencies with no reports show no numbers at all — Seen never fabricates a rate.',
+      a: 'No. They are aggregated community signals from applicant accounts and public hiring data, with confidence labels where data is thin. Agencies with no reports show no numbers at all — Seen never fabricates a rate.',
     },
   ]
   const jsonLd = {
@@ -255,7 +254,7 @@ export default async function AgenciesPage() {
   return (
     <div className="page-full">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }} />
-      <div style={wrap}>
+      <div className={st.wrap}>
         <PageHeader
           size="lg"
           eyebrow="Live index · updates hourly"
@@ -268,66 +267,66 @@ export default async function AgenciesPage() {
               : ' No agency has applicant-reported outcomes on Seen yet — it grows with every report submitted.'}
           </>}
         />
-        <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', margin: '0 0 2.6rem' }}>
-          <Link href="/report?outcome=ghosted" className="btn" style={{ background: 'linear-gradient(135deg,var(--g-start),var(--g-mid),var(--g-end))', color: '#fff', padding: '.7rem 1.3rem', fontWeight: 800 }}>Ghosted by an agency? Report it →</Link>
-          <Link href="/ghosted" className="btn btn-ghost" style={{ padding: '.7rem 1.3rem' }}>Why this index exists</Link>
+        <div className={st.actions}>
+          <Button href="/report?outcome=ghosted" variant="primary" size="lg" prefetch={false}>Ghosted by an agency? Report it →</Button>
+          <Button href="/ghosted" variant="ghost" size="lg" prefetch={false}>Why this index exists</Button>
         </div>
 
         {/* Sponsor slot — LABELED advertising above the index. Never part of the ranking, never a
             score. Renders only when the owner has granted an active sponsor (employer_perks.sponsor_until). */}
         {sponsor && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '.9rem', flexWrap: 'wrap', margin: '0 0 2.6rem', padding: '.9rem 1.1rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12 }}>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-50)', textTransform: 'uppercase', letterSpacing: '.16em', color: 'var(--muted)', border: '1px solid var(--line2)', borderRadius: 5, padding: '.15rem .4rem', flexShrink: 0 }}>Sponsored</span>
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ fontFamily: 'var(--display)', fontSize: '.92rem', fontWeight: 700, color: 'var(--white)', textTransform: 'capitalize' }}>{sponsor.company}</div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-56)', color: 'var(--sub)', marginTop: '.1rem' }}>Sponsors the Staffing Agency Ghost Index · placement only, never part of the ranking</div>
+          <div className={st.sponsor}>
+            <Badge>Sponsored</Badge>
+            <div className={st.main}>
+              <div className={st.sponsorName}>{sponsor.company}</div>
+              <div className={st.meta}>Sponsors the Staffing Agency Ghost Index · placement only, never part of the ranking</div>
             </div>
-            <Link href={`/company/${slugify(sponsor.company)}`} className="btn btn-ghost" style={{ padding: '.5rem 1rem', flexShrink: 0 }}>View their record →</Link>
+            <Button href={`/company/${slugify(sponsor.company)}`} variant="secondary" size="sm" prefetch={false}>View their record →</Button>
           </div>
         )}
 
         {reported.length > 0 && (
-          <section style={{ marginBottom: '2.4rem' }}>
-            <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Ranked by reported ghost rate</h2>
-            <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 300 }}>{`Agencies with enough evidence for a grade: at least one real applicant report and ${MIN_REPORTS_FOR_GRADE} pieces in total. Applicant accounts shared publicly in discussion threads and on review sites count (labeled and down-weighted), online mentions count half. Worst ghost rate first; rows with fewer than 10 reports are marked low confidence.`}</p>
+          <section className={st.section}>
+            <h2 className={st.h2}>Ranked by reported ghost rate</h2>
+            <p className={st.lede}>{`Agencies with enough evidence for a grade: at least one real applicant account and ${MIN_REPORTS_FOR_GRADE} pieces in total. Applicant accounts shared publicly in discussion threads and on review sites count (labeled and down-weighted), online mentions count half. Worst ghost rate first; rows with fewer than 10 accounts are marked low confidence.`}</p>
             {reported.map((r, i) => <ReportedRow key={r.agency.name} r={r} rank={i + 1} />)}
           </section>
         )}
 
         {building.length > 0 && (
-          <section style={{ marginBottom: '2.4rem' }}>
-            <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Building a record — not graded yet</h2>
-            <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 300 }}>{`These agencies have applicant reports you can read on their page, but not yet ${MIN_REPORTS_FOR_GRADE} pieces of evidence — too few for a fair grade or ghost rate. Every new report gets them closer.`}</p>
+          <section className={st.section}>
+            <h2 className={st.h2}>Building a record — not graded yet</h2>
+            <p className={st.lede}>{`These agencies have applicant accounts you can read on their page, but fewer than ${MIN_REPORTS_FOR_GRADE} in all (an online mention counts half) — too few for a fair grade or ghost rate. Every new report gets them closer.`}</p>
             {building.map(r => <BuildingRow key={r.agency.name} r={r} />)}
           </section>
         )}
 
         {unlisted.length > 0 && (
-          <section style={{ marginBottom: '2.4rem' }}>
-            <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Not enough reports yet ({unlisted.length})</h2>
-            <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 300 }}>No applicant reports on these agencies yet, so no grade or rate — we won&apos;t invent a number.</p>
+          <section className={st.section}>
+            <h2 className={st.h2}>Not enough reports yet ({unlisted.length})</h2>
+            <p className={st.lede}>No applicant accounts on these agencies yet, so no grade or rate — we won&apos;t invent a number.</p>
             <NoDataList rows={unlisted} />
           </section>
         )}
 
         {reported.length === 0 && building.length === 0 && unlisted.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-70)' }}>
-            The index is loading its first data. Check back shortly — or <Link href="/report?outcome=ghosted" style={{ color: 'var(--blue)' }}>add the first report</Link>.
+          <div className={st.emptyAll}>
+            The index is loading its first data. Check back shortly — or <Link href="/report?outcome=ghosted" prefetch={false} className={st.inline}>add the first report</Link>.
           </div>
         )}
 
-        <section style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.4rem', marginBottom: '1.5rem' }}>
-          <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .8rem' }}>What is a staffing agency ghost rate?</h2>
+        <section className={st.faq}>
+          <h2 className={st.h2}>What is a staffing agency ghost rate?</h2>
           {faqQa.map(({ q, a }) => (
-            <div key={q} style={{ marginBottom: '.9rem' }}>
-              <div style={{ fontFamily: 'var(--display)', fontSize: '.85rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.25rem' }}>{q}</div>
-              <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.7, fontWeight: 300, margin: 0 }}>{a}</p>
+            <div key={q} className={st.qa}>
+              <h3 className={st.q}>{q}</h3>
+              <p className={st.a}>{a}</p>
             </div>
           ))}
         </section>
 
-        <p style={{ ...mono('var(--fs-60)', 'var(--dim)'), lineHeight: 1.7 }}>
-          Seen Grades aggregate applicant reports and public hiring signals into a 0–100 score. They are community signals, not verified facts, and update hourly as new reports arrive. Grades and percentages appear only once at least {MIN_REPORTS_FOR_GRADE} applicants have reported outcomes. Report counts include outcomes shared publicly in discussion threads and on review sites (labeled and counted at reduced weight); web-research estimates are never counted as reports.
+        <p className={st.fine}>
+          Seen Grades aggregate applicant accounts and public hiring signals into a 0–100 score. They are community signals, not verified facts, and update hourly as new reports arrive. Grades and percentages appear only once at least {MIN_REPORTS_FOR_GRADE} applicants have reported outcomes. Report counts include outcomes shared publicly in discussion threads and on review sites (labeled and counted at reduced weight); web-research estimates are never counted as reports.
         </p>
       </div>
     </div>

@@ -2,7 +2,7 @@
 
 .pulse { position: relative; z-index: 2; width: 100%; max-width: 1120px; margin: 0 auto; padding: 0.5rem 1.25rem 1.5rem; box-sizing: border-box; }
 
-.head { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.7rem; font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); }
+.head { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.7rem; font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); }
 .live { display: inline-flex; align-items: center; gap: 0.4rem; color: #6ee7b7; font-weight: 600; }
 .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); animation: lpPing 2.2s infinite; }
 @keyframes lpPing { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55) } 70% { box-shadow: 0 0 0 7px rgba(16, 185, 129, 0) } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0) } }
@@ -28,16 +28,16 @@
   display: inline-flex; align-items: center; gap: 0.5rem; white-space: nowrap;
   padding: 0.5rem 0.8rem 0.5rem 0.6rem; border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.09); background: rgba(255, 255, 255, 0.03);
-  color: var(--sub); font-size: 0.78rem; text-decoration: none;
+  color: var(--sub); font-size: var(--fs-meta); text-decoration: none;
   max-width: calc(100vw - 2.5rem); min-width: 0; box-sizing: border-box;
   transition: border-color 0.18s ease, background 0.18s ease, transform 0.3s var(--ease-spring);
 }
 .chip b, .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .chip:hover { border-color: rgba(129, 140, 248, 0.45); background: rgba(99, 102, 241, 0.1); transform: translateY(-2px); }
 .chip b { color: var(--white); font-weight: 600; }
-.ico { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; font-size: 0.72rem; background: rgba(255, 255, 255, 0.05); }
+.ico { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; font-size: var(--fs-meta); background: rgba(255, 255, 255, 0.05); }
 .what { max-width: 26ch; overflow: hidden; text-overflow: ellipsis; }
-.when { font-family: var(--mono); font-size: 0.6rem; color: var(--dim); }
+.when { font-family: var(--mono); font-size: var(--fs-meta); color: var(--dim); }
 .red .ico { background: rgba(239, 68, 68, 0.15); }
 .amber .ico { background: rgba(245, 158, 11, 0.15); }
 .blue .ico { background: rgba(59, 130, 246, 0.15); }
@@ -47,7 +47,7 @@
 @media (max-width: 560px) {
   .pulse { padding: 0.25rem 1rem 1.25rem; }
   .more { margin-left: 0; }
-  .chip { font-size: 0.74rem; }
+  .chip { font-size: var(--fs-meta); }
   .what { max-width: 20ch; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -61,12 +61,15 @@
 
 /* Phone floor (audit 2026-10-23): 12px meta, 44px hit areas on the feed link and the gliding chips. */
 @media (max-width: 768px) {
-  .head, .when, .ico { font-size: 0.75rem; }
-  .chip { font-size: 0.78rem; min-height: 44px; }
+  .head, .when, .ico { font-size: var(--fs-meta); }
+  .chip { font-size: var(--fs-meta); min-height: 44px; }
   .more { display: inline-flex; align-items: center; min-height: 44px; }
 }
 
-/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
-@media (max-width: 768px) {
-  .head, .ico, .when, .chip { font-size: 0.75rem; }
-}
+
+/* Outcome icons (components/ui/Icon) take the tone's readable text colour. */
+.red .ico { color: var(--bad-text); }
+.amber .ico { color: var(--caution-text); }
+.blue .ico { color: var(--info-text); }
+.green .ico { color: var(--good-text); }
+.dim .ico { color: var(--text-3); }

@@ -73,8 +73,8 @@ function DisputeForm({ companyName, presetPermalink, onClose }: {
   if (state === 'done') {
     return (
       <div style={{ background: 'var(--card)', border: '1px solid rgba(16,185,129,.3)', borderRadius: 8, padding: '1rem', marginTop: '.75rem' }}>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.66rem', color: 'var(--green)', marginBottom: '.3rem' }}>✓ Thank you — your correction was recorded.</div>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', lineHeight: 1.5 }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', marginBottom: '.3rem' }}>✓ Thank you — your correction was recorded.</div>
+        <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.5 }}>
           A person will review it. We surface public discussion for transparency and correct it in good faith.
         </div>
         <button onClick={onClose} style={btnGhost}>Close</button>
@@ -84,7 +84,7 @@ function DisputeForm({ companyName, presetPermalink, onClose }: {
 
   return (
     <div style={{ background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 8, padding: '1rem', marginTop: '.75rem' }}>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)', marginBottom: '.6rem', lineHeight: 1.5 }}>
+      <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginBottom: '.6rem', lineHeight: 1.5 }}>
         Dispute or correct the public discussion shown for <strong>{companyName}</strong>.
         {presetPermalink && <span style={{ color: 'var(--muted)' }}><br />Regarding a specific thread you flagged.</span>}
       </div>
@@ -100,14 +100,14 @@ function DisputeForm({ companyName, presetPermalink, onClose }: {
       />
       <label style={labelStyle}>Contact email <span style={{ color: 'var(--muted)', textTransform: 'none' }}>(optional — only if you want a reply)</span></label>
       <input autoComplete="off" value={contact} onChange={e => setContact(e.target.value)} maxLength={200} placeholder="you@company.com" style={inputStyle} />
-      {err && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--red)', marginTop: '.4rem' }}>{err}</div>}
+      {err && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--red)', marginTop: '.4rem' }}>{err}</div>}
       <div style={{ display: 'flex', gap: '.5rem', marginTop: '.75rem' }}>
         <button onClick={submit} disabled={state === 'sending'} style={{ ...btnPrimary, opacity: state === 'sending' ? 0.6 : 1 }}>
           {state === 'sending' ? 'Sending…' : 'Submit correction'}
         </button>
         <button onClick={onClose} style={btnGhost}>Cancel</button>
       </div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)', marginTop: '.6rem', lineHeight: 1.5 }}>
+      <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.6rem', lineHeight: 1.5 }}>
         No account needed. Submissions are rate-limited and reviewed by a person.
       </div>
     </div>
@@ -152,11 +152,11 @@ export default function CompanyRedditDiscussion({ companyName, hasReportData = f
   return (
     <div>
       {/* Attribution framing — always present, so the source is unambiguous */}
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: '.35rem', display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: '.35rem', display: 'flex', alignItems: 'center', gap: '.5rem' }}>
         <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--red)', display: 'inline-block', flexShrink: 0 }} />
         What people are saying on Reddit
       </div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', marginBottom: '1rem', lineHeight: 1.5 }}>
+      <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginBottom: '1rem', lineHeight: 1.5 }}>
         {PUBLIC_DISCUSSION_LABEL} — public third-party threads, linked to their source. Not Seen&apos;s assessment.
       </div>
 
@@ -169,7 +169,7 @@ export default function CompanyRedditDiscussion({ companyName, hasReportData = f
               <div style={{ height: 8, width: '30%', background: 'var(--line2)', borderRadius: 4, marginTop: '.55rem', opacity: .4 }} />
             </div>
           ))}
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', textAlign: 'center', paddingTop: '.4rem' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', textAlign: 'center', paddingTop: '.4rem' }}>
             Checking Reddit for public discussion about {companyName}…
           </div>
         </div>
@@ -181,17 +181,17 @@ export default function CompanyRedditDiscussion({ companyName, hasReportData = f
           {items.map(t => (
             <div key={t.id} style={{ background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 8, padding: '.85rem 1rem' }}>
               <a href={t.permalink} target="_blank" rel="noopener noreferrer nofollow"
-                 style={{ fontFamily: 'var(--mono)', fontSize: '.7rem', color: 'var(--white, #fff)', lineHeight: 1.5, textDecoration: 'none', display: 'block' }}>
+                 style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--white, #fff)', lineHeight: 1.5, textDecoration: 'none', display: 'block' }}>
                 {t.title} <span style={{ color: 'var(--blue)' }}>↗</span>
               </a>
               <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap', marginTop: '.5rem' }}>
                 {t.subreddit && (
                   <a href={`https://www.reddit.com/r/${encodeURIComponent(t.subreddit)}/`} target="_blank" rel="noopener noreferrer nofollow"
-                     style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', color: 'var(--muted)', textDecoration: 'none', border: '1px solid var(--line2)', borderRadius: 4, padding: '.1rem .4rem' }}>
+                     style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', textDecoration: 'none', border: '1px solid var(--line2)', borderRadius: 4, padding: '.1rem .4rem' }}>
                     r/{t.subreddit}
                   </a>
                 )}
-                {t.created && <span style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', color: 'var(--muted)' }}>{relativeDate(t.created)}</span>}
+                {t.created && <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>{relativeDate(t.created)}</span>}
                 <button onClick={() => openDispute(t.permalink)} title="Flag this thread as a name collision, outdated, or misleading"
                         style={{ ...flagBtn, marginLeft: 'auto' }}>Flag</button>
               </div>
@@ -202,10 +202,10 @@ export default function CompanyRedditDiscussion({ companyName, hasReportData = f
 
       {/* Honest empty state — never a broken blank. Points to the first-party report data. */}
       {(status === 'empty' || (status === 'ok' && items.length === 0)) && (
-        <div style={{ textAlign: 'center', padding: '2rem 1.25rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.68rem', background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 10, lineHeight: 1.6 }}>
+        <div style={{ textAlign: 'center', padding: '2rem 1.25rem', color: 'var(--muted)', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 10, lineHeight: 1.6 }}>
           No public Reddit discussion found yet for {companyName}.
           <br />
-          <span style={{ fontSize: '.6rem', opacity: .75 }}>
+          <span style={{ fontSize: 'var(--fs-meta)', opacity: .75 }}>
             {hasReportData
               ? 'The scores and reports on this page are built from first-party applicant outcomes.'
               : 'Be the first to add a first-party outcome from the report tab.'}
@@ -217,13 +217,13 @@ export default function CompanyRedditDiscussion({ companyName, hasReportData = f
           and hides the section if nothing turns up — never a dead "Retry" on first load (audit 2026-10-23:
           Walmart / Sheetz / Insight Global sat on "Still checking… Retry" for 15 s+). */}
       {status === 'checking' && (
-        <div role="status" style={{ textAlign: 'center', padding: '1.75rem 1.25rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.66rem', background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 10, lineHeight: 1.6 }}>
+        <div role="status" style={{ textAlign: 'center', padding: '1.75rem 1.25rem', color: 'var(--muted)', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 10, lineHeight: 1.6 }}>
           Still checking Reddit for {companyName}…
-          <br /><span style={{ fontSize: '.58rem', opacity: .75 }}>This closes by itself if no hiring threads turn up.</span>
+          <br /><span style={{ fontSize: 'var(--fs-meta)', opacity: .75 }}>This closes by itself if no hiring threads turn up.</span>
         </div>
       )}
       {status === 'error' && (
-        <div style={{ textAlign: 'center', padding: '1.75rem 1.25rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.66rem', background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 10, lineHeight: 1.6 }}>
+        <div style={{ textAlign: 'center', padding: '1.75rem 1.25rem', color: 'var(--muted)', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 10, lineHeight: 1.6 }}>
           Couldn&apos;t load Reddit discussion just now.
           <br /><button onClick={load} style={{ ...btnGhost, marginTop: '.6rem' }}>Retry</button>
         </div>
@@ -240,9 +240,9 @@ export default function CompanyRedditDiscussion({ companyName, hasReportData = f
 }
 
 // ── shared inline styles ─────────────────────────────────────────────────────────────
-const labelStyle: React.CSSProperties = { display: 'block', fontFamily: 'var(--mono)', fontSize: '.54rem', textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--muted)', margin: '.6rem 0 .3rem' }
-const inputStyle: React.CSSProperties = { width: '100%', background: 'var(--surface, #111)', border: '1px solid var(--line2)', borderRadius: 6, padding: '.45rem .7rem', color: 'var(--white, #fff)', fontFamily: 'var(--mono)', fontSize: '.66rem', outline: 'none', boxSizing: 'border-box' }
-const btnPrimary: React.CSSProperties = { background: 'linear-gradient(135deg,rgba(99,102,241,0.15),rgba(16,185,129,0.15))', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 6, color: 'var(--blue)', fontFamily: 'var(--mono)', fontSize: '.66rem', padding: '.45rem 1rem', cursor: 'pointer' }
-const btnGhost: React.CSSProperties = { background: 'none', border: '1px solid var(--line2)', borderRadius: 6, color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.64rem', padding: '.4rem .75rem', cursor: 'pointer' }
-const btnDispute: React.CSSProperties = { background: 'none', border: '1px solid var(--line2)', borderRadius: 6, color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.4rem .8rem', cursor: 'pointer' }
-const flagBtn: React.CSSProperties = { background: 'none', border: 'none', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.52rem', cursor: 'pointer', textDecoration: 'underline', padding: 0 }
+const labelStyle: React.CSSProperties = { display: 'block', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--muted)', margin: '.6rem 0 .3rem' }
+const inputStyle: React.CSSProperties = { width: '100%', background: 'var(--surface, #111)', border: '1px solid var(--line2)', borderRadius: 6, padding: '.45rem .7rem', color: 'var(--white, #fff)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', outline: 'none', boxSizing: 'border-box' }
+const btnPrimary: React.CSSProperties = { background: 'linear-gradient(135deg,rgba(99,102,241,0.15),rgba(16,185,129,0.15))', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 6, color: 'var(--blue)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.45rem 1rem', cursor: 'pointer' }
+const btnGhost: React.CSSProperties = { background: 'none', border: '1px solid var(--line2)', borderRadius: 6, color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.4rem .75rem', cursor: 'pointer' }
+const btnDispute: React.CSSProperties = { background: 'none', border: '1px solid var(--line2)', borderRadius: 6, color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.4rem .8rem', cursor: 'pointer' }
+const flagBtn: React.CSSProperties = { background: 'none', border: 'none', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', cursor: 'pointer', textDecoration: 'underline', padding: 0 }

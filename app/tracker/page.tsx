@@ -18,7 +18,7 @@ import { gradeLetter } from '@/lib/companyDisplay'
 import ModalPortal from '@/components/ModalPortal'
 import WithdrawModal from '@/components/WithdrawModal'
 import PageHeader from '@/components/shell/PageHeader'
-import GuestTracker from '@/components/tracker/GuestTracker'
+import GuestTracker, { GuestTrackerShell } from '@/components/tracker/GuestTracker'
 import InboxAutopilot from '@/components/tracker/InboxAutopilot'
 import InterviewPrep from '@/components/tracker/InterviewPrep'
 import ApplicationForm from '@/components/tracker/ApplicationForm'
@@ -38,6 +38,7 @@ import { _sync } from '@/lib/sync'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { showReportReward } from '@/lib/rewardNotice'
 import s from '@/components/tracker/tracker.module.css'
+import Icon, { type IconName } from '@/components/ui/Icon'
 import { LoadError, PageSkeleton } from '@/components/shell/LoadStates'
 import type { CheckType } from '@/lib/constants'
 const SurveyModal = dynamic(() => import('@/components/SurveyModal'), { ssr: false })
@@ -61,7 +62,7 @@ type Intel = { ghost_rate?: number; avg_wait_days?: number; report_count?: numbe
 type ScoreIntel = { ghost_rate: number; overall_score: number; report_count: number; avg_wait_days?: number; first_party_report_count?: number; data_source?: string | null }
 // Time-aware "is this normal?" verdict — the insight only Seen can give: compare how
 // long an application has been silent against how this company ACTUALLY responds.
-// Stated as fact ("they ghost 42%") ONLY when first-party applicant reports back it; a score
+// Stated as fact ("they ghost 42%") ONLY when first-party applicant accounts back it; a score
 // built from web research alone (fused report_count > 0, first-party 0) is worded as an estimate.
 function ghostWatch(days: number, intel?: Intel): Watch | null {
   if (!intel || !intel.report_count || !intel.avg_wait_days) return null
@@ -130,7 +131,7 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
   const watch = isActive ? ghostWatch(days, intel) : null
   const listing = listingHref(app)
   // 40px hit area without growing the row (negative vertical margin).
-  const linkStyle = { fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--blue)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', minHeight: 40, padding: '0 .4rem', margin: '-8px -.4rem' } as const
+  const linkStyle = { fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', minHeight: 40, padding: '0 .4rem', margin: '-8px -.4rem' } as const
   // "Next check-in Oct 30 — did they respond?" — while a check is due the card asks it instead; a check
   // put off with "Later" says when it comes back ("We'll ask again Oct 25 — …", audit 3 M6).
   const next = isActive && !check ? EventStore.nextCheck(app) : null
@@ -160,7 +161,7 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
               "EMPLOYER: NEW" on every hand-tracked card. */}
           {app.seenApply && app.employerStage && (
             <div className={`${s.empBadge}${app.employerStage === 'Not selected' ? ' ' + s.neg : ''}`} title={`${app.company} set this from their Seen applications inbox — it is their status for your application, not Seen's guess.`}>
-              🏢 Employer: {app.employerStage}
+              <Icon name="briefcase-business" size={13} /> Employer: {app.employerStage}
             </div>
           )}
           {/* Inbox Autopilot read an employer email about this application (lib/server/inbox/apply.js). */}
@@ -170,22 +171,22 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
             const last = fromEmail[fromEmail.length - 1]
             const label: Record<string, string> = { application_submitted: 'confirmation', interview_received: 'interview invite', assessment_received: 'assessment', rejected: 'rejection', offer_received: 'offer' }
             return (
-              <div title="Updated from an email you forwarded to Seen" style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem', marginTop: '.25rem', marginLeft: app.seenApply && app.employerStage ? '.35rem' : 0, fontFamily: 'var(--mono)', fontSize: '.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--blue)', border: '1px solid currentColor', borderRadius: 999, padding: '.12rem .5rem' }}>
-                ✉ From email: {label[String(last.type)] || 'update'}
+              <div title="Updated from an email you forwarded to Seen" style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem', marginTop: '.25rem', marginLeft: app.seenApply && app.employerStage ? '.35rem' : 0, fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--blue)', border: '1px solid currentColor', borderRadius: 999, padding: '.12rem .5rem' }}>
+                <Icon name="mail" size={13} /> From email: {label[String(last.type)] || 'update'}
               </div>
             )
           })()}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '.25rem', flexShrink: 0 }}>
           {app.score != null && (
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: app.score >= 70 ? 'var(--green)' : app.score >= 40 ? 'var(--amber)' : 'var(--red)', fontWeight: 600 }}>{app.score}</span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: app.score >= 70 ? 'var(--green)' : app.score >= 40 ? 'var(--amber)' : 'var(--red)', fontWeight: 500 }}>{app.score}</span>
           )}
           {ghostRate != null && ghostRate > 0.3 && (
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: ghostRate > 0.55 ? 'var(--red)' : 'var(--amber)', background: ghostRate > 0.55 ? 'rgba(239,68,68,.08)' : 'rgba(245,158,11,.08)', border: `1px solid ${ghostRate > 0.55 ? 'rgba(239,68,68,.2)' : 'rgba(245,158,11,.2)'}`, borderRadius: 4, padding: '.1rem .3rem', marginTop: '.1rem' }}>
-              {ghostRate > 0.55 ? '👻' : '⚠'} {Math.round(ghostRate * 100)}% ghost
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: ghostRate > 0.55 ? 'var(--red)' : 'var(--amber)', background: ghostRate > 0.55 ? 'rgba(239,68,68,.08)' : 'rgba(245,158,11,.08)', border: `1px solid ${ghostRate > 0.55 ? 'rgba(239,68,68,.2)' : 'rgba(245,158,11,.2)'}`, borderRadius: 4, padding: '.1rem .3rem', marginTop: '.1rem' }}>
+              <Icon name={ghostRate > 0.55 ? 'ghost' : 'triangle-alert'} size={12} /> {Math.round(ghostRate * 100)}% ghost
             </span>
           )}
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--muted)', background: 'var(--raised)', border: '1px solid var(--line)', borderRadius: 4, padding: '.1rem .35rem' }}>Day {days}</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', background: 'var(--raised)', border: '1px solid var(--line)', borderRadius: 4, padding: '.1rem .35rem' }}>Day {days}</span>
           {sync === 'saving' && <span className={`${s.sync} ${s.syncSaving}`} role="status">Saving…</span>}
           {sync === 'unsynced' && (
             <button type="button" className={`${s.sync} ${s.syncOff}`} onClick={e => { e.stopPropagation(); onRetry(app.id) }} title="This change is saved on this device but has not reached your account yet. Tap to send it again.">
@@ -221,12 +222,12 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
       {/* Ghost Watch — time-aware verdict from this company's real Seen data */}
       {watch && (
         <div style={{
-          marginTop: '.55rem', fontFamily: 'var(--mono)', fontSize: '.75rem', lineHeight: 1.6, borderRadius: 7, padding: '.45rem .7rem',
+          marginTop: '.55rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', lineHeight: 1.6, borderRadius: 7, padding: '.45rem .7rem',
           color: watch.tone === 'danger' ? 'var(--red)' : watch.tone === 'warn' ? 'var(--amber)' : 'var(--muted)',
           background: watch.tone === 'danger' ? 'rgba(239,68,68,.07)' : watch.tone === 'warn' ? 'rgba(245,158,11,.06)' : 'var(--raised)',
           border: `1px solid ${watch.tone === 'danger' ? 'rgba(239,68,68,.2)' : watch.tone === 'warn' ? 'rgba(245,158,11,.2)' : 'var(--line)'}`,
         }}>
-          {watch.tone === 'danger' ? '👻 ' : watch.tone === 'warn' ? '⏰ ' : '✓ '}{watch.text}
+          <Icon name={watch.tone === 'danger' ? 'ghost' : watch.tone === 'warn' ? 'clock' : 'check'} size={13} className={s.watchIcon} /> {watch.text}
         </div>
       )}
 
@@ -239,8 +240,8 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
 
       {/* Meta row */}
       <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', marginTop: '.5rem', alignItems: 'center', minHeight: 24 }}>
-        <span style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--muted)' }}>Applied {fmt(app.appliedAt)}</span>
-        {app.platform && <span style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--muted)' }}>via {app.platform}</span>}
+        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>Applied {fmt(app.appliedAt)}</span>
+        {app.platform && <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>via {app.platform}</span>}
         {listing && (listing.internal
           // A listing posted on Seen: its page is /jobs/<id> here, so open it in the app.
           ? <Link href={listing.href} onClick={e => e.stopPropagation()} style={linkStyle}>View listing →</Link>
@@ -250,8 +251,8 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
       {/* The employer edited the listing after this application went in — dated so the applicant
           knows the posting they read may have changed. */}
       {app.listingEditedAt && Date.parse(app.listingEditedAt) > app.appliedAt && (
-        <div style={{ marginTop: '.45rem', fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--amber)' }}>
-          ✎ Listing edited by the employer {fmt(Date.parse(app.listingEditedAt))} — after you applied
+        <div style={{ marginTop: '.45rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--amber)' }}>
+          <Icon name="pencil" size={13} /> Listing edited by the employer {fmt(Date.parse(app.listingEditedAt))} — after you applied
         </div>
       )}
 
@@ -261,12 +262,12 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
         <div style={{ marginTop: '.7rem', display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
           {app.messages.map((m, i) => (
             <div key={i} style={{ borderRadius: 9, padding: '.5rem .7rem', background: m.from === 'employer' ? 'rgba(59,130,246,.08)' : 'var(--raised)', border: `1px solid ${m.from === 'employer' ? 'rgba(59,130,246,.25)' : 'var(--line)'}` }}>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: m.from === 'employer' ? 'var(--blue)' : 'var(--muted)', marginBottom: '.2rem' }}>
-                {m.from === 'employer' ? `🏢 ${app.company}` : m.withdrawal ? 'You · withdrew' : 'You'} · {fmt(Date.parse(m.at))}
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: m.from === 'employer' ? 'var(--blue)' : 'var(--muted)', marginBottom: '.2rem' }}>
+                {m.from === 'employer' ? app.company : m.withdrawal ? 'You · withdrew' : 'You'} · {fmt(Date.parse(m.at))}
               </div>
               {m.text
-                ? <div style={{ fontSize: '.8rem', color: 'var(--white)', lineHeight: 1.5, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{m.text}</div>
-                : <div style={{ fontSize: '.75rem', color: 'var(--muted)' }}>Withdrew without a note.</div>}
+                ? <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--white)', lineHeight: 1.5, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{m.text}</div>
+                : <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>Withdrew without a note.</div>}
             </div>
           ))}
         </div>
@@ -278,9 +279,9 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
         <div className={`app-actions ${s.panel}`} onClick={e => e.stopPropagation()}>
           <div className={s.label}>What happened?</div>
           <div className={s.actRow}>
-            <button type="button" className={`${s.act} ${s.actGreen}`} onClick={() => { onUpdate(app.id, { status: 'hired', stage: 'Offer' }); setExpanded(false) }}>🎉 Got the job</button>
-            <button type="button" className={`${s.act} ${s.actRed}`} onClick={() => { onUpdate(app.id, { status: 'ghosted' }); setExpanded(false) }}>👻 Ghosted</button>
-            <button type="button" className={`${s.act} ${s.actQuiet}`} onClick={() => { onUpdate(app.id, { status: 'rejected' }); setExpanded(false) }}>❌ Rejected</button>
+            <button type="button" className={`${s.act} ${s.actGreen}`} onClick={() => { onUpdate(app.id, { status: 'hired', stage: 'Offer' }); setExpanded(false) }}><Icon name="trophy" size={15} />Got the job</button>
+            <button type="button" className={`${s.act} ${s.actRed}`} onClick={() => { onUpdate(app.id, { status: 'ghosted' }); setExpanded(false) }}><Icon name="ghost" size={15} />Ghosted</button>
+            <button type="button" className={`${s.act} ${s.actQuiet}`} onClick={() => { onUpdate(app.id, { status: 'rejected' }); setExpanded(false) }}><Icon name="circle-x" size={15} />Rejected</button>
           </div>
           {/* Phones: the pipeline is a chip + "Next"; jumping to any stage happens here. */}
           <div className={s.moveRow} style={{ flexDirection: 'column' }}>
@@ -293,11 +294,11 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
           </div>
           <div className={s.label}>This record</div>
           <div className={s.manage}>
-            <button type="button" className={s.act} onClick={() => onEdit(app)}>✎ Edit</button>
-            <button type="button" className={`${s.act} ${s.actQuiet}`} onClick={() => setDeleting(true)} title="Added by mistake? Delete files nothing.">🗑 Delete</button>
-            <button type="button" className={`${s.act} ${s.actRed}`} onClick={() => setWithdrawing(true)}>↩ Withdraw</button>
+            <button type="button" className={s.act} onClick={() => onEdit(app)}><Icon name="pencil" size={15} />Edit</button>
+            <button type="button" className={`${s.act} ${s.actQuiet}`} onClick={() => setDeleting(true)} title="Added by mistake? Delete files nothing."><Icon name="trash-2" size={15} />Delete</button>
+            <button type="button" className={`${s.act} ${s.actRed}`} onClick={() => setWithdrawing(true)}><Icon name="undo-2" size={15} />Withdraw</button>
           </div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--dim)', marginTop: '.5rem', lineHeight: 1.5 }}>
+          <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.5rem', lineHeight: 1.5 }}>
             Delete = added by mistake, nothing is filed. Withdraw = you pulled out; the card stays.
           </div>
         </div>
@@ -310,10 +311,10 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
               className={`${s.act} ${s.actPrimary}`}
               onClick={() => onShare(app)}
             >
-              ✦ Share outcome card
+              <Icon name="image" size={15} />Share outcome card
             </button>
           )}
-          <button type="button" className={`${s.act} ${s.actQuiet}`} onClick={() => setDeleting(true)}>🗑 Delete</button>
+          <button type="button" className={`${s.act} ${s.actQuiet}`} onClick={() => setDeleting(true)}><Icon name="trash-2" size={15} />Delete</button>
         </div>
       )}
       {withdrawing && <WithdrawModal app={app} onClose={() => setWithdrawing(false)} onWithdrawn={onReload} />}
@@ -341,26 +342,26 @@ function CheckIn({ check, onAnswer, onSnooze, ghostRate, avgWaitDays }: {
   const { app, checkType, daysElapsed, q } = check
   // tone: good = a step forward (green) · neutral = nothing has happened yet (no ghost icon, no colour —
   // "Still nothing" with a 👻 read as if it filed a ghosting, audit 3 M6) · end = an outcome.
-  const answers: Array<{ label: string; data: Record<string, unknown>; tone?: 'good' | 'neutral' }> = []
+  const answers: Array<{ label: string; icon?: IconName; data: Record<string, unknown>; tone?: 'good' | 'neutral' }> = []
   if (checkType === 'response_check') {
-    answers.push({ label: '✅ Got a response', data: { got_response: true, response_type: 'unknown', days_to_response: daysElapsed }, tone: 'good' })
-    answers.push({ label: '📅 Interview', data: { got_response: true, response_type: 'interview', days_to_response: daysElapsed }, tone: 'good' })
+    answers.push({ icon: 'circle-check', label: 'Got a response', data: { got_response: true, response_type: 'unknown', days_to_response: daysElapsed }, tone: 'good' })
+    answers.push({ icon: 'calendar', label: 'Interview', data: { got_response: true, response_type: 'interview', days_to_response: daysElapsed }, tone: 'good' })
     answers.push({ label: '⏳ Not yet', data: { got_response: false, not_yet: true }, tone: 'neutral' })
-    answers.push({ label: '❌ Rejected', data: { got_response: true, response_type: 'rejection', days_to_response: daysElapsed } })
-    answers.push({ label: '👻 Ghosted', data: { got_response: false, response_type: 'ghosted', days_to_response: daysElapsed } })
-    answers.push({ label: '↩ I withdrew', data: { got_response: false, response_type: 'withdrew', withdrew: true, days_to_response: daysElapsed } })
+    answers.push({ icon: 'circle-x', label: 'Rejected', data: { got_response: true, response_type: 'rejection', days_to_response: daysElapsed } })
+    answers.push({ icon: 'ghost', label: 'Ghosted', data: { got_response: false, response_type: 'ghosted', days_to_response: daysElapsed } })
+    answers.push({ icon: 'undo-2', label: 'I withdrew', data: { got_response: false, response_type: 'withdrew', withdrew: true, days_to_response: daysElapsed } })
   } else if (checkType === 'interview_check') {
-    answers.push({ label: '✅ Had an interview', data: { had_interview: true, interview_type: 'interview' }, tone: 'good' })
-    answers.push({ label: '📞 Phone screen', data: { had_interview: true, interview_type: 'phone_screen' }, tone: 'good' })
+    answers.push({ icon: 'circle-check', label: 'Had an interview', data: { had_interview: true, interview_type: 'interview' }, tone: 'good' })
+    answers.push({ icon: 'phone', label: 'Phone screen', data: { had_interview: true, interview_type: 'phone_screen' }, tone: 'good' })
     answers.push({ label: '⏳ Not yet', data: { had_interview: false, ended: false, not_yet: true }, tone: 'neutral' })
-    answers.push({ label: '❌ Rejected', data: { had_interview: false, ended: true, outcome: 'rejected' } })
-    answers.push({ label: '↩ I withdrew', data: { had_interview: false, ended: true, outcome: 'withdrew', withdrew: true } })
+    answers.push({ icon: 'circle-x', label: 'Rejected', data: { had_interview: false, ended: true, outcome: 'rejected' } })
+    answers.push({ icon: 'undo-2', label: 'I withdrew', data: { had_interview: false, ended: true, outcome: 'withdrew', withdrew: true } })
   } else {
-    answers.push({ label: '🎉 Got an offer', data: { outcome: 'offer' }, tone: 'good' })
+    answers.push({ icon: 'trophy', label: 'Got an offer', data: { outcome: 'offer' }, tone: 'good' })
     answers.push({ label: '⏳ Still waiting', data: { outcome: 'active' }, tone: 'neutral' })
-    answers.push({ label: '❌ Rejected', data: { outcome: 'rejected' } })
-    answers.push({ label: '👻 Ghosted', data: { outcome: 'ghosted' } })
-    answers.push({ label: '↩ I withdrew', data: { outcome: 'withdrew', withdrew: true } })
+    answers.push({ icon: 'circle-x', label: 'Rejected', data: { outcome: 'rejected' } })
+    answers.push({ icon: 'ghost', label: 'Ghosted', data: { outcome: 'ghosted' } })
+    answers.push({ icon: 'undo-2', label: 'I withdrew', data: { outcome: 'withdrew', withdrew: true } })
   }
   const showGhost = ghostRate != null && ghostRate > 0.4 && checkType === 'response_check'
 
@@ -380,7 +381,7 @@ function CheckIn({ check, onAnswer, onSnooze, ghostRate, avgWaitDays }: {
       <div className="app-check-opts">
         {answers.map(a => (
           <button key={a.label} type="button" className={`app-check-opt${a.tone === 'good' ? ' hi' : ''}${a.tone === 'neutral' ? ' ' + s.neutral : ''}`} style={{ minHeight: 44 }} onClick={() => onAnswer(app.id, checkType, a.data)}>
-            {a.label}
+            {a.icon && <Icon name={a.icon} size={15} />}{a.label}
           </button>
         ))}
       </div>
@@ -394,6 +395,9 @@ function TrackerPage() {
   const { isLoggedIn, isSeeker, ready, token } = useAuth()
   const [apps, setApps] = useState<Application[]>([])
   const [loading, setLoading] = useState(true)
+  // Mounted on a hard load (session not yet read): the prerendered first frame is already on screen,
+  // so the guest page that replaces it must not play the page entrance a second time.
+  const [afterFirstFrame] = useState(!ready)
   // The account's rows could not be read: show the error + Retry and this device's local copy, never
   // "0 TOTAL · No applications yet" (R-1).
   const [loadFailed, setLoadFailed] = useState(false)
@@ -685,14 +689,14 @@ function TrackerPage() {
       if (data.not_yet || data.got_response === false && !rt) return
       if (rt === 'rejection') {
         setUpdateInsight({
-          title: '❌ Rejection logged',
+          title: 'Rejection logged',
           body: `${app.company} answered after ${days} days. A rejection still counts as hearing back — it goes into their response record.`,
           color: 'rgba(156,163,175,0.12)',
         })
       } else if (rt === 'ghosted') {
         const ghostPct = score ? Math.round(score.ghost_rate * 100) : null
         setUpdateInsight({
-          title: '👻 Ghost documented',
+          title: 'Ghost documented',
           body: ghostPct != null
             ? `${app.company} has a ${ghostPct}% ghost rate. You're not alone — this data helps warn other applicants.`
             : `Ghosting logged after ${days} days. This adds to the public record for ${app.company}.`,
@@ -701,7 +705,7 @@ function TrackerPage() {
       } else if (rt === 'interview') {
         const avgWait = score?.avg_wait_days || null // null = no wait data for this company; never invent one
         setUpdateInsight({
-          title: '📞 Interview unlocked — you\'re ahead',
+          title: 'Interview unlocked — you\'re ahead',
           body: avgWait
             ? `You reached the interview stage at ${app.company} in ${days} days. Applicants there wait about ${avgWait} days just for a first response. Your interview prep is on the card.`
             : `You reached the interview stage at ${app.company} in ${days} days. Your interview prep is on the card — see what happened to others who interviewed there.`,
@@ -710,7 +714,7 @@ function TrackerPage() {
       } else if (rt !== 'withdrew') {
         const avgWait = score?.avg_wait_days || null
         setUpdateInsight({
-          title: '✅ Response received',
+          title: 'Response received',
           body: avgWait
             ? (days <= avgWait
                 ? `${app.company} responded in ${days} days — faster than their ${avgWait}-day average.`
@@ -722,7 +726,7 @@ function TrackerPage() {
     } else if (checkType === 'interview_check') {
       if (data.interview_type) {
         setUpdateInsight({
-          title: '🗓 Interview stage confirmed',
+          title: 'Interview stage confirmed',
           body: `You\'re in the interview stage at ${app.company} after ${days} days. Most applications never get this far. Your interview prep is on the card.`,
           color: 'rgba(99,102,241,0.12)',
         })
@@ -731,7 +735,7 @@ function TrackerPage() {
       const outcome = data.outcome as string
       if (outcome === 'ghosted') {
         setUpdateInsight({
-          title: '👻 Final outcome: Ghosted',
+          title: 'Final outcome: Ghosted',
           body: `${app.company} went silent after ${days} days. Outcome card coming next — your experience will be visible to future applicants.`,
           color: 'rgba(156,163,175,0.12)',
         })
@@ -831,11 +835,19 @@ function TrackerPage() {
     showToast(`Removed ${removed.length} duplicate${removed.length === 1 ? '' : 's'} — kept the original of each.`)
   }
 
-  // Session unresolved or first load in flight → the page's own skeleton, never a blank (R-2).
-  if (!ready || (isLoggedIn && isSeeker && loading)) {
-    return <div className="page-full"><div className={s.body} style={{ maxWidth: 1000, margin: '0 auto', padding: '2.5rem 1rem', width: '100%', boxSizing: 'border-box' }}><PageSkeleton label="Loading your applications" tiles={5} rows={4} /></div></div>
+  // Session unresolved → a guest's page (the browser holds no stored session) or the account
+  // skeleton (it does), chosen by CSS from html.has-session before React knows (app/layout.tsx). The
+  // guest tracker stays mounted in the same slot once the session resolves to "no one", so its form
+  // never re-mounts. First account load in flight → the page's own skeleton, never a blank (R-2).
+  if (!ready || !isLoggedIn) {
+    return (
+      <>
+        <div className={ready ? undefined : 'guest-first'}><GuestTracker still={afterFirstFrame} /></div>
+        {!ready && <div className="session-first"><TrackerSkeleton /></div>}
+      </>
+    )
   }
-  if (!isLoggedIn) return <GuestTracker />
+  if (isSeeker && loading) return <TrackerSkeleton />
   if (!isSeeker) return null
 
   const active = apps.filter(a => a.status === 'active')
@@ -981,7 +993,7 @@ function TrackerPage() {
         {/* Funnel visualization — needs enough applications to mean anything */}
         {apps.length >= 5 && (
           <div className={s.after} style={{ marginBottom: '1.5rem', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 12, padding: '1rem 1.25rem' }}>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', textTransform: 'uppercase', letterSpacing: '.09em', color: 'var(--dim)', marginBottom: '.85rem' }}>Application Funnel</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.09em', color: 'var(--dim)', marginBottom: '.85rem' }}>Application Funnel</div>
             <div className="funnel">
               {(() => {
                 const stageLevel = (s: string) => ['Applied', 'Viewed', 'Phone Screen', 'Interview', 'Final Round', 'Offer'].indexOf(s)
@@ -1007,7 +1019,7 @@ function TrackerPage() {
               })()}
             </div>
             {ghosted.length > 0 && (
-              <div className="funnel-ghost-note" style={{ marginTop: '.5rem' }}>👻 {ghosted.length} ghosted before responding</div>
+              <div className="funnel-ghost-note" style={{ marginTop: '.5rem' }}><Icon name="ghost" size={13} /> {ghosted.length} ghosted before responding</div>
             )}
           </div>
         )}
@@ -1026,8 +1038,8 @@ function TrackerPage() {
           if (!atRisk.length) return null
           return (
             <div style={{ marginBottom: '1.25rem', background: 'rgba(239,68,68,.05)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 12, padding: '1rem 1.1rem' }}>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', textTransform: 'uppercase', letterSpacing: '.09em', color: 'var(--red)', marginBottom: '.65rem', display: 'flex', alignItems: 'center', gap: '.5rem' }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--red)', display: 'inline-block', animation: 'pulse 2s infinite' }} />
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.09em', color: 'var(--red)', marginBottom: '.65rem', display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--red)', display: 'inline-block' }} />
                 {atRisk.length} application{atRisk.length > 1 ? 's' : ''} at ghost risk
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
@@ -1039,14 +1051,14 @@ function TrackerPage() {
                   return (
                     <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.75rem' }}>
                       <div>
-                        <span style={{ fontFamily: 'var(--display)', fontSize: '.8rem', fontWeight: 700, color: 'var(--white)' }}>{a.company}</span>
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--muted)', marginLeft: '.5rem' }}>{a.role}</span>
+                        <span style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--white)' }}>{a.company}</span>
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginLeft: '.5rem' }}>{a.role}</span>
                       </div>
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <div style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--red)', fontWeight: 600 }}>
+                        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--red)', fontWeight: 500 }}>
                           {Math.round(score.ghost_rate * 100)}% ghost rate
                         </div>
-                        <div style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--muted)' }}>
+                        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>
                           {daysLeft > 0 ? `~${daysLeft}d to ghost point` : `past ghost window (day ${days})`}
                         </div>
                       </div>
@@ -1060,12 +1072,12 @@ function TrackerPage() {
 
         {/* Update insight — shown after answering a check card */}
         {updateInsight && (
-          <div style={{ marginBottom: '1.25rem', background: updateInsight.color, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '1rem 1.1rem', animation: 'fadeUp .3s ease both', display: 'flex', gap: '.85rem', alignItems: 'flex-start' }}>
+          <div style={{ marginBottom: '1.25rem', background: updateInsight.color, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '1rem 1.1rem', animation: 'fadeUp .3s ease backwards', display: 'flex', gap: '.85rem', alignItems: 'flex-start' }}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.3rem' }}>{updateInsight.title}</div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--sub)', lineHeight: 1.7 }}>{updateInsight.body}</div>
+              <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--white)', marginBottom: '.3rem' }}>{updateInsight.title}</div>
+              <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.7 }}>{updateInsight.body}</div>
             </div>
-            <button type="button" aria-label="Dismiss" onClick={() => setUpdateInsight(null)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '.75rem', minWidth: 44, minHeight: 44, margin: '-.6rem -.6rem -.6rem 0', flexShrink: 0 }}>✕</button>
+            <button type="button" aria-label="Dismiss" onClick={() => setUpdateInsight(null)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 'var(--fs-meta)', minWidth: 44, minHeight: 44, margin: '-.6rem -.6rem -.6rem 0', flexShrink: 0 }}>✕</button>
           </div>
         )}
 
@@ -1087,9 +1099,9 @@ function TrackerPage() {
         {/* Empty state — both ways in: track one yourself, or Apply on a job. Never shown for a failed load. */}
         {apps.length === 0 && !loadFailed && (
           <div className={s.empty}>
-            <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>📋</div>
-            <div style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.5rem' }}>No applications yet</div>
-            <div style={{ fontSize: '.82rem', color: 'var(--sub)', lineHeight: 1.6, maxWidth: 420, margin: '0 auto' }}>Add one you already sent, or hit Apply on a job here and it lands on this list by itself.</div>
+            <div className={s.emptyIcon}><Icon name="list-checks" size={28} /></div>
+            <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', marginBottom: '.5rem' }}>No applications yet</div>
+            <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.6, maxWidth: 420, margin: '0 auto' }}>Add one you already sent, or hit Apply on a job here and it lands on this list by itself.</div>
             <div className={s.emptyBtns}>
               <button type="button" className={`${s.act} ${s.actPrimary}`} onClick={() => setShowManual(true)}>+ Track application</button>
               <Link href="/jobs" className={s.act}>Browse jobs →</Link>
@@ -1120,20 +1132,20 @@ function TrackerPage() {
             }}
           >
             <div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--indigo)', fontWeight: 600, marginBottom: '.12rem', display: 'flex', alignItems: 'center', gap: '.35rem' }}>
-                <span style={{ fontSize: '.75rem' }}>✦</span>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--indigo)', fontWeight: 500, marginBottom: '.12rem', display: 'flex', alignItems: 'center', gap: '.35rem' }}>
+                <Icon name="sparkles" size={13} />
                 {creditsEarned > 0 ? `You earned ${creditsEarned} credit${creditsEarned !== 1 ? 's' : ''} — keep going` : 'Earn up to 5 credits today'}
               </div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--sub)' }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)' }}>
                 Share what happened with your applications — 90 sec, helps future job seekers
               </div>
             </div>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--indigo)', flexShrink: 0 }}>Start →</span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--indigo)', flexShrink: 0 }}>Start →</span>
           </div>
         )}
         {creditsEarned > 0 && !showSurvey && (
-          <div className={s.after} style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--green)', textAlign: 'center', marginBottom: '.65rem' }}>
-            ✓ +{creditsEarned} credits earned this session
+          <div className={s.after} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', textAlign: 'center', marginBottom: '.65rem' }}>
+            <Icon name="check" size={13} /> +{creditsEarned} credits earned this session
           </div>
         )}
 
@@ -1214,9 +1226,24 @@ function TrackerPage() {
   )
 }
 
+function TrackerSkeleton() {
+  return <div className="page-full"><div className={s.body} style={{ maxWidth: 1000, margin: '0 auto', padding: '2.5rem 1rem', width: '100%', boxSizing: 'border-box' }}><PageSkeleton label="Loading your applications" tiles={5} rows={4} /></div></div>
+}
+
+/** What the prerendered HTML paints (the page reads search params, so it renders on the client):
+ *  the guest tracker's header for a browser with no stored session, the account skeleton otherwise. */
+function TrackerFirstFrame() {
+  return (
+    <>
+      <div className="guest-first"><GuestTrackerShell /></div>
+      <div className="session-first"><TrackerSkeleton /></div>
+    </>
+  )
+}
+
 export default function TrackerPageWrapper() {
   return (
-    <Suspense fallback={<div className="page-full"><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}><div className="spinner" /></div></div>}>
+    <Suspense fallback={<TrackerFirstFrame />}>
       <TrackerPage />
     </Suspense>
   )

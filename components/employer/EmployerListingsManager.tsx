@@ -71,9 +71,9 @@ type Dispute = {
 const mono = (size: string, color: string): React.CSSProperties => ({ fontFamily: 'var(--mono)', fontSize: size, color })
 const card: React.CSSProperties = { background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16, padding: '1.5rem', marginBottom: 0 }
 const kicker: React.CSSProperties = { ...mono('.55rem', 'var(--blue)'), textTransform: 'uppercase', letterSpacing: '.16em', marginBottom: '.5rem' }
-const h2: React.CSSProperties = { fontFamily: 'var(--display)', fontSize: '1.15rem', fontWeight: 800, color: 'var(--white)', margin: '0 0 .4rem', letterSpacing: '-.02em' }
-const bodyText: React.CSSProperties = { color: 'var(--sub)', fontSize: '.85rem', lineHeight: 1.7, margin: '0 0 1.4rem', maxWidth: 560 }
-const primaryBtn: React.CSSProperties = { background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 9, padding: '.7rem 1.4rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.8rem', color: '#fff', cursor: 'pointer' }
+const h2: React.CSSProperties = { fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', margin: '0 0 .4rem', letterSpacing: '-.02em' }
+const bodyText: React.CSSProperties = { color: 'var(--sub)', fontSize: 'var(--fs-ui)', lineHeight: 1.7, margin: '0 0 1.4rem', maxWidth: 560 }
+const primaryBtn: React.CSSProperties = { background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 9, padding: '.7rem 1.4rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)', color: '#fff', cursor: 'pointer' }
 const ghostBtn: React.CSSProperties = { background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem 1rem', ...mono('.62rem', 'var(--white)'), cursor: 'pointer' }
 const inputStyle: React.CSSProperties = { flex: 1, minWidth: 200, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.7rem .9rem', ...mono('.75rem', 'var(--white)'), outline: 'none', boxSizing: 'border-box' }
 
@@ -387,7 +387,7 @@ export function EmployerListingsManager() {
       {/* Listings */}
       {listings.length === 0 ? (
         <div style={{ padding: '1.6rem 0 .4rem', textAlign: 'center' }}>
-          <div style={{ fontFamily: 'var(--display)', fontSize: '.95rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.35rem' }}>No listings matched to {company || 'your company'} yet.</div>
+          <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', marginBottom: '.35rem' }}>No listings matched to {company || 'your company'} yet.</div>
           <p style={{ ...mono('.6rem', 'var(--muted)'), lineHeight: 1.6, margin: 0 }}>
             When Seen indexes a listing for your company — or you post one above — it appears here.
           </p>
@@ -400,7 +400,7 @@ export function EmployerListingsManager() {
               <div key={l.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', padding: '.95rem 0', borderBottom: '1px solid var(--line)' }}>
                 <div style={{ flex: 1, minWidth: 220 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
-                    <span style={{ fontFamily: 'var(--display)', fontSize: '.9rem', fontWeight: 700, color: l.removed ? 'var(--muted)' : 'var(--white)', textDecoration: l.removed ? 'line-through' : 'none' }}>{l.title}</span>
+                    <span style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-ui)', fontWeight: 700, color: l.removed ? 'var(--muted)' : 'var(--white)', textDecoration: l.removed ? 'line-through' : 'none' }}>{l.title}</span>
                     <span style={{ ...mono('.5rem', om.color), textTransform: 'uppercase', letterSpacing: '.08em', border: `1px solid ${om.color}`, borderRadius: 5, padding: '.1rem .4rem' }}>{om.label}</span>
                     {l.removed ? (
                       <span style={{ ...mono('.5rem', 'var(--red)'), textTransform: 'uppercase', letterSpacing: '.06em', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.4)', borderRadius: 999, padding: '.1rem .45rem' }}>Deleted by admin</span>
@@ -433,7 +433,7 @@ export function EmployerListingsManager() {
                   )}
                   {claimFor === l.id && (
                     <div style={{ marginTop: '.6rem', padding: '.75rem .85rem', background: 'rgba(16,185,129,.05)', border: '1px solid rgba(16,185,129,.3)', borderRadius: 10 }}>
-                      <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: '.85rem', color: 'var(--white)' }}>Take applications for this listing on Seen</div>
+                      <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 'var(--fs-ui)', color: 'var(--white)' }}>Take applications for this listing on Seen</div>
                       <div style={{ ...mono('.56rem', 'var(--sub)'), lineHeight: 1.6, margin: '.3rem 0 .6rem' }}>
                         It becomes yours to manage: applications come to your Seen inbox, you can edit or close it, and it shows ahead of aggregated listings in search. Anyone who saved or tracked it keeps the same link.
                       </div>
@@ -441,7 +441,7 @@ export function EmployerListingsManager() {
                         {([['seen', 'On Seen only', 'Résumés come to your inbox'], ...(l.apply_url ? [['both', 'Seen + original link', 'Candidates choose']] : [])] as [ApplyMode, string, string][]).map(([m, t, sub]) => (
                           <button key={m} type="button" aria-pressed={claimMode === m} onClick={() => setClaimMode(m)}
                             style={{ flex: '1 1 140px', textAlign: 'left', background: claimMode === m ? 'rgba(16,185,129,.1)' : 'var(--card)', border: `1px solid ${claimMode === m ? 'var(--green)' : 'var(--line2)'}`, borderRadius: 9, padding: '.5rem .65rem', cursor: 'pointer' }}>
-                            <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: '.78rem', color: claimMode === m ? 'var(--green)' : 'var(--white)' }}>{t}</div>
+                            <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 'var(--fs-meta)', color: claimMode === m ? 'var(--green)' : 'var(--white)' }}>{t}</div>
                             <div style={{ ...mono('.52rem', 'var(--muted)'), marginTop: '.1rem' }}>{sub}</div>
                           </button>
                         ))}
@@ -455,7 +455,7 @@ export function EmployerListingsManager() {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '.35rem', flexShrink: 0 }}>
                   <div style={{ textAlign: 'right' }}>
-                    <span style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 800, color: l.applications ? 'var(--white)' : 'var(--muted)', lineHeight: 1 }}>{l.applications}</span>
+                    <span style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: l.applications ? 'var(--white)' : 'var(--muted)', lineHeight: 1 }}>{l.applications}</span>
                     <span style={{ ...mono('.5rem', 'var(--dim)'), marginLeft: '.35rem' }}>application{l.applications === 1 ? '' : 's'}</span>
                   </div>
                   {seenApplyAvailable && l.is_employer_posted && (l.apply_mode === 'seen' || l.apply_mode === 'both' || (l.seen_applications?.total || 0) > 0) && (
@@ -542,7 +542,7 @@ export function EmployerListingsManager() {
 function Stat({ value, label, color }: { value: number; label: string; color: string }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '.2rem' }}>
-      <div style={{ fontFamily: 'var(--display)', fontSize: '1.5rem', fontWeight: 800, color, lineHeight: 1 }}>{value.toLocaleString()}</div>
+      <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color, lineHeight: 1 }}>{value.toLocaleString()}</div>
       <div style={mono('.52rem', 'var(--dim)')}>{label}</div>
     </div>
   )
@@ -686,7 +686,7 @@ function AddListingForm({ token, onCreated, onCancel, initial, editId, seenApply
               ] as [ApplyMode, string, string][]).map(([m, t, sub]) => (
                 <button key={m} type="button" onClick={() => setApplyMode(m)} aria-pressed={applyMode === m}
                   style={{ flex: '1 1 150px', textAlign: 'left', background: applyMode === m ? 'rgba(16,185,129,.08)' : 'var(--card)', border: `1px solid ${applyMode === m ? 'var(--green)' : 'var(--line2)'}`, borderRadius: 9, padding: '.55rem .7rem', cursor: 'pointer' }}>
-                  <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: '.8rem', color: applyMode === m ? 'var(--green)' : 'var(--white)' }}>{t}</div>
+                  <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 'var(--fs-sm)', color: applyMode === m ? 'var(--green)' : 'var(--white)' }}>{t}</div>
                   <div style={{ ...mono('.52rem', 'var(--muted)'), marginTop: '.15rem', lineHeight: 1.4 }}>{sub}</div>
                 </button>
               ))}
@@ -775,8 +775,8 @@ function DisputeModal({ listing, token, onClose, onSubmitted, defaultKind }: { l
           solid bg, but see-through as a floating panel), so the modal uses an opaque background. */}
       <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 560, background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 16, padding: '1.6rem', boxShadow: '0 24px 70px rgba(0,0,0,.7)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', marginBottom: '.3rem' }}>
-          <div style={{ fontFamily: 'var(--display)', fontSize: '1.15rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em' }}>Dispute a listing</div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--dim)', fontSize: '1rem', cursor: 'pointer', lineHeight: 1 }}>✕</button>
+          <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em' }}>Dispute a listing</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--dim)', fontSize: 'var(--fs-lead)', cursor: 'pointer', lineHeight: 1 }}>✕</button>
         </div>
         <div style={{ ...mono('.6rem', 'var(--sub)'), marginBottom: '1.1rem' }}>{listing.title}</div>
 
@@ -949,7 +949,7 @@ function ApplicationsInbox({ listing, token, onClose, canClose }: { listing: Lis
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.75rem', marginBottom: '.9rem' }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ ...mono('.55rem', 'var(--green)'), textTransform: 'uppercase', letterSpacing: '.1em' }}>Applications on Seen</div>
-              <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.05rem', color: 'var(--white)', marginTop: '.2rem' }}>{listing.title}</div>
+              <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-lead)', color: 'var(--white)', marginTop: '.2rem' }}>{listing.title}</div>
             </div>
             <button type="button" onClick={onClose} aria-label="Close" style={{ ...ghostBtn, width: 32, height: 32, padding: 0 }}>✕</button>
           </div>
@@ -958,7 +958,7 @@ function ApplicationsInbox({ listing, token, onClose, canClose }: { listing: Lis
           {closedNote && <div role="status" style={{ ...mono('.62rem', 'var(--green)'), marginBottom: '.7rem', lineHeight: 1.6 }}>✓ {closedNote}</div>}
           {pending?.status === 'hired' && (
             <div id="inbox-status-prompt" style={{ background: 'var(--raised)', border: '1px solid rgba(16,185,129,.45)', borderRadius: 11, padding: '.85rem .9rem', marginBottom: '.8rem' }}>
-              <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.95rem', color: 'var(--white)' }}>Mark {pending.app.name} as hired 🎉</div>
+              <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-body)', color: 'var(--white)' }}>Mark {pending.app.name} as hired 🎉</div>
               <div style={{ ...mono('.6rem', 'var(--sub)'), lineHeight: 1.6, margin: '.3rem 0 .75rem' }}>
                 Is the role filled? You can close the listing now and send everyone still waiting a decline message — you’ll confirm everyone you hired and choose the message first.
               </div>
@@ -971,7 +971,7 @@ function ApplicationsInbox({ listing, token, onClose, canClose }: { listing: Lis
           )}
           {pending?.status === 'rejected' && (
             <div id="inbox-status-prompt" style={{ background: 'var(--raised)', border: '1px solid rgba(239,68,68,.35)', borderRadius: 11, padding: '.85rem .9rem', marginBottom: '.8rem' }}>
-              <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.95rem', color: 'var(--white)', marginBottom: '.55rem' }}>Not moving forward with {pending.app.name}</div>
+              <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-body)', color: 'var(--white)', marginBottom: '.55rem' }}>Not moving forward with {pending.app.name}</div>
               <DeclineMessagePicker templates={declineTemplates({ title: listing.title, company: listing.company }, 'single')} value={declineText} onChange={setDeclineText} allowNone />
               <div style={{ display: 'flex', gap: '.45rem', flexWrap: 'wrap', marginTop: '.75rem' }}>
                 <button type="button" onClick={() => { const a = pending.app; const m = declineText.trim(); setPending(null); setStatus(a, 'rejected', m || undefined) }} style={{ ...ghostBtn, ...mono('.62rem', '#fff'), background: 'var(--red)', border: 'none', fontWeight: 700 }}>{declineText.trim() ? 'Decline & send message' : 'Decline without a message'}</button>
@@ -1007,7 +1007,7 @@ function ApplicationsInbox({ listing, token, onClose, canClose }: { listing: Lis
               <div key={a.id} style={{ background: 'var(--raised)', border: `1px solid ${a.status === 'new' ? 'rgba(16,185,129,.4)' : 'var(--line2)'}`, borderRadius: 11, padding: '.8rem .9rem' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.6rem', flexWrap: 'wrap' }}>
                   <div style={{ flex: 1, minWidth: 180 }}>
-                    <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: '.9rem', color: 'var(--white)' }}>{a.name}</div>
+                    <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 'var(--fs-ui)', color: 'var(--white)' }}>{a.name}</div>
                     <div style={{ ...mono('.58rem', 'var(--sub)'), marginTop: '.2rem', display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
                       <a href={`mailto:${a.email}?subject=${encodeURIComponent(`Your application — ${listing.title}`)}`} style={{ color: 'var(--blue)', textDecoration: 'none' }}>{a.email}</a>
                       {a.phone && <a href={`tel:${a.phone}`} style={{ color: 'var(--blue)', textDecoration: 'none' }}>{a.phone}</a>}
@@ -1042,7 +1042,7 @@ function ApplicationsInbox({ listing, token, onClose, canClose }: { listing: Lis
                           {m.from === 'employer' ? 'You' : m.withdrawal ? `${a.name} · withdrew` : a.name} · {fmtDate(m.at)}
                         </div>
                         {m.text
-                          ? <div style={{ fontSize: '.78rem', color: 'var(--white)', lineHeight: 1.5, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{m.text}</div>
+                          ? <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--white)', lineHeight: 1.5, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{m.text}</div>
                           : <div style={mono('.58rem', 'var(--muted)')}>Withdrew without a note.</div>}
                       </div>
                     ))}
@@ -1056,7 +1056,7 @@ function ApplicationsInbox({ listing, token, onClose, canClose }: { listing: Lis
                     rows={2}
                     aria-label={`Message to ${a.name}`}
                     placeholder={`Message ${a.name} — interview time, a number to call, anything they should know`}
-                    style={{ ...inputStyle, flex: 1, minHeight: 44, resize: 'vertical', fontSize: '.74rem', lineHeight: 1.45 }}
+                    style={{ ...inputStyle, flex: 1, minHeight: 44, resize: 'vertical', fontSize: 'var(--fs-meta)', lineHeight: 1.45 }}
                   />
                   <button type="button" onClick={() => sendMessage(a)} disabled={sendingId === a.id || !(drafts[a.id] || '').trim()} style={{ ...ghostBtn, padding: '.45rem .8rem', ...mono('.6rem', 'var(--blue)'), opacity: sendingId === a.id || !(drafts[a.id] || '').trim() ? .55 : 1 }}>
                     {sendingId === a.id ? 'Sending…' : 'Send'}

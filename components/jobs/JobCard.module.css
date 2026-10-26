@@ -1,0 +1,37 @@
+/* Compact job result (~120px). Grid tracks are minmax(0, …) so no line can widen a phone screen. */
+.card { display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-4) var(--sp-5); border-bottom: 1px solid var(--border-1); min-width: 0; background: var(--surface-1); }
+.card:last-child { border-bottom: 0; }
+.card:hover { background: var(--surface-2); }
+@media (max-width: 560px) { .card { padding: var(--sp-3) var(--sp-4); } }
+
+.main { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: var(--sp-3); align-items: start; cursor: pointer; border-radius: var(--r-control); }
+.logo { width: 36px; height: 36px; border-radius: var(--r-control); background: var(--surface-2); border: 1px solid var(--border-2); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: var(--fs-ui); color: var(--text-2); }
+.body { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.title { margin: 0; font-family: var(--body); font-size: var(--fs-lead); font-weight: 600; line-height: 1.3; color: var(--text-1); overflow-wrap: anywhere; }
+.main:hover .title { color: #fff; text-decoration: underline; text-decoration-color: var(--border-3); text-underline-offset: 3px; }
+.meta { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 2px var(--sp-3); font-size: var(--fs-sm); color: var(--text-3); line-height: 1.4; }
+.co { color: var(--text-2); font-weight: 500; }
+.place { display: inline-flex; align-items: center; gap: 3px; min-width: 0; }
+.pay { color: var(--text-1); font-weight: 600; }
+.tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 2px; }
+.tag { display: inline-flex; }
+.check { display: inline-flex; align-items: center; gap: 5px; min-height: 24px; padding: 2px 8px; border-radius: var(--r-chip); border: 1px dashed var(--border-2); background: transparent; color: var(--text-3); font: inherit; font-size: var(--fs-meta); font-weight: 500; cursor: pointer; max-width: 100%; }
+.check:hover { color: var(--text-1); border-color: var(--border-3); }
+
+.more { margin-left: 48px; }
+.moreBtn { display: inline-flex; align-items: center; gap: 5px; min-height: 32px; padding: 0; background: none; border: 0; color: var(--accent); font: inherit; font-size: var(--fs-sm); cursor: pointer; }
+.flip { transform: rotate(180deg); }
+.moreList { list-style: none; margin: var(--sp-1) 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.moreRow { display: flex; justify-content: space-between; align-items: center; gap: var(--sp-2); width: 100%; min-height: 40px; padding: 0 var(--sp-3); border-radius: var(--r-control); background: var(--surface-2); border: 1px solid var(--border-1); color: var(--text-2); font: inherit; font-size: var(--fs-sm); text-align: left; cursor: pointer; }
+.moreRow span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.actions { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; margin-left: 48px; }
+@media (max-width: 560px) { .actions, .more { margin-left: 0; } }
+.save, .flag { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: var(--r-control); border: 1px solid var(--border-2); background: transparent; color: var(--text-3); cursor: pointer; flex-shrink: 0; }
+.save:hover, .flag:hover { color: var(--text-1); border-color: var(--border-3); }
+.save[data-saved="1"] { color: var(--bad-text); border-color: var(--bad-line); background: var(--bad-tint); }
+.save[data-saved="1"] svg { fill: currentColor; }
+.flag { margin-left: auto; border-color: transparent; }
+.details { margin-left: 0; }
+.reported { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-meta); color: var(--text-3); }
+@media (max-width: 768px) { .save, .flag { width: 44px; height: 44px; } .moreBtn, .check { min-height: 44px; } }

@@ -86,8 +86,8 @@ export function EmployerListings() {
   return (
     <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 18, padding: '2rem', marginBottom: '2.5rem' }}>
       <div style={{ ...mono('.55rem', 'var(--blue)'), textTransform: 'uppercase', letterSpacing: '.16em', marginBottom: '.5rem' }}>Your listings</div>
-      <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.5rem', fontWeight: 800, color: 'var(--white)', margin: '0 0 .5rem', letterSpacing: '-.02em' }}>Filled the role? Close the listing in one click.</h2>
-      <p style={{ color: 'var(--sub)', fontSize: '.85rem', lineHeight: 1.7, margin: '0 0 1.4rem', maxWidth: 560 }}>
+      <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--white)', margin: '0 0 .5rem', letterSpacing: '-.02em' }}>Filled the role? Close the listing in one click.</h2>
+      <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-ui)', lineHeight: 1.7, margin: '0 0 1.4rem', maxWidth: 560 }}>
         A filled role that stays listed collects applications you&apos;ll never answer — and every one of those becomes a ghost report against your score. Find your live listings and close the ones that are done. We confirm against your own posting before anything is removed.
       </p>
 
@@ -95,7 +95,7 @@ export function EmployerListings() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap', marginBottom: listings || loading ? '1.6rem' : 0 }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '.5rem', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.55rem .9rem' }}>
             <span style={{ ...mono('.52rem', 'var(--dim)'), textTransform: 'uppercase', letterSpacing: '.14em' }}>Your company</span>
-            <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', color: 'var(--white)' }}>{employerCompany}</span>
+            <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)', color: 'var(--white)' }}>{employerCompany}</span>
           </div>
           {loading && <span style={mono('.6rem', 'var(--dim)')}>Loading…</span>}
         </div>
@@ -109,7 +109,7 @@ export function EmployerListings() {
             aria-label="Your company name, as it appears on the listing"
             style={{ flex: 1, minWidth: 220, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.7rem .9rem', ...mono('.75rem', 'var(--white)'), outline: 'none' }}
           />
-          <button onClick={look} disabled={loading || !name.trim()} style={{ background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 9, padding: '.7rem 1.4rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.8rem', color: '#fff', cursor: 'pointer', opacity: loading ? .6 : 1 }}>
+          <button onClick={look} disabled={loading || !name.trim()} style={{ background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 9, padding: '.7rem 1.4rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)', color: '#fff', cursor: 'pointer', opacity: loading ? .6 : 1 }}>
             {loading ? 'Looking…' : 'Show my listings →'}
           </button>
         </div>
@@ -125,7 +125,7 @@ export function EmployerListings() {
               return (
                 <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', padding: '.85rem 0', borderBottom: '1px solid var(--line)' }}>
                   <div style={{ flex: 1, minWidth: 220 }}>
-                    <div style={{ fontFamily: 'var(--display)', fontSize: '.9rem', fontWeight: 700, color: 'var(--white)' }}>{l.title}</div>
+                    <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-ui)', fontWeight: 700, color: 'var(--white)' }}>{l.title}</div>
                     <div style={{ ...mono('.6rem', 'var(--dim)'), marginTop: 2 }}>
                       {[l.location, l.created_at ? `posted ${new Date(l.created_at).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}` : '', l.availability_status].filter(Boolean).join(' · ')}
                       {l.apply_url && <> · <a href={l.apply_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--dim)' }}>view</a></>}
@@ -152,8 +152,8 @@ export function EmployerListings() {
           </div>
         ) : (
           <div style={{ borderTop: '1px solid var(--line)', paddingTop: '1.4rem' }}>
-            <div style={{ fontFamily: 'var(--display)', fontSize: '.95rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.35rem' }}>No live listings found for &ldquo;{checked}&rdquo;.</div>
-            <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.65, margin: 0, maxWidth: 520 }}>
+            <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', marginBottom: '.35rem' }}>No live listings found for &ldquo;{checked}&rdquo;.</div>
+            <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.65, margin: 0, maxWidth: 520 }}>
               Try the exact company name as it appears on your job listing. If a stale listing of yours is still showing in search, email <a href="mailto:hello@seenjobs.io" style={{ color: 'var(--sub)' }}>hello@seenjobs.io</a> and we&apos;ll remove it.
             </p>
           </div>

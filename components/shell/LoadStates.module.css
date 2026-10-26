@@ -1,0 +1,18 @@
+.err {
+  display: flex; align-items: center; gap: var(--sp-3) var(--sp-4); flex-wrap: wrap;
+  padding: var(--sp-4) var(--sp-5); border-radius: var(--r-card);
+  background: var(--bad-tint); border: 1px solid var(--bad-line);
+}
+.compact { padding: var(--sp-3) var(--sp-4); }
+.errIcon { color: var(--bad-text); }
+.errText { flex: 1; min-width: 200px; }
+.errTitle { font-size: var(--fs-body); font-weight: 600; color: var(--text-1); }
+.compact .errTitle { font-size: var(--fs-ui); }
+.errDetail { margin-top: 2px; font-size: var(--fs-sm); color: var(--text-3); line-height: var(--lh-body); }
+
+.sk { display: flex; flex-direction: column; gap: var(--sp-4); padding: var(--sp-6) 0; }
+.skTitle { width: 38%; height: 28px; border-radius: var(--r-chip); }
+.skLine { width: 56%; height: 12px; }
+.skTiles { display: grid; gap: var(--sp-2); margin-top: var(--sp-1); }
+.skTile { height: 64px; border-radius: var(--r-card); }
+.skRow { height: 76px; border-radius: var(--r-card); }

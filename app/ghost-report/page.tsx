@@ -1,7 +1,8 @@
 import type { Metadata } from 'next'
 import { pageMetadata } from '@/lib/seo'
 import Link from 'next/link'
-import { getLeaderboard, getScoresByNames, slugify, grade, riskColor, riskLabel, type LeaderboardRow } from '@/lib/growth'
+import { getLeaderboard, getScoresByNames, slugify, grade, type LeaderboardRow } from '@/lib/growth'
+import { gradeTone, toneText, ghostRateTone, responseRateTone } from '@/lib/ui/tone.js'
 import { STAFFING_AGENCIES } from '@/lib/agencies'
 import { assembleGhostReport, pickHeadline, weekProvenance } from '@/lib/server/ghostReport'
 
@@ -16,7 +17,7 @@ export const revalidate = 3600
 export const metadata: Metadata = pageMetadata({
   title: 'The Weekly Ghost Report — Which Companies Ghost Applicants',
   description:
-    'A weekly, auto-generated snapshot of hiring transparency from real applicant reports: the most-reported ghosters, the companies that actually reply, and the running staffing-agency ghost index. Real numbers only — companies with no reports show no score.',
+    'A weekly, auto-generated snapshot of hiring transparency from real applicant accounts: the most-reported ghosters, the companies that actually reply, and the running staffing-agency ghost index. Real numbers only — companies with no reports show no score.',
   path: '/ghost-report',
   ogTitle: 'The Weekly Ghost Report',
   ogDescription: 'The most-reported ghosters and the companies that actually reply — from real applicant outcomes.',
@@ -48,29 +49,29 @@ type Ranked = ReturnType<typeof assembleGhostReport>['worstOffenders'][number]
 function Stat({ value, label, color }: { value: string; label: string; color: string }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '.25rem', minWidth: 0 }}>
-      <div style={{ fontFamily: 'var(--display)', fontSize: '1.7rem', fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
-      <div style={mono('.55rem', 'var(--dim)')}>{label}</div>
+      <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-fig)', fontWeight: 600, color, lineHeight: 1 }}>{value}</div>
+      <div style={mono('var(--fs-meta)', 'var(--dim)')}>{label}</div>
     </div>
   )
 }
 
 function OffenderRow({ r, rank }: { r: Ranked; rank: number }) {
-  const accent = riskColor(r.riskLevel)
+  const accent = toneText(gradeTone(r.overallScore))
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '.85rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '.8rem 1rem', marginBottom: '.5rem' }}>
-      <div style={{ ...mono('.62rem', 'var(--muted)'), minWidth: 40, textAlign: 'right', flexShrink: 0 }}>{rank}</div>
-      <div style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: accent, minWidth: 36, textAlign: 'center', flexShrink: 0 }}>{grade(r.overallScore)}</div>
+      <div style={{ ...mono('var(--fs-meta)', 'var(--muted)'), minWidth: 40, textAlign: 'right', flexShrink: 0 }}>{rank}</div>
+      <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-xl)', fontWeight: 600, color: accent, minWidth: 36, textAlign: 'center', flexShrink: 0 }}>{grade(r.overallScore)}</div>
       <div style={{ minWidth: 0, flex: 1 }}>
-        <Link href={`/company/${slugify(r.name)}`} style={{ fontFamily: 'var(--display)', fontSize: '.92rem', fontWeight: 700, color: 'var(--white)', textDecoration: 'none', textTransform: 'capitalize' }}>{r.name}</Link>
-        <div style={{ ...mono('.58rem', 'var(--dim)'), marginTop: '.15rem' }}>
+        <Link href={`/company/${slugify(r.name)}`} style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', textDecoration: 'none', textTransform: 'capitalize' }}>{r.name}</Link>
+        <div style={{ ...mono('var(--fs-meta)', 'var(--dim)'), marginTop: '.15rem' }}>
           {r.reportCount.toLocaleString()} report{r.reportCount !== 1 ? 's' : ''}
           {r.isAgency ? ' · staffing agency' : ''}
           {r.thin ? ' · early signal — low confidence' : ''}
         </div>
       </div>
       <div style={{ textAlign: 'right', flexShrink: 0 }}>
-        {r.ghostPct != null && <div style={mono('.62rem', 'var(--red)')}>{r.ghostPct}% ghost</div>}
-        {r.replyPct != null && <div style={mono('.62rem', 'var(--green)')}>{r.replyPct}% reply</div>}
+        {r.ghostPct != null && <div style={mono('var(--fs-meta)', toneText(ghostRateTone(r.ghostPct / 100)))}>{r.ghostPct}% ghost</div>}
+        {r.replyPct != null && <div style={mono('var(--fs-meta)', toneText(responseRateTone(r.replyPct / 100)))}>{r.replyPct}% reply</div>}
       </div>
     </div>
   )
@@ -87,7 +88,7 @@ export default async function GhostReportPage() {
   return (
     <div className="page-full">
       <div style={wrap}>
-        <div style={{ ...mono('.55rem', 'var(--blue)'), textTransform: 'uppercase', letterSpacing: '.2em', marginBottom: '.7rem', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ ...mono('var(--fs-meta)', 'var(--blue)'), textTransform: 'uppercase', letterSpacing: '.2em', marginBottom: '.7rem', display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ width: 20, height: 1, background: 'var(--blue)', display: 'inline-block' }} />
           Weekly Ghost Report · {weekLabel} · updates hourly
         </div>
@@ -98,7 +99,7 @@ export default async function GhostReportPage() {
         {report.hasReported ? (
           <>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.6rem 2.2rem', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.2rem 1.4rem', margin: '1.2rem 0 2.4rem' }}>
-              <Stat value={h.reportsTotal.toLocaleString()} label="applicant reports" color="var(--white)" />
+              <Stat value={h.reportsTotal.toLocaleString()} label="applicant accounts" color="var(--white)" />
               <Stat value={String(h.companiesTracked)} label="companies with reports" color="var(--white)" />
               {h.avgGhostRatePct != null && <Stat value={`${h.avgGhostRatePct}%`} label="avg reported ghost rate" color="var(--red)" />}
               {h.avgWaitDays != null && <Stat value={`${h.avgWaitDays}d`} label="avg reported wait to silence" color="var(--amber)" />}
@@ -107,18 +108,18 @@ export default async function GhostReportPage() {
 
             {report.agencySpotlight && (
               <div style={{ background: 'linear-gradient(135deg, rgba(239,68,68,.10), rgba(239,68,68,.02))', border: '1px solid rgba(239,68,68,.3)', borderRadius: 12, padding: '1.1rem 1.3rem', marginBottom: '2.2rem' }}>
-                <div style={{ ...mono('.55rem', 'var(--red)'), textTransform: 'uppercase', letterSpacing: '.15em', marginBottom: '.4rem' }}>Agency spotlight</div>
-                <div style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 700, color: 'var(--white)', lineHeight: 1.5 }}>
+                <div style={{ ...mono('var(--fs-meta)', 'var(--red)'), textTransform: 'uppercase', letterSpacing: '.15em', marginBottom: '.4rem' }}>Agency spotlight</div>
+                <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', lineHeight: 1.5 }}>
                   <span style={{ textTransform: 'capitalize' }}>{report.agencySpotlight.name}</span> is the most-reported ghosting staffing agency this week — {report.agencySpotlight.ghostPct}% of {report.agencySpotlight.reportCount.toLocaleString()} reported applications got no response at all.
                 </div>
-                <Link href="/agencies" style={{ ...mono('.62rem', 'var(--blue)'), textDecoration: 'none', display: 'inline-block', marginTop: '.6rem' }}>See the full staffing-agency ghost index →</Link>
+                <Link href="/agencies" style={{ ...mono('var(--fs-meta)', 'var(--blue)'), textDecoration: 'none', display: 'inline-block', marginTop: '.6rem' }}>See the full staffing-agency ghost index →</Link>
               </div>
             )}
 
             {report.worstOffenders.length > 0 && (
               <section style={{ marginBottom: '2.4rem' }}>
-                <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Most-reported ghosters</h2>
-                <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 300 }}>Ranked by reported ghost rate among companies with real applicant reports. No reports, no number.</p>
+                <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Most-reported ghosters</h2>
+                <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 400 }}>Ranked by reported ghost rate among companies with real applicant accounts. No reports, no number.</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                 {report.worstOffenders.map((r, i) => (
                 <OffenderRow key={r.name} r={r} rank={i + 1} />
@@ -129,8 +130,8 @@ export default async function GhostReportPage() {
 
                 {report.responseLeaders.length > 0 && (
                 <section style={{ marginBottom: '2.4rem' }}>
-                <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Actually replies</h2>
-                <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 300 }}>The companies applicants reported hearing back from most — proof that responding is a choice.</p>
+                <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Actually replies</h2>
+                <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 400 }}>The companies applicants reported hearing back from most — proof that responding is a choice.</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                 {report.responseLeaders.map((r, i) => (
                 <OffenderRow key={r.name} r={r} rank={i + 1} />
@@ -141,7 +142,7 @@ export default async function GhostReportPage() {
           </>
         ) : (
           <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.6rem', margin: '1.4rem 0 2.4rem' }}>
-            <p style={{ color: 'var(--sub)', fontSize: '.9rem', lineHeight: 1.7, fontWeight: 300, margin: 0 }}>
+            <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-ui)', lineHeight: 1.7, fontWeight: 400, margin: 0 }}>
               The report is waiting on its first substantial batch of applicant outcomes. The framework is live — every report you submit becomes a data point in next week&apos;s edition. We&apos;ll never print a number we don&apos;t have.
             </p>
           </div>
@@ -152,7 +153,7 @@ export default async function GhostReportPage() {
           <Link href="/agencies" className="btn btn-ghost" style={{ padding: '.7rem 1.3rem' }}>The full ghost index</Link>
         </div>
 
-        <p style={{ ...mono('.6rem', 'var(--dim)'), lineHeight: 1.7 }}>
+        <p style={{ ...mono('var(--fs-meta)', 'var(--dim)'), lineHeight: 1.7 }}>
           Methodology: applicant-reported outcomes, trust-weighted, aggregated with public hiring signals into a 0–100 Seen Grade. These are community signals, not verified facts, and update hourly as reports arrive. Percentages appear only where applicants have actually reported outcomes; companies with no reports show no number — Seen never fabricates a rate. Report counts include outcomes submitted to Seen and outcomes shared publicly in discussion threads or on review sites (labeled and down-weighted); web-research estimates are never counted as reports. Where reports are few, rates can be blended with a public-data baseline and are marked low confidence.
         </p>
       </div>

@@ -5,40 +5,40 @@
 .wrap { max-width: 920px; margin: 0 auto; padding: 3.5rem 1.25rem 5rem; width: 100%; box-sizing: border-box; min-width: 0; }
 
 .lead {
-  font-family: var(--display); font-size: clamp(1.05rem, 2.6vw, 1.25rem); font-weight: 600; line-height: 1.5;
+  font-family: var(--body); font-size: clamp(1.05rem, 2.6vw, 1.25rem); font-weight: 600; line-height: 1.5;
   color: var(--white); margin: 0 0 .9rem; text-wrap: pretty; overflow-wrap: anywhere;
 }
-.meta { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .9rem; font-family: var(--mono); font-size: .75rem; color: var(--dim); margin: 0 0 1.8rem; }
-.metaLink { color: var(--blue); text-decoration: none; display: inline-flex; align-items: center; min-height: 44px; }
+.meta { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .9rem; font-family: var(--mono); font-size: var(--fs-meta); color: var(--dim); margin: 0 0 1.8rem; }
+.metaLink { color: var(--accent); text-decoration: none; display: inline-flex; align-items: center; min-height: 44px; }
 .metaLink:hover { text-decoration: underline; }
 
 .note {
-  border: 1px solid rgba(245, 158, 11, .35); background: rgba(245, 158, 11, .07); border-radius: 10px;
-  padding: .8rem 1rem; color: var(--text); font-size: .88rem; line-height: 1.6; margin: 0 0 1.5rem;
+  border: 1px solid var(--caution-line); background: var(--caution-tint); border-radius: var(--r-control);
+  padding: .8rem 1rem; color: var(--text); font-size: var(--fs-ui); line-height: 1.6; margin: 0 0 1.5rem;
 }
 
 .section { margin: 0 0 2.4rem; min-width: 0; }
-.h2 { font-family: var(--display); font-size: 1.1rem; font-weight: 700; color: var(--white); margin: 0 0 .45rem; }
-.h3 { font-family: var(--display); font-size: .95rem; font-weight: 700; color: var(--white); margin: 1.2rem 0 .5rem; }
-.p { color: var(--sub); font-size: .88rem; line-height: 1.7; margin: 0 0 .75rem; font-weight: 300; overflow-wrap: anywhere; }
-.p a { color: var(--blue); text-decoration: underline; text-decoration-color: rgba(59, 130, 246, .45); text-underline-offset: .14em; }
+.h2 { font-family: var(--display); font-size: var(--fs-h3); font-weight: 700; color: var(--white); margin: 0 0 .45rem; }
+.h3 { font-family: var(--display); font-size: var(--fs-body); font-weight: 700; color: var(--white); margin: 1.2rem 0 .5rem; }
+.p { color: var(--sub); font-size: var(--fs-ui); line-height: 1.7; margin: 0 0 .75rem; font-weight: 400; overflow-wrap: anywhere; }
+.p a { color: var(--accent); text-decoration: underline; text-decoration-color: rgba(59, 130, 246, .45); text-underline-offset: .14em; }
 
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 1rem; margin: 0 0 2.2rem; }
 .grid > * { min-width: 0; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 1.15rem 1.2rem; min-width: 0; box-sizing: border-box; }
-.cardTitle { font-family: var(--display); font-size: .98rem; font-weight: 700; color: var(--white); margin: 0 0 .5rem; }
+.cardTitle { font-family: var(--display); font-size: var(--fs-lead); font-weight: 700; color: var(--white); margin: 0 0 .5rem; }
 
 .btnRow { display: flex; flex-wrap: wrap; gap: .6rem; margin: .4rem 0 .7rem; }
 .btn {
   display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 1rem; box-sizing: border-box;
   border: 1px solid var(--line2); border-radius: 10px; background: var(--raised); color: var(--white);
-  font-family: var(--mono); font-size: .8rem; text-decoration: none; transition: border-color .15s ease, background .15s ease;
+  font-family: var(--body); font-weight: 500; font-size: var(--fs-sm); text-decoration: none; transition: border-color .15s ease, background .15s ease;
 }
-.btn:hover { border-color: var(--blue); background: rgba(59, 130, 246, .1); }
-.small { font-family: var(--mono); font-size: .75rem; color: var(--dim); line-height: 1.6; margin: 0; overflow-wrap: anywhere; }
+.btn:hover { border-color: var(--border-3); background: var(--surface-3); }
+.small { font-family: var(--body); font-size: var(--fs-meta); color: var(--dim); line-height: 1.6; margin: 0; overflow-wrap: anywhere; }
 
 .cite {
-  display: block; font-family: var(--mono); font-size: .8rem; line-height: 1.6; color: var(--text);
+  display: block; font-family: var(--body); font-size: var(--fs-sm); line-height: 1.6; color: var(--text);
   background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: .7rem .85rem; margin: 0 0 .6rem;
   overflow-wrap: anywhere; white-space: normal;
 }
@@ -50,20 +50,20 @@
   background: var(--surface); border: 1px solid var(--line2); border-radius: 10px; color: var(--white);
   font-family: var(--body, inherit); font-size: 16px; outline: none;
 }
-.search:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(59, 130, 246, .2); }
-.count { font-family: var(--mono); font-size: .75rem; color: var(--dim); }
+.search:focus { border-color: var(--accent); box-shadow: var(--sh-focus); }
+.count { font-family: var(--mono); font-size: var(--fs-meta); color: var(--dim); }
 
 .tableWrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: 12px; max-width: 100%; background: var(--card); }
-.table { width: 100%; border-collapse: collapse; min-width: 640px; font-size: .85rem; }
+.table { width: 100%; border-collapse: collapse; min-width: 640px; font-size: var(--fs-ui); }
 .table th {
-  text-align: left; font-family: var(--mono); font-size: .75rem; font-weight: 500; color: var(--dim); white-space: nowrap;
+  text-align: left; font-family: var(--mono); font-size: var(--fs-meta); font-weight: 500; color: var(--dim); white-space: nowrap;
   border-bottom: 1px solid var(--line2); background: var(--surface); padding: 0 .75rem; height: 44px;
 }
 .table td { padding: .2rem .75rem; border-bottom: 1px solid var(--line); color: var(--text); vertical-align: middle; }
 .table tbody tr:last-child td { border-bottom: 0; }
 .table tbody tr:hover td { background: rgba(255, 255, 255, .02); }
 .num { text-align: right !important; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.rank { font-family: var(--mono); font-size: .75rem; color: var(--muted); width: 2.5rem; }
+.rank { font-family: var(--mono); font-size: var(--fs-meta); color: var(--muted); width: 2.5rem; }
 .dash { color: var(--muted); }
 
 .sortBtn {
@@ -77,18 +77,18 @@
 .coLink { display: inline-flex; align-items: center; min-height: 44px; color: var(--white); font-weight: 600; text-decoration: none; overflow-wrap: break-word; }
 /* The company column keeps a readable width; the table scrolls inside its box instead of breaking names. */
 .colCo { min-width: 10.5rem; }
-.coLink:hover { color: var(--blue); }
-.say { display: block; font-family: var(--mono); font-size: .75rem; color: var(--dim); margin: -.45rem 0 .35rem; }
-.tag { display: inline-block; margin-left: .45rem; font-family: var(--mono); font-size: .75rem; color: var(--muted); }
+.coLink:hover { color: var(--accent); }
+.say { display: block; font-family: var(--mono); font-size: var(--fs-meta); color: var(--dim); margin: -.45rem 0 .35rem; }
+.tag { display: inline-block; margin-left: .45rem; font-family: var(--mono); font-size: var(--fs-meta); color: var(--muted); }
 
-.grade { font-family: var(--display); font-weight: 800; font-size: 1rem; }
-.gGood { color: var(--green); }
-.gMid { color: var(--amber); }
-.gBad { color: var(--red); }
+.grade { font-family: var(--body); font-weight: 600; font-size: var(--fs-lead); }
+.gGood { color: var(--good-text); }
+.gMid { color: var(--caution-text); }
+.gBad { color: var(--bad-text); }
 
 .defs { display: grid; grid-template-columns: minmax(0, 11rem) minmax(0, 1fr); gap: .45rem 1rem; margin: 0; }
-.defs dt { font-family: var(--mono); font-size: .75rem; color: var(--white); overflow-wrap: anywhere; }
-.defs dd { margin: 0; color: var(--sub); font-size: .85rem; line-height: 1.55; }
+.defs dt { font-family: var(--mono); font-size: var(--fs-meta); color: var(--white); overflow-wrap: anywhere; }
+.defs dd { margin: 0; color: var(--sub); font-size: var(--fs-ui); line-height: 1.55; }
 @media (max-width: 520px) {
   .defs { grid-template-columns: minmax(0, 1fr); }
   .defs dd { margin-bottom: .5rem; }
@@ -96,5 +96,8 @@
 
 .listCard { display: block; text-decoration: none; }
 .listCard:hover { border-color: var(--line2); }
-.listTitle { display: inline-flex; align-items: center; min-height: 44px; font-family: var(--display); font-size: 1.05rem; font-weight: 700; color: var(--white); text-decoration: none; }
-.listTitle:hover { color: var(--blue); }
+.listTitle { display: inline-flex; align-items: center; min-height: 44px; font-family: var(--body); font-size: var(--fs-lead); font-weight: 600; color: var(--white); text-decoration: none; }
+.listTitle:hover { color: var(--accent); }
+
+/* Short names ("IBM") still get a 44px-wide tap box. */
+.coLink { min-width: 44px; }

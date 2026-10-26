@@ -13,32 +13,28 @@
 .mixed { border-left-color: var(--amber, #fbbf24); }
 .thin { border-left-color: var(--red, #f87171); }
 .head { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-.kicker { font-family: var(--mono); font-size: 0.55rem; text-transform: uppercase; letter-spacing: 0.16em; color: var(--dim); }
-.scope { font-family: var(--mono); font-size: 0.55rem; color: var(--sub); border: 1px solid var(--line); border-radius: 999px; padding: 0.1rem 0.5rem; }
+.kicker { font-family: var(--mono); font-size: var(--fs-meta); text-transform: uppercase; letter-spacing: 0.16em; color: var(--dim); }
+.scope { font-family: var(--body); font-size: var(--fs-meta); color: var(--text-3); border: 1px solid var(--line); border-radius: 999px; padding: 0.1rem 0.5rem; }
 .top { display: flex; align-items: baseline; gap: 0.6rem; margin: 0.45rem 0 0.55rem; flex-wrap: wrap; }
-.score { font-family: var(--mono); font-size: 1.35rem; font-weight: 700; }
-.score small { font-size: 0.7rem; color: var(--dim); font-weight: 400; }
-.label { font-size: 0.85rem; color: var(--sub); }
+.score { font-family: var(--mono); font-size: var(--fs-h3); font-weight: 500; }
+.score small { font-size: var(--fs-meta); color: var(--dim); font-weight: 400; }
+.label { font-size: var(--fs-ui); color: var(--sub); }
 .factors { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.45rem; }
 .factor { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto; grid-template-areas: 'l b v' 'd d d'; gap: 0.15rem 0.6rem; align-items: center; min-width: 0; }
-.fLabel { grid-area: l; font-size: 0.78rem; min-width: 0; overflow-wrap: anywhere; }
-.fLabel em { font-style: normal; color: var(--dim); font-family: var(--mono); font-size: 0.6rem; }
+.fLabel { grid-area: l; font-size: var(--fs-meta); min-width: 0; overflow-wrap: anywhere; }
+.fLabel em { font-style: normal; color: var(--dim); font-family: var(--mono); font-size: var(--fs-meta); }
 .bar { grid-area: b; height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; min-width: 0; }
 .bar span { display: block; height: 100%; background: var(--sub); border-radius: 999px; }
 .clear .bar span { background: var(--green, #34d399); }
 .mixed .bar span { background: var(--amber, #fbbf24); }
 .thin .bar span { background: var(--red, #f87171); }
-.fVal { grid-area: v; font-family: var(--mono); font-size: 0.72rem; }
-.fDetail { grid-area: d; font-size: 0.68rem; color: var(--dim); min-width: 0; overflow-wrap: anywhere; }
-.basis { margin: 0.6rem 0 0; font-size: 0.68rem; color: var(--dim); }
-.thinLine { margin: 0.6rem 0 0; font-family: var(--mono); font-size: 0.66rem; color: var(--dim); }
+.fVal { grid-area: v; font-family: var(--mono); font-size: var(--fs-meta); }
+.fDetail { grid-area: d; font-size: var(--fs-meta); color: var(--dim); min-width: 0; overflow-wrap: anywhere; }
+.basis { margin: 0.6rem 0 0; font-size: var(--fs-meta); color: var(--dim); }
+.thinLine { margin: 0.6rem 0 0; font-family: var(--mono); font-size: var(--fs-meta); color: var(--dim); }
 
 /* Phone floor (audit 2026-10-23): every label and value reads at 12px. */
 @media (max-width: 768px) {
-  .kicker, .scope, .score small, .fLabel em, .fVal, .fDetail, .basis, .thinLine { font-size: 0.75rem; }
+  .kicker, .scope, .score small, .fLabel em, .fVal, .fDetail, .basis, .thinLine { font-size: var(--fs-meta); }
 }
 
-/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
-@media (max-width: 768px) {
-  .kicker, .scope, .score small, .fLabel em, .fVal, .fDetail, .basis, .thinLine { font-size: 0.75rem; }
-}
