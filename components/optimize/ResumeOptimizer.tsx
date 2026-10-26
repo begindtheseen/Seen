@@ -17,6 +17,8 @@ import {
   type OptimizeDiagnosis, type OptimizeResult, type OptimizeInput, type OptimizeError,
 } from '@/lib/optimizeClient'
 import s from './ResumeOptimizer.module.css'
+import Button from '@/components/ui/Button'
+import Badge, { Chip } from '@/components/ui/Badge'
 
 type Phase = 'reading' | 'questions' | 'writing' | 'review' | 'done' | 'error'
 
@@ -34,12 +36,12 @@ export interface ResumeOptimizerProps extends OptimizeInput {
   onClose?: () => void
 }
 
-const STRENGTH: Record<string, { label: string; tone: 'good' | 'ok' | 'gap' }> = {
+const STRENGTH: Record<string, { label: string; tone: 'good' | 'caution' | 'neutral' }> = {
   strong: { label: 'Shown in a bullet', tone: 'good' },
-  weak: { label: 'Shown, could be clearer', tone: 'ok' },
-  stated: { label: 'Listed, not shown', tone: 'ok' },
-  implied: { label: 'Your titles show it', tone: 'ok' },
-  none: { label: 'Not on your résumé', tone: 'gap' },
+  weak: { label: 'Shown, could be clearer', tone: 'caution' },
+  stated: { label: 'Listed, not shown', tone: 'caution' },
+  implied: { label: 'Your titles show it', tone: 'caution' },
+  none: { label: 'Not on your résumé', tone: 'neutral' },
 }
 
 export default function ResumeOptimizer(props: ResumeOptimizerProps) {
@@ -141,7 +143,7 @@ export default function ResumeOptimizer(props: ResumeOptimizerProps) {
       {phase === 'error' && (
         <div className={s.block}>
           <p className={s.errorText} role="alert">{error}</p>
-          {onClose && <button type="button" className={s.secondary} onClick={onClose}>Close</button>}
+          {onClose && <Button variant="secondary" onClick={onClose}>Close</Button>}
         </div>
       )}
 
@@ -156,7 +158,7 @@ export default function ResumeOptimizer(props: ResumeOptimizerProps) {
                 return (
                   <li key={r.label} className={s.req}>
                     <span className={s.reqLabel}>{r.label}</span>
-                    <span className={`${s.chip} ${s[st.tone]}`}>{st.label}</span>
+                    <Badge tone={st.tone} pill>{st.label}</Badge>
                   </li>
                 )
               })}
@@ -182,8 +184,8 @@ export default function ResumeOptimizer(props: ResumeOptimizerProps) {
                     {q.choices.length > 0 && (
                       <div className={s.choices} role="group" aria-label="Quick answers">
                         {q.choices.map((c) => (
-                          <button key={c} type="button" className={`${s.choice} ${answers[q.id] === c ? s.choiceOn : ''}`} aria-pressed={answers[q.id] === c}
-                            onClick={() => setAnswers((a) => ({ ...a, [q.id]: a[q.id] === c ? '' : c }))}>{c}</button>
+                          <Chip key={c} selected={answers[q.id] === c}
+                            onClick={() => setAnswers((a) => ({ ...a, [q.id]: a[q.id] === c ? '' : c }))}>{c}</Chip>
                         ))}
                       </div>
                     )}
@@ -206,9 +208,9 @@ export default function ResumeOptimizer(props: ResumeOptimizerProps) {
           )}
 
           <div className={s.actions}>
-            <button type="button" className={s.primary} onClick={write}>
+            <Button variant="primary" size="lg" onClick={write}>
               Write my changes · {isPro ? 'included with Pro' : priceLabel}
-            </button>
+            </Button>
             <p className={s.fine}>{answeredCount ? `Uses your ${answeredCount} answer${answeredCount > 1 ? 's' : ''}. ` : ''}Every line is checked against your résumé before you see it. You choose what to keep.</p>
           </div>
         </>
@@ -274,10 +276,10 @@ export default function ResumeOptimizer(props: ResumeOptimizerProps) {
           )}
 
           <div className={s.actions}>
-            <button type="button" className={s.primary} onClick={finish} disabled={!kept.size && !(result.summary && keepSummary)}>
+            <Button variant="primary" size="lg" onClick={finish} disabled={!kept.size && !(result.summary && keepSummary)}>
               {kept.size || (result.summary && keepSummary) ? `Apply ${kept.size + (result.summary && keepSummary ? 1 : 0)} change${kept.size + (result.summary && keepSummary ? 1 : 0) === 1 ? '' : 's'}` : 'Keep at least one change'}
-            </button>
-            {onClose && <button type="button" className={s.secondary} onClick={onClose}>Not now</button>}
+            </Button>
+            {onClose && <Button variant="secondary" onClick={onClose}>Not now</Button>}
           </div>
         </>
       )}
@@ -287,11 +289,11 @@ export default function ResumeOptimizer(props: ResumeOptimizerProps) {
           <p className={s.lede}>Your résumé for this job. Read it once in your own voice before you send it.</p>
           <pre className={s.resume} aria-label="Updated résumé">{finalText}</pre>
           <div className={s.actions}>
-            {onApply && <button type="button" className={s.primary} onClick={() => onApply(finalText)}>{applyLabel}</button>}
-            <button type="button" className={s.secondary} onClick={async () => { try { await navigator.clipboard.writeText(finalText); setCopied(true); setTimeout(() => setCopied(false), 1800) } catch { /* clipboard blocked */ } }}>
+            {onApply && <Button variant="primary" size="lg" onClick={() => onApply(finalText)}>{applyLabel}</Button>}
+            <Button variant="secondary" icon={copied ? 'check' : undefined} onClick={async () => { try { await navigator.clipboard.writeText(finalText); setCopied(true); setTimeout(() => setCopied(false), 1800) } catch { /* clipboard blocked */ } }}>
               {copied ? 'Copied' : 'Copy text'}
-            </button>
-            <button type="button" className={s.secondary} onClick={() => setPhase('review')}>Back to changes</button>
+            </Button>
+            <Button variant="ghost" onClick={() => setPhase('review')}>Back to changes</Button>
           </div>
         </>
       )}
@@ -305,7 +307,7 @@ function lineOf(diag: OptimizeDiagnosis | null, result: OptimizeResult, id: stri
 const short = (t: string) => (t.length > 70 ? `${t.slice(0, t.lastIndexOf(' ', 68))}…` : t)
 
 function Keep({ on, onClick }: { on: boolean; onClick: () => void }) {
-  return <button type="button" className={`${s.keep} ${on ? s.keepOn : ''}`} aria-pressed={on} onClick={onClick}>{on ? '✓ Keep' : 'Skip'}</button>
+  return <Chip selected={on} icon={on ? 'check' : undefined} onClick={onClick} aria-label={on ? 'Keeping this change — tap to skip it' : 'Skipping this change — tap to keep it'}>{on ? 'Keep' : 'Skip'}</Chip>
 }
 
 function Busy({ line, sub }: { line: string; sub: string }) {
