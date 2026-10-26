@@ -1,10 +1,12 @@
 'use client'
 
+import { notify } from '@/lib/notify'
+
+/**
+ * A one-line confirmation ("Synced to your account."). Routed through the ONE toast surface
+ * (components/ToastHost via lib/notify) — there used to be a second, bottom-centred #toast pill
+ * with its own look and timer.
+ */
 export function showToast(message: string): void {
-  if (typeof document === 'undefined') return
-  const t = document.getElementById('toast')
-  if (!t) return
-  t.textContent = message
-  t.classList.add('show')
-  setTimeout(() => t.classList.remove('show'), 3200)
+  notify({ title: message, severity: 'info', duration: 3200 })
 }

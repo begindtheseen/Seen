@@ -12,6 +12,7 @@ import CommandPalette from '@/components/shell/CommandPalette'
 import RouteProgress from '@/components/shell/RouteProgress'
 import { Syne, Instrument_Sans, DM_Mono } from 'next/font/google'
 import './globals.css'
+import '@/components/ui/ui.css'
 import './motion.css'
 
 // Exactly the faces the type scale uses (app/globals.css tokens) — self-hosted by next/font, so no
@@ -96,7 +97,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Footer />
           <TabBar />
           <CommandPalette />
-          <div id="toast" />
           <ToastHost />
           <MicroSurveyHost />
           {/* Invite links: keeps ?ref= and claims it once an account signs in (lib/referralClient.ts). */}

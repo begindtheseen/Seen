@@ -131,7 +131,7 @@ p{text-wrap:pretty}
 .site-main a:not([class]){color:var(--blue);text-decoration:underline;text-decoration-color:rgba(59,130,246,.45);text-underline-offset:.14em}
 .site-main a:not([class]):hover{text-decoration-color:var(--blue)}
 /* Phone tab bar (components/shell/TabBar) — pages and the footer leave room for it; the bottom toast rides above it. */
-@media(max-width:768px){html.tabbar .site-main{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}html.tabbar footer{padding-bottom:calc(1.2rem + 64px + env(safe-area-inset-bottom,0px))!important}html.tabbar .toast{bottom:calc(80px + env(safe-area-inset-bottom,0px))}}
+@media(max-width:768px){html.tabbar .site-main{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}html.tabbar footer{padding-bottom:calc(1.2rem + 64px + env(safe-area-inset-bottom,0px))!important}}
 
 @keyframes heroIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
 @keyframes heroOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-14px)}}
@@ -239,17 +239,11 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .ntab.active{color:#fff;font-weight:600;background:rgba(255,255,255,.12);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-radius:9px;box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 2px 8px rgba(0,0,0,.3),0 0 0 .5px rgba(255,255,255,.1)}
 .ntab-new{font-family:var(--mono);font-size:var(--fs-meta);background:var(--blue);color:#fff;border-radius:3px;padding:.1rem .3rem;font-weight:500;letter-spacing:.04em}
 .nav-right{display:flex;align-items:center;gap:.45rem;flex-shrink:0}
-.btn{display:inline-flex;align-items:center;gap:.32rem;padding:.44rem 1rem;border-radius:8px;font-family:var(--body);font-weight:600;font-size:var(--fs-meta);cursor:pointer;text-decoration:none;transition:all .15s;border:none;white-space:nowrap}
-.btn-ghost{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);color:var(--sub);transition:all 0.2s ease}
-.btn-ghost:hover{background:rgba(59,130,246,0.08);border-color:rgba(59,130,246,0.4);color:var(--blue);box-shadow:0 0 16px rgba(59,130,246,0.12)}
-.btn-solid{background:linear-gradient(135deg,#1d4ed8 0%,#7c3aed 55%,#a855f7 100%);color:#fff;font-weight:600;box-shadow:0 0 24px rgba(124,58,237,0.35),0 0 48px rgba(29,78,216,0.15);transition:all 0.2s ease}
-.btn-solid:hover{background:linear-gradient(135deg,#3b82f6 0%,#8b5cf6 55%,#c084fc 100%);box-shadow:0 0 40px rgba(124,58,237,0.5),0 0 80px rgba(99,102,241,0.2);transform:translateY(-1px)}
-.btn-green{background:linear-gradient(135deg,#1d4ed8 0%,#7c3aed 55%,#a855f7 100%);color:#fff;font-weight:600;box-shadow:0 0 28px rgba(124,58,237,0.4)}
-.btn-green:hover{box-shadow:0 0 48px rgba(124,58,237,0.6),0 4px 28px rgba(99,102,241,0.3);transform:translateY(-1px)}
-.btn-purple{background:var(--purple);color:#fff;font-weight:600}
-.btn-purple:hover{opacity:.88;transform:translateY(-1px)}
-.btn-lg{padding:.72rem 1.75rem;font-size:var(--fs-ui)}
-.btn-xl{padding:.9rem 2.25rem;font-size:var(--fs-body)}
+/* Legacy .btn classes render exactly like components/ui/Button (rules in components/ui/ui.css alias
+   .btn-solid/.btn-green → primary and .btn-ghost → ghost). New markup uses <Button>. */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:34px;padding:0 var(--sp-3);border-radius:var(--r-control);font-family:var(--body);font-weight:600;font-size:var(--fs-sm);line-height:1.2;cursor:pointer;text-decoration:none;border:1px solid transparent;white-space:nowrap;transition:background var(--dur-state) var(--ease-out),border-color var(--dur-state) var(--ease-out),color var(--dur-state) var(--ease-out),box-shadow var(--dur-state) var(--ease-out),transform var(--dur-press) var(--ease-out)}
+.btn-lg{min-height:44px;padding:0 var(--sp-5);font-size:var(--fs-ui)}
+.btn-xl{min-height:48px;padding:0 var(--sp-6);font-size:var(--fs-body)}
 
 /* PAGES */
 .page{display:none;min-height:100vh;padding-top:58px;box-sizing:border-box;overflow-x:hidden;width:100%}
@@ -835,8 +829,6 @@ select.fi,select.fs,select.fi-r,select.fs-r{background-image:url("data:image/svg
 .disc a{color:var(--blue);text-decoration:none}
 
 /* TOAST */
-.toast{position:fixed;bottom:1.4rem;left:50%;transform:translateX(-50%) translateY(60px);background:var(--raised);border:1px solid var(--line2);color:var(--sub);padding:.6rem 1.35rem;border-radius:9px;font-family:var(--mono);font-size:var(--fs-meta);z-index:9997;transition:all .22s ease;opacity:0;white-space:nowrap;box-shadow:0 8px 32px rgba(0,0,0,.4)}
-.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
 
 /* SEEN LIVE — stacked notification toasts (ToastHost) + activity-feed enter */
 @keyframes toastIn{from{transform:translateX(120%);opacity:0}to{transform:translateX(0);opacity:1}}
@@ -1761,7 +1753,7 @@ details[open] .dt-chev{transform:rotate(180deg)}
 :focus-visible{outline:2px solid rgba(129,140,248,.75);outline-offset:2px}
 
 /* ── Press feedback on every button-like control ── */
-.btn:active,.lp2-btn:active{transform:translateY(0) scale(.975)}
+.btn:active,.lp2-btn:active{transform:scale(.98)}
 
 /* ── Value cards: icon responds with the card ── */
 .lp2-card-ico{transition:transform .3s cubic-bezier(.16,1,.3,1),background .3s ease,color .3s ease,border-color .3s ease}
@@ -1856,7 +1848,7 @@ body.modal-open .site-main,body.modal-open .site-main *,body.modal-open nav,body
    utility gives an inline text link (Report →, @ company) the same floor. */
 @media(max-width:768px){
   :root{--fs-46:.75rem;--fs-48:.75rem;--fs-50:.75rem;--fs-52:.75rem;--fs-53:.75rem;--fs-54:.75rem;--fs-55:.75rem;--fs-56:.75rem;--fs-57:.75rem;--fs-58:.75rem;--fs-60:.75rem;--fs-62:.75rem;--fs-64:.75rem;--fs-65:.75rem;--fs-66:.75rem;--fs-68:.75rem;--fs-70:.75rem;--fs-72:.75rem;--fs-74:.75rem}
-  .loader-txt,.eyebrow,.waste-badge,.vibe,.mbar-lbl,.mbar-val,.funnel-label,.funnel-pct,.funnel-ghost-note,.tick,.tloc,.hero-kicker,.qtag,.hs-l,.ht-url,.ht-status,.ht-loc,.ht-role,.wp-label,.wp-note,.src-chip,.ldr-rank,.ldr-loc,.ldr-label,.ldr-waste,.side-menu-label,.jc-logo,.jc-ts-lbl,.jc-co,.jc-loc,.jc-sal,.how-n,.how-tag,.diff-winner,.fh,.fc,.jct,.jss,.jlc-sl,.jlc-loc,.jlc-mi,.jlc-sal,.jlc-waste-badge,.jd-sl,.dsr-l,.dc-urg,.dc-count,.rpanel-title,.rp-live,.fl,.rta,.r-empty-txt,.shl,.as-title,.fp-title,.fp-val,.back-btn,.co-ind,.co-loc-tag,.co-grade-lbl,.co-grade-score,.co-verified,.co-share-btn,.co-live,.co-ml,.agg-item,.feed-filter-btn,.feed-role,.feed-meta,.rc-av,.rc-meta,.rc-src,.rc-via,.co-badge,.co-dq,.co-sec-lbl,.co-tl-l,.co-act,.co-chip,.co-track-input,.co-sticky-logo,.co-sticky-score span,.co-sec-cnt,.co-sec-sum,.co-kv,.co-city-input,.co-more,.co-pill,.co-link-btn,.co-about-line,.co-cmp-input,.co-cmp-go,.co-cmp-clear,.co-cmp-table,.co-cmp-metric-h,.co-cmp-name,.co-cmp-metric,.co-cmp-val,.co-seo-sub,.fb-hd,.ok-msg,.pc-eye,.pc-per,.disc,.toast,.check-count,.app-check-tag,.app-check-later,.app-check-note,.app-check-opt,.app-card-co,.app-card-loc,.app-card-score-l,.status-pill,.days-chip,.nudge,.tracker-stat-l,.dstat-l,.dsec-link,.deyebrow,.dmove-s,.dqa-s,.dchip,.sugg-chip,.hs-title,.hs-rec,.vfeed-hdr-l,.vfeed-clock,.vfeed-detail,.vfeed-ts,.vfeed-foot,.vtag,.vtag-grade,.idx-eyebrow,.adm-kpi-l,.adm-kpi-sub,.adm-section-lbl,.surge-chip,.oc-comp,.oc-trust-sig,.oc-btn,.oc-benchmark,.oc-trust,.qs-btn,.adm-btn,.adm-btn-danger,.issue-chip,.issue-badge,.swipe-badge,.co-page .vibe,.co-page .rc-outcome,.co-page .rc-meta,.co-page .rc-src,.co-page .rc-via,.lp2-trust-l,.ac-eyebrow,.ac-meta,.ac-panel-title,.ac-panel-status,.ac-tile-l,.ac-tile-p,.ac-mrow-l,.ac-mrow-mid,.ac-mrow-arrow,.ac-panel-foot,.ac-attn-t,.ac-attn-d,.ac-attn-act,.ac-allclear,.ac-badge,.ac-btn,.ac-adv>summary,.ac-modal-sub,.ac-modal-search input,.ac-acct-email,.ac-acct-age,.a2-eyebrow,.a2-build,.a2-pill,.a2-card-l,.a2-card-p,.a2-card-sec,.a2-queue-ttl,.a2-queue-count,.a2-queue-empty,.a2-attn-sev,.a2-attn-t,.a2-attn-d,.a2-attn-act,.a2-tab,.a2-overview-hint,.ai-tab{font-size:var(--fs-meta)}
+  .loader-txt,.eyebrow,.waste-badge,.vibe,.mbar-lbl,.mbar-val,.funnel-label,.funnel-pct,.funnel-ghost-note,.tick,.tloc,.hero-kicker,.qtag,.hs-l,.ht-url,.ht-status,.ht-loc,.ht-role,.wp-label,.wp-note,.src-chip,.ldr-rank,.ldr-loc,.ldr-label,.ldr-waste,.side-menu-label,.jc-logo,.jc-ts-lbl,.jc-co,.jc-loc,.jc-sal,.how-n,.how-tag,.diff-winner,.fh,.fc,.jct,.jss,.jlc-sl,.jlc-loc,.jlc-mi,.jlc-sal,.jlc-waste-badge,.jd-sl,.dsr-l,.dc-urg,.dc-count,.rpanel-title,.rp-live,.fl,.rta,.r-empty-txt,.shl,.as-title,.fp-title,.fp-val,.back-btn,.co-ind,.co-loc-tag,.co-grade-lbl,.co-grade-score,.co-verified,.co-share-btn,.co-live,.co-ml,.agg-item,.feed-filter-btn,.feed-role,.feed-meta,.rc-av,.rc-meta,.rc-src,.rc-via,.co-badge,.co-dq,.co-sec-lbl,.co-tl-l,.co-act,.co-chip,.co-track-input,.co-sticky-logo,.co-sticky-score span,.co-sec-cnt,.co-sec-sum,.co-kv,.co-city-input,.co-more,.co-pill,.co-link-btn,.co-about-line,.co-cmp-input,.co-cmp-go,.co-cmp-clear,.co-cmp-table,.co-cmp-metric-h,.co-cmp-name,.co-cmp-metric,.co-cmp-val,.co-seo-sub,.fb-hd,.ok-msg,.pc-eye,.pc-per,.disc,.check-count,.app-check-tag,.app-check-later,.app-check-note,.app-check-opt,.app-card-co,.app-card-loc,.app-card-score-l,.status-pill,.days-chip,.nudge,.tracker-stat-l,.dstat-l,.dsec-link,.deyebrow,.dmove-s,.dqa-s,.dchip,.sugg-chip,.hs-title,.hs-rec,.vfeed-hdr-l,.vfeed-clock,.vfeed-detail,.vfeed-ts,.vfeed-foot,.vtag,.vtag-grade,.idx-eyebrow,.adm-kpi-l,.adm-kpi-sub,.adm-section-lbl,.surge-chip,.oc-comp,.oc-trust-sig,.oc-btn,.oc-benchmark,.oc-trust,.qs-btn,.adm-btn,.adm-btn-danger,.issue-chip,.issue-badge,.swipe-badge,.co-page .vibe,.co-page .rc-outcome,.co-page .rc-meta,.co-page .rc-src,.co-page .rc-via,.lp2-trust-l,.ac-eyebrow,.ac-meta,.ac-panel-title,.ac-panel-status,.ac-tile-l,.ac-tile-p,.ac-mrow-l,.ac-mrow-mid,.ac-mrow-arrow,.ac-panel-foot,.ac-attn-t,.ac-attn-d,.ac-attn-act,.ac-allclear,.ac-badge,.ac-btn,.ac-adv>summary,.ac-modal-sub,.ac-modal-search input,.ac-acct-email,.ac-acct-age,.a2-eyebrow,.a2-build,.a2-pill,.a2-card-l,.a2-card-p,.a2-card-sec,.a2-queue-ttl,.a2-queue-count,.a2-queue-empty,.a2-attn-sev,.a2-attn-t,.a2-attn-d,.a2-attn-act,.a2-tab,.a2-overview-hint,.ai-tab{font-size:var(--fs-meta)}
   .hstat-l,.adm-panel-hdr,.co-page .rc-srclink{font-size:var(--fs-meta)!important}
   .sring-l,.hs-c-lbl,.hs-m-lbl,.hs-m-avg,.dpill-l{font-size:var(--fs-meta)}
   /* The listing score ring (JobCard sets width/height 46 inline): 11px "CAUTION" needs a 56px ring; min-width wins over the inline width. */
