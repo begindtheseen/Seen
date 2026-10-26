@@ -123,7 +123,7 @@ export default function DashboardPage() {
     if (!isLoggedIn) { router.replace(loginHref(`${window.location.pathname}${window.location.search}`)); return }
     // Employers have no seeker dashboard — route them to their portal. Safety net for a stale
     // link or a post-login redirect race; the login page already sends employers to /employers.
-    if (isLoggedIn && !isSeeker) { router.replace('/employers'); return }
+    if (!isSeeker) { router.replace('/employers'); return }
   }, [ready, isLoggedIn, isSeeker, router])
 
   // ONE /api/user-sync call at mount: `load` brings the applications AND the pro flag, the account's

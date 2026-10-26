@@ -308,7 +308,6 @@ export default async function handler(req, res) {
 
   // ── Company leaderboard ───────────────────────────────────────────────────────
   if (body.action === 'leaderboard') {
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(200).json({ companies: [] });
     try {
       // report_count is the FUSED total (first-party rows + the web-research claim) — fine for
       // ordering, never for a "reports" label. Every row also carries the honest split so clients
@@ -749,7 +748,7 @@ export default async function handler(req, res) {
     // wait_days: accept the client's value when plausible (0–365) — it feeds response-time
     // intel; the old hardcoded null discarded it even on successful submits.
     const waitDays = Number.isFinite(parseInt(body.wait_days)) ? Math.max(0, Math.min(365, parseInt(body.wait_days))) : null;
-    const reportBase = { company_id: cid, location_id: lid || null, role: (role||'').trim().slice(0,200), platform: (platform||'').trim().slice(0,100), outcome: outcome||'waiting', ghost_stage: ghost_stage||null, rounds: parseInt(rounds)||0, wait_days: waitDays, unpaid_work: unpaid_work||'na', experience_level: (experience_level||'').trim().slice(0,50), report_text: report_text ? report_text.slice(0,2000) : null,
+    const reportBase = { company_id: cid, location_id: lid || null, role: String(role).trim().slice(0,200), platform: (platform||'').trim().slice(0,100), outcome: outcome||'waiting', ghost_stage: ghost_stage||null, rounds: parseInt(rounds)||0, wait_days: waitDays, unpaid_work: unpaid_work||'na', experience_level: (experience_level||'').trim().slice(0,50), report_text: report_text ? report_text.slice(0,2000) : null,
       source:        trusted ? 'direct' : 'anonymous',
       needs_review:  trust.review,
       outcome_weight: trust.weight,
