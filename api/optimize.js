@@ -27,7 +27,7 @@ import { unoptimizableListing } from '../lib/server/optimizePackage.js';
 import { chat, llmAvailable, LLMUnavailableError } from '../lib/server/llm.js';
 import { textHash } from '../lib/server/optimizeCache.js';
 import {
-  OPTIMIZER_V3, buildContext, diagnosePrompt, guardDiagnosis, rewritePrompt, reviewPrompt, guardRewrites, repairPrompt, repairable,
+  OPTIMIZER_V3, gapsAfterAnswers, buildContext, diagnosePrompt, guardDiagnosis, rewritePrompt, reviewPrompt, guardRewrites, repairPrompt, repairable,
 } from '../lib/resume/optimize/engine.js';
 
 const sha = (s) => createHash('sha256').update(s).digest('hex');
@@ -188,7 +188,7 @@ export default async function handler(req, res) {
         skills: gated.skills,
         order: diagnosis.bullets.filter((b) => b.action === 'move_up').map((b) => b.id),
         cut: diagnosis.bullets.filter((b) => b.action === 'cut').map((b) => ({ id: b.id, why: b.why })),
-        gaps: diagnosis.gaps,
+        gaps: gapsAfterAnswers(diagnosis.gaps, answers),
         requirements: diagnosis.requirements,
         answered: answers.map((a) => a.id),
         rejected_count: gated.rejected.length,
