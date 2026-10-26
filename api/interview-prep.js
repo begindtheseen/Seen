@@ -56,6 +56,8 @@ export function previewFrom({ company, role, resumeText, stage = '' }) {
 }
 
 const clean = (s, n) => String(s || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, n);
+// A posting keeps its lines: its sections ("What we're looking for") are how Seen reads requirements.
+const cleanText = (s, n) => String(s || '').replace(/\r\n?/g, '\n').replace(/[\u0000-\u0008\u000b-\u001f]/g, ' ').trim().slice(0, n);
 // Legal suffixes dropped so "Ross Stores, Inc." and "ross stores" read the same reports.
 const SUFFIX_RE = /[,.]?\s+(inc|llc|corp|corporation|co|company|ltd|plc)\.?$/i;
 function nameVariants(company) {
@@ -206,7 +208,7 @@ export default async function handler(req, res) {
 
     // The posting: the card's own listing when it has one (round 2: the model was told "JOB POSTING: not
     // provided" while Seen held the exact listing), else what the client sent.
-    let jobText = clean(body.job_text, 6000);
+    let jobText = cleanText(body.job_text, 6000);
     const jobId = String(body.job_id || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
     if (!jobText && jobId) {
       const jr = await db(`jobs?id=eq.${encodeURIComponent(jobId)}&select=title,company,description&limit=1`).catch(() => null);

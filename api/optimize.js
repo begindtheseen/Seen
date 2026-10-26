@@ -32,6 +32,8 @@ import {
 
 const sha = (s) => createHash('sha256').update(s).digest('hex');
 const clean = (s, n) => String(s || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, n);
+// A posting keeps its lines: its sections ("What we're looking for") are how Seen reads requirements.
+const cleanText = (s, n) => String(s || '').replace(/\r\n?/g, '\n').replace(/[\u0000-\u0008\u000b-\u001f]/g, ' ').trim().slice(0, n);
 const CACHE_DAYS = 7;
 
 function db(path, opts = {}) {
@@ -69,7 +71,7 @@ async function inputs(req, res, body) {
   const preview = previewOnlyError(body);
   if (preview) { res.status(preview.status).json({ ...preview.body, charged: false }); return null; }
   const resume = canonicalResumeText(body.resume);
-  const jobDescription = clean(body.jobDescription, 12000);
+  const jobDescription = cleanText(body.jobDescription, 12000);
   const job = clean(body.job, 160);
   const company = clean(body.company, 120);
   const taxonomy = await loadSkillTaxonomy().catch(() => null);

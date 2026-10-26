@@ -116,6 +116,12 @@ test('a posting that states no requirements is refused free, before any model ca
   assert.equal(state.modelCalls.length, calls);
 });
 
+test('a posting keeps its lines, so its requirement sections are read (customer-service posting)', async () => {
+  const cs = JSON.parse(readFileSync(new URL('../scripts/eval/fixtures/04-customer-service.json', import.meta.url), 'utf8'));
+  const r = await call({ action: 'diagnose', resume: cs.resume.join('\n'), job: cs.job.title, company: cs.job.company, jobDescription: cs.job.description.join('\n') });
+  assert.equal(r.code, 200, JSON.stringify(r.body).slice(0, 200));
+});
+
 test('decide records accepted and rejected ids only', async () => {
   const d = await call({ action: 'diagnose', ...base });
   const r = await call({ action: 'decide', key: d.body.key, accepted: ['J1.2', '<script>'], rejected: ['J1.3'] });
