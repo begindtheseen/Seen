@@ -46,6 +46,9 @@ export interface OptimizeProposal {
   merges?: string[]
   merged_text?: string[]
   repaired?: boolean
+  /** a new bullet from the person's answer, inserted after insert_after */
+  add?: boolean
+  insert_after?: string
   repeated_lead?: boolean
 }
 export interface OptimizeResult {
@@ -120,6 +123,12 @@ export function applyAccepted(resume: string, proposals: OptimizeProposal[], acc
   const strip = (l: string) => l.replace(/^[\s•●▪◦*·\-–—]+/, '').trim()
   for (const p of proposals) {
     if (!accepted.has(p.id)) continue
+    if (p.add) {
+      const lines = out.split('\n')
+      const at = lines.findIndex((l) => !!p.insert_after && l.includes(p.insert_after))
+      if (at >= 0) { const mark = (lines[at].match(/^\s*[•●▪◦*·\-–—]\s*/) || ['• '])[0]; lines.splice(at + 1, 0, `${mark}${p.after}`); out = lines.join('\n') }
+      continue
+    }
     const idx = out.indexOf(p.before)
     if (idx >= 0) out = out.slice(0, idx) + p.after + out.slice(idx + p.before.length)
     for (const m of p.merged_text || []) out = out.split('\n').filter((l) => strip(l) !== m).join('\n')

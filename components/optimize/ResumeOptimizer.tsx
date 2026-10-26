@@ -245,7 +245,7 @@ export default function ResumeOptimizer(props: ResumeOptimizerProps) {
                       <span className={s.why}>{p.why}</span>
                       <Keep on={kept.has(p.id)} onClick={() => toggle(p.id)} />
                     </div>
-                    <p className={s.before}><span className={s.tag}>Now</span>{p.before}</p>
+                    {p.add ? <p className={s.before}><span className={s.tag}>Adds</span>A new line from your answer</p> : <p className={s.before}><span className={s.tag}>Now</span>{p.before}</p>}
                     {(p.merged_text || []).map((m) => <p key={m} className={s.before}><span className={s.tag}>Merged in</span>{m}</p>)}
                     <p className={s.after}><span className={s.tag}>New</span>{p.after}</p>
                     {p.used_answers.length > 0 && <p className={s.fine}>Uses your answer{p.used_answers.length > 1 ? 's' : ''}.</p>}

@@ -196,7 +196,7 @@ export default async function handler(req, res) {
       if (!authed?.uid) return res.status(401).json({ error: 'Sign in' });
       const key = clean(body.key, 80);
       if (!/^v3:[a-f0-9]{40}$/.test(key)) return res.status(400).json({ error: 'Bad key' });
-      const ids = (x) => (Array.isArray(x) ? x : []).map(String).filter((s) => /^J\d+\.\d+$|^summary$/.test(s)).slice(0, 80);
+      const ids = (x) => (Array.isArray(x) ? x : []).map(String).filter((s) => /^J\d+\.(?:\d+|new\d+)$|^summary$/.test(s)).slice(0, 80);
       const saved = await writeRun(authed.uid, `${key}:decision`, { version: OPTIMIZER_V3, accepted: ids(body.accepted), rejected: ids(body.rejected), at: new Date().toISOString() });
       return res.status(200).json({ ok: true, saved });
     }
