@@ -12,7 +12,6 @@ import type { NextRequest } from 'next/server'
 //   to us.i; lazy feature bundles like session replay load from us-assets)
 // - js.stripe.com / hooks.stripe.com — Stripe checkout widget
 // - nominatim.openstreetmap.org — City autocomplete
-// - api.anthropic.com is server-side only; never called from the browser
 // - cdn.jsdelivr.net is NOT used
 // Next.js DEV MODE only: the dev runtime (react-refresh / webpack eval sourcemaps)
 // requires 'unsafe-eval'. Without it the client bundle throws EvalError before

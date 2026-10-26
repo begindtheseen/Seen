@@ -17,7 +17,6 @@ import { structureAction, healthAction, rewriteAction, tailorAction, atsCheckAct
 import { renderPdf } from '../lib/resume/render/pdf.js';
 import { parseResume } from '../lib/resume/parse/index.js';
 import { normalizeDoc, docIsEmpty } from '../lib/resume/model.js';
-import { llmAvailable } from '../lib/server/llm.js';
 import { loadSkillTaxonomy } from '../lib/server/skillTaxonomy.js';
 import { fitContext } from '../lib/server/fitContext.js';
 import { canonicalResumeText } from '../lib/resume/canonical.js';
@@ -120,7 +119,7 @@ export default async function handler(req, res) {
   // ── Résumé Studio routes (lib/server/resumeStudio.js) ──────────────────────
   // structure / health / rewrite / ats_check / templates: deterministic, keyless, FREE (CPU only,
   // rate-limited). export: free with the "seenjobs.io" line, unbranded for Pro (same rule as
-  // download_resume). tailor: 1 credit like every AI tool; its optional LLM polish is Pro-only.
+  // download_resume). tailor: 1 credit like every AI tool (deterministic; no model is called).
   if (STUDIO_ROUTES[body.action]) return handleStudio(req, res, body);
 
   // ── Route: download_resume — return a complete, submittable résumé PDF ────────
@@ -668,7 +667,7 @@ async function handleStudio(req, res, body) {
         }
         const gate = await gateAI(req, 'resume_tailor');
         if (!gate.ok) return res.status(gate.status).json({ error: gate.error, credits_required: gate.credits_required, pro_required: gate.pro_required, balance: gate.balance ?? 0 });
-        const out = await tailorAction(body, { pro: !!gate.pro, allowPolish: llmAvailable(), taxonomy, fit });
+        const out = await tailorAction(body, { taxonomy, fit });
         return res.status(200).json({ ...out, balance: gate.balance, pro: !!gate.pro, charged: !gate.pro });
       }
       default: return res.status(400).json({ error: `Unknown action: ${body.action}` });

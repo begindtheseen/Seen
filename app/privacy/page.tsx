@@ -13,8 +13,8 @@ import { LegalMeta, LegalFooter, LEGAL_CONTACT, LEGAL_OPERATOR } from '@/compone
 //   email or session id stored, held for review (api/reports.js submit) · Inbox Autopilot facts only
 //   (lib/server/inbox) · emails: outcome-followups + cron-job-matches with per-list unsubscribe ·
 //   deletion: api/user-sync.js delete_account (cancels billing first, deletes every user table, de-links
-//   reports) · admin access: api/admin-stats.js, audited in admin_audit_log · AI: Anthropic
-//   (api.anthropic.com) and an OpenAI-compatible provider, Groq by default (lib/server/llm.js) ·
+//   reports) · admin access: api/admin-stats.js, audited in admin_audit_log · AI: none — every résumé,
+//   interview and job tool runs on Seen's own servers (owner decision 2026-10-26: no model API) ·
 //   geocoding: OpenStreetMap Nominatim (lib/server/geo.js) · analytics: PostHog only when
 //   NEXT_PUBLIC_POSTHOG_KEY is set (lib/analytics.ts).
 
@@ -147,11 +147,14 @@ export default function PrivacyPage() {
             <li style={li}><strong>Vercel</strong> — website hosting, serverless functions and request logs.</li>
             <li style={li}><strong>Stripe</strong> — payments and subscriptions.</li>
             <li style={li}><strong>Resend</strong> — sending Seen&apos;s emails, and receiving email you forward to your Inbox Autopilot address.</li>
-            <li style={li}><strong>Anthropic</strong>, and where enabled <strong>Groq</strong> — AI processing for features you use, such as résumé analysis and tailoring and job insights. The text needed for the request (for example your résumé and the job posting) is sent to produce the result.</li>
             <li style={li}><strong>PostHog</strong> — product analytics, only where enabled.</li>
             <li style={li}><strong>OpenStreetMap (Nominatim)</strong> — turning a city name into map coordinates for nearby-job search. Only the place name is sent.</li>
             <li style={li}><strong>Google Fonts</strong> — the typefaces on every page load from Google&apos;s servers, so your browser sends Google its IP address and browser details, as with any font host.</li>
           </ul>
+          <p style={p}>
+            Seen&apos;s résumé, interview-prep and job tools run on Seen&apos;s own servers. Your résumé and the job
+            postings you work with are not sent to any outside AI provider.
+          </p>
           <p style={p}>
             Job-listing sources we search for you (such as Adzuna, USAJOBS and employers&apos; job boards) receive
             only search words and a location — never your name, email or résumé.

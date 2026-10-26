@@ -330,7 +330,7 @@ function StudioInner() {
                   )}
                   {panelTab === 'health' && fixPreview && fixAll && <FixPreview log={fixAll.log} onApply={applyFixes} onCancel={() => setFixPreview(false)} />}
                   {panelTab === 'health' && health && <HealthPanel health={health} doc={doc} onJump={jump} onApplyRewrite={applyRewrite} onApplyVerb={applyVerb} onFixAll={fixAllNow} fixAllCount={fixAllCount} />}
-                  {panelTab === 'tailor' && <TailorPanel doc={doc} isLoggedIn={isLoggedIn} pro={pro} savedJobs={savedJobs} initialJob={initialJob} onNeed={(r) => { if (r === 'signin') { setError('Sign in to tailor your résumé (1 credit).'); router.push('/login?next=/resume/studio?tab=tailor') } else { setUpgradeFeature(r === 'pro' ? 'AI polish' : undefined); setShowUpgrade(r) } }} onUseVariant={useVariant} />}
+                  {panelTab === 'tailor' && <TailorPanel doc={doc} isLoggedIn={isLoggedIn} pro={pro} savedJobs={savedJobs} initialJob={initialJob} onNeed={(r) => { if (r === 'signin') { setError('Sign in to tailor your résumé (1 credit).'); router.push('/login?next=/resume/studio?tab=tailor') } else { setUpgradeFeature(undefined); setShowUpgrade(r) } }} onUseVariant={useVariant} />}
                   {panelTab === 'export' && <ExportPanel doc={doc} pro={pro} isLoggedIn={isLoggedIn} onNeedPro={() => { setUpgradeFeature('unbranded downloads'); setShowUpgrade('pro') }} role={active?.role} />}
                 </div>
               )}

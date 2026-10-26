@@ -413,9 +413,8 @@ export default async function handler(req, res) {
 
         canonical = expansion.canonical || qNorm;
         // DETERMINISTIC (no-AI) expansion — the curated role families bridge "theft prevention"
-        // → "asset protection", "warehouse" → "material handler" even though the LLM expansion
-        // has been dormant since 2026-07-03 (owner directive: no paid AI). Merge with any LLM
-        // related terms so the bridge exists on EVERY search, not just cached ones.
+        // → "asset protection", "warehouse" → "material handler". Seen calls no model API; merge
+        // with any related terms cached in query_expansions so the bridge exists on EVERY search.
         const curatedRelated = expandQueryTerms(qNorm);
         relatedTerms = [...new Set([...(expansion.related || []), ...curatedRelated])].filter(Boolean);
         // Pool reads: the ORIGINAL query FIRST (so rows stamped search_query=<query> — the

@@ -390,7 +390,7 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
                   {([
                     ['queued', stats.enrichment.queued], ['running', stats.enrichment.running], ['done', stats.enrichment.done],
                     ['empty', stats.enrichment.empty], ['error', stats.enrichment.error],
-                    ['reports added 24h', stats.enrichment.reports_added_24h], ['LLM calls 24h', stats.enrichment.llm_calls_24h],
+                    ['reports added 24h', stats.enrichment.reports_added_24h],
                   ] as [string, number | undefined][]).map(([label, n]) => (
                     <div key={label} style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', padding: '.35rem .75rem', borderRadius: 6, background: 'var(--raised, #111)', color: label === 'error' && (n ?? 0) > 0 ? 'var(--red)' : 'var(--sub)', border: '1px solid var(--line)' }}>
                       {label}: {n ?? 0}

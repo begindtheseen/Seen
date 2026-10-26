@@ -27,11 +27,12 @@ test('writableOutcome: applied → waiting, unknown/junk → null, valid passes 
   assert.equal(writableOutcome('maybe'), null);
 });
 
-test('self-filling worker row: no stated role → "" (never null)', () => {
-  const row = enrichRow({ outcome: 'ghosted', role: '', summary: 'Applicant reports no response.' }, { companyName: 'Sheetz', subreddit: 'jobs', threadId: 'abc123' });
+test('self-filling worker row: role is "" (never null), outcome writable', () => {
+  const row = enrichRow({ thread_id: 'abc123', comment_id: null, outcome: 'ghosted', excerpt: 'I applied to Sheetz and never heard back after the interview.' }, { companyName: 'Sheetz', subreddit: 'jobs', threadId: 'abc123' });
   assert.equal(row.role, '');
-  assert.equal(enrichRow({ outcome: 'ghosted', summary: 'x' }, { companyName: 'a', subreddit: 'jobs', threadId: 'abc123' }).role, '');
-  assert.equal(enrichRow({ outcome: 'ghosted', role: ' Cashier ', summary: 'x' }, { companyName: 'a', subreddit: 'jobs', threadId: 'abc123' }).role, 'Cashier');
+  assert.ok(REPORT_OUTCOMES.has(row.outcome));
+  // every outcome the rules can store is one the constraint accepts
+  for (const o of ['ghosted', 'rejected', 'autoreject', 'offer', 'hired', 'interview', 'interviewing', 'human']) assert.ok(REPORT_OUTCOMES.has(enrichRow({ thread_id: 'abc123', outcome: o, excerpt: 'x' }, { companyName: 'a', subreddit: 'jobs', threadId: 'abc123' }).outcome), o);
 });
 
 test('credit web-reports row: null role → ""', () => {

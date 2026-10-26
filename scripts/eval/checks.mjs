@@ -226,7 +226,7 @@ export function checkRecord(rec, fx, opts = {}) {
 
   if (rec.error) add('error', 'status', rec.error, `status ${rec.status}`);
   if (rec.status >= 500 || rec.status === 599) add('error', 'status', JSON.stringify(rec.output || '').slice(0, 200), `HTTP ${rec.status}`);
-  const budget = opts.latencyBudgetMs || (/interview_prep(?!_fallback)|tailor_polish/.test(rec.tool) ? 30000 : 3000);
+  const budget = opts.latencyBudgetMs || (/interview_prep(?!_fallback)/.test(rec.tool) ? 30000 : 3000);
   if (rec.ms > budget) add('latency', 'ms', `${rec.ms} ms`, `over ${budget} ms`);
 
   for (const it of items) {
@@ -307,7 +307,7 @@ export function checkRecord(rec, fx, opts = {}) {
 
   // role family: prep family field + other-field vocabulary in plans and questions
   if (rec.meta?.family && g.family && !g.family.includes(rec.meta.family)) add('wrong_family', 'family', rec.meta.family, `expected ${g.family.join(' / ')}`);
-  if (['advantage', 'interview_prep', 'interview_prep_fallback', 'optimize', 'tailor', 'tailor_polish'].includes(rec.tool) && g.family) {
+  if (['advantage', 'interview_prep', 'interview_prep_fallback', 'optimize', 'tailor'].includes(rec.tool) && g.family) {
     const mine = new Set([...g.family, ...g.family.flatMap((f) => FAMILY_ALIASES[f] || [])]);
     const text = items.filter((i) => ['advice', 'question', 'claim'].includes(i.kind) && !i.perRole).map((i) => i.text).join('\n');
     const tl = squash(text);
@@ -320,7 +320,7 @@ export function checkRecord(rec, fx, opts = {}) {
     }
   }
 
-  // HumanProof / polish: a rewrite must not drop meaning words
+  // HumanProof: a rewrite must not drop meaning words
   for (const [from, to] of rec.meta?.pairs || []) {
     const lost0 = droppedWords(from, to);
     // content words and numbers always count; a function word counts only when it ended a clause ("calls for." → "calls.")

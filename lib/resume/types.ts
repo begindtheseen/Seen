@@ -88,8 +88,7 @@ export interface TailorPlan {
   transferable: Array<{ requirement: string; evidence: string; explanation: string }>
   provenance: Array<Record<string, unknown> & { kind: string }>
 }
-export interface PolishResult { available: boolean; reason?: string; applied?: number; changes: Array<{ id: string; from: string; text: string; reason: string }>; rejected: Array<{ id: string; reason: string }> }
-export interface TailorResponse { ok: boolean; plan: TailorPlan; variant: ResumeDoc; health: Health; polish: PolishResult | null; balance?: number; pro?: boolean; error?: string; credits_required?: boolean; pro_required?: boolean }
+export interface TailorResponse { ok: boolean; plan: TailorPlan; variant: ResumeDoc; health: Health; balance?: number; pro?: boolean; error?: string; credits_required?: boolean; pro_required?: boolean }
 
 export interface AtsCheck {
   version: string; format: string; template: string | null; score: number; grade: string

@@ -35,14 +35,14 @@ const want = (tool) => !onlyTools || onlyTools.includes(tool);
 // ── run ───────────────────────────────────────────────────────────────────────────────────────────
 const records = [];
 let prod = null;
-const prodTools = ['interview_prep', 'tailor_polish'];
+const prodTools = ['interview_prep'];
 const P = await import(new URL('prod.mjs', EVAL).href);
 if (args.prod) {
   prod = new P.ProdClient({ base: typeof args.base === 'string' ? args.base : 'https://seenjobs.io', accounts: typeof args.accounts === 'string' ? args.accounts : process.env.EVAL_ACCOUNTS_FILE, fresh: !!args.fresh, reserve: Number(args.reserve ?? 5), paceMs: Number(args.pace ?? 15) * 1000, wait: !!args.wait, log });
 } else {
   // cached live results only (no network): a re-run still shows the last model outputs, marked cached
   prod = new P.ProdClient({ base: typeof args.base === 'string' ? args.base : 'https://seenjobs.io', fresh: false, log });
-  prod.stopped = { interview_prep: 'not run (pass --prod)', tailor_polish: 'not run (pass --prod)', interview_prep_jobtext: 'not run (pass --prod)' };
+  prod.stopped = { interview_prep: 'not run (pass --prod)', interview_prep_jobtext: 'not run (pass --prod)' };
 }
 
 for (const fx of fixtures) {
@@ -67,7 +67,6 @@ for (const fx of fixtures) {
   if (!fx.gold.expect_no_requirements) {
     try {
       if (want('interview_prep')) recs.push(await P.prodInterviewPrep(prod, fx));
-      if (want('tailor_polish') && doc) recs.push(await P.prodTailorPolish(prod, fx, doc));
       if (args.jobtext && want('interview_prep_jobtext')) recs.push(await P.prodInterviewPrep(prod, fx, { withJobText: true }));
     } catch (e) {
       log(`  live call failed: ${String(e.message || e).slice(0, 200)}`);

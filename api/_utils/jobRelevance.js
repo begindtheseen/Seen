@@ -30,9 +30,9 @@ const GENERIC_SYNONYM = new Set([
 // ── Curated role families — DETERMINISTIC query expansion (NO AI) ─────────────────
 // The single hardest problem in job search is the gap between what a seeker TYPES and what
 // employers TITLE the same job: "theft prevention" → "Asset Protection Specialist",
-// "warehouse" → "Material Handler", "budtender" → "Cannabis Dispensary Associate". The LLM
-// expansion (lib/server/expand.js) is optional and, on this deployment, dormant — so these
-// curated families are the ONLY cross-lexical bridge, by design (owner directive: no paid AI).
+// "warehouse" → "Material Handler", "budtender" → "Cannabis Dispensary Associate". Seen calls no
+// model API (lib/server/expand.js only reads cached rows), so these curated families are the ONLY
+// cross-lexical bridge, by design.
 //
 // Each family is a set of INTERCHANGEABLE role phrases for the SAME work. Any query matching a
 // member expands (BIDIRECTIONALLY) to the rest of the family, which we use to (a) recognize a

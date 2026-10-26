@@ -233,7 +233,7 @@ export default async function handler(req, res) {
       'Content-Type': 'application/json',
     };
 
-    // Resolve canonical form for each search term (DB cache → LLM gateway, runs once per term).
+    // Resolve canonical form for each search term (query_expansions cache; the raw term on a miss).
     // Bounded to 10 concurrent — in full/auto-heal mode this can be 72 terms, and firing them
     // all at once contributed to the same socket exhaustion ("fetch failed") the mapLimit fix targets.
     const canonicalMap = Object.fromEntries(
