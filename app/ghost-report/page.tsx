@@ -1,7 +1,8 @@
 import type { Metadata } from 'next'
 import { pageMetadata } from '@/lib/seo'
 import Link from 'next/link'
-import { getLeaderboard, getScoresByNames, slugify, grade, riskColor, riskLabel, type LeaderboardRow } from '@/lib/growth'
+import { getLeaderboard, getScoresByNames, slugify, grade, type LeaderboardRow } from '@/lib/growth'
+import { gradeTone, toneText, ghostRateTone, responseRateTone } from '@/lib/ui/tone.js'
 import { STAFFING_AGENCIES } from '@/lib/agencies'
 import { assembleGhostReport, pickHeadline, weekProvenance } from '@/lib/server/ghostReport'
 
@@ -49,28 +50,28 @@ function Stat({ value, label, color }: { value: string; label: string; color: st
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '.25rem', minWidth: 0 }}>
       <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-fig)', fontWeight: 600, color, lineHeight: 1 }}>{value}</div>
-      <div style={mono('.55rem', 'var(--dim)')}>{label}</div>
+      <div style={mono('var(--fs-meta)', 'var(--dim)')}>{label}</div>
     </div>
   )
 }
 
 function OffenderRow({ r, rank }: { r: Ranked; rank: number }) {
-  const accent = riskColor(r.riskLevel)
+  const accent = toneText(gradeTone(r.overallScore))
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '.85rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '.8rem 1rem', marginBottom: '.5rem' }}>
-      <div style={{ ...mono('.62rem', 'var(--muted)'), minWidth: 40, textAlign: 'right', flexShrink: 0 }}>{rank}</div>
+      <div style={{ ...mono('var(--fs-meta)', 'var(--muted)'), minWidth: 40, textAlign: 'right', flexShrink: 0 }}>{rank}</div>
       <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-xl)', fontWeight: 600, color: accent, minWidth: 36, textAlign: 'center', flexShrink: 0 }}>{grade(r.overallScore)}</div>
       <div style={{ minWidth: 0, flex: 1 }}>
         <Link href={`/company/${slugify(r.name)}`} style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', textDecoration: 'none', textTransform: 'capitalize' }}>{r.name}</Link>
-        <div style={{ ...mono('.58rem', 'var(--dim)'), marginTop: '.15rem' }}>
+        <div style={{ ...mono('var(--fs-meta)', 'var(--dim)'), marginTop: '.15rem' }}>
           {r.reportCount.toLocaleString()} report{r.reportCount !== 1 ? 's' : ''}
           {r.isAgency ? ' · staffing agency' : ''}
           {r.thin ? ' · early signal — low confidence' : ''}
         </div>
       </div>
       <div style={{ textAlign: 'right', flexShrink: 0 }}>
-        {r.ghostPct != null && <div style={mono('.62rem', 'var(--red)')}>{r.ghostPct}% ghost</div>}
-        {r.replyPct != null && <div style={mono('.62rem', 'var(--green)')}>{r.replyPct}% reply</div>}
+        {r.ghostPct != null && <div style={mono('var(--fs-meta)', toneText(ghostRateTone(r.ghostPct / 100)))}>{r.ghostPct}% ghost</div>}
+        {r.replyPct != null && <div style={mono('var(--fs-meta)', toneText(responseRateTone(r.replyPct / 100)))}>{r.replyPct}% reply</div>}
       </div>
     </div>
   )
@@ -87,7 +88,7 @@ export default async function GhostReportPage() {
   return (
     <div className="page-full">
       <div style={wrap}>
-        <div style={{ ...mono('.55rem', 'var(--blue)'), textTransform: 'uppercase', letterSpacing: '.2em', marginBottom: '.7rem', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ ...mono('var(--fs-meta)', 'var(--blue)'), textTransform: 'uppercase', letterSpacing: '.2em', marginBottom: '.7rem', display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ width: 20, height: 1, background: 'var(--blue)', display: 'inline-block' }} />
           Weekly Ghost Report · {weekLabel} · updates hourly
         </div>
@@ -107,11 +108,11 @@ export default async function GhostReportPage() {
 
             {report.agencySpotlight && (
               <div style={{ background: 'linear-gradient(135deg, rgba(239,68,68,.10), rgba(239,68,68,.02))', border: '1px solid rgba(239,68,68,.3)', borderRadius: 12, padding: '1.1rem 1.3rem', marginBottom: '2.2rem' }}>
-                <div style={{ ...mono('.55rem', 'var(--red)'), textTransform: 'uppercase', letterSpacing: '.15em', marginBottom: '.4rem' }}>Agency spotlight</div>
+                <div style={{ ...mono('var(--fs-meta)', 'var(--red)'), textTransform: 'uppercase', letterSpacing: '.15em', marginBottom: '.4rem' }}>Agency spotlight</div>
                 <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', lineHeight: 1.5 }}>
                   <span style={{ textTransform: 'capitalize' }}>{report.agencySpotlight.name}</span> is the most-reported ghosting staffing agency this week — {report.agencySpotlight.ghostPct}% of {report.agencySpotlight.reportCount.toLocaleString()} reported applications got no response at all.
                 </div>
-                <Link href="/agencies" style={{ ...mono('.62rem', 'var(--blue)'), textDecoration: 'none', display: 'inline-block', marginTop: '.6rem' }}>See the full staffing-agency ghost index →</Link>
+                <Link href="/agencies" style={{ ...mono('var(--fs-meta)', 'var(--blue)'), textDecoration: 'none', display: 'inline-block', marginTop: '.6rem' }}>See the full staffing-agency ghost index →</Link>
               </div>
             )}
 
@@ -152,7 +153,7 @@ export default async function GhostReportPage() {
           <Link href="/agencies" className="btn btn-ghost" style={{ padding: '.7rem 1.3rem' }}>The full ghost index</Link>
         </div>
 
-        <p style={{ ...mono('.6rem', 'var(--dim)'), lineHeight: 1.7 }}>
+        <p style={{ ...mono('var(--fs-meta)', 'var(--dim)'), lineHeight: 1.7 }}>
           Methodology: applicant-reported outcomes, trust-weighted, aggregated with public hiring signals into a 0–100 Seen Grade. These are community signals, not verified facts, and update hourly as reports arrive. Percentages appear only where applicants have actually reported outcomes; companies with no reports show no number — Seen never fabricates a rate. Report counts include outcomes submitted to Seen and outcomes shared publicly in discussion threads or on review sites (labeled and down-weighted); web-research estimates are never counted as reports. Where reports are few, rates can be blended with a public-data baseline and are marked low confidence.
         </p>
       </div>

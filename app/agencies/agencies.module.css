@@ -1,0 +1,44 @@
+/* /agencies — the Staffing Agency Ghost Index. Tokens only; every text ≥ 12px, every tap ≥ 44px on phones. */
+.wrap { max-width: var(--w-narrow); margin: 0 auto; padding: 3.5rem 1.25rem 5rem; width: 100%; box-sizing: border-box; }
+.actions { display: flex; gap: var(--sp-2); flex-wrap: wrap; margin: 0 0 2.6rem; }
+.section { margin-bottom: 2.4rem; }
+.h2 { font-family: var(--display); font-size: var(--fs-h3); font-weight: 700; color: var(--text-1); margin: 0 0 .3rem; }
+.lede { color: var(--text-3); font-size: var(--fs-sm); line-height: 1.6; margin: 0 0 1rem; max-width: 62ch; }
+
+.row { display: flex; align-items: center; gap: var(--sp-3); background: var(--surface-1); border: 1px solid var(--border-1); border-radius: var(--r-card); padding: .85rem 1rem; margin-bottom: var(--sp-2); }
+.rowQuiet { background: transparent; }
+.rank { font-family: var(--mono); font-size: var(--fs-meta); color: var(--text-4); width: 18px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.letter { font-family: var(--body); font-size: var(--fs-xl); font-weight: 600; width: 34px; text-align: center; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.letterNone { color: var(--text-4); }
+.main { min-width: 0; flex: 1; }
+.name { display: inline-flex; align-items: center; min-height: 44px; font-family: var(--body); font-size: var(--fs-body); font-weight: 600; color: var(--text-1); text-decoration: none; margin: -.6rem 0; }
+.name:hover { color: var(--accent); }
+.rates { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); margin-top: .3rem; }
+.meta { font-family: var(--body); font-size: var(--fs-meta); color: var(--text-3); margin-top: .3rem; line-height: 1.5; }
+.cta { display: inline-flex; align-items: center; min-height: 44px; padding: 0 .25rem; font-family: var(--body); font-weight: 500; font-size: var(--fs-sm); color: var(--accent); text-decoration: none; white-space: nowrap; flex-shrink: 0; }
+.cta:hover { text-decoration: underline; }
+
+.none { background: var(--surface-1); border: 1px dashed var(--border-2); border-radius: var(--r-card); padding: .9rem 1rem; }
+.noneNames { display: flex; flex-wrap: wrap; gap: 0 var(--sp-4); }
+.noneName { display: inline-flex; align-items: center; min-height: 44px; font-family: var(--body); font-size: var(--fs-sm); color: var(--text-2); text-decoration: none; }
+.noneName:hover { color: var(--text-1); }
+.noneNote { font-family: var(--body); font-size: var(--fs-sm); color: var(--text-3); margin: .5rem 0 0; line-height: 1.6; }
+.inline { color: var(--accent); text-decoration: none; display: inline-block; padding: .6rem 0; margin: -.6rem 0; }
+.inline:hover { text-decoration: underline; }
+.emptyAll { text-align: center; padding: 2.5rem; color: var(--text-3); font-size: var(--fs-sm); }
+
+.sponsor { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; margin: 0 0 2.6rem; padding: .9rem 1.1rem; background: var(--surface-1); border: 1px solid var(--border-1); border-radius: var(--r-card); }
+.sponsorName { font-family: var(--body); font-size: var(--fs-body); font-weight: 600; color: var(--text-1); text-transform: capitalize; }
+
+.faq { background: var(--surface-1); border: 1px solid var(--border-1); border-radius: var(--r-card); padding: 1.4rem; margin-bottom: 1.5rem; }
+.faq .h2 { margin-bottom: .8rem; }
+.qa { margin-bottom: .9rem; }
+.q { font-family: var(--body); font-size: var(--fs-ui); font-weight: 600; color: var(--text-1); margin: 0 0 .25rem; letter-spacing: 0; }
+.a { color: var(--text-3); font-size: var(--fs-sm); line-height: 1.7; margin: 0; }
+.fine { font-family: var(--body); font-size: var(--fs-meta); color: var(--text-4); line-height: 1.7; }
+
+@media (max-width: 480px) {
+  .wrap { padding: 1.5rem 16px 4rem; }
+  .row { gap: var(--sp-2); padding: .8rem .85rem; }
+  .actions > * { flex: 1 1 100%; }
+}
