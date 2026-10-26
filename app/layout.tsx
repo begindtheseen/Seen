@@ -79,6 +79,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             animation starts on the server-rendered frame, with no hydration flash. There is no blocking
             splash any more — the page is the intro. (Class added before React, hence suppressHydrationWarning.) */}
         <script dangerouslySetInnerHTML={{ __html: "try{if(!sessionStorage.getItem('seen_opened')){document.documentElement.classList.add('seen-first');sessionStorage.setItem('seen_opened','1')}}catch(e){}" }} />
+        {/* A HINT, not auth: `html.has-session` when this browser holds a stored Supabase session, so a
+            prerendered page can paint the right first frame (guest form vs. "loading your account")
+            before React knows who is signed in (globals.css `.guest-first` / `.session-first`). Every
+            decision is still made by useAuth() once the session resolves. */}
+        <script dangerouslySetInnerHTML={{ __html: "try{for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&/^sb-.+-auth-token$/.test(k)){document.documentElement.classList.add('has-session');break}}}catch(e){}" }} />
       </head>
       <body>
         <AuthProvider>

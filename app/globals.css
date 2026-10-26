@@ -257,6 +257,10 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
    position:fixed child — the nav then scrolls away under the content and modals open off-screen. */
 @keyframes pageIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){.page-full{animation:fadeIn .2s ease backwards}}
+/* First frame before auth resolves (app/layout.tsx marks html.has-session from stored-session presence). */
+html.has-session .guest-first{display:none}
+html:not(.has-session) .session-first{display:none}
+.page-full.page-still{animation:none}
 .wrap{max-width:1300px;margin:0 auto;padding:0 1.25rem}
 
 /* SHARED COMPONENTS */
@@ -314,7 +318,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .funnel-bar-wrap{flex:1;background:var(--line2);border-radius:2px;height:6px;overflow:hidden;position:relative}
 .funnel-bar-fill{height:100%;border-radius:2px;transition:width 1.5s cubic-bezier(.25,.46,.45,.94)}
 .funnel-pct{font-family:var(--mono);font-size:var(--fs-meta);color:var(--muted);width:32px;text-align:right}
-.funnel-ghost-note{font-family:var(--mono);font-size:var(--fs-meta);color:var(--red);margin-left:.5rem;font-style:italic}
+.funnel-ghost-note{display:inline-flex;align-items:center;gap:.3rem;font-family:var(--body);font-size:var(--fs-meta);color:var(--bad-text);margin-left:.5rem}
 
 /* TICKER */
 .ticker-wrap{overflow:hidden;white-space:nowrap;padding:.42rem 0;border-bottom:1px solid var(--line);background:var(--void)}
@@ -861,7 +865,7 @@ select.fi,select.fs,select.fi-r,select.fs-r{background-image:url("data:image/svg
 .app-check-q{font-size:var(--fs-sm);color:var(--white);font-weight:500;margin-bottom:.55rem}
 .app-check-note{font-family:var(--body);font-size:var(--fs-meta);color:var(--amber);margin:-.25rem 0 .55rem;line-height:1.5}
 .app-check-opts{display:flex;flex-wrap:wrap;gap:.35rem}
-.app-check-opt{font-family:var(--body);font-size:var(--fs-meta);font-weight:600;color:var(--sub);background:rgba(255,255,255,.03);border:1px solid var(--line2);border-radius:999px;padding:.34rem .7rem;cursor:pointer;transition:color .15s,border-color .15s,background .15s,transform .25s var(--ease-spring,ease)}
+.app-check-opt{display:inline-flex;align-items:center;gap:.35rem;font-family:var(--body);font-size:var(--fs-meta);font-weight:600;color:var(--sub);background:rgba(255,255,255,.03);border:1px solid var(--line2);border-radius:999px;padding:.34rem .7rem;cursor:pointer;transition:color .15s,border-color .15s,background .15s,transform .25s var(--ease-spring,ease)}
 .app-check-opt:hover{color:var(--white);border-color:rgba(255,255,255,.28);background:rgba(255,255,255,.06)}
 .app-check-opt.hi{color:var(--green);border-color:rgba(16,185,129,.45)}
 .app-check-opt.hi:hover{background:rgba(16,185,129,.1)}

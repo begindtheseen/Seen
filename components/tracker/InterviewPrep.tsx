@@ -218,7 +218,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
   return (
     <section ref={boxRef} className={`${s.box}${lead ? ` ${s.lead}` : ''}`} onClick={e => e.stopPropagation()} aria-label={`Interview prep for ${company}`} data-testid="interview-prep">
       <button type="button" className={s.head} aria-expanded={open} onClick={() => setOpen(!open)}>
-        <span className={s.kicker}>🎯 Interview at {company}</span>
+        <span className={s.kicker}>Interview at {company}</span>
         <span className={s.toggle}>{open ? 'Hide' : 'Show'}</span>
       </button>
 

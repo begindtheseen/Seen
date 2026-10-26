@@ -259,3 +259,6 @@
 /* In-flow room at the end of the page so the footer can scroll clear of the fixed banner. */
 .inviteSpacer { height: 84px; }
 @media (max-width: 480px) { .inviteSpacer { height: 150px; } }
+/* The guest tracker's page column (GuestTracker + its prerendered shell share it, so the first
+   frame and the live page line up exactly). */
+.guestWrap { max-width: 760px; margin: 0 auto; padding: 2rem 16px 4rem; width: 100%; box-sizing: border-box; }
