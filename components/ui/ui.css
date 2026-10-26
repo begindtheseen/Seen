@@ -28,6 +28,9 @@
 .ui-btn--ghost:hover,.btn-ghost:hover{background:rgba(255,255,255,.05);border-color:var(--border-2);color:var(--text-1);box-shadow:none}
 .ui-btn--danger{background:var(--bad-tint);color:var(--bad-text);border-color:var(--bad-line)}
 .ui-btn--danger:hover{background:rgba(239,68,68,.16);border-color:rgba(239,68,68,.4)}
+/* The nav's "Get started": a light pill — always visible, never competing with the page's one gradient CTA. */
+.btn-nav-cta{background:var(--text-1);color:var(--bg);border-color:transparent}
+.btn-nav-cta:hover{background:#fff;color:var(--bg)}
 /* Disabled: a quieter tier, never opacity (dimmed text fails contrast and reads as broken). */
 .ui-btn:disabled,.ui-btn[aria-disabled="true"]{background:var(--surface-2);color:var(--text-4);border-color:var(--border-1);box-shadow:none;cursor:not-allowed}
 .ui-btn .ui-icon{flex-shrink:0}

@@ -1,0 +1,28 @@
+/* /jobs page pieces (the search bar itself is components/jobs/JobSearchBar.module.css). */
+.toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2) var(--sp-3); flex-wrap: wrap; margin-bottom: var(--sp-3); }
+.count { margin: 0; font-size: var(--fs-sm); color: var(--text-3); min-width: 0; }
+.tools { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: nowrap; margin-left: auto; }
+.seg { display: inline-flex; gap: 4px; }
+.sort { width: auto; min-height: 36px; font-size: var(--fs-sm); padding-left: var(--sp-3); }
+.more { margin: var(--sp-3) 0 var(--sp-10); }
+.state { padding: var(--sp-6) 0 var(--sp-12); }
+@media (max-width: 560px) {
+  .tools { width: 100%; margin-left: 0; flex-wrap: wrap; }
+  .sort { flex: 1 1 9rem; min-width: 0; min-height: 44px; }
+  .hideSm { display: none; }
+  /* After a search the page header shrinks to its title so results start near the top. */
+  .searchedHead p { display: none; }
+  .searchedHead { margin-bottom: var(--sp-2); }
+}
+
+.idle { text-align: center; padding: var(--sp-12) var(--sp-4) var(--sp-16); display: flex; flex-direction: column; align-items: center; gap: var(--sp-2); }
+.idleTitle { margin: 0; font-family: var(--display); font-weight: 700; font-size: var(--fs-h3); letter-spacing: var(--ls-heading); color: var(--text-1); }
+.idleSub { margin: 0; max-width: 46ch; font-size: var(--fs-body); color: var(--text-3); line-height: var(--lh-body); }
+.suggest { display: flex; gap: var(--sp-2); flex-wrap: wrap; justify-content: center; margin-top: var(--sp-4); max-width: 640px; }
+.emptyIcon { color: var(--text-4); margin-bottom: var(--sp-2); }
+.resumeAsk { margin-top: var(--sp-6); padding: var(--sp-4) var(--sp-5); max-width: 380px; text-align: left; border-radius: var(--r-card); background: var(--surface-1); border: 1px solid var(--accent-line); display: flex; flex-direction: column; gap: var(--sp-2); align-items: flex-start; }
+.resumeTitle { margin: 0; font-size: var(--fs-body); font-weight: 600; color: var(--text-1); }
+
+.skRow { display: flex; gap: var(--sp-3); align-items: flex-start; padding: var(--sp-4) var(--sp-5); border-bottom: 1px solid var(--border-1); }
+.skLogo { width: 36px; height: 36px; border-radius: var(--r-control); flex-shrink: 0; }
+.skBody { flex: 1; display: flex; flex-direction: column; gap: var(--sp-2); }

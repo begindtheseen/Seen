@@ -33,17 +33,18 @@
 .input {
   width: 100%;
   min-width: 0;
-  background: var(--surface);
-  border: 1.5px solid var(--line2);
-  border-radius: 8px;
-  padding: 0.62rem 0.9rem;
-  color: var(--white);
+  min-height: 44px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-control);
+  padding: 0 var(--sp-4);
+  color: var(--text-1);
   font-family: var(--body);
-  font-size: var(--fs-ui);
+  font-size: var(--fs-body);
   outline: none;
-  caret-color: var(--blue);
+  caret-color: var(--accent);
 }
-.input:focus { border-color: rgba(59, 130, 246, 0.6); }
+.input:focus { border-color: var(--accent); box-shadow: var(--sh-focus); }
 .locInput { padding-right: 2.4rem; }
 
 .pin {
@@ -51,71 +52,85 @@
   right: 0.15rem;
   top: 50%;
   transform: translateY(-50%);
-  width: 2.2rem;
-  height: 2.2rem;
+  width: 2.5rem;
+  height: 2.5rem;
   display: grid;
   place-items: center;
   background: none;
   border: none;
-  font-size: var(--fs-ui);
-  color: var(--muted);
+  color: var(--text-3);
   padding: 0;
   line-height: 1;
-  transition: color 0.15s;
+  border-radius: var(--r-control);
+  transition: color var(--dur-state) var(--ease-out);
 }
 .pin:not(:disabled) { cursor: pointer; }
-.pinBusy { color: var(--blue); }
-.pinOff { opacity: 0.3; cursor: default; }
+.pin:not(:disabled):hover { color: var(--text-1); }
+.pinBusy { color: var(--accent); }
+/* A city is typed: the pin has nothing to do. Hidden from the eye and the tab order (it was text at
+   opacity .3 — a contrast failure, audit #17). */
+.pinOff { visibility: hidden; }
+.spin { animation: spin .8s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .spin { animation-duration: 2.4s; } }
 
 .radius {
   flex: none;
-  background: var(--card);
-  border: 1px solid var(--line2);
-  border-radius: 6px;
-  padding: 0.33rem 0.68rem;
-  font-family: var(--mono);
-  font-size: var(--fs-meta);
-  color: var(--sub);
+  width: auto;
+  min-height: 44px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-control);
+  padding: 0 var(--sp-3);
+  font-family: var(--body);
+  font-size: var(--fs-sm);
+  color: var(--text-2);
   outline: none;
   cursor: pointer;
 }
 
 .go {
   flex: none;
-  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  min-height: 44px;
+  background: var(--cta-gradient);
   color: #fff;
   border: none;
-  border-radius: 8px;
-  padding: 0.62rem 1.25rem;
-  font-family: var(--display);
-  font-weight: 800;
+  border-radius: var(--r-control);
+  padding: 0 var(--sp-6);
+  font-family: var(--body);
+  font-weight: 600;
   font-size: var(--fs-ui);
   cursor: pointer;
-  box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+  box-shadow: var(--sh-control);
+  transition: background var(--dur-state) var(--ease-out), box-shadow var(--dur-state) var(--ease-out), transform var(--dur-press) var(--ease-out);
 }
-.go:disabled { cursor: not-allowed; opacity: 0.6; }
+.go:hover:not(:disabled) { background: var(--cta-gradient-hover); box-shadow: 0 10px 28px -10px rgba(124, 58, 237, .7); }
+.go:active:not(:disabled) { transform: scale(.98); }
+.go:disabled { cursor: progress; background: var(--surface-2); color: var(--text-3); box-shadow: none; }
+
+/* The compact bar's icon Search button — only shown in .compact on phones. */
+.goIcon { display: none; }
 
 /* The honest location note under the results header. */
 .notice {
-  margin: -0.35rem 0 0.85rem;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid rgba(245, 158, 11, 0.25);
-  background: rgba(245, 158, 11, 0.07);
-  border-radius: 8px;
-  font-family: var(--mono);
-  font-size: var(--fs-meta);
+  margin: 0 0 var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--caution-line);
+  background: var(--caution-tint);
+  border-radius: var(--r-control);
+  font-family: var(--body);
+  font-size: var(--fs-sm);
   line-height: 1.5;
-  color: var(--amber);
+  color: var(--caution-text);
 }
 
 /* One line for a signed-in account with a résumé but no city on the profile. */
 .cityLine {
   margin: 0.2rem 0 1.1rem;
-  font-family: var(--mono);
-  font-size: var(--fs-meta);
-  color: var(--dim);
+  font-family: var(--body);
+  font-size: var(--fs-sm);
+  color: var(--text-3);
 }
-.cityLine a { color: #a78bfa; text-decoration: none; }
+.cityLine a { color: var(--accent); }
 
 @media (max-width: 560px) {
   /* Three rows: title · city (full width, so "Phoenix, AZ" never clips) · [radius · Search]. */
@@ -123,9 +138,8 @@
   .query, .row { flex: 1 1 100%; }
   .row { flex-wrap: wrap; }
   .loc { flex: 1 1 100%; }
-  .input { font-size: 16px; padding: 0.68rem 0.85rem; }
-  .radius { font-size: var(--fs-meta); padding: 0.33rem 0.6rem; }
-  .go { flex: 1 1 auto; padding: 0.62rem 0.95rem; }
+  .input { font-size: 16px; }
+  .go { flex: 1 1 auto; }
 }
 
 /* "Other openings" — the rows below every match that only share a word with the search (audit H9). */
@@ -140,14 +154,15 @@
 .dividerTitle {
   font-family: var(--mono);
   font-size: var(--fs-meta);
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--sub);
+  letter-spacing: var(--ls-meta);
+  color: var(--text-3);
 }
 .dividerSub {
-  font-family: var(--mono);
-  font-size: var(--fs-meta);
-  color: var(--dim);
+  font-family: var(--body);
+  font-size: var(--fs-sm);
+  color: var(--text-3);
   line-height: 1.5;
 }
 
@@ -180,3 +195,22 @@
   white-space: nowrap;
 }
 
+
+/* ── After a search, on phones: ONE sticky line (title box + Search). The location row comes back while
+   the bar has focus, so it can still be changed (audit #25). Solid surface, never glass. ── */
+@media (max-width: 768px) {
+  .compact {
+    position: sticky; top: 58px; z-index: 30;
+    margin: 0 calc(-1 * var(--sp-4)); padding: var(--sp-2) var(--sp-4);
+    background: var(--surface-overlay); border-bottom: 1px solid var(--border-1);
+  }
+  .compact .query { flex: 1 1 100%; gap: var(--sp-2); }
+  .compact .goIcon {
+    display: inline-flex; align-items: center; justify-content: center; flex: none;
+    width: 44px; height: 44px; border: 0; border-radius: var(--r-control);
+    background: var(--cta-gradient); color: #fff; cursor: pointer;
+  }
+  .compact .row { display: none; }
+  .compact:focus-within .row { display: flex; }
+  .compact:focus-within .go { display: none; }
+}

@@ -1,0 +1,6 @@
+.chip { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 2px 12px; border: 1px solid var(--border-2); border-radius: var(--r-pill); background: var(--surface-2); text-decoration: none; font-size: var(--fs-sm); font-weight: 500; color: var(--text-2); max-width: 100%; min-width: 0; }
+.chip:hover { border-color: var(--border-3); color: var(--text-1); }
+.compact { min-height: 24px; padding: 2px 8px; border-radius: var(--r-chip); font-size: var(--fs-meta); }
+.name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.letter { font-weight: 600; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+@media (max-width: 768px) { .compact { min-height: 44px; } }

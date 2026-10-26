@@ -375,7 +375,7 @@ export default function Nav() {
               {/* Primary CTA for a brand-new visitor = start as a job seeker (the default persona).
                   The employer path stays reachable via the "Employers" primary link + More menu, so
                   this no longer misdirects new seekers into employer login. */}
-              <Link href="/login?signup=1" className="btn btn-solid">Get started</Link>
+              <Link href="/login?signup=1" className="btn btn-nav-cta">Get started</Link>
             </>
           )}
         </div>
