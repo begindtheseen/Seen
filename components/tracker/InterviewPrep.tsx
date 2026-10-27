@@ -47,13 +47,13 @@ type InterviewRecord = {
 type Pay = { unit: 'hour' | 'year'; low: number; high: number; listings: number; scope: 'role' | 'company' | 'market' }
 type FollowUp = { thankYouBy: string; followUpOn: string; lastCheckOn: string }
 type RecordData = { record: InterviewRecord; pay: Pay | null; follow_up: FollowUp; guide?: Guide | null; sample_question?: { q: string; why: string; principle: string | null } | null }
-type Answer = { q: string; answer: string; resume_fact: string; coached?: boolean; script?: boolean; frame?: boolean; exercise?: boolean; practice?: string; reference?: string; company?: boolean; principle?: string | null }
+type Answer = { q: string; answer: string; resume_fact: string; coached?: boolean; script?: boolean; frame?: boolean; exercise?: boolean; practice?: string; reference?: string; hint?: string; company?: boolean; principle?: string | null }
 type Pack = {
   questions: { q: string; why: string; company?: boolean; principle?: string | null }[]
   answers: Answer[]
   intro: string | null
   resume_check?: { line: string; note: string }[]
-  job_match?: { label: string; status: 'shown' | 'stated' | 'gap' | 'expired' | 'in progress'; proof?: string; say: string; duty?: boolean }[]
+  job_match?: { label: string; status: 'shown' | 'stated' | 'gap' | 'expired' | 'in progress'; proof?: string; say: string; duty?: boolean; cert?: boolean }[]
   ask_them?: { q: string; company?: boolean }[]
   format?: string
   guide?: { company: string; confidence: string; framework: { name: string; note: string } | null; tips: string[]; watch: string } | null
@@ -451,14 +451,31 @@ const MATCH_WORD = { shown: 'your résumé shows it', stated: 'listed, not shown
 function grow(el: HTMLTextAreaElement | null) { if (!el) return; el.style.height = 'auto'; el.style.height = `${Math.max(el.scrollHeight, 56)}px` }
 function AnswerEditor({ a, company, values, notes, onSave, defaultOpen, title, tagText, pre }: { a: Answer; company: string; values: string[]; notes?: string[]; onSave: (values: string[]) => void; defaultOpen: boolean; title?: string; tagText?: string; pre?: boolean }) {
   const [vals, setVals] = useState<string[]>(values)
-  useEffect(() => { setVals(values) }, [values])
+  // What the account holds only replaces what is typed here when it is NEW (another device, a rebuild) —
+  // never because the parent re-rendered with the same words, and never over a box still being typed in
+  // (round 5, Ray: the first of three boxes typed in a row came back empty; a pay answer never saved).
+  const seen = useRef(values.join('\u0000'))
+  const saved = useRef(values.join('\u0000'))
+  useEffect(() => {
+    const key = values.join('\u0000')
+    if (key === seen.current) return
+    seen.current = key
+    setVals(prev => values.map((v, i) => (prev[i]?.trim() && !v?.trim() ? prev[i] : v)).concat(prev.slice(values.length)))
+  }, [values])
+  const latest = useRef(vals)
+  latest.current = vals
+  // typing saves on its own after a pause, so a tab or a reload mid-answer loses nothing
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const flush = useCallback(() => { const v = latest.current; const key = v.join('\u0000'); if (key !== saved.current) { saved.current = key; onSave(v) } }, [onSave])
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
   const parts = splitAnswer(a.answer)
   const n = blankCount(a.answer)
   const finished = isFinished(a.answer, vals)
   const composed = composeAnswer(a.answer, vals)
   const touched = vals.some(v => v && v.trim())
   const tag = tagText || (a.exercise ? 'Practised at a keyboard, not answered out loud' : a.company ? `${company} question${a.principle ? ` · ${a.principle}` : ''}` : a.script ? 'From your résumé’s dates and the posting' : a.frame ? `No line on your résumé fits this one yet — answer in ${n} short lines` : 'From your résumé')
-  const save = () => { if (vals.join('\u0000') !== values.join('\u0000')) onSave(vals) }
+  const save = () => { if (timer.current) clearTimeout(timer.current); flush() }
+  const queue = () => { if (timer.current) clearTimeout(timer.current); timer.current = setTimeout(flush, 900) }
   return (
     <details className={`${s.answer}${finished && n ? ` ${s.done}` : ''}`} open={defaultOpen}>
       <summary>{a.company && <span className={s.chip}>{company}</span>}{title || a.q}{n > 0 && <span className={s.state}>{finished ? '✓ finished' : touched ? `${vals.filter(v => v?.trim()).length}/${n} filled` : `${n} ${n === 1 ? 'blank' : 'blanks'} to fill`}</span>}</summary>
@@ -469,13 +486,14 @@ function AnswerEditor({ a, company, values, notes, onSave, defaultOpen, title, t
         <div className={s.editor}>
           {parts.map((p, i) => ('blank' in p ? (
             <textarea key={i} ref={grow} className={s.fill} rows={2} value={vals[p.index] || ''} placeholder={p.blank} aria-label={p.blank}
-              onChange={e => { const next = [...vals]; next[p.index] = e.target.value; setVals(next); grow(e.target) }} onBlur={save} />
+              onChange={e => { const next = [...vals]; next[p.index] = e.target.value; setVals(next); latest.current = next; grow(e.target); queue() }} onBlur={save} />
           ) : (
             <span key={i} className={pre ? s.givenPre : s.given}>{p.text}</span>
           )))}
         </div>
       )}
       {a.reference && <p className={s.ref}>{a.reference}</p>}
+      {a.hint && !touched && <p className={s.ref}>A line of yours that might hold this story: “{a.hint}” — if it does, tell it in the three boxes above.</p>}
       {!!notes?.length && (
         <div className={s.notes}>
           <div className={s.label}>Your words from before the rebuild</div>

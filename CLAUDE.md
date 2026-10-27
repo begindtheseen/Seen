@@ -79,6 +79,18 @@ longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.m
   delivered and counts +0.5 in the fit score; `pastWindow` is never "past" for Phone Screen / Interview / Final
   Round / Offer (dashboard said "Stripe has been quiet for 23 days" beside a phone screen); the preview counts
   questions and practice items apart.
+- **Ray round 5: 6/5 no ("one more round of this and I'd pay").** Round 8 (branch claude/wip-round8): AnswerEditor
+  never lets a stale prop overwrite a box being typed in (`seen`/`saved` refs; account values replace local ones
+  only when NEW and never over typed text), and saves on a 900 ms pause as well as on blur (a first box typed in a
+  row of three came back empty; a pay answer never saved); `loadBundle` returns `this.loadSync()` after a guest
+  carry (the page kept the pre-carry row and re-sent the legacy date); jobMatch's "one entry per proof line" now
+  drops a row only when it shares the proof AND a non-generic label word, and never a duty row (forklift,
+  inventory management, basic computer skills and the "Monitor rate, quality and inventory accuracy" duty all
+  vanished behind the WMS / order-picking rows); a duty is shown by TWO specific shared stems; a certification the
+  posting names gets a row when the reader surfaced nothing and the intro says "I hold an OSHA forklift
+  certification."; the why-now draft for a title equal to the one applied for reads "I've been a Warehouse Lead at
+  X since 2017, and I'm looking for the same role at a bigger operation"; company frames carry a `hint` (the line
+  most likely to hold the story, shown as a suggestion under the boxes, never built in). Cap 12 rows.
 - **Still open from round 5:** loss prevention / payroll rows missing from job match (requirement extraction);
   Studio tailor result lost on reload + "(2 pages)" header; Strategy filler; "Walk me through one thing you did
   well at <old employer>"; Stripe "Choose currency MX$" (Stripe Adaptive Pricing — dashboard setting, owner).
