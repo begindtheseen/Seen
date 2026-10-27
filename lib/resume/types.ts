@@ -90,7 +90,7 @@ export interface TailorPlan {
   transferable: Array<{ requirement: string; evidence: string; explanation: string }>
   provenance: Array<Record<string, unknown> & { kind: string }>
 }
-export interface TailorResponse { ok: boolean; plan: TailorPlan; variant: ResumeDoc; health: Health; balance?: number; pro?: boolean; error?: string; credits_required?: boolean; pro_required?: boolean }
+export interface TailorResponse { ok: boolean; plan: TailorPlan; variant: ResumeDoc; health: Health; balance?: number; pro?: boolean; error?: string; credits_required?: boolean; pro_required?: boolean; posting_basis?: { kind: 'twin' | 'similar' | 'role'; note: string; core?: string | null; count?: number | null } | null }
 
 export interface AtsCheck {
   version: string; format: string; template: string | null; score: number; grade: string

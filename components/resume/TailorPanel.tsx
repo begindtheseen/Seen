@@ -19,6 +19,7 @@ import { markQuiet } from '@/lib/quietWindow'
 import { RESUME_OPTIMIZE_COST, priceLabel } from '@/lib/creditRules'
 import { httpHref } from '@/lib/safeHref.js'
 import { ResumeDocStore } from '@/lib/stores/ResumeDocStore'
+import { BasisNote, type PostingBasis } from '@/components/optimizer/Verdict'
 
 const LINES_PER_PAGE = 46
 
@@ -43,6 +44,8 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
   const { user } = useAuth()
   const [job, setJob] = useState<TailorJob>(initialJob || { title: '', company: '', description: '', jobId: '' })
   const [previewLink, setPreviewLink] = useState('')
+  // what a summary-only listing was tailored against (api `posting_basis`); null = the full posting
+  const [basis, setBasis] = useState<PostingBasis | null>(null)
   // The first paid action on this account/device is confirmed once (lib/creditConfirm) — the
   // 2026-10-24 audits found the Tailor charging with no dialog while every other paid button asked.
   const [confirming, setConfirming] = useState(false)
@@ -113,6 +116,7 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
       if (!res.ok || !data.plan) { setError(data.error || 'Could not tailor this résumé. Try again.'); setState('error'); return }
       window.dispatchEvent(new Event('seen:credits-updated'))
       setPlan(data.plan); setBaseDoc(clone(doc)); setOverrides({}); setAnswers({})
+      setBasis((data.posting_basis as PostingBasis | null | undefined) ?? null)
       setState('done')
       markQuiet() // nothing optional pops over a result the person just paid for
     } catch { setError('Network error — try again.'); setState('error') }
@@ -175,6 +179,7 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
 
       {state === 'done' && plan && finalVariant && (
         <>
+          {basis && <BasisNote basis={basis} />}
           <div className={s.card}>
             {noRequirements || plan.score.after == null || plan.score.before == null ? (
               <div className={s.dim} style={{ color: 'var(--amber)' }}>{plan.score.verdict?.withheld ? plan.score.verdict.sentence : 'The posting text gave us no requirements to match — this version is arranged from the job title and family only.'} Paste the full posting (requirements and responsibilities) for a real match score.</div>

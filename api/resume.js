@@ -4,7 +4,8 @@ import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { gateAI, resolveProAccess, resolveAuthedUser } from '../lib/server/credits.js';
 import { RESUME_OPTIMIZE_COST } from '../lib/server/creditRules.js';
-import { previewOnlyOrFetch } from '../lib/server/postingGate.js';
+import { previewOnlyOrFetch, postingBasisField } from '../lib/server/postingGate.js';
+import { annotateBasis } from '../lib/server/postingBasis.js';
 import { optimizeCacheKey, readCachedOptimize, writeCachedOptimize } from '../lib/server/optimizeCache.js';
 import { buildPaidOptimize, unoptimizableListing } from '../lib/server/optimizePackage.js';
 import { runAdvantage, requirementsStated, extractEmployment, extractCareerSignal, buildResumeDocument, resumeFileName } from '../lib/server/resumeAnalysis.js';
@@ -606,19 +607,19 @@ async function handleOptimizeTool(req, res, body) {
     // `fresh: true` (the "Re-run" button) skips the cache.
     const key = optimizeCacheKey({ uid: authed.uid, jobId, jobDescription, resume });
     const hit = body.fresh ? null : await readCachedOptimize(authed.uid, key);
-    if (hit) return res.status(200).json({ ...hit.output, cached: true, cached_at: hit.created_at, charged: false });
+    if (hit) return res.status(200).json({ ...annotateBasis(hit.output, body.postingBasis), posting_basis: postingBasisField(body), cached: true, cached_at: hit.created_at, charged: false });
     // A posting with no measurable requirements has nothing to optimize against: refused free,
     // probe or not, before the credit gate (the modal said "No score" and then charged a credit).
     const unoptimizable = unoptimizableListing({ resume, jobDescription, job, company, taxonomy });
     if (unoptimizable) return res.status(422).json({ error: 'no_requirements', ...unoptimizable, cost: 0, charged: false });
-    if (body.probe) return res.status(200).json({ cached: false, price: RESUME_OPTIMIZE_COST, charged: false });
+    if (body.probe) return res.status(200).json({ cached: false, price: RESUME_OPTIMIZE_COST, charged: false, posting_basis: postingBasisField(body) });
 
     const gate = await gateAI(req, 'resume_optimize');
     if (!gate.ok) return res.status(gate.status).json({ error: gate.error, credits_required: gate.credits_required, pro_required: gate.pro_required, balance: gate.balance ?? 0 });
     const result = buildPaidOptimize({ resume, jobDescription, job, company, pro: gate.pro, jobId, taxonomy, fit });
     const stored = await writeCachedOptimize(authed.uid, key, result);
     // charged is what the gate did: a Pro user is never charged (consume_credit answers pro:true)
-    return res.status(200).json({ ...result, cached: false, cache_saved: stored, charged: !gate.pro, pro: !!gate.pro, balance: gate.balance });
+    return res.status(200).json({ ...annotateBasis(result, body.postingBasis), posting_basis: postingBasisField(body), cached: false, cache_saved: stored, charged: !gate.pro, pro: !!gate.pro, balance: gate.balance });
   } catch (err) {
     const ref = logError('resume', err, { method: req.method, tool: 'optimize' });
     return res.status(500).json({ error: err.message, ref });
@@ -671,7 +672,7 @@ async function handleStudio(req, res, body) {
         const gate = await gateAI(req, 'resume_tailor');
         if (!gate.ok) return res.status(gate.status).json({ error: gate.error, credits_required: gate.credits_required, pro_required: gate.pro_required, balance: gate.balance ?? 0 });
         const out = await tailorAction(body, { taxonomy, fit });
-        return res.status(200).json({ ...out, balance: gate.balance, pro: !!gate.pro, charged: !gate.pro });
+        return res.status(200).json({ ...out, posting_basis: postingBasisField(body), balance: gate.balance, pro: !!gate.pro, charged: !gate.pro });
       }
       default: return res.status(400).json({ error: `Unknown action: ${body.action}` });
     }

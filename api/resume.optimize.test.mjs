@@ -67,19 +67,31 @@ const call = async (handler, body, uid) => {
 };
 const optimize = (extra, uid = '11111111-1111-4111-8111-111111111111') => call(resumeHandler, { tool: 'optimize', job: A.title, company: A.company, resume: RESUME, jobDescription: A.jd, jobId: 'job-a', ...extra }, uid);
 
-test('D2: a preview-only posting is 422 preview_only and charges nothing', async () => {
+test('D2 (2026-10-27): a summary-only listing is checked against a labelled basis; with nothing to build from it is 422 and free', async () => {
   const before = state.charges;
-  const r = await optimize({ jobDescription: WALMART.jd, jobSource: 'adzuna', jobId: 'job-w' });
-  assert.equal(r.code, 422, JSON.stringify(r.body));
-  assert.equal(r.body.error, 'preview_only');
-  assert.equal(r.body.message, 'This listing only has a summary. Paste the full posting to optimize for it.');
-  assert.equal(state.charges, before);
-  // the same teaser without a source is still a preview (≤520 chars ending in an ellipsis)
-  assert.equal((await optimize({ jobDescription: WALMART.jd, jobId: 'job-w' })).code, 422);
-  // the full posting pasted for the same Adzuna listing is optimized
+  // the Adzuna summary of a Walmart cashier role: the full posting is out of reach, so the check uses the summary plus what
+  // cashier roles ask for — said in posting_basis, never passed off as the employer's posting
+  const probe = await optimize({ job: WALMART.title, company: WALMART.company, jobDescription: WALMART.jd, jobSource: 'adzuna', jobId: 'job-w', probe: true });
+  assert.equal(probe.code, 200, JSON.stringify(probe.body).slice(0, 300));
+  assert.equal(probe.body.posting_basis.kind, 'role');
+  assert.match(probe.body.posting_basis.note, /only read a summary/);
+  assert.equal(state.charges, before, 'a probe never charges');
+  const press = await optimize({ job: WALMART.title, company: WALMART.company, jobDescription: WALMART.jd, jobSource: 'adzuna', jobId: 'job-w' });
+  assert.equal(press.code, 200, JSON.stringify(press.body).slice(0, 300));
+  assert.equal(press.body.posting_basis.kind, 'role');
+  assert.ok(press.body.unsupported_requirements.concat(press.body.matched_requirements).some((r) => r.from_similar), 'borrowed requirements are marked');
+  assert.equal(state.charges, before + 1);
+  // a summary with no role to read and no saved row: the paste box, free
+  const none = await optimize({ job: '', company: '', jobDescription: WALMART.jd, jobSource: 'adzuna', jobId: '' });
+  assert.equal(none.code, 422, JSON.stringify(none.body));
+  assert.equal(none.body.error, 'preview_only');
+  assert.equal(none.body.message, 'This listing only has a summary. Paste the full posting to optimize for it.');
+  assert.equal(state.charges, before + 1);
+  // the full posting pasted for the same Adzuna listing is optimized as the posting (no basis)
   const pasted = await optimize({ jobDescription: A.jd, jobSource: 'adzuna', postingPasted: true, jobId: 'job-w' });
   assert.equal(pasted.code, 200, JSON.stringify(pasted.body));
-  assert.equal(state.charges, before + 1);
+  assert.equal(pasted.body.posting_basis, null);
+  assert.equal(state.charges, before + 2);
 });
 
 test('E6: a probe never charges; C2: the first run charges once and every reopen is free', async () => {
@@ -140,10 +152,14 @@ test('C3: the free diagnosis has none of the paid fields; the paid package is a 
   for (const r of paid.body.rewrite_plan) assert.equal(r.accepted, false);
 });
 
-test('D2: the free path answers a preview the same way (one paste box for both)', async () => {
+test('D2: the free path answers a summary the same way: the same labelled basis, or the paste box when there is none', async () => {
   const r = await call(optimizerHandler, { action: 'optimize', resumeText: RESUME, jobTitle: WALMART.title, jobDescription: WALMART.jd });
-  assert.equal(r.code, 422);
-  assert.equal(r.body.error, 'preview_only');
+  assert.equal(r.code, 200, JSON.stringify(r.body).slice(0, 300));
+  assert.equal(r.body.posting_basis.kind, 'role');
+  assert.doesNotMatch(r.body.verdict.sentence, /the posting also asks for/, 'borrowed requirements are not "the posting"');
+  const none = await call(optimizerHandler, { action: 'optimize', resumeText: RESUME, jobTitle: '', jobDescription: WALMART.jd });
+  assert.equal(none.code, 422);
+  assert.equal(none.body.error, 'preview_only');
 });
 
 // Willingness-to-pay test 2026-10-25: the modal said "No score: this listing does not state its

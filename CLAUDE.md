@@ -96,8 +96,29 @@ longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.m
   cashier pull (123 fetched, 0 saved) — `search_pull_log.result_count` counts fetched, not saved.
 - **Not fixed / follow-ups:** hourly supply is still thin wherever nobody has searched (43% of cases <10 good local rows);
   Adzuna `title_only`/`what_phrase` parameters unverified (no keys in the sandbox) — would cut pull noise; "UPS" the company vs
-  "UPS" power systems; Adzuna teaser Optimize (paused mid-investigation: adzuna.com answers servers 403/405 and the reader
-  rung 401, so `fetchFullPosting` never succeeds for Adzuna rows).
+  "UPS" power systems.
+- **Adzuna teaser Optimize — fixed the same session (owner: "Don't pause shit"; screenshot: "Optimizing resume honestly
+  shouldn't even be allowed for adzuna applications if all it's gonna do is this" — the paste box).** adzuna.com answers
+  servers 403/405 and the reader rung 401, so `fetchFullPosting` never succeeds for an Adzuna row. Probing Adzuna with a
+  browser identity was REFUSED by the session classifier as bot-check circumvention — do not route around it; the fix uses
+  only Seen's own corpus. `lib/server/postingBasis.js buildPostingBasis` (called by `postingGate.previewOnlyOrFetch` after
+  the fetch fails; `fetchFullPosting` now returns the row with a failure): (1) **twin** = same title + company prefix from
+  a non-Adzuna board = the posting; (2) **similar** = summary + the requirement sentences ≥30% (and ≥2) of up to 40 full
+  postings with the role words as WHOLE words (`title=imatch.\m…\M`; "cashier" matched "Director of Cashiering"), same
+  level, sentences filtered (≥4 words, no question/heading/benefit, a requirement cue or section), needs ≥3 requirements;
+  (3) **role** = summary + `ROLE_COMMON` (what hourly families commonly state: valet licence/manual transmission/outdoors,
+  warehouse lifting/scanner, security guard card…) + taxonomy skills from the ontology, kept only when the reader extracts
+  ≥3 requirements. Nothing → the old 422 paste box. Every response carries `posting_basis` {kind, note, core, count};
+  `annotateBasis` marks borrowed rows `from_similar`, and only for borrowed rows rewrites "Requires X" → "Roles like this
+  usually require X", "the posting also asks for" → "postings like this usually also ask for", checklist messages likewise.
+  UI: `BasisNote` (components/optimizer/Verdict.tsx) above the verdict in the Optimize modal (choose + review, with "Paste
+  the full posting" → the paste step titled "Paste the full posting for an exact match"), /resume Fit + Rewrite, SeenFit
+  panel, Studio Tailor. Real check (prod reads, harness refusing writes + every other host): an Adzuna valet summary →
+  `role` basis, 35, "Roles like this usually require a driver's license; your résumé does not list one; you do show
+  customer service and cash handling". **Corpus fact:** full-text hourly postings are rare (valet attendant: 1 non-Adzuna
+  row; warehouse associate 40; barista 24) — the role layer is what fires for most Adzuna hourly rows. Also fixed: the
+  physical checklist line read "Able to outdoor conditions" (`ableTo`), background read "The employer runs a clean driving
+  record" (records are "checked for").
 
 ## Session 2026-10-27 E: round 7 — 4/4 yes again, but #383 shipped two regressions; PRs #384, #385
 - **Round 7 (live, after #383/#384):** Maria 7/7 prep YES, Dev 7/5 Pass YES, Tasha 7/7 prep YES, Ray 8/6 prep YES. Worth-it

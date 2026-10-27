@@ -18,7 +18,7 @@ import { WELCOME_CREDITS } from '@/lib/creditRules'
 import { LOCK_NOTE, PASS_AFTER_WIN } from '@/lib/pricing'
 import { signupHref } from '@/lib/signupIntent.js'
 import dynamic from 'next/dynamic'
-import { VerdictCard, WhyYouMatch, MissingList, Checklist, PaidPlanView, type Verdict, type ConstraintRow, type PaidPlan } from '@/components/optimizer/Verdict'
+import { VerdictCard, WhyYouMatch, MissingList, Checklist, PaidPlanView, BasisNote, type Verdict, type ConstraintRow, type PaidPlan, type PostingBasis } from '@/components/optimizer/Verdict'
 import CreditConfirmDialog from '@/components/CreditConfirmDialog'
 import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
 import { RESUME_OPTIMIZE_COST, creditCostLabel, priceLabel } from '@/lib/creditRules'
@@ -42,6 +42,7 @@ interface RequirementMatch { requirement: string; surface: string; importance: s
 // checklist + the factor breakdown. Bullets, rewrites and the message are the paid package below.
 interface OptimizerOutput {
   run_id?: string | null
+  posting_basis?: PostingBasis | null
   verdict: Verdict
   constraints: ConstraintRow[]
   fit_score: number | null
@@ -64,6 +65,7 @@ interface OptimizerOutput {
 // The PAID package (/api/resume tool:'optimize', 1 credit, cached 7 days) — a strict superset.
 interface OptimizeBullet { original: string; optimized: string; addresses: string }
 interface PaidOptimize extends PaidPlan {
+  posting_basis?: PostingBasis | null
   verdict?: Verdict
   matched_requirements?: RequirementMatch[]
   unsupported_requirements?: RequirementMatch[]
@@ -156,6 +158,7 @@ function FitView({ out, intel, jobCompany, insights }: { out: OptimizerOutput; i
   const metrics = (out.explanation.contributions || []).filter(c => c.scored !== false && c.factor !== 'risk_penalty' && c.factor !== 'company_process_score')
   return (
     <div style={{ animation: 'fadeUp .3s ease both' }}>
+      {out.posting_basis && <Card><BasisNote basis={out.posting_basis} /></Card>}
       <Card><VerdictCard verdict={out.verdict} note={`${out.confidence_label} confidence · free`} /></Card>
 
       {out.verdict.score != null && metrics.length > 0 && (
@@ -230,6 +233,7 @@ function RewriteView({ out, copy, copied, onRerun, pro }: { out: PaidOptimize; c
   const guidance = (out.optimized_bullets || []).filter(b => isGuidance(b.original) || isGuidance(b.optimized))
   return (
     <div style={{ animation: 'fadeUp .3s ease both' }} className="ai-stack">
+      {out.posting_basis && <BasisNote basis={out.posting_basis} />}
       {out.cached && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', color: 'var(--green)' }}>No credit used — you built this plan for this job and résumé in the last 7 days.{onRerun && <> <button type="button" data-testid="resume-rerun" onClick={onRerun} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--green)', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit' }}>Re-run with the latest engine{pro === true ? '' : ` · ${OPTIMIZE_PRICE}`} →</button></>}</div>}
       <PaidPlanView plan={out} />
 
