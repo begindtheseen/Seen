@@ -15,7 +15,24 @@ import { searchQueryString, readSearchQuery } from '@/lib/jobs/searchUrl.js'
 // In-memory search cache: `${query}|${location}|${radius}` → the page as it was shown (rows, whether
 // the server has more, and the honest note/label it carried), so a repeat of the same search — Enter
 // right after the auto-search, Back from a listing — is served without a second request.
-interface CachedSearch { jobs: Job[]; ts: number; hasMore: boolean; pages: number; notice: string | null; label: string | null }
+/**
+ * How the server read a search (api/jobs.js `interpreted`): the role words after typo fixes and modifiers, the place
+ * after resolving it, and what was moved out of the query. Shown above the results so a corrected search says so.
+ */
+export interface InterpretedSearch {
+  query?: string
+  query_typed?: string
+  corrections?: { from: string; to: string }[]
+  location?: string
+  location_typed?: string
+  location_corrected?: boolean
+  location_from_query?: boolean
+  location_zip?: string
+  modifiers?: string[]
+  browse?: boolean
+  remote?: boolean
+}
+interface CachedSearch { jobs: Job[]; ts: number; hasMore: boolean; pages: number; notice: string | null; label: string | null; interp: InterpretedSearch | null }
 const searchCache = new Map<string, CachedSearch>()
 // A repeat inside this window is answered from the cache alone (no background refresh).
 const FRESH_MS = 30 * 1000
@@ -155,6 +172,8 @@ export function useJobSearch() {
   const [statusMsg, setStatusMsg] = useState('Enter a search above →')
   // The honest location note for the current page ("Only 6 within 25 mi …"); null = nothing to say.
   const [notice, setNotice] = useState<string | null>(null)
+  // How the server read the current search (typo fixed, place resolved, modifiers) — null = taken as typed.
+  const [interp, setInterp] = useState<InterpretedSearch | null>(null)
   const [recommended, setRecommended] = useState<Job[]>([])
   const [recSkills, setRecSkills] = useState<string[]>([])
   const [recStatus, setRecStatus] = useState<'idle' | 'loading' | 'done'>('idle')
@@ -186,7 +205,7 @@ export function useJobSearch() {
   const filtersRef = useRef({ niche, level, jobType, posted }); filtersRef.current = { niche, level, jobType, posted }
   // The last COMMITTED search (Enter / Search / a pick / a link) — what the URL shows and "Show more"
   // continues. The debounced auto-search never commits.
-  const committedRef = useRef<{ q: string; loc: string; radius: string } | null>(null)
+  const committedRef = useRef<{ q: string; loc: string; radius: string; exact?: boolean } | null>(null)
   // The committed query as state, for what the page shows about the search that ran (the company card).
   const [committedQuery, setCommittedQuery] = useState('')
   // The search key a request is in flight for — a second call for the same search is dropped.
@@ -505,7 +524,7 @@ export function useJobSearch() {
    * call for a search already in flight, or one answered < 30 s ago, sends no request (audit L2: Enter
    * right after the auto-search fired the same POST twice and flashed the results).
    */
-  async function searchJobs(queryOverride?: string, locationOverride?: string, opts: { radius?: string; commit?: boolean } = {}) {
+  async function searchJobs(queryOverride?: string, locationOverride?: string, opts: { radius?: string; commit?: boolean; exact?: boolean } = {}) {
     const q = (queryOverride ?? queryRef.current).trim()
     const loc = (locationOverride ?? locationRef.current).trim()
     const rad = opts.radius ?? radiusRef.current
@@ -515,8 +534,9 @@ export function useJobSearch() {
       return
     }
     searchedOnceRef.current = true
-    const cacheKey = `${q}|${loc}|${rad}`
-    if (commit) { committedRef.current = { q, loc, radius: rad }; setCommittedQuery(q); writeUrl({ radius: rad }) }
+    const exact = opts.exact === true
+    const cacheKey = `${q}|${loc}|${rad}${exact ? '|exact' : ''}`
+    if (commit) { committedRef.current = { q, loc, radius: rad, exact }; setCommittedQuery(q); writeUrl({ radius: rad }) }
     if (inflightKeyRef.current === cacheKey) return // the same search is already on its way
     const cached = searchCache.get(cacheKey)
     const showCached = (c: CachedSearch, refreshing: boolean) => {
@@ -528,6 +548,7 @@ export function useJobSearch() {
       updateDisplayRef.current(c.jobs, sortRef.current)
       setStatus('done')
       setNotice(c.notice)
+      setInterp(c.interp)
       if (c.label) setStatusMsg(c.label)
       else if (refreshing) setStatusMsg(`${c.jobs.length} result${c.jobs.length !== 1 ? 's' : ''} (from cache — refreshing…)`)
     }
@@ -540,6 +561,7 @@ export function useJobSearch() {
     const seq = ++searchSeqRef.current
     if (topupTimerRef.current) { clearTimeout(topupTimerRef.current); topupTimerRef.current = null }
     setNotice(null)
+    setInterp(null)
 
     const CACHE_TTL = 5 * 60 * 1000 // 5 min
     if (cached && Date.now() - cached.ts < CACHE_TTL) {
@@ -571,7 +593,7 @@ export function useJobSearch() {
         const res = await fetch('/api/jobs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}) },
-          body: JSON.stringify({ query: q, location: loc, radius: rad }),
+          body: JSON.stringify({ query: q, location: loc, radius: rad, ...(exact ? { exact: true } : {}) }),
           signal: ctrl.signal,
         })
         if (res.status === 429) {
@@ -583,7 +605,7 @@ export function useJobSearch() {
           return
         }
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const data = await res.json() as { jobs?: unknown[]; results?: unknown[]; widened?: boolean; fallback?: 'outside_radius' | 'unrelated' | 'remote_thin' | null; radius?: number | null; location?: string; topup?: string | null; in_radius?: number | null; has_more?: boolean }
+        const data = await res.json() as { jobs?: unknown[]; results?: unknown[]; widened?: boolean; fallback?: 'outside_radius' | 'unrelated' | 'remote_thin' | null; radius?: number | null; location?: string; topup?: string | null; in_radius?: number | null; has_more?: boolean; interpreted?: InterpretedSearch }
         if (seq !== searchSeqRef.current) return // a newer search took over
         done()
         const raw: Job[] = toJobs(data.jobs || data.results || [], loc)
@@ -599,23 +621,28 @@ export function useJobSearch() {
         //  remote_thin → few remote matches; non-remote roles fill the rest
         // For a place search the server counts the rows inside the radius (`in_radius`) and serves
         // them first; the note says how many — never "no jobs within 25 mi" above six Phoenix rows.
-        const placeSearch = !!loc && data.location !== 'remote' && rad !== '0'
+        const it = data.interpreted || null
+        setInterp(it && (it.query_typed || it.location_typed || it.location_from_query || it.modifiers || it.browse) ? it : null)
+        // the role and the place as the server read them ("cashir" → cashier, "Anahiem ca" → Anaheim, CA)
+        const dq = it?.browse ? 'matching' : (it?.query || q)
+        const dloc = it?.location || loc
+        const placeSearch = !!dloc && data.location !== 'remote' && rad !== '0' && !it?.remote
         const inR = typeof data.in_radius === 'number' ? data.in_radius : null
         let label: string | null = null
         let note: string | null = null
         if (raw.length && data.fallback === 'unrelated') {
-          label = `No matches for "${q}" — showing ${raw.length} other opening${raw.length !== 1 ? 's' : ''}${placeSearch ? ` near ${loc}` : ''}`
+          label = `No matches for "${dq}" — showing ${raw.length} other opening${raw.length !== 1 ? 's' : ''}${placeSearch ? ` near ${dloc}` : ''}`
         } else if (raw.length && data.fallback === 'remote_thin') {
-          label = `Few remote matches for "${q}" — also showing roles that aren't marked remote`
+          label = `Few remote matches for "${dq}" — also showing roles that aren't marked remote`
         } else if (raw.length && placeSearch && inR !== null && inR < raw.length) {
           const r = data.radius || rad
           note = inR === 0
-            ? `No ${q} jobs within ${r} mi of ${loc} — showing the nearest and remote ones`
-            : `Only ${inR} within ${r} mi of ${loc} — the rest are further away or remote`
+            ? `No ${dq} jobs within ${r} mi of ${dloc} — showing the nearest and remote ones`
+            : `Only ${inR} within ${r} mi of ${dloc} — the rest are further away or remote`
         }
         if (label) setStatusMsg(label)
         setNotice(note)
-        searchCache.set(cacheKey, { jobs: raw, ts: Date.now(), hasMore: more, pages: 1, notice: note, label })
+        searchCache.set(cacheKey, { jobs: raw, ts: Date.now(), hasMore: more, pages: 1, notice: note, label, interp: it })
         if (q) try { RecentSearchesStore.push(q, loc || undefined) } catch {}
         // The server answered instantly from our corpus and is pulling more listings in the
         // background (topup:'pending'). Re-read once, silently — no spinner, sort kept — and merge
@@ -627,15 +654,22 @@ export function useJobSearch() {
               const r2 = await fetch('/api/jobs', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}) },
-                body: JSON.stringify({ query: q, location: loc, radius: rad, db_only: true }),
+                body: JSON.stringify({ query: q, location: loc, radius: rad, db_only: true, ...(exact ? { exact: true } : {}) }),
               })
               if (!r2.ok || seq !== searchSeqRef.current || pagesRef.current > 1) return
               const d2 = await r2.json() as { jobs?: unknown[]; has_more?: boolean }
               const fresh = toJobs(d2.jobs || [], loc)
-              if (seq !== searchSeqRef.current || pagesRef.current > 1 || fresh.length <= raw.length) return
+              // Keep the re-read when it holds more listings in the area — not more rows: a thin first page is padded
+              // to 60 with listings from elsewhere, so "more rows" never happened and every top-up was thrown away
+              // (audit 2026-10-27: the live pull's local cashier listings never reached the page).
+              const local = (list: Job[]) => list.filter(j => (j as SearchJob).in_radius !== false).length
+              if (seq !== searchSeqRef.current || pagesRef.current > 1 || (local(fresh) <= local(raw) && fresh.length <= raw.length)) return
               const more2 = d2.has_more === true
               hasMoreRef.current = more2; setHasMore(more2)
-              searchCache.set(cacheKey, { jobs: fresh, ts: Date.now(), hasMore: more2, pages: 1, notice: note, label })
+              const inR2 = typeof (d2 as { in_radius?: number }).in_radius === 'number' ? (d2 as { in_radius: number }).in_radius : null
+              const note2 = inR2 !== null && inR2 >= fresh.length ? null : note
+              setNotice(note2)
+              searchCache.set(cacheKey, { jobs: fresh, ts: Date.now(), hasMore: more2, pages: 1, notice: note2, label, interp: it })
               JobCache.setMany(fresh)
               setJobs(fresh)
               updateDisplayRef.current(fresh, sortRef.current)
@@ -659,7 +693,7 @@ export function useJobSearch() {
   async function loadMore() {
     const c = committedRef.current
     if (!c || loadingMore || !hasMoreRef.current) return
-    const key = `${c.q}|${c.loc}|${c.radius}`
+    const key = `${c.q}|${c.loc}|${c.radius}${c.exact ? "|exact" : ""}`
     const seq = searchSeqRef.current
     const have = jobsRef.current
     setLoadingMore(true)
@@ -669,7 +703,7 @@ export function useJobSearch() {
       const res = await fetch('/api/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}) },
-        body: JSON.stringify({ query: c.q, location: c.loc, radius: c.radius, offset: pagesRef.current * 60, exclude: have.map(j => j.id) }),
+        body: JSON.stringify({ query: c.q, location: c.loc, radius: c.radius, offset: pagesRef.current * 60, exclude: have.map(j => j.id), ...(c.exact ? { exact: true } : {}) }),
       })
       if (!res.ok || seq !== searchSeqRef.current) { if (res.status === 429) notifyFast(); return }
       const data = await res.json() as { jobs?: unknown[]; has_more?: boolean }
@@ -681,7 +715,7 @@ export function useJobSearch() {
       const more = data.has_more === true && added.length > 0
       hasMoreRef.current = more; setHasMore(more)
       const prev = searchCache.get(key)
-      searchCache.set(key, { jobs: all, ts: Date.now(), hasMore: more, pages: pagesRef.current, notice: prev?.notice ?? null, label: prev?.label ?? null })
+      searchCache.set(key, { jobs: all, ts: Date.now(), hasMore: more, pages: pagesRef.current, notice: prev?.notice ?? null, label: prev?.label ?? null, interp: prev?.interp ?? null })
       JobCache.setMany(all)
       setJobs(all)
       updateDisplayRef.current(all, sortRef.current)
@@ -698,6 +732,12 @@ export function useJobSearch() {
     setPosted('')
     setFiltered(applySort(jobs, sort))
     setStatusMsg(jobs.length > 0 ? `${jobs.length} result${jobs.length !== 1 ? 's' : ''}` : 'Enter a search above →')
+  }
+
+  // "Search for what I typed instead": the same search with no typo fixes.
+  function searchExact() {
+    const c = committedRef.current
+    void searchJobs(c?.q ?? queryRef.current, c?.loc ?? locationRef.current, { radius: c?.radius, exact: true })
   }
 
   // The error state's Retry: re-run the same query and location (the inputs still hold them).
@@ -729,6 +769,8 @@ export function useJobSearch() {
     status,
     statusMsg,
     notice,
+    interp,
+    searchExact,
     // recommendations + company scores
     recommended,
     recSkills,

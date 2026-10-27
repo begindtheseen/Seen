@@ -9,6 +9,7 @@ import {
   resolveCompanyIds,
   upsertJobs,
   mapLimit,
+  recordPull,
 } from '../lib/server/jobSources.js';
 // Employer-direct ATS ingestion + self-growing source registry (multi-source engine).
 // Stale-job protocol (age → stale → delete): one batched Postgres function, shared with the admin
@@ -18,6 +19,7 @@ import { JOB_SEARCHES } from '../lib/server/jobSearchCatalog.js';
 import { fetchUsaJobs, usajobsCredentials } from '../lib/server/usajobs.js';
 import { pacificHour, pacificDayOfYear } from '../lib/time/pacific.js';
 import { isVercelCron } from '../lib/server/cronAuth.js';
+import { loadDemandSearches } from '../lib/server/demandSearches.js';
 
 // Refresh a batch of registered employer-direct ATS boards straight from the source. Fail-open +
 // bounded so it never breaks the cron or exceeds the function time budget. Returns a small summary.
@@ -44,7 +46,10 @@ const ALL_SEARCHES = JOB_SEARCHES;
 // free-tier cap while re-confirming more existing listings each run (cuts the stale
 // count). All 30 run in parallel, each ≤8s, so wall-clock stays well within the 60s
 // maxDuration. The full ALL_SEARCHES list is covered every ~36 hours.
-const BATCH_SIZE = 30;
+const BATCH_SIZE = 22;
+// …plus the searches people actually ran (lib/server/demandSearches.js): the most-searched (role, place) pairs of the last
+// two weeks that no search refreshed in the last 20 hours. 22 catalog + 8 demand = the same 30 Adzuna calls a run.
+const DEMAND_SLOTS = 8;
 
 // Progressive rotation — cycles through ALL batches over time rather than
 // repeating the same 6 forever. Uses day-of-year so each cron run advances
@@ -223,9 +228,11 @@ export default async function handler(req, res) {
     // reliably completes inside the 60s function limit at 8-concurrent (240 was too many and
     // threw "fetch failed"). Combined with all 5 secondary sources this adds ~600+ listings
     // per run — plenty to clear the crisis floor; the next scheduled runs top up the rest.
-    const searches = fullMode
+    const catalog = fullMode
       ? ALL_SEARCHES.slice(0, 72)
       : ALL_SEARCHES.slice(batchIndex * BATCH_SIZE, (batchIndex + 1) * BATCH_SIZE);
+    const demand = fullMode ? [] : await loadDemandSearches({ supabaseUrl: SUPABASE_URL, serviceKey: SUPABASE_SERVICE_KEY, limit: DEMAND_SLOTS, exclude: catalog });
+    const searches = [...catalog, ...demand.map(({ what, where }) => ({ what, where, demand: true }))];
 
     const dbHeaders = {
       apikey: SUPABASE_SERVICE_KEY,
@@ -253,6 +260,8 @@ export default async function handler(req, res) {
       mapLimit(searches, 8, async s => {
         const jobs = await fetchAdzuna(s.what, s.where, ADZUNA_APP_ID, ADZUNA_APP_KEY);
         const canonical = canonicalMap[s.what] || s.what.toLowerCase().trim();
+        // a demand pull counts as the pair's last pull, so a person's next search inside the cooldown reads the corpus
+        if (s.demand) recordPull(canonical, s.where === 'Remote' ? 'remote' : s.where, jobs.length, SUPABASE_URL, SUPABASE_SERVICE_KEY);
         return jobs.map(j => ({ ...j, search_query: canonical }));
       }),
       // Secondary sources self-tag their own search_query and isolate their own failures.
@@ -352,6 +361,7 @@ export default async function handler(req, res) {
       auto_healed: autoHealed,
       batch: fullMode ? 'all' : batchIndex,
       searches: searches.length,
+      demand: demand.map((d) => `${d.what} @ ${d.where}`),
       found: allJobs.length,
       bySource: sourceCounts,
       upserted: upsertedTotal,

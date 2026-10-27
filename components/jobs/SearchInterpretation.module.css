@@ -1,0 +1,27 @@
+.line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin: 0 0 var(--sp-3);
+  font-family: var(--body);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  color: var(--text-2);
+}
+.part { min-width: 0; }
+.line strong { color: var(--white); font-weight: 600; }
+.typed { color: var(--text-3); }
+.link {
+  background: none;
+  border: 0;
+  padding: 0.6rem 0;
+  margin: -0.6rem 0;
+  font: inherit;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+@media (max-width: 768px) {
+  .line { font-size: max(var(--fs-sm), 0.75rem); }
+}

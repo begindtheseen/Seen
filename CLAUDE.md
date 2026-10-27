@@ -50,6 +50,55 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-10-27 F: jobs search audit — 132 live searches graded, five failure classes fixed (branch claude/wip-round9)
+- **Owner: "It's important we do an intensive audit on the search abilities on the jobs section. It still sucks with certain
+  searches."** Battery of 132 real searches (role × city, typos, acronyms, plurals, companies, natural phrasing, ZIPs, states,
+  remote, the owner's own "valet/host/Data Analyst · Anahiem ca") graded by a per-case title regex. Harness in the session
+  scratchpad `search/` (battery.mjs, run.mjs = prod API db_only, local.mjs = local handler vs prod Supabase with every write
+  refused, grade.mjs, trace.mjs = per-read timings). Same data, before → after: p@10 82 → 91, p@30 74 → 89, false matches
+  387 → 255, median 799 → 480 ms; "valet · Anahiem ca" 0 → 29 local, "Data Analyst · Anahiem ca" 3 → 23.
+- **Classes fixed:**
+  1. **Location typed = location used.** `lib/geo/resolveLocation.js` (bundled Census gazetteer `lib/geo/usPlaces.data.js`,
+     10,254 places + 3-digit ZIP centres; built by `scripts/geo/build-us-places.mjs`, downtown points for 820 cities ≥50k from
+     `scripts/geo/centers.json` via `fetch-centers.mjs`): typos (OSA distance), nicknames/regions (NYC, LA = Los Angeles, OC,
+     Inland Empire), "City ST", states on their own (box + "Arizona"/", AZ" text — was a 25-mile circle around the state's
+     middle), foreign names never snap to small US towns. Nominatim answered "pheonix" with a Round Rock TX business and
+     "socal" with a Miami cantina, and throttles servers — it is now only the fallback for unknown places; ZIPs use its
+     structured `postalcode=` search (cached) then the ZIP3 centre, labelled by the population-weighted nearest city.
+  2. **Whole words everywhere.** `title.includes(query)` and `company.includes(query)` let "server" match "Observer", "RN"
+     name "Western Veterinary"/"Marketech International" (+60, ranked first), "SWE" Newsweek, "HR" Thrivent, "ups" every
+     "… Groups". `isCompanyMatch` (jobRelevance.js) = same name / query contains the whole name / query is the name's start
+     (not ending in a job word); `phraseIn`/`canonText` for phrases; hyphens = spaces (Chick-fil-A, In-N-Out).
+  3. **One generic word of a longer search is not a match** (`GENERIC_TOKEN`): "social worker" no longer lists "Yard Worker",
+     "IT support" no "Customer Support Lead", "medical assistant" no "Executive Assistant". Family containment only for
+     non-generic words ("engineer" no longer borrows the software family). Provenance (`search_query`) only for 2+ word
+     searches — Adzuna's full-text pull stamped "bookkeeper" on surrogacy ads.
+  4. **Query understanding** `lib/jobs/searchQuery.js`: typo fix against `lib/jobs/titleVocabulary.data.js` (9,648 words
+     from every title + employer, `scripts/jobs/build-title-vocabulary.mjs`), plural → singular when the singular is commoner
+     ("nurses" found 0 vs 59), modifiers off the role (part/full time, night, weekend, entry level, remote/WFH, "$20 an hour")
+     → `lib/jobs/searchModifiers.js` ranking nudges (never hide), "in/near <place>" → location when the box is empty, a
+     modifier-only search = `db-browse` of the area. Acronym families (RN, LPN, HR, SWE, QA, UX, IT support, EMT, PT, OT, MSW,
+     data entry, SDR, CDL…). Short words (≤3 letters) read with `title=imatch.(^|[^/$0-9a-z])rn([^a-z0-9]|$)` — the
+     substring read returned 61 arbitrary "Western/Learning/Intern" rows; "/hr" pay text is excluded.
+  5. **Supply.** Pool reads newest first via `poolRead` (2.5 s guard → unordered); company reads by whole-name prefixes,
+     NEVER ordered (an OR + ORDER BY measured 5 s); the fill-in corpus read stays unordered. Client: the silent top-up re-read
+     was kept only when it had MORE ROWS than the first page — a thin page is padded to 60 with out-of-area rows, so every
+     local top-up was thrown away; now it compares in-area counts. Refresh cron: 22 catalog + 8 demand searches per run
+     (`lib/server/demandSearches.js`: most-searched (role, place) pairs of 14 days from `search_pull_log`, normalised, junk
+     and <20 h-fresh skipped; each records a pull) — same 30 Adzuna calls.
+- **Every search response carries `interpreted`** ({query, query_typed, corrections, location, location_typed,
+  location_corrected, location_zip, location_from_query, modifiers, browse, remote}); `components/jobs/SearchInterpretation`
+  shows "Showing results for cashier (you typed “cashir”) · Search for “cashir” instead" (`exact: true`) and "Near Anaheim, CA
+  (you typed …)". Phone lesson: a button tapped while the search input is focused must `preventDefault` on mousedown — the
+  keyboard closing shifts the page between press and release and swallows the click.
+- **Facts found:** corpus 123,267 active rows, 110,013 Greenhouse (89%), 8,754 Adzuna; only 7,443 rows have coordinates;
+  "cashier" titles nationwide: 47. The storage guard (raised 470 → 6000 MB on 10-25) had silently refused the 10-24 Phoenix
+  cashier pull (123 fetched, 0 saved) — `search_pull_log.result_count` counts fetched, not saved.
+- **Not fixed / follow-ups:** hourly supply is still thin wherever nobody has searched (43% of cases <10 good local rows);
+  Adzuna `title_only`/`what_phrase` parameters unverified (no keys in the sandbox) — would cut pull noise; "UPS" the company vs
+  "UPS" power systems; Adzuna teaser Optimize (paused mid-investigation: adzuna.com answers servers 403/405 and the reader
+  rung 401, so `fetchFullPosting` never succeeds for Adzuna rows).
+
 ## Session 2026-10-27 E: round 7 — 4/4 yes again, but #383 shipped two regressions; PRs #384, #385
 - **Round 7 (live, after #383/#384):** Maria 7/7 prep YES, Dev 7/5 Pass YES, Tasha 7/7 prep YES, Ray 8/6 prep YES. Worth-it
   fell for Dev and Ray because all four hit the same two breaks, and three of them traced the cause themselves:
