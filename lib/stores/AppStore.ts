@@ -195,6 +195,20 @@ export const AppStore = {
         this.lastLoad = { conflicts, failed }
         const merged = [...mapped, ...unsynced]
         save(merged)
+        // A guest card that merged into an account row (same company + role) still gives that row what the
+        // guest did on it: the interview stage and the interview date (round 3: Ray set the date as a guest,
+        // signed in, and the account's older Amazon card had no date).
+        const carried = local.filter(a => !isDbId(a.id) && !unsynced.includes(a) && !dbIds.has(a.id))
+        for (const g of carried) {
+          const row = mapped.find(a => (g.jobId && a.jobId === g.jobId) || `${(a.company || '').toLowerCase()}|${(a.role || '').toLowerCase()}` === `${(g.company || '').toLowerCase()}|${(g.role || '').toLowerCase()}`)
+          if (!row || row.status !== 'active') continue
+          const gDate = [...(g.events || [])].reverse().find(e => e.type === 'interview_scheduled' && typeof e.data?.at === 'string')
+          const hasDate = (row.events || []).some(e => e.type === 'interview_scheduled' && typeof e.data?.at === 'string')
+          const higher = stageLevel(g.stage) > stageLevel(row.stage) ? { stage: g.stage } : {}
+          if (!gDate && !higher.stage) continue
+          if (gDate && !hasDate) { try { await this.update(row.id, higher, true, { markers: [{ ...gDate, id: eventId() }] }) } catch { /* the row keeps the account's version */ } }
+          else if (higher.stage) { try { await this.update(row.id, higher, true) } catch { /* same */ } }
+        }
         return {
           applications: merged,
           credits: result.credits ?? null,

@@ -50,6 +50,38 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-10-27: round 4 — the prep knows the company, and the person finishes every answer (branch claude/wip-round4)
+- **Owner (after round 3, Fable 5.1 switched on): "genuinely solve these. We have been at this for months."** Four fixes, all without
+  a model API:
+  1. **Company interview guides** — `lib/server/interviewGuides.js` + `lib/server/guides/{retail,services,tech}.js` (generated
+     from the hand-written JSON in the session scratchpad `guides/` by `scripts/guides-to-js.mjs`; edit the JSON). 106
+     employers (Amazon with LPs + STAR + the Loop; Walmart's four values; Google's four attributes; Stripe's loop; Big Four,
+     MBB, airlines, banks, staffing agencies, hospitals…), each hedged ("usually", "many applicants report"), no pay figures /
+     statistics / dates / guarantees (`interviewGuides.test.mjs` enforces it on every guide). `guideFor(company, role)` picks the
+     track (hourly / corporate / tech) by `prepFamily`; a shared name ("Apple") resolves by track. The guide's format replaces
+     the field's; its questions come right after the openers (flagged `company:true`, with `principle`), get a résumé story
+     when a line fits (`PRINCIPLE_CUES`), and its tips / watch / ask-them ride on the pack. The FREE record and preview carry
+     the guide headline + one company question — that was the thing all four testers said would make them pay.
+  2. **Finished answers** — every [blank] is a field on the card (`components/tracker/prepAnswer.ts` splitAnswer /
+     composeAnswer); typed words are saved per question with the prep (`POST /api/interview-prep {action:'fill'}` →
+     `pack.fills`, every device), and the composed answer shows with Copy. Every question now has an answer: a résumé story
+     (one prompt, chosen for the QUESTION — `promptForQuestion`), a drafted recruiter script, or a 3-blank STAR/how-to frame
+     (`frameFor`). Prompts match the question (incident → cause/fix; system → trade-off).
+  3. **The posting survives checkout** — stashed in `localStorage seen_prep_posting_<appId>` (swept on sign-out) before
+     Stripe and used on the auto-build; `pack.job_text` is saved so "Add the posting and rebuild" (refresh) works on any
+     device and keeps `fills`.
+  4. **Small but real:** `processSignals()` reads Seen's own accounts for HireVue / assessment / panel / rounds / drug test
+     ("Applicants to X mention…"); the guest card's interview stage + date reach the account (AppStore.loadBundle merges
+     them onto the matching row; `pending_applications` carries `stage` + `interview_at`); a time-of-day field (a date-only
+     pick is stored at noon local with a 500 ms marker); the card says "N applicant accounts mention interviewing" (what it
+     counts); the phone's floating button hides while a prep is open (`seen:prep-toggle`); no "still in the normal window"
+     line at interview stages; Studio keeps certifications from a "SKILLS & CERTIFICATIONS" heading (`splitSkillList` allowed
+     a 60-char item max — Ray's OSHA line was 66) and moves cert-looking skills to certifications; the tailor summary leads
+     with the person's OWN title ("Backend Engineer with 6+ years…, most recently at…"), never "Dependable … candidate"; an
+     engineering posting's "customer experience" is not a customer-service demand.
+- Verified: suite 2346/2346 (+ guides, prepAnswer, fill/rebuild API, round-4 pack tests); tsc clean; `next build` clean; the
+  four personas' packs rebuilt locally from their real résumés/postings. NOT yet verified: round 4 with the personas on prod.
+
 ## Session 2026-10-26: PR #375 merged (no model API) + willingness-to-pay round 3
 - **#375 merged** (merge 8f9ecce); prod deployment dpl_HvqFsmsWSN8NmNVupsW7SJzqNTAn served on seenjobs.io within ~1 min, 0
   runtime errors. Migrations 20261025140000 + 20261025160000 still unapplied (code is backward-compatible: interview_preps /

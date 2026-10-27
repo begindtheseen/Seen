@@ -185,6 +185,7 @@ test('build: Seen\'s own engine — no model call even with a key; every answer 
     assert.equal(res.body.pack.model, false);
     assert.ok(res.body.pack.answers.length >= 2);
     for (const a of res.body.pack.answers) {
+      if (a.script || a.frame) continue; // drafted from dates / a frame to finish: no single line
       assert.ok(RESUME.includes(a.resume_fact), a.resume_fact);
       assert.match(a.answer, /\bI\b/, 'told in first person');
     }
@@ -200,7 +201,9 @@ test('preview: signed in, no gate, no model — 2 role questions and 1 coached s
     const res = await call({ action: 'preview', company: 'Ross Stores', role: 'Assistant Store Manager', stage: 'Interview' });
     assert.equal(res.code, 200);
     assert.equal(res.body.has_resume, true);
-    assert.equal(res.body.questions.length, 2);
+    // 2 role questions — 3 when Seen has a guide for the company, whose own question comes first
+    assert.ok(res.body.questions.length >= 2 && res.body.questions.length <= 3, JSON.stringify(res.body.questions));
+    if (res.body.guide) { assert.equal(res.body.questions[0].company, true); assert.ok(res.body.guide.format.length > 60); }
     for (const q of res.body.questions) {
       assert.ok(q.q.endsWith('?') && q.why, JSON.stringify(q));
       assert.doesNotMatch(q.q, /^Tell me about yourself|^Why do you want to work at/, 'role questions, not the generic openers');
@@ -218,7 +221,7 @@ test('preview without a résumé: questions only, has_resume false', async () =>
   assert.equal(res.code, 200);
   assert.equal(res.body.has_resume, false);
   assert.equal(res.body.answer, null);
-  assert.equal(res.body.questions.length, 2);
+  assert.ok(res.body.questions.length >= 2 && res.body.questions.length <= 3);
 });
 
 test('preview needs sign-in and a company', async () => {
@@ -237,4 +240,32 @@ test('event carries surface and sku; checkout steps cannot be posted by a browse
     { user_id: UID, event: 'offer_clicked', company: 'Ross', surface: 'company_page', sku: 'interview' },
     { user_id: null, event: 'pricing_view', company: null },
   ]);
+});
+
+// ── Round 4: the person finishes each answer in their own words; the words stay with the prep ──────────
+test('fill: saves the typed blanks on the prep, refuses an unknown question, needs sign-in', async () => {
+  const cached = { company: 'Ross Stores', questions: [{ q: 'How do you keep shrink down?' }], answers: [{ q: 'How do you keep shrink down?', answer: 'At Target, I trained 30 new team members on loss prevention. [One time it mattered.]', resume_fact: 'Trained 30 new team members on register, returns and loss prevention' }] };
+  const calls = installFetch({ pro: false, cached });
+  const r = await call({ action: 'fill', company: 'Ross Stores', role: 'Assistant Store Manager', q: 'How do you keep shrink down?', values: ['A new hire let a friend through with a bad coupon; I caught it on the audit and we retrained the lane.'] });
+  assert.equal(r.code, 200, JSON.stringify(r.body));
+  const patch = calls.find((c) => c.path === '/rest/v1/interview_preps' && c.method === 'PATCH');
+  assert.ok(patch, 'the prep row is updated');
+  const saved = JSON.parse(patch.body).pack;
+  assert.equal(saved.fills['How do you keep shrink down?'][0], 'A new hire let a friend through with a bad coupon; I caught it on the audit and we retrained the lane.');
+  assert.equal(saved.answers.length, 1, 'nothing else on the pack changes');
+  assert.ok(!calls.some((c) => c.path === '/rest/v1/ai_credits'), 'no credit or Pro check for typing your own words');
+  assert.equal((await call({ action: 'fill', company: 'Ross Stores', role: 'Assistant Store Manager', q: 'Not a question here?', values: ['x'] })).code, 400);
+  assert.equal((await call({ action: 'fill', company: 'Ross Stores', role: 'Assistant Store Manager', q: 'How do you keep shrink down?', values: ['x'] }, { auth: false })).code, 401);
+});
+
+test('a rebuild keeps the posting and the typed blanks from the prep it replaces', async () => {
+  const cached = { company: 'Ross Stores', job_text: 'Assistant Store Manager at Ross Stores\nRequirements\nShrink control\nScheduling to a payroll budget', fills: { 'How do you keep shrink down?': ['kept'] }, answers: [{ q: 'How do you keep shrink down?', answer: 'x [y]' }] };
+  const calls = installFetch({ pro: true, cached });
+  const r = await call({ action: 'build', company: 'Ross Stores', role: 'Assistant Store Manager', refresh: true });
+  assert.equal(r.code, 200, JSON.stringify(r.body));
+  assert.equal(r.body.cached, false);
+  assert.match(r.body.pack.job_text, /Shrink control/, 'the pasted posting is reused');
+  assert.deepEqual(r.body.pack.fills, { 'How do you keep shrink down?': ['kept'] });
+  assert.ok(r.body.pack.job_match.length >= 1, 'what the job asks for, from the kept posting');
+  assert.ok(calls.some((c) => c.path === '/rest/v1/interview_preps' && c.method === 'POST'));
 });
