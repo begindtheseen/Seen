@@ -203,10 +203,13 @@ export const AppStore = {
           const row = mapped.find(a => (g.jobId && a.jobId === g.jobId) || `${(a.company || '').toLowerCase()}|${(a.role || '').toLowerCase()}` === `${(g.company || '').toLowerCase()}|${(g.role || '').toLowerCase()}`)
           if (!row || row.status !== 'active') continue
           const gDate = [...(g.events || [])].reverse().find(e => e.type === 'interview_scheduled' && typeof e.data?.at === 'string')
-          const hasDate = (row.events || []).some(e => e.type === 'interview_scheduled' && typeof e.data?.at === 'string')
+          const rowDate = [...(row.events || [])].reverse().find(e => e.type === 'interview_scheduled' && typeof e.data?.at === 'string')
           const higher = stageLevel(g.stage) > stageLevel(row.stage) ? { stage: g.stage } : {}
           if (!gDate && !higher.stage) continue
-          if (gDate && !hasDate) { try { await this.update(row.id, higher, true, { markers: [{ ...gDate, id: eventId() }] }) } catch { /* the row keeps the account's version */ } }
+          // the guest's entry is newer than the card's (round 4, Ray: typed 8:00 as a guest, saw the account's
+          // old date-only entry after sign-in)
+          const newer = !!gDate && (!rowDate || (Number(gDate.date) || 0) > (Number(rowDate.date) || 0))
+          if (newer) { try { await this.update(row.id, higher, true, { markers: [{ ...gDate, id: eventId() }] }) } catch { /* the row keeps the account's version */ } }
           else if (higher.stage) { try { await this.update(row.id, higher, true) } catch { /* same */ } }
         }
         return {
