@@ -36,7 +36,9 @@ function _intelUsable(ci) {
 function _seenIntel(company, ci) {
   if (!_intelUsable(ci)) return '';
   const pct = (v) => Math.round((Number(v) || 0) * 100);
-  return `SEEN DATA on ${company} (from ${firstPartyReportCount(ci)} real applicant reports): ${pct(ci.ghost_rate)}% were ghosted, ${pct(ci.response_rate)}% got a response, average wait ${Math.round(Number(ci.avg_wait_days) || 0)} days, Seen hiring grade ${Math.round(Number(ci.overall_score) || 0)}/100.`;
+  // no wait figure, no "average wait 0 days" (round 7, Dev)
+  const wait = Number(ci.avg_wait_days) > 0 ? `, average wait ${Math.round(Number(ci.avg_wait_days))} days` : '';
+  return `SEEN DATA on ${company} (from ${firstPartyReportCount(ci)} real applicant reports): ${pct(ci.ghost_rate)}% were ghosted, ${pct(ci.response_rate)}% got a response${wait}, Seen hiring grade ${Math.round(Number(ci.overall_score) || 0)}/100.`;
 }
 
 // Numeric company-intel rates for deterministic advice templates (or null).

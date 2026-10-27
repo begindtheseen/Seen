@@ -93,6 +93,9 @@ const STAGE_ANSWERS: Record<string, string[]> = {
   'Final Round': ['response_check', 'interview_check'],
   'Offer': ['response_check', 'interview_check'],
 }
+/** The checks a card's stage has already answered — "did they schedule any interviews?" is never the next
+ *  check-in under an Interview (round 7, Maria: "Next check-in Oct 31 — did they schedule any interviews?"). */
+export function impliedChecks(stage: string | undefined): string[] { return STAGE_ANSWERS[stage || ''] || [] }
 
 export function pickDueCheck(app: Application, answered: ReadonlySet<string>, snoozedUntil: (type: CheckType) => number | null, now = Date.now()): DueCheck | null {
   if (app.status !== 'active') return null

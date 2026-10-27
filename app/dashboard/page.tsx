@@ -414,7 +414,7 @@ export default function DashboardPage() {
             {ratedCount > 0 && <p className={styles.caption}>Based on {ratedCount} tracked application{ratedCount !== 1 ? 's' : ''}{apps.length > ratedCount ? ` · ${apps.length - ratedCount} withdrawn not counted` : ''}</p>}
           </section>
 
-          <section className={`${styles.card}`}>
+          <section className={`${styles.card}${topMoves[0]?.icon === 'calendar' ? ` ${styles.leadMove}` : ''}`}>
             <div className={styles.cardHead}>
               <h2 className={styles.cardT}>Next best move</h2>
               {topMoves.length > 0 && <span className={styles.eyebrow}>{topMoves.length} action{topMoves.length !== 1 ? 's' : ''}</span>}
