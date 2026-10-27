@@ -107,8 +107,9 @@
 .go:active:not(:disabled) { transform: scale(.98); }
 .go:disabled { cursor: progress; background: var(--surface-2); color: var(--text-3); box-shadow: none; }
 
-/* The compact bar's icon Search button — only shown in .compact on phones. */
+/* The compact bar's icon Search button and location chip — only shown in .compact on phones. */
 .goIcon { display: none; }
+.locChip { display: none; }
 
 /* The honest location note under the results header. */
 .notice {
@@ -196,8 +197,8 @@
 }
 
 
-/* ── After a search, on phones: ONE sticky line (title box + Search). The location row comes back while
-   the bar has focus, so it can still be changed (audit #25). Solid surface, never glass. ── */
+/* ── After a search, on phones: ONE sticky line (title box + location chip + Search). The location row comes back
+   when the bar is opened, so it can still be changed (audit #25). Solid surface, never glass. ── */
 @media (max-width: 768px) {
   .compact {
     position: sticky; top: 58px; z-index: 30;
@@ -210,7 +211,16 @@
     width: 44px; height: 44px; border: 0; border-radius: var(--r-control);
     background: var(--cta-gradient); color: #fff; cursor: pointer;
   }
+  /* Closed: title box · location chip · Search icon. Open (focus inside the bar or a chip tap, until a search runs
+     or a tap lands outside): the location row too. State, not :focus-within — see app/jobs/page.tsx barOpen. */
   .compact .row { display: none; }
-  .compact:focus-within .row { display: flex; }
-  .compact:focus-within .go { display: none; }
+  .compact.open .row { display: flex; }
+  .compact.open .go { display: none; }
+  .compact .locChip {
+    display: inline-flex; align-items: center; gap: 4px; flex: 0 1 auto; min-width: 0; max-width: 42%;
+    min-height: 44px; padding: 0 10px; border: 1px solid var(--border-2); border-radius: var(--r-control);
+    background: var(--surface-2); color: var(--text-2); font-family: var(--body); font-size: var(--fs-sm); cursor: pointer;
+  }
+  .compact .locChip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .compact.open .locChip { display: none; }
 }
