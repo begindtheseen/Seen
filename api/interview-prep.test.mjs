@@ -258,14 +258,45 @@ test('fill: saves the typed blanks on the prep, refuses an unknown question, nee
   assert.equal((await call({ action: 'fill', company: 'Ross Stores', role: 'Assistant Store Manager', q: 'How do you keep shrink down?', values: ['x'] }, { auth: false })).code, 401);
 });
 
-test('a rebuild keeps the posting and the typed blanks from the prep it replaces', async () => {
+test('a rebuild keeps the posting; a typed blank stays only with the sentence it finished, else it becomes a note', async () => {
+  // the cached answer's sentence is not the rebuilt one → the person's words are kept as a note, never stitched on
   const cached = { company: 'Ross Stores', job_text: 'Assistant Store Manager at Ross Stores\nRequirements\nShrink control\nScheduling to a payroll budget', fills: { 'How do you keep shrink down?': ['kept'] }, answers: [{ q: 'How do you keep shrink down?', answer: 'x [y]' }] };
   const calls = installFetch({ pro: true, cached });
   const r = await call({ action: 'build', company: 'Ross Stores', role: 'Assistant Store Manager', refresh: true });
   assert.equal(r.code, 200, JSON.stringify(r.body));
   assert.equal(r.body.cached, false);
   assert.match(r.body.pack.job_text, /Shrink control/, 'the pasted posting is reused');
-  assert.deepEqual(r.body.pack.fills, { 'How do you keep shrink down?': ['kept'] });
+  assert.deepEqual(r.body.pack.fills, {});
+  assert.deepEqual(r.body.pack.notes, { 'How do you keep shrink down?': ['kept'] });
   assert.ok(r.body.pack.job_match.length >= 1, 'what the job asks for, from the kept posting');
   assert.ok(calls.some((c) => c.path === '/rest/v1/interview_preps' && c.method === 'POST'));
+  // the same sentence on both sides → the fill rides along (round 4, Dev: a rebuild moved a finished story onto
+  // another employer and kept the typed middle)
+  const same = r.body.pack.answers.find((a) => /\[/.test(a.answer));
+  installFetch({ pro: true, cached: { ...r.body.pack, fills: { [same.q]: ['mine'] } } });
+  const r2 = await call({ action: 'build', company: 'Ross Stores', role: 'Assistant Store Manager', refresh: true });
+  assert.deepEqual(r2.body.pack.fills, { [same.q]: ['mine'] });
+  // the earlier note is still the person's writing: it rides along until they type over it
+  assert.deepEqual(r2.body.pack.notes, { 'How do you keep shrink down?': ['kept'] });
+});
+
+test('the posting pasted before checkout is kept on the server and used by the first build', async () => {
+  const calls = installFetch({ pro: true, cached: null });
+  const st = await call({ action: 'stash', company: 'Ross Stores', role: 'Assistant Store Manager', application_id: 'app1', job_text: 'Assistant Store Manager at Ross Stores\nRequirements\nShrink control\nScheduling to a payroll budget' });
+  assert.equal(st.code, 200, JSON.stringify(st.body));
+  assert.equal(st.body.kept, true);
+  const w = calls.find((c) => c.path.startsWith('/rest/v1/interview_preps') && c.method === 'POST');
+  assert.ok(w && JSON.parse(w.body).pack.pending === true, 'stored as a stash, not a prep');
+  // the stash is not a prep: `mine` says so and hands the posting back
+  installFetch({ pro: true, cached: { pending: true, job_text: 'Assistant Store Manager at Ross Stores\nRequirements\nShrink control\nScheduling to a payroll budget' } });
+  const mine = await call({ action: 'mine', company: 'Ross Stores', role: 'Assistant Store Manager' });
+  assert.equal(mine.body.pack, null);
+  assert.match(mine.body.pending_job_text, /Shrink control/);
+  // the build with no job_text of its own reads the stash
+  const b = await call({ action: 'build', company: 'Ross Stores', role: 'Assistant Store Manager' });
+  assert.equal(b.code, 200, JSON.stringify(b.body));
+  assert.equal(b.body.cached, false);
+  assert.match(b.body.pack.job_text, /Shrink control/);
+  assert.ok(b.body.pack.job_match.length >= 1);
+  assert.equal((await call({ action: 'stash', company: 'Ross Stores', role: 'Assistant Store Manager', job_text: 'x'.repeat(300) }, { auth: false })).code, 401);
 });

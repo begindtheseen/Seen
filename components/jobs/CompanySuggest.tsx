@@ -8,6 +8,7 @@
 // Data: POST /api/reports { action: 'resolve', query } — the same company resolver the rest of the
 // site uses (aliases + company_scores), up to 5 candidates, already grade-gated server-side.
 
+import { gradeLetter } from '@/lib/companyDisplay'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { queryNamesCompany } from '@/lib/server/jobPriority.js'
@@ -15,7 +16,9 @@ import { queryNamesCompany } from '@/lib/server/jobPriority.js'
 export type CompanyCandidate = { name: string; overall_score?: number | null; gradeable?: boolean }
 
 const slugOf = (name: string) => encodeURIComponent(name.toLowerCase().replace(/\s+/g, '-'))
-const letter = (s: number) => (s >= 80 ? 'A' : s >= 65 ? 'B' : s >= 50 ? 'C' : s >= 35 ? 'D' : 'F')
+// the ONE letter scale (lib/companyDisplay.ts) — this file carried its own A-at-80 scale and said "Grade C" for a
+// company whose page says F (round 4, Tasha)
+const letter = (s: number) => gradeLetter(s)
 const titleCase = (s: string) => s.replace(/\b\w/g, (c) => c.toUpperCase())
 
 /** Company lookup for a committed search (empty string = none). Results for a query are cached. */

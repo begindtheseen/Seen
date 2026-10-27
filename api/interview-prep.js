@@ -16,6 +16,14 @@
 //                                                  same deterministic path the paid pack falls back to
 //                                                  (guardPack with no model output). {questions, answer,
 //                                                  has_resume}; answer is null without a résumé.
+//   POST {action:'stash', company, role, application_id?, job_text}
+//                                                  signed in, free: the posting pasted BEFORE checkout, kept on
+//                                                  the server so it is there on the build whatever device or
+//                                                  browser comes back from Stripe (round 4: "it is kept if you
+//                                                  buy" sat over a box that was thrown away).
+//   POST {action:'fill', company, role, q, values}   signed in: the person's words for one answer's blanks (or
+//                                                  the intro / an email: q = __intro__ | __thankyou__ |
+//                                                  __followup__), saved with the prep.
 //   POST {action:'event', event, company?, surface?, sku?}
 //                                                  funnel counters (funnel_events) — lib/server/funnelEvents.js
 //                                                  holds the allow-listed names, surfaces and SKUs.
@@ -30,6 +38,7 @@ import {
 } from '../lib/server/interviewPrep.js';
 import { CLIENT_EVENTS, funnelRow, recordFunnelEvent } from '../lib/server/funnelEvents.js';
 import { guideFor } from '../lib/server/interviewGuides.js';
+import { carryFills, fillTarget, SPECIAL_FILL_KEYS } from '../lib/server/prepFills.js';
 
 /** The events a browser may post here (checkout and build steps are written by the server). */
 export const FUNNEL_EVENTS = CLIENT_EVENTS;
@@ -151,6 +160,9 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true, company, role, ...out,
       guide: guide ? { company: guide.company, format: guide.format, framework: guide.framework, questions: guide.questions.length, confidence: guide.confidence } : null,
+      // one of the company's own questions, free, for the guest card too (round 4, Ray: the guest preview
+      // showed only the pay question while the signed-in one named three Amazon questions)
+      sample_question: guide && guide.questions[0] ? { q: guide.questions[0].q, why: guide.questions[0].why, principle: guide.questions[0].principle || null } : null,
       follow_up: followUpPlan(clean(body.interview_at, 40)),
       offer: { sku: 'interview', name: sku.name, amount_cents: sku.amount_cents, pro_days: sku.pro_days },
     });
@@ -180,11 +192,33 @@ export default async function handler(req, res) {
 
   // A prep pack someone already has is theirs on every device and after their Pro days end (round 2: the
   // pack vanished on another device, and the gate ran before the cache, so a bought prep would lock).
-  const readCached = async (uid) => {
+  // The row may hold only a stash (pack.pending: the posting pasted before checkout) — that is not a prep.
+  const readRow = async (uid) => {
     const c = await db(`interview_preps?user_id=eq.${encodeURIComponent(uid)}&prep_key=eq.${encodeURIComponent(prepKey(company, role))}&select=pack,updated_at&limit=1`).catch(() => null);
     const rows = c && c.ok ? await readJson(c) : null;
     return Array.isArray(rows) && rows[0]?.pack ? rows[0].pack : null;
   };
+  const readCached = async (uid) => { const p = await readRow(uid); return p && !p.pending ? p : null; };
+
+  if (action === 'stash') {
+    if (await applyRateLimit(req, res, 'interview-record')) return;
+    if (!company) return res.status(400).json({ error: 'company required' });
+    const uid = await uidFromToken(req, SUPABASE_URL, SERVICE_KEY);
+    if (!uid) return res.status(401).json({ error: 'Sign in' });
+    const jobText = cleanText(body.job_text, 6000);
+    const row = await readRow(uid);
+    // a built prep keeps its own posting; a stash only fills the gap before the first build
+    if (row && !row.pending) return res.status(200).json({ ok: true, kept: false, reason: 'prep exists' });
+    if (!jobText) {
+      if (row?.pending) await db(`interview_preps?user_id=eq.${encodeURIComponent(uid)}&prep_key=eq.${encodeURIComponent(prepKey(company, role))}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }).catch(() => null);
+      return res.status(200).json({ ok: true, kept: false });
+    }
+    const w = await db('interview_preps?on_conflict=user_id,prep_key', {
+      method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({ user_id: uid, prep_key: prepKey(company, role), company, role, application_id: clean(body.application_id, 80) || null, pack: { pending: true, job_text: jobText, stashed_at: new Date().toISOString() }, updated_at: new Date().toISOString() }),
+    }).catch(() => null);
+    return res.status(w && w.ok ? 200 : 502).json(w && w.ok ? { ok: true, kept: true } : { error: 'Could not keep the posting right now' });
+  }
 
   if (action === 'mine') {
     if (await applyRateLimit(req, res, 'interview-record')) return;
@@ -193,25 +227,30 @@ export default async function handler(req, res) {
     if (!uid) return res.status(200).json({ ok: true, pack: null, has_resume: null });
     // Whether a résumé is on file, so the card never sells a prep it cannot build (round 2: Ray paid, then
     // got "Add your résumé first").
-    const [pack, pr] = await Promise.all([
-      readCached(uid),
+    const [row, pr] = await Promise.all([
+      readRow(uid),
       db(`profiles?id=eq.${encodeURIComponent(uid)}&select=resume_text&limit=1`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
     ]);
     const text = Array.isArray(pr) && pr[0] ? String(pr[0].resume_text || '') : null;
-    return res.status(200).json({ ok: true, pack, has_resume: text == null ? null : text.replace(/\s+/g, ' ').length >= 200 });
+    const pack = row && !row.pending ? row : null;
+    // the posting stashed before checkout, so the card can build with it the moment Pro is on
+    return res.status(200).json({ ok: true, pack, pending_job_text: !pack && row?.pending ? String(row.job_text || '') : '', has_resume: text == null ? null : text.replace(/\s+/g, ' ').length >= 200 });
   }
 
   if (action === 'build') {
     if (await applyRateLimit(req, res, 'interview-prep')) return;
     if (!company) return res.status(400).json({ error: 'company required' });
-    let priorFills = null;
+    let prior = null;
     let priorJobText = '';
     {
       const owner = await uidFromToken(req, SUPABASE_URL, SERVICE_KEY);
-      const cached = owner ? await readCached(owner) : null;
+      const row = owner ? await readRow(owner) : null;
+      const cached = row && !row.pending ? row : null;
       if (cached && !body.refresh) return res.status(200).json({ ok: true, cached: true, pack: cached });
-      // a rebuild keeps what the person already typed into their answers, and the posting they pasted before
-      if (cached) { priorFills = cached.fills || null; priorJobText = String(cached.job_text || ''); }
+      // a rebuild keeps what the person already typed (pinned to the sentence it finished — prepFills.js), and
+      // the posting they pasted before: on the earlier build, or stashed before checkout
+      if (cached) prior = cached;
+      if (row) priorJobText = String(row.job_text || '');
     }
     // Signed in + Pro access. gateAI logs the use and never charges a credit to a Pro user.
     const gate = await gateAI(req, 'interview_prep', { proOnly: true });
@@ -258,8 +297,12 @@ export default async function handler(req, res) {
       // the posting the prep was built from (so "Add the posting and rebuild" works on any device), and the
       // person's own words for the blanks, keyed by question
       job_text: jobText || '',
-      fills: priorFills && typeof priorFills === 'object' ? priorFills : {},
+      // the posting's own pay, when it states one, shown beside Seen's range from other employers
+      posting_pay: pack.posting_pay || null,
+      fills: {},
+      notes: {},
     };
+    if (prior) { const carried = carryFills(prior, full); full.fills = carried.fills; full.notes = carried.notes; }
     // Cache; a missing table only means the next open rebuilds it.
     await db('interview_preps?on_conflict=user_id,prep_key', {
       method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
@@ -281,10 +324,13 @@ export default async function handler(req, res) {
     if (!q) return res.status(400).json({ error: 'q required' });
     const cached = await readCached(uid);
     if (!cached) return res.status(404).json({ error: 'No prep yet' });
-    if (!cached.answers?.some((a) => a.q === q)) return res.status(400).json({ error: 'Not a question in this prep' });
+    if (fillTarget(cached, q) == null && !SPECIAL_FILL_KEYS.includes(q)) return res.status(400).json({ error: 'Not a question in this prep' });
     const fills = { ...(cached.fills && typeof cached.fills === 'object' ? cached.fills : {}) };
     if (values.some((v) => v)) fills[q] = values; else delete fills[q];
-    const pack = { ...cached, fills };
+    // the person's own words replace a note for the same question
+    const notes = { ...(cached.notes && typeof cached.notes === 'object' ? cached.notes : {}) };
+    delete notes[q];
+    const pack = { ...cached, fills, notes };
     const w = await db(`interview_preps?user_id=eq.${encodeURIComponent(uid)}&prep_key=eq.${encodeURIComponent(prepKey(company, role))}`, {
       method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ pack, updated_at: new Date().toISOString() }),
     }).catch(() => null);

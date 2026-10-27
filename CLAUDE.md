@@ -50,6 +50,41 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-10-27 B: round 4 verdicts → round 5 fixes (PR #378 merged; branch claude/wip-round5)
+- **#378 merged** (b478367, prod dpl_GMXqbnhS9c5KuMXkYTsWF844PDZn): the résumé tools fetch an Adzuna teaser's full
+  posting through the listing importer before asking anyone to paste it; Optimize is back on teaser rows (card,
+  drawer, detail page). Unverified from the sandbox: a real reader fetch through Adzuna's redirect.
+- **Round 4 (same 4 personas, live, after #377):** pay-now/worth-it Tasha 5/5 no, Dev 6/4 no (Pass), Ray 5/4 no,
+  Maria 5/6 YES. The free company section is what they value now. Paid prep lost trust at the same seams for all
+  four: the posting pasted before checkout was thrown away (localStorage only; `cached:true` on the buyer's return
+  dropped it); a rebuild re-matched a question to another résumé line and KEPT the typed fill (an invented
+  "✓ finished" story), or redrafted the sentence a fill continued (self-contradicting pay answer), or cut the
+  "why now" question; a principle cue alone (+2) carried any line (Dive Deep ← a training line; "ingest large data"
+  ← mentoring; "machine learning" ← FastAPI); a time of day nobody typed (date-only rows saved at noon by round-3
+  code); WMS/logistics/computer-skills "not on your résumé"; "ended in June 2026" from a year-only end; pay from
+  other employers drafted into the person's mouth; "Google slides · listed" from "Google Analytics".
+- **Round 5 rules (keep):** `lib/server/prepFills.js` — a fill belongs to the GIVEN text of its answer (`givenKey`):
+  `carryFills` keeps it only when the rebuilt answer has the same given text and blank count, else it moves to
+  `pack.notes[q]` (shown as "your words from before the rebuild", never finished). `action:'stash'` stores the
+  posting pasted before checkout as `interview_preps.pack = {pending:true, job_text}`; `readCached` ignores
+  pending rows; `mine` returns `pending_job_text`; the card auto-builds with it once Pro is on, and a `cached`
+  answer to a build that carried a posting is rebuilt with `refresh`. Fills on `__intro__` / `__thankyou__` /
+  `__followup__`. Matching: a line must share a real word with the question (`words >= 1`); principle bonus only
+  on behavioral questions; "experience with X" needs X's words; mistake/disagreement/conflict questions and
+  present-tense scenarios are always frames; `isExercise` guide questions get a practice note; a used line may
+  serve a field question again at n ≥ 2.5; GENERIC_Q adds team/shift/crew/store/customer/guest. Company questions
+  come right after the openers; KEEP staples (why now, pay, start, know) are never cut; cap 20 with a guide.
+  Pay: only the posting's own band is spoken (em dash parsed); Seen's range from other listings is a
+  `reference` beside the blank. `prepClaims`: a year-only end equal to the current year is `current`.
+  Time field: ms 500 = no time, ms 1 = typed, anything else = legacy date-only (field empty). Fill saves are
+  queued in order. Guest date carried when NEWER than the account row's. `CompanySuggest` uses `gradeLetter`.
+  `OPTIMIZER_VERSION` optimizer_v3 (old cached "Dependable … candidate" summaries never served).
+- **Verified:** suite green, tsc + next build clean, Playwright on `next start` (prep API stubbed, prod writes
+  blocked, Ray's account): intro/email editors, notes, exercise item, posting pay line, legacy time hidden, boxes
+  ≥56px, 0 overflow at 390, ordered saves, auto-build from the stash with the posting.
+- **Not fixed:** dashboard never mentions the interview; "N accounts mention interviewing" vs company-page counts;
+  Strategy tab filler ("average wait 0 days"); Studio tailor result lost on reload; Strategy/Insights boilerplate.
+
 ## Session 2026-10-27: round 4 — the prep knows the company, and the person finishes every answer (branch claude/wip-round4)
 - **Owner (after round 3, Fable 5.1 switched on): "genuinely solve these. We have been at this for months."** Four fixes, all without
   a model API:
