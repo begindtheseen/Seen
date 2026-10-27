@@ -23,6 +23,7 @@ import { PREP, PASS, PREP_PRICE, PASS_PRICE, ONE_TIME_NOTE } from '@/lib/pricing
 import { useCheckout } from '@/lib/useCheckout'
 import { funnelEvent } from '@/lib/funnel'
 import { splitAnswer, composeAnswer, isFinished, blankCount } from './prepAnswer'
+import { localDay, localTime, isoFrom } from '@/lib/interviewTime'
 import s from './InterviewPrep.module.css'
 
 const SKU = PREP
@@ -105,21 +106,8 @@ const money = (p: Pay) => p.unit === 'hour'
   ? `$${p.low % 1 ? p.low.toFixed(2) : p.low}–$${p.high % 1 ? p.high.toFixed(2) : p.high}/hr`
   : `$${Math.round(p.low / 1000)}k–$${Math.round(p.high / 1000)}k/yr`
 
-// The interview's date and time as the person's own clock shows them (the browser is where they are).
-const pad = (n: number) => String(n).padStart(2, '0')
-function localDay(iso: string): string { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` }
-// A date with no time yet is stored at noon local with a 500 ms marker, so the day never shifts in any US
-// timezone and the time field stays empty until the person sets it. A time the person typed carries a 1 ms
-// marker. Anything else is a date saved before the time field existed (noon in whatever browser saved it): it
-// is a DAY, and the field stays empty — never "02:00 PM" nobody entered (round 4: all four personas).
-const NO_TIME_MS = 500
-const TIMED_MS = 1
-function localTime(iso: string): string { const d = new Date(iso); return Number.isNaN(d.getTime()) || d.getMilliseconds() !== TIMED_MS ? '' : `${pad(d.getHours())}:${pad(d.getMinutes())}` }
-function isoFrom(dayStr: string, timeStr: string): string {
-  const [y, m, d] = dayStr.split('-').map(Number)
-  const [hh, mm] = (timeStr || '12:00').split(':').map(Number)
-  return new Date(y, m - 1, d, hh, mm, 0, timeStr ? TIMED_MS : NO_TIME_MS).toISOString()
-}
+// The interview's date and time as the person's own clock shows them: lib/interviewTime.ts (shared with the
+// dashboard).
 
 // The posting pasted before buying is kept on the SERVER (action 'stash', used by the first build on any
 // device — round 4: all four personas lost it); this device keeps a copy as a backstop for a stash that failed.
@@ -516,6 +504,7 @@ function PackView({ pack, company, fu, onFill, onRebuild, building }: { pack: Pa
   const orphanNotes = Object.entries(notes).filter(([q, v]) => v?.length && !special.has(q) && !pack.answers.some(a => a.q === q))
   const done = pack.answers.filter(a => !a.exercise && isFinished(a.answer, fills[a.q] || [])).length
   const [addPosting, setAddPosting] = useState('')
+  const [editing, setEditing] = useState(false)
   const needsPosting = !pack.job_text && !(pack.job_match && pack.job_match.length)
   return (
     <div className={s.pack}>
@@ -531,7 +520,7 @@ function PackView({ pack, company, fu, onFill, onRebuild, building }: { pack: Pa
             </ul>
           )}
           {pack.guide.watch && <p className={s.watch}>Watch out: {pack.guide.watch}</p>}
-          <p className={s.dim}>From {pack.guide.company}&apos;s own hiring pages and consistent public accounts — how it usually runs, not a guarantee. Your recruiter&apos;s email wins.</p>
+          <p className={s.dim}>From {poss(pack.guide.company)} own hiring pages and consistent public accounts — how it usually runs, not a guarantee. Your recruiter&apos;s email wins.</p>
         </div>
       )}
       {!!pack.resume_check?.length && (
@@ -554,9 +543,6 @@ function PackView({ pack, company, fu, onFill, onRebuild, building }: { pack: Pa
           )}
         </div>
       )}
-      {pack.posting_pay && (
-        <p className={s.fact}>This posting lists <b>{pack.posting_pay}</b>.</p>
-      )}
       <div className={s.block}>
         <div className={s.label}>Your answers · {done}/{pack.answers.filter(a => !a.exercise).length} finished</div>
         <p className={s.dim} style={{ margin: '0 0 .45rem' }}>Every answer starts from your résumé or the posting. Type the part only you know into each blank, and the finished answer is yours — saved here, on every device.</p>
@@ -575,6 +561,7 @@ function PackView({ pack, company, fu, onFill, onRebuild, building }: { pack: Pa
       {!!pack.job_match?.length && (
         <div className={s.block}>
           <div className={s.label}>What this job asks for — and your answer</div>
+          {pack.posting_pay && <p className={s.fact}>This posting lists <b>{pack.posting_pay}</b>.</p>}
           <ul className={s.qs}>
             {pack.job_match.map((m, i) => (
               <li key={i}>
@@ -585,17 +572,20 @@ function PackView({ pack, company, fu, onFill, onRebuild, building }: { pack: Pa
           </ul>
         </div>
       )}
-      {needsPosting && (
+      {(needsPosting || editing) ? (
         <div className={s.block}>
-          <div className={s.label}>What this job asks for</div>
+          <div className={s.label}>{needsPosting ? 'What this job asks for' : 'The posting this prep was built from'}</div>
           <label className={s.paste}>
-            <span>Paste the job posting and Seen adds each requirement with your proof line, or your honest answer for a gap, and rebuilds the questions to match. Your finished answers are kept.</span>
-            <textarea rows={3} value={addPosting} onChange={e => setAddPosting(e.target.value)} autoComplete="off" />
+            <span>{needsPosting ? 'Paste the job posting and Seen adds each requirement with your proof line, or your honest answer for a gap, and rebuilds the questions to match.' : 'Change the posting and rebuild.'} Your finished answers are kept where their sentence is unchanged; the rest are kept as your notes.</span>
+            <textarea rows={needsPosting ? 3 : 6} value={addPosting} onChange={e => setAddPosting(e.target.value)} autoComplete="off" />
           </label>
-          <button type="button" className={s.passBtn} disabled={building || addPosting.trim().length < 80} onClick={() => onRebuild(addPosting)}>
-            {building ? 'Rebuilding…' : 'Add the posting and rebuild →'}
+          <button type="button" className={s.passBtn} disabled={building || addPosting.trim().length < 80 || (!needsPosting && addPosting.trim() === String(pack.job_text || '').trim())} onClick={() => onRebuild(addPosting)}>
+            {building ? 'Rebuilding…' : needsPosting ? 'Add the posting and rebuild →' : 'Rebuild with this posting →'}
           </button>
         </div>
+      ) : (
+        // the posting can be changed after a build (round 5, Tasha: no way to touch it once built)
+        <p className={s.dim}><button type="button" className={s.copy} onClick={() => { setAddPosting(String(pack.job_text || '')); setEditing(true) }}>Edit the posting and rebuild</button></p>
       )}
       {!!pack.format && !pack.guide && (
         <div className={s.block}>

@@ -26,6 +26,7 @@ export interface RequirementRow {
   importance: string
   matched: boolean
   via: string
+  inferred?: boolean
   evidence: string | null
   soft?: boolean
   hard?: boolean
@@ -80,7 +81,8 @@ export function VerdictCard({ verdict, title = 'SeenFit match', note, cached }: 
 
 /** "Why you match" — every matched requirement with the sentence of the résumé that proves it. */
 export function WhyYouMatch({ matched, limit = 6 }: { matched: RequirementRow[]; limit?: number }) {
-  const rows = (matched || []).filter((m) => m.matched).sort((a, b) => Number(a.via === 'related') - Number(b.via === 'related')).slice(0, limit)
+  // a soft skill inferred from related work is counted, never shown as proof (round 5, Tasha)
+  const rows = (matched || []).filter((m) => m.matched && !m.inferred).sort((a, b) => Number(a.via === 'related') - Number(b.via === 'related')).slice(0, limit)
   if (!rows.length) return null
   return (
     <div>

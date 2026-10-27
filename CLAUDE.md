@@ -50,6 +50,30 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-10-27 C: round 5 verdicts (first "would have paid") → round 6 (branch claude/wip-round6)
+- **#379 merged** (b5898e9, prod dpl_H37iJifgjSXafww4VZhdn2J31psa). Round-4 preps backed up (`wtp/preps-backup-r4.json`)
+  and deleted; Pro reset; round 5 ran live. Tasha 6/6 no; Maria 6/7 **YES** (Dev, Ray pending at the time of writing).
+  Both: the posting now survives checkout and a storage-less device auto-builds with it; stories sit on lines that
+  say the thing; nothing invented; words persist. What still cost the sale: the finished EMAIL read "Hi Ms.
+  Okafor., … year.," on one line (composeAnswer added a stop and a capital to every fill and collapsed newlines);
+  the time typed in round 4 (ms .000) was hidden by the legacy rule (prod has ONLY test-account
+  interview_scheduled rows — no real user affected; left as is); no way to edit the posting after a build; the
+  Ross freight scenario still built on a scheduling line (through "hours"); "Why do you want to work at X" showed a
+  Built-on line it did not use; Optimize listed "attention to detail (related experience) — Serve 200+ customers"
+  and "CRM ← HubSpot Academy certification"; the dashboard said nothing about the interview.
+- **Round 6 rules (keep):** `composeAnswer` keeps newlines, capitalises and adds a stop only when the blank starts /
+  ends a sentence (a blank inside "Hi [name]," takes neither). `SCENARIO_Q` questions need TWO real words to take a
+  line; GENERIC_Q adds hours/associate/employee/coworker/friend. `QUESTION_PROMPTS` has a method prompt for "how do
+  you decide/measure/know". `haveVerb` keeps a brand word ("Google Slides"). Scheduling alias adds calendar/
+  Hootsuite/Buffer/Sprout/Later. `lib/interviewTime.ts` is THE time helper (card + dashboard); the dashboard's first
+  move is "Interview at X · Thu, Oct 29 at 3:00 PM → open your prep". PackView: "Edit the posting and rebuild" after
+  a build; posting pay line lives in the job-match block. Optimizer v3 `scoreFit`: a related match is `inferred`
+  when the requirement is soft (counted for the score, never shown as proof — Verdict and the application message
+  skip it) and is NOT a match when the evidence is a certification/course/education line.
+- **Still open from round 5:** loss prevention / payroll rows missing from job match (requirement extraction);
+  Studio tailor result lost on reload + "(2 pages)" header; Strategy filler; "Walk me through one thing you did
+  well at <old employer>"; Stripe "Choose currency MX$" (Stripe Adaptive Pricing — dashboard setting, owner).
+
 ## Session 2026-10-27 B: round 4 verdicts → round 5 fixes (PR #378 merged; branch claude/wip-round5)
 - **#378 merged** (b478367, prod dpl_GMXqbnhS9c5KuMXkYTsWF844PDZn): the résumé tools fetch an Adzuna teaser's full
   posting through the listing importer before asking anyone to paste it; Optimize is back on teaser rows (card,

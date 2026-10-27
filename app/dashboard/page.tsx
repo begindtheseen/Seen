@@ -1,5 +1,6 @@
 'use client'
 
+import { whenLabel } from '@/lib/interviewTime'
 import { pathSegment, slugSegment, loginHref } from '@/lib/safeHref.js'
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -302,6 +303,14 @@ export default function DashboardPage() {
   type Move = { icon: IconName; title: string; sub: string; go: () => void }
   const moves: Move[] = []
   if (apps.length > 0) {
+    // The interview on the calendar comes first — the one thing the dashboard said nothing about (round 4 and 5,
+    // every persona): "Interview at Grubhub · Thu, Oct 29 at 3:00 PM — open your prep".
+    const upcoming = active
+      .filter(a => ['Phone Screen', 'Interview', 'Final Round'].includes(a.stage))
+      .map(a => { const ev = [...(a.events || [])].reverse().find(e => e.type === 'interview_scheduled' && typeof e.data?.at === 'string'); return { a, at: ev ? String(ev.data!.at) : '' } })
+      .filter(x => !x.at || Date.parse(x.at) >= Date.now() - 86_400_000)
+      .sort((x, y) => (x.at ? Date.parse(x.at) : Infinity) - (y.at ? Date.parse(y.at) : Infinity))[0]
+    if (upcoming) moves.push({ icon: 'calendar', title: `Interview at ${upcoming.a.company}${upcoming.at ? ` · ${whenLabel(upcoming.at)}` : ''}`, sub: upcoming.at ? 'Open your prep: the questions, your answers, the thank-you email' : 'Add the date and open your prep', go: () => router.push(`/tracker#app_${pathSegment(upcoming.a.id)}`) })
     const stale = staleApps[0]
     // Straight to that card (#app_<id>), like the Signals row — not the top of the tracker (M3).
     if (stale) moves.push({ icon: 'clock', title: `Follow up with ${stale.company}`, sub: windowOf(stale).reference ? `Past the ${REFERENCE_WINDOW_DAYS}-day reference window` : 'Past its usual response window', go: () => router.push(`/tracker#app_${pathSegment(stale.id)}`) })
