@@ -17,7 +17,7 @@ import ModalPortal from '@/components/ModalPortal'
 import { uniqueKeywords } from '@/lib/optimizer/rewriteGuard.js'
 import { markQuiet } from '@/lib/quietWindow'
 import { markOptimized } from '@/lib/optimizedJobs'
-import { VerdictCard, WhyYouMatch, MissingList, Checklist, PaidPlanView, type Verdict, type RequirementRow, type ConstraintRow, type PaidPlan } from './optimizer/Verdict'
+import { VerdictCard, WhyYouMatch, MissingList, Checklist, PaidPlanView, BasisNote, type Verdict, type RequirementRow, type ConstraintRow, type PaidPlan, type PostingBasis } from './optimizer/Verdict'
 
 // The optimizer's price, rendered from the credit rules — the same literal the server charges.
 const OPTIMIZE_PRICE = creditCostLabel(RESUME_OPTIMIZE_COST)
@@ -47,6 +47,7 @@ interface OptimizeResult extends PaidPlan {
   constraints?: ConstraintRow[]
   cached?: boolean
   charged?: boolean
+  posting_basis?: PostingBasis | null
 }
 // The free diagnosis (api/optimizer.js action:optimize): verdict + matched/missing + checklist.
 interface FreeDiagnosis {
@@ -54,6 +55,7 @@ interface FreeDiagnosis {
   matched_requirements: RequirementRow[]
   unsupported_requirements: RequirementRow[]
   constraints: ConstraintRow[]
+  posting_basis?: PostingBasis | null
 }
 
 // HumanProof "package mode" response (from /api/optimizer action:'humanize' with bullets[]).
@@ -222,6 +224,8 @@ export default function ApplyOptimizeModal({
   const [diag, setDiag] = useState<FreeDiagnosis | null>(null)
   const [posting, setPosting] = useState<string | null>(null)
   const [pasteDraft, setPasteDraft] = useState('')
+  // what a summary-only listing is checked against (api `posting_basis`); null = the full posting was read or pasted
+  const [basis, setBasis] = useState<PostingBasis | null>(null)
   // The posting states too few requirements to optimize against: the server refuses it free (422
   // no_requirements) before any credit — this is its message.
   const [noReqNote, setNoReqNote] = useState('')
@@ -287,7 +291,8 @@ export default function ApplyOptimizeModal({
       ])
       const probe = await probeRes.json().catch(() => ({})) as OptimizeResult & { error?: string; message?: string }
       const d = await diagRes.json().catch(() => ({})) as FreeDiagnosis & { error?: string }
-      if (probe.error === 'preview_only' || d.error === 'preview_only') { setStep('needs-posting'); return }
+      if (probe.error === 'preview_only' || d.error === 'preview_only') { setBasis(null); setStep('needs-posting'); return }
+      setBasis(probe.posting_basis ?? d.posting_basis ?? null)
       if (probe.error === 'no_requirements') { setNoReqNote(probe.message || NO_REQUIREMENTS_NOTE); setStep('no-requirements'); return }
       if (probe.error === 'RESUME_CORRUPTED') { setStep('resume-corrupted'); return }
       if (probeRes.ok && probe.cached) { showResult(probe); return }
@@ -300,6 +305,7 @@ export default function ApplyOptimizeModal({
 
   function showResult(data: OptimizeResult) {
     setResult(data)
+    if (data.posting_basis !== undefined) setBasis(data.posting_basis ?? null)
     markOptimized(user?.id, job.id)
     setStep('review')
   }
@@ -667,9 +673,11 @@ export default function ApplyOptimizeModal({
           {step === 'needs-posting' && (
             <div className="ai-stack">
               <div style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.22)', borderRadius: 10, padding: '.8rem .95rem' }}>
-                <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '.88rem', marginBottom: '.3rem' }}>Seen could not read the full posting</div>
+                <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '.88rem', marginBottom: '.3rem' }}>{basis ? 'Paste the full posting for an exact match' : 'Seen could not read the full posting'}</div>
                 <div style={{ fontSize: 'var(--fs-72)', color: 'var(--sub)', lineHeight: 1.6 }}>
-                  This source gives Seen only a short preview, and the listing&apos;s own page would not hand over the rest just now. No credit was used. Open the listing, select all of its text, and paste it here — the check is free.
+                  {basis
+                    ? 'Open the listing, select all of its text, and paste it here. The check against the full posting is free.'
+                    : 'This source gives Seen only a short preview, and Seen holds no similar postings to fill in what it asks for. No credit was used. Open the listing, select all of its text, and paste it here — the check is free.'}
                 </div>
                 {job.apply_url && (
                   <a href={job.apply_url} target="_blank" rel="noopener noreferrer" data-testid="needs-posting-link"
@@ -794,6 +802,8 @@ export default function ApplyOptimizeModal({
           {/* ── choose ── */}
           {step === 'choose' && (
             <>
+              {/* A summary-only listing: what the check uses, before the score — the paste box one tap away. */}
+              {basis && <div style={{ marginBottom: '.85rem' }}><BasisNote basis={basis} onPaste={() => setStep('needs-posting')} /></div>}
               {/* The free diagnosis first — the same verdict the paid result opens with. */}
               {diag && (
                 <div className="ai-stack" style={{ marginBottom: '1rem' }}>
@@ -848,6 +858,7 @@ export default function ApplyOptimizeModal({
           {/* ── review ── */}
           {step === 'review' && result && (
             <div className="ai-stack">
+              {basis && <BasisNote basis={basis} onPaste={() => setStep('needs-posting')} />}
               {error && (
                 <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, padding: '.6rem .85rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--red)' }}>
                   {error}

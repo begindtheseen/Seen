@@ -20,6 +20,7 @@ import PageHeader from '@/components/shell/PageHeader'
 import { LoadError } from '@/components/shell/LoadStates'
 import { resultsView } from '@/lib/searchView.js'
 import bar from '@/components/jobs/JobSearchBar.module.css'
+import SearchInterpretation from '@/components/jobs/SearchInterpretation'
 import { groupListings } from '@/lib/jobs/groupListings.js'
 import { isMatch } from '@/lib/server/jobPriority.js'
 import Button from '@/components/ui/Button'
@@ -53,6 +54,8 @@ export default function JobsPage() {
     status,
     statusMsg,
     notice,
+    interp,
+    searchExact,
     recommended,
     recHasResume,
     recReason,
@@ -261,6 +264,7 @@ export default function JobsPage() {
             </div>
           </div>
         )}
+        {status === 'done' && filtered.length > 0 && <SearchInterpretation interp={interp} onExact={searchExact} />}
         {notice && filtered.length > 0 && <div className={bar.notice} role="status">{notice}</div>}
 
         {/* Results — swipe deck or list */}

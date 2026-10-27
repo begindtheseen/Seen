@@ -15,7 +15,7 @@ import { aiHeaders } from '@/lib/aiHeaders'
 import { useAuth } from '@/lib/auth'
 import type { Job } from '@/lib/types'
 import { MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
-import { VerdictCard, WhyYouMatch, MissingList, Checklist, type Verdict, type ConstraintRow } from '@/components/optimizer/Verdict'
+import { VerdictCard, WhyYouMatch, MissingList, Checklist, BasisNote, type Verdict, type ConstraintRow, type PostingBasis } from '@/components/optimizer/Verdict'
 
 interface Contribution { factor: string; weight: number; raw: number; points: number; reason: string; scored?: boolean }
 interface RiskFlag { code: string; severity: 'low' | 'medium' | 'high'; message: string }
@@ -23,6 +23,7 @@ interface RequirementMatch { requirement: string; surface: string; importance: s
 
 interface OptimizerOutput {
   run_id?: string | null
+  posting_basis?: PostingBasis | null
   verdict: Verdict
   constraints: ConstraintRow[]
   fit_score: number | null
@@ -162,6 +163,7 @@ export default function SeenFitPanel({ job }: { job: Job }) {
 
   return (
     <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      {out.posting_basis && <BasisNote basis={out.posting_basis} />}
       <VerdictCard verdict={out.verdict} note={`${out.confidence_label} confidence · free`} />
 
       {out.verdict.score != null && (

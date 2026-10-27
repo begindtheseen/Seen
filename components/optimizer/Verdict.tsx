@@ -30,7 +30,11 @@ export interface RequirementRow {
   evidence: string | null
   soft?: boolean
   hard?: boolean
+  /** read from a requirement similar postings state, not from this listing's own text (lib/server/postingBasis.js) */
+  from_similar?: boolean
 }
+/** What a summary-only listing was checked against (api `posting_basis`): null when the full posting was read or pasted. */
+export interface PostingBasis { kind: 'twin' | 'similar' | 'role'; note: string; core?: string | null; count?: number | null; apply_url?: string | null }
 export interface ConstraintRow { kind: string; label: string; status: 'met' | 'unmet' | 'ask'; gate: boolean; message: string; conflict?: boolean }
 export interface RewriteProposal { bulletId: string; from: string; to: string; rules: string[] }
 export interface ReorderProposal { itemId: string; role: string; company: string; text: string; from: number; to: number; why: string }
@@ -108,12 +112,31 @@ export function MissingList({ missing, limit = 8 }: { missing: RequirementRow[];
   if (!rows.length) return null
   return (
     <div>
-      <div style={{ ...kicker, color: 'var(--amber)' }}>The posting asks for — add only if true</div>
+      <div style={{ ...kicker, color: 'var(--amber)' }}>{rows.every((m) => m.from_similar) ? 'Postings like this usually ask for — add only if true' : 'The posting asks for — add only if true'}</div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.3rem' }}>
         {rows.map((m, i) => (
-          <span key={i} style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.28)', color: 'var(--amber)', borderRadius: 5, padding: '.18rem .55rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', maxWidth: '100%', overflowWrap: 'anywhere' }}>{show(m.surface)}{m.importance === 'preferred' ? ' · preferred' : ''}</span>
+          <span key={i} style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.28)', color: 'var(--amber)', borderRadius: 5, padding: '.18rem .55rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', maxWidth: '100%', overflowWrap: 'anywhere' }}>{show(m.surface)}{m.importance === 'preferred' ? ' · preferred' : ''}{m.from_similar && !rows.every((r) => r.from_similar) ? ' · usual for the role' : ''}</span>
         ))}
       </div>
+    </div>
+  )
+}
+
+/**
+ * What a summary-only listing was checked against, said before the score (owner 2026-10-27: an Adzuna listing gave a
+ * paste box instead of a check). The paste box stays one tap away for an exact match.
+ */
+export function BasisNote({ basis, onPaste }: { basis: PostingBasis | null | undefined; onPaste?: () => void }) {
+  if (!basis) return null
+  return (
+    <div data-testid="posting-basis" style={{ background: 'rgba(99,102,241,.07)', border: '1px solid rgba(99,102,241,.2)', borderRadius: 10, padding: '.65rem .85rem', fontSize: 'var(--fs-70)', color: 'var(--sub)', lineHeight: 1.55 }}>
+      <span style={{ overflowWrap: 'anywhere' }}>{basis.note}</span>
+      {onPaste && basis.kind !== 'twin' && (
+        <button type="button" onClick={onPaste} data-testid="basis-paste"
+          style={{ display: 'inline-block', marginLeft: '.35rem', background: 'none', border: 0, padding: '.6rem 0', margin: '-.6rem 0 -.6rem .35rem', color: 'var(--accent)', font: 'inherit', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>
+          Paste the full posting
+        </button>
+      )}
     </div>
   )
 }

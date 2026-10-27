@@ -223,11 +223,12 @@ test('customer service: the plain role outranks Director/Architect titles; "Serv
   const snow = J('Cyber ServiceNow Architect', 'Deloitte');
   const care = J('Customer Care Specialist', 'Lucid', 'customer service for owners');
   assert.equal(isRelevant(snow, q), false, 'token "service" must not match inside "ServiceNow"');
-  assert.equal(isRelevant(dir, q), true, 'still relevant (Services), just ranked low');
+  // audit 2026-10-27: one generic word of a two-word search ("services") no longer makes a listing a match
+  assert.equal(isRelevant(dir, q), false, 'sharing only "services" with "customer service" is not a match');
   assert.ok(relevanceScore(csr, q) > relevanceScore(care, q), 'full phrase beats one token');
   assert.ok(relevanceScore(care, q) > relevanceScore(dir, q), 'one plain token beats a Director with one token');
   const out = filterAndRank([dir, snow, care, csr], q).map((j) => j.title);
-  assert.deepEqual(out, ['Customer Service Representative', 'Customer Care Specialist', 'Managed Services - Data, Analytics & AI - Director']);
+  assert.deepEqual(out, ['Customer Service Representative', 'Customer Care Specialist']);
 });
 
 test('a query that names a seniority pays no seniority penalty', () => {
@@ -286,4 +287,48 @@ test('isTitleRelated: abbreviations a title uses count as the query word (live 2
   assert.equal(isTitleRelated({ title: 'Nursery Teacher', company: 'X' }, 'travel nurse'), false);
   assert.equal(isTitleRelated({ title: 'Travel Agent', company: 'X' }, 'travel nurse'), false);
   assert.equal(isTitleRelated({ title: 'Technical Writer', company: 'X' }, 'pharmacy technician'), false);
+});
+
+// ── Live audit 2026-10-27 (125 searches against prod): substring matching and one-word matches ──
+test('company match is whole words: "RN" is not Western/International, "SWE" is not Newsweek, "HR" is not Thrivent, "ups" is not Groups', async () => {
+  const { isCompanyMatch } = await import('./jobRelevance.js');
+  for (const [co, q] of [['Western Veterinary Partners', 'RN'], ['Marketech International', 'rn'], ['Home Sweet Home Health Agency', 'swe'], ['Newsweek', 'swe'],
+    ['Thrivent', 'hr'], ['Chris Bolton - State Farm Agent', 'hr'], ['Startups Group', 'ups'], ['ZipRecruiter', 'recruiter'], ['Direct One Recruiters LLC', 'recruiter']]) {
+    assert.equal(isCompanyMatch(co, q), false, `${q} must not name ${co}`);
+  }
+  for (const [co, q] of [['Chick-fil-A', 'chick fil a'], ['In-N-Out Burger', 'in-n-out'], ['In-N-Out Burger', 'in n out'], ['Target Corporation', 'target cashier'],
+    ['Amazon', 'amazon warehouse'], ['The Home Depot', 'home depot'], ['UPS', 'ups'], ['Banner Health', 'banner'], ['Stripe, Inc.', 'stripe']]) {
+    assert.equal(isCompanyMatch(co, q), true, `${q} names ${co}`);
+  }
+});
+
+test('the query phrase is matched as whole words: "server" is not "Observer", "intern" is not "International"', () => {
+  const obs = J('Visual Observer (Contract Opportunity)', 'Zipline');
+  assert.equal(isRelevant(obs, 'server'), false);
+  assert.equal(relevanceScore(J('Server', 'Olive Garden'), 'server') > relevanceScore(obs, 'server'), true);
+  assert.equal(isRelevant(J('International Account Manager', 'Acme'), 'intern'), false);
+  assert.equal(isRelevant(J('Software Engineering Intern', 'Acme'), 'intern'), true);
+});
+
+test('one generic word of a longer search is not a match; a specific one still is', () => {
+  assert.equal(isRelevant(J('Yard Worker', 'National Construction'), 'social worker'), false);
+  assert.equal(isRelevant(J('Paid Social & Discoverability COOP', 'Attention Arc'), 'social worker'), false);
+  assert.equal(isRelevant(J('Medical Social Worker', 'Home Health'), 'social worker'), true);
+  assert.equal(isRelevant(J('Customer Support Lead (Onsite)', 'axon'), 'IT support'), false);
+  assert.equal(isRelevant(J('IT Support Specialist', 'Ledgent'), 'IT support'), true);
+  assert.equal(isRelevant(J('Help Desk Technician', 'Ledgent'), 'IT support'), true, 'the IT support family');
+  assert.equal(isRelevant(J('Data Engineer II', 'SpyCloud'), 'data entry'), false);
+  assert.equal(isRelevant(J('Executive Assistant', 'Marketech'), 'medical assistant'), false);
+  assert.equal(isRelevant(J('Center-Based Behavior Technician', 'Life Skills'), 'pharmacy technician'), false);
+  assert.equal(isRelevant(J('Mental Health Therapist II', 'WellPower'), 'physical therapist'), true, '"therapist" says something on its own');
+});
+
+test('acronyms reach the titles that spell them out', () => {
+  assert.equal(isRelevant(J('Registered Nurse - Med Surg', 'Banner Health'), 'RN'), true);
+  assert.equal(isRelevant(J('Travel ICU RN - $2,935/week', 'TotalMed'), 'rn'), true);
+  assert.equal(isRelevant(J('Software Developer II', 'Acme'), 'swe'), true);
+  assert.equal(isRelevant(J('HR Generalist', 'Lucid Motors'), 'HR'), true);
+  assert.equal(isRelevant(J('Human Resources Coordinator', 'Acme'), 'hr'), true);
+  assert.equal(isRelevant(J('Emergency Medical Technician', 'AMR'), 'EMT'), true);
+  assert.deepEqual(expandQueryTerms('engineer'), [], 'a generic word does not borrow the software family');
 });

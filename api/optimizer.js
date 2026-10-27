@@ -18,7 +18,8 @@ import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { gateAI } from '../lib/server/credits.js';
 import { runOptimizer, ENGINE_VERSION } from '../lib/optimizer/index.js';
-import { previewOnlyOrFetch } from '../lib/server/postingGate.js';
+import { previewOnlyOrFetch, postingBasisField } from '../lib/server/postingGate.js';
+import { annotateBasis } from '../lib/server/postingBasis.js';
 import { freeDiagnostic } from '../lib/server/optimizePackage.js';
 import { extractJobFacts } from '../lib/optimizer/extractJobFacts.js';
 import { runHumanProof, HUMANPROOF_ENGINE_VERSION } from '../lib/humanizer/index.js';
@@ -532,7 +533,10 @@ export default async function handler(req, res) {
     // The V2 and Resume-Intelligence engines no longer ride here: their second and third scores
     // contradicted the one verdict on the same screen (2026-10-24 audits, D4).
     return res.status(200).json({
-      ...freeDiagnostic(output),
+      // a summary-only listing was checked against a labelled basis (lib/server/postingBasis.js): say which, and mark
+      // the requirements that came from similar postings
+      ...annotateBasis(freeDiagnostic(output), body.postingBasis),
+      posting_basis: postingBasisField(body),
       legacy_seenfit_compatible: true,
       run_id: runId, _facts_source: factsSource, _engine_version: ENGINE_VERSION,
     });

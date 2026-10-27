@@ -3,7 +3,10 @@ import { getQueryExpansion } from '../lib/server/expand.js';
 import { applyRateLimit, rateLimit, rateLimitGlobal, resolveRateBucket } from '../lib/server/ratelimit.js';
 import { jobsReadFromQuery, setPublicCache } from '../lib/server/publicRead.js';
 import { logError } from '../lib/server/errlog.js';
-import { filterAndRank, relevanceScore, isTitleRelated, sortByProximity, locationDbTerm, expandQueryTerms, parseLocation, locationScore } from './_utils/jobRelevance.js';
+import { filterAndRank, relevanceScore, isTitleRelated, sortByProximity, locationDbTerm, expandQueryTerms, parseLocation, locationScore, canonText } from './_utils/jobRelevance.js';
+import { parseSearchQuery } from '../lib/jobs/searchQuery.js';
+import { modifierBoost, hasModifiers, modifierLabels } from '../lib/jobs/searchModifiers.js';
+import { resolveLocation } from '../lib/geo/resolveLocation.js';
 import { sortByPriority, companyMatchesQuery, queryNamesCompany, isSeedListing } from '../lib/server/jobPriority.js';
 import { waitUntil } from '@vercel/functions';
 import { aggregateForQuery, upsertJobs, inferLevel, wasRecentlyPulled, recordPull, adzunaPay, cleanDescription } from '../lib/server/jobSources.js';
@@ -14,7 +17,7 @@ import { aggregateWithSources } from '../lib/jobs/expand.js';
 import { scoreJob, wasteScore, scoreRow, explainListingScore } from '../lib/server/jobScore.js';
 import { computeListingFreshness } from '../lib/server/listingFreshness.js';
 import { listingSignals } from '../lib/server/listingSignals.js';
-import { geocodeLocation, haversineMiles, milesToKm, hasUsableCoords, sanitizeCoords } from '../lib/server/geo.js';
+import { geocodeLocation, geocodeZip, haversineMiles, milesToKm, hasUsableCoords, sanitizeCoords } from '../lib/server/geo.js';
 import { findResumeMatches, geoScopeClause } from '../lib/server/resumeMatches.js';
 
 // DB-side scope for a place search (box OR city text): geoScopeClause in lib/server/resumeMatches.js.
@@ -238,6 +241,10 @@ export default async function handler(req, res) {
   let poolLimit = PAGE + 1;
   let poolFull = false; // a title/search_query read came back full → more matches exist past this page
   let serve = async (list) => list; // final shaping of every response (set once the search context exists)
+  // How Seen read the search (lib/jobs/searchQuery.js, lib/geo/resolveLocation.js) — on every response, so the page can
+  // say "Showing results for cashier near Anaheim, CA" when a word or the place was corrected.
+  let interp = {};
+  let mods = null; // the modifiers typed with the role (part time, night shift, $20 an hour …)
 
   try {
     let body = _body;
@@ -248,9 +255,14 @@ export default async function handler(req, res) {
     if (!rawQuery) return res.status(400).json({ error: 'No query' });
     // Strip characters that could abuse prompt injection
     safeQuery = rawQuery.replace(/[<>`\\]/g, '').trim();
-    relevanceQuery = safeQuery;
+    // The role words, apart from what was typed with them: "part time cashir in phoenix" → role "cashier", part-time,
+    // location Phoenix. `exact: true` (the page's "search for what I typed" link) keeps the words as typed.
+    const typedLoc = (location || '').trim();
+    const parsed = parseSearchQuery(safeQuery, { hasLocation: !!typedLoc, exact: body.exact === true });
+    mods = parsed;
+    relevanceQuery = parsed.role;
 
-    loc = (location || '').trim();
+    loc = typedLoc || parsed.location || '';
     const rawOffset = parseInt(body.offset, 10);
     offset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.min(MAX_OFFSET, Math.floor(rawOffset / PAGE) * PAGE) : 0;
     // One row past the page: a full read means the corpus holds more than this page can show.
@@ -276,7 +288,7 @@ export default async function handler(req, res) {
       getFeaturedSet(SUPABASE_URL, dbHeaders),
     ]);
 
-    const qNorm = safeQuery.toLowerCase();
+    const qNorm = relevanceQuery.toLowerCase();
 
     // canonical + expansion terms stay in outer scope so the aggregation step can use them
     let canonical = qNorm;
@@ -288,8 +300,12 @@ export default async function handler(req, res) {
     // is filled in during the DB-first Promise.all below (overlapped with the DB reads).
     // radius === '0'/'remote' means REMOTE: skip geo filtering entirely and search remote
     // listings — the old clamp silently turned "Remote" into an ordinary 25-mile search.
-    const isRemote = String(radius) === '0' || String(radius).toLowerCase() === 'remote';
-    const isRemoteListing = (j) => /\bremote\b|\bwork from home\b|\banywhere\b/i.test(`${j.location || ''} ${j.type || ''} ${j.description || ''}`);
+    const isRemote = String(radius) === '0' || String(radius).toLowerCase() === 'remote' || parsed.remote;
+    // A remote listing says so where the job is described as a job: its location, type or title, or a description that
+    // calls the work remote ("fully remote", "work from home"). A description that only mentions the word ("our remote
+    // team", "not remote") is not a remote job (audit 2026-10-27: an onsite San Jose role in a Remote search).
+    const isRemoteListing = (j) => /\bremote\b|\bwork from home\b|\banywhere\b/i.test(`${j.location || ''} ${j.type || ''} ${j.title || ''}`)
+      || (REMOTE_DESC_RE.test(String(j.description || '')) && !NOT_REMOTE_RE.test(String(j.description || '')));
     if (isRemote) { loc = 'remote'; }
     const radiusMiles = isRemote ? Infinity : Math.min(500, Math.max(5, parseInt(radius, 10) || 25));
     const distanceKm = isRemote ? null : milesToKm(radiusMiles);
@@ -307,11 +323,41 @@ export default async function handler(req, res) {
     //  • Search geocode failed (no center) → coarse city / same-state text match (honest degrade).
     // Order is NOT changed here: in-radius rows keep their relevance order (relevance first,
     // transparency score as the tiebreak) instead of nearest-first, which scrambled matches.
+    // The place the person meant (lib/geo/resolveLocation.js): "Anahiem ca" → Anaheim, CA; "LA" → Los Angeles, CA;
+    // "Arizona" → the whole state; "85004" → Phoenix, AZ. Everything below — the geocode, the location-text match for
+    // listings without coordinates, the live pull's `where`, the pull log — then uses the canonical label.
+    let knownCenter = null; // coordinates the resolver already holds — no geocoder call
+    let stateBox = null;     // a state searched on its own: its box, not a 25-mile circle around its middle
+    if (loc && !isRemote) {
+      const r = resolveLocation(loc);
+      if (r && r.kind === 'city') {
+        interp.location = r.label; if (r.corrected) interp.location_corrected = true;
+        loc = r.label; knownCenter = { lat: r.lat, lng: r.lng };
+      } else if (r && r.kind === 'state') {
+        interp.location = r.label; if (r.corrected) interp.location_corrected = true;
+        loc = r.label; stateBox = r.box;
+      } else if (r && r.kind === 'zip') {
+        const z = await geocodeZip(r.zip, process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+        if (z) { interp.location = z.label; interp.location_zip = r.zip; loc = z.label; knownCenter = { lat: z.lat, lng: z.lng }; }
+      }
+      if (interp.location && typedLoc && interp.location !== typedLoc) interp.location_typed = typedLoc;
+    }
+    if (isRemote) interp.remote = true;
+    interp.query = relevanceQuery;
+    if (relevanceQuery !== safeQuery.toLowerCase()) interp.query_typed = safeQuery;
+    if (parsed.corrections.length) interp.corrections = parsed.corrections;
+    if (parsed.location && !typedLoc) interp.location_from_query = true;
+    const modLabels = modifierLabels({ ...parsed, remote: false });
+    if (modLabels.length) interp.modifiers = modLabels;
+    if (parsed.browse) interp.browse = true;
+    const inStateBox = (j) => !!stateBox && j.lat >= stateBox.latMin && j.lat <= stateBox.latMax && j.lng >= stateBox.lngMin && j.lng <= stateBox.lngMax;
+
     const parsedLoc = parseLocation(loc);
     const namesSearchedCity = (j) => !!(parsedLoc && parsedLoc.city) && locationScore(j.location, parsedLoc) === 3;
     const nearSearch = (j) => {
       if (!loc) return true;
       if (isRemote) return isRemoteListing(j);
+      if (stateBox) return hasUsableCoords(j) ? inStateBox(j) : locationScore(j.location, parsedLoc) >= 2;
       if (!center) return locationScore(j.location, parsedLoc) >= 2;
       if (hasUsableCoords(j)) return haversineMiles(center, j) <= radiusMiles + 1;
       return namesSearchedCity(j);
@@ -350,7 +396,7 @@ export default async function handler(req, res) {
           ...j,
           employer_posted: postIds.has(j.id) || j.employer_posted === true,
           in_radius: nearSearch(j),
-          relevance: relevanceScore(j, relevanceQuery, { synonyms, canonical }),
+          relevance: relevanceScore(j, relevanceQuery, { synonyms, canonical }) + (hasModifiers(mods) ? modifierBoost(j, mods) : 0),
           // A MATCH (the role typed) vs an opening that only shares a word with it — the page lists
           // matches first and the rest under "Other openings" (jobRelevance.isTitleRelated).
           related: isTitleRelated(j, relevanceQuery, { canonical }),
@@ -385,7 +431,7 @@ export default async function handler(req, res) {
             .then(r => r.ok ? r.json() : []).catch(() => []),
           // 'remote' is not a place: skip geocoding (a null center + remote loc also skips the
           // distance filter below).
-          loc && !isRemote ? geocodeLocation(loc, SUPABASE_URL, SUPABASE_SERVICE_KEY) : Promise.resolve(null),
+          loc && !isRemote && !stateBox ? (knownCenter ? Promise.resolve(knownCenter) : geocodeLocation(loc, SUPABASE_URL, SUPABASE_SERVICE_KEY)) : Promise.resolve(null),
         ]);
         center = centerResolved;
 
@@ -401,7 +447,20 @@ export default async function handler(req, res) {
         // coordinate-less ATS-board rows in the searched city are read too.
         const locTerm = locationDbTerm(loc);
         const textClause = locTerm ? `&location=ilike.*${encodeURIComponent(locTerm)}*` : '';
-        const geoClause = isRemote ? '' : (center ? geoScopeClause(center, radiusMiles, parsedLoc && parsedLoc.city) : textClause);
+        const geoClause = isRemote ? '' : stateBox ? stateScopeClause(stateBox, parsedLoc) : (center ? geoScopeClause(center, radiusMiles, parsedLoc && parsedLoc.city) : textClause);
+
+        // Only modifiers were typed ("part time", "jobs that pay 20 an hour", "remote"): no role to match — list what is
+        // in the area, newest first, ranked by the modifiers. No live pull (a pull needs a role to search for).
+        if (!relevanceQuery) {
+          const scope = isRemote ? '&location=ilike.*remote*' : geoClause;
+          const rows = await poolRead(`${SUPABASE_URL}/rest/v1/jobs`, `availability_status=eq.active${scope}&expires_at=gt.${now}&limit=${Math.min(400, PAGE + offset + 120)}`, dbHeaders);
+          let list = applyRadius((Array.isArray(rows) ? rows : []).map((j) => toUiRow(j, loc)));
+          if (hasModifiers(mods)) list = list.map((j, i) => ({ j, b: modifierBoost(j, mods), i })).sort((a, b) => (b.b - a.b) || (a.i - b.i)).map((x) => x.j);
+          const shown = new Set((Array.isArray(body.exclude) ? body.exclude : []).slice(0, MAX_OFFSET + PAGE).map(String));
+          const rest = offset > 0 ? list.filter((j) => !shown.has(String(j.id))) : list;
+          const jobs = await serve(rest.slice(0, PAGE), { withPosts: offset === 0 });
+          return res.status(200).json({ ok: true, jobs, in_radius: countInRadius(jobs), query, location: loc, radius: Number.isFinite(radiusMiles) ? radiusMiles : null, offset, has_more: offset + PAGE <= MAX_OFFSET && rest.length > PAGE, _src: 'db-browse', interpreted: interp });
+        }
 
         // Below TARGET related listings → top up from the live API. Admin lowers this
         // to calm aggregation, raises it to aggregate harder. Clamped to a sane range.
@@ -426,7 +485,6 @@ export default async function handler(req, res) {
         // words dropped). This keeps real synonyms ("SWE" → "Software Engineer") while
         // closing the leak where a loose expansion token ("sales") pulled in a "Sales
         // Manager" for a "budtender" search. relevanceQuery stays the raw user query.
-        relevanceQuery = safeQuery;
         synonyms = searchTerms;
 
         // Keyword-fallback + company-column pool reads, geo-scoped by the DB (bbox ANDs with
@@ -438,16 +496,17 @@ export default async function handler(req, res) {
             ? fetch(`${SUPABASE_URL}/rest/v1/jobs?${t3filter}${geoClause}&expires_at=gt.${now}&limit=${poolLimit}`, { headers: dbHeaders })
                 .then(r => r.ok ? r.json() : []).catch(() => [])
             : Promise.resolve([]),
-          fetch(`${SUPABASE_URL}/rest/v1/jobs?company=ilike.*${qEnc}*${geoClause}&expires_at=gt.${now}&limit=${poolLimit}`, { headers: dbHeaders })
-            .then(r => r.ok ? r.json() : []).catch(() => []),
+          // the company named in the search, by whole-name prefixes ("chick fil a" → Chick-fil-A, "target cashier" → Target)
+          companyFilter(relevanceQuery)
+            ? fetch(`${SUPABASE_URL}/rest/v1/jobs?${companyFilter(relevanceQuery)}${geoClause}&expires_at=gt.${now}&limit=${poolLimit}`, { headers: dbHeaders })
+              .then(r => r.ok ? r.json() : []).catch(() => [])
+            : Promise.resolve([]),
         ]),
           // Search both search_query and title columns so jobs cached under different
           // query keys still surface for synonymous searches.
-          Promise.all(searchTerms.map(term => {
-            const orFilter = `or=${encodeURIComponent(`(search_query.ilike.*${term}*,title.ilike.*${term}*)`)}`;
-            return fetch(`${SUPABASE_URL}/rest/v1/jobs?${orFilter}${geoClause}&expires_at=gt.${now}&limit=${poolLimit}`, { headers: dbHeaders })
-              .then(r => r.ok ? r.json() : []).catch(() => []);
-          })),
+          // newest first, so the page ranks this week's listings rather than whichever rows the table holds first
+          // (bounded: an ordered read slower than 2.5 s is re-read unordered)
+          Promise.all(searchTerms.map(term => poolRead(`${SUPABASE_URL}/rest/v1/jobs`, `${termFilter(term)}${geoClause}&expires_at=gt.${now}&limit=${poolLimit}`, dbHeaders))),
         ]);
 
         poolFull = termRows.some((arr) => Array.isArray(arr) && arr.length >= poolLimit);
@@ -463,6 +522,7 @@ export default async function handler(req, res) {
           }
         }
         dbMatches = filterAndRank(pool, relevanceQuery, { synonyms, canonical }).map(j => toUiRow(j, loc));
+        if (hasModifiers(mods)) dbMatches = rankWithModifiers(dbMatches, relevanceQuery, { synonyms, canonical }, mods);
         // Keep only listings within the searched radius (true distance when we have
         // coordinates, else coarse city → state), nearest first.
         dbMatches = applyRadius(dbMatches);
@@ -475,13 +535,13 @@ export default async function handler(req, res) {
           const shown = new Set((Array.isArray(body.exclude) ? body.exclude : []).slice(0, MAX_OFFSET + PAGE).map(String));
           const rest = dbMatches.filter((j) => !shown.has(String(j.id)));
           const jobs = await serve(rest.slice(0, PAGE), { withPosts: false });
-          return res.status(200).json({ ok: true, jobs, in_radius: countInRadius(jobs), query, location: loc, radius: Number.isFinite(radiusMiles) ? radiusMiles : null, offset, has_more: offset + PAGE <= MAX_OFFSET && (rest.length > PAGE || (poolFull && rest.length >= PAGE)), _src: 'db-page' });
+          return res.status(200).json({ ok: true, jobs, in_radius: countInRadius(jobs), query, location: loc, radius: Number.isFinite(radiusMiles) ? radiusMiles : null, offset, has_more: offset + PAGE <= MAX_OFFSET && (rest.length > PAGE || (poolFull && rest.length >= PAGE)), _src: 'db-page', interpreted: interp });
         }
         if (dbMatches.length >= TARGET) {
           console.log(`DB HIT: "${query}" → "${canonical}" @ "${loc}" (${radiusMiles}mi) — ${dbMatches.length} in-radius results (no API call)`);
           const jobs = await serve(dbMatches.slice(0, PAGE));
           if (seedsDropped) console.log(`SEED ROWS DROPPED: ${seedsDropped}`);
-          return res.status(200).json({ ok: true, jobs, in_radius: countInRadius(jobs), query, location: loc, radius: Number.isFinite(radiusMiles) ? radiusMiles : null, offset: 0, has_more: dbMatches.length > PAGE || (poolFull && dbMatches.length >= PAGE), _src: 'db' });
+          return res.status(200).json({ ok: true, jobs, in_radius: countInRadius(jobs), query, location: loc, radius: Number.isFinite(radiusMiles) ? radiusMiles : null, offset: 0, has_more: dbMatches.length > PAGE || (poolFull && dbMatches.length >= PAGE), _src: 'db', interpreted: interp });
         }
       } catch(e) { console.warn('DB-first search error:', e.message); }
       console.log(`DB TOP-UP: "${query}" → "${canonical}" @ "${loc}" — ${dbMatches.length} in DB, pulling more from API`);
@@ -489,7 +549,7 @@ export default async function handler(req, res) {
 
     // A later page that the DB-first block could not answer (DB error) is an empty last page, never
     // page one again.
-    if (offset > 0) return res.status(200).json({ ok: true, jobs: [], in_radius: 0, query, location: loc, offset, has_more: false, _src: 'db-page' });
+    if (offset > 0) return res.status(200).json({ ok: true, jobs: [], in_radius: 0, query, location: loc, offset, has_more: false, _src: 'db-page', interpreted: interp });
 
     // ── INSTANT RESPONSE (owner directive 2026-10-17: a search never waits on a live pull) ──────
     // Below TARGET this handler used to AWAIT a live Adzuna/ATS aggregation (plus geo and national
@@ -499,7 +559,7 @@ export default async function handler(req, res) {
     // db_only:true, and every later search reads the new listings straight from the DB.
     // The cooldown and the per-bucket + global top-up budgets still gate every live pull.
     const dbOnly = body.db_only === true;
-    const canPull = !!(SUPABASE_URL && SUPABASE_SERVICE_KEY) && !dbOnly;
+    const canPull = !!(SUPABASE_URL && SUPABASE_SERVICE_KEY) && !dbOnly && !!relevanceQuery;
     inflightKey = `${canonical}::${loc}`;
 
     // Fill a thin in-radius page from our own corpus (query-relevant, nearest-first), then the
@@ -591,6 +651,7 @@ export default async function handler(req, res) {
       offset: 0, has_more: dbMatches.length > PAGE || (poolFull && dbMatches.length >= PAGE),
       _src: dbOnly ? 'db-refresh' : `db-${decision}`, widened, fallback,
       topup: pending ? 'pending' : null,
+      interpreted: interp,
       ...(decision === 'budget' ? { degraded: true } : {}),
     });
 
@@ -602,7 +663,7 @@ export default async function handler(req, res) {
     // empty error — search should never go blank just because the top-up couldn't run.
     if (dbMatches.length) {
       const jobs = await serve(dbMatches.slice(0, 60)).catch(() => dbMatches.slice(0, 60));
-      return res.status(200).json({ ok: true, jobs, in_radius: jobs.filter((j) => j.in_radius !== false).length, query: safeQuery, location: loc, _src: 'db-fallback' });
+      return res.status(200).json({ ok: true, jobs, in_radius: jobs.filter((j) => j.in_radius !== false).length, query: safeQuery, location: loc, _src: 'db-fallback', interpreted: interp });
     }
     return res.status(500).json({ error: err.message, jobs: [] });
   }
@@ -651,9 +712,12 @@ async function corpusRelevant({ supabaseUrl, dbHeaders, terms, query, canonical,
   if (!uniq.length) return [];
   try {
     const arrays = await Promise.all(uniq.map(t => {
-      const orf = `or=${encodeURIComponent(`(company.ilike.*${t}*,title.ilike.*${t}*,search_query.ilike.*${t}*)`)}`;
-      return fetch(`${supabaseUrl}/rest/v1/jobs?${orf}&expires_at=gt.${now}&select=${cols}&limit=120`, { headers: dbHeaders })
-        .then(r => r.ok ? r.json() : []).catch(() => []);
+      const clean = t.replace(/[(),*"\\]/g, ' ').replace(/\s+/g, ' ').trim();
+      const c = canonText(clean);
+      // a short word ("rn", "hr") only as a whole word in the title; anything longer in title, search key or company
+      const orf = c && !c.includes(' ') && c.length <= 3 ? termFilter(clean) : `or=${encodeURIComponent(`(company.ilike.*${clean}*,title.ilike.*${clean}*,search_query.ilike.*${clean}*)`)}`;
+      // unordered: these rows are re-sorted nearest-first below, and a three-column OR ordered by date measured 2 s
+      return poolRead(`${supabaseUrl}/rest/v1/jobs`, `${orf}&expires_at=gt.${now}&select=${cols}&limit=120`, dbHeaders, { ordered: false });
     }));
     const pool = [], seen = new Set();
     for (const arr of arrays) for (const row of (Array.isArray(arr) ? arr : [])) {
@@ -726,6 +790,80 @@ function _logSearch(query, location, resultCount, supabaseUrl, headers) {
     headers: { ...headers, Prefer: 'return=minimal' },
     body: JSON.stringify({ query, location: location || '', result_count: resultCount, source: 'api' }),
   }).catch(() => {});
+}
+
+const REMOTE_DESC_RE = /\b(?:fully remote|100% remote|remote (?:position|role|job|opportunity|work|employee)|work(?:ing)? remotely|remote[- ]first|work from home|wfh)\b/i;
+const NOT_REMOTE_RE = /\b(?:not (?:a )?remote|no remote|not eligible for remote|on-?site only|in[- ]office only|must (?:work|be) on-?site)\b/i;
+
+// ── Pool reads ─────────────────────────────────────────────────────────────────────────────────
+// One search term → the PostgREST filter that reads its candidate listings.
+//  • A short word ("rn", "hr", "qa", "swe") only as a WHOLE word in the title. The substring read (`title ilike *rn*`)
+//    returned 61 arbitrary rows containing "rn" — "Western", "Learning", "Intern" — and the real RN listings never
+//    reached the ranker (audit 2026-10-27). "/hr" in a pay line is not HR.
+//  • Anything longer in the title or the search key it was fetched under.
+export function termFilter(term) {
+  const t = String(term || '').toLowerCase().replace(/[(),*"\\]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!t) return 'id=is.null';
+  const c = canonText(t);
+  if (c && !c.includes(' ') && c.length <= 3) {
+    const esc = c.replace(/[+#.]/g, (ch) => `\\${ch}`);
+    return `title=imatch.${encodeURIComponent(`(^|[^/$0-9a-z])${esc}([^a-z0-9]|$)`)}`;
+  }
+  return `or=${encodeURIComponent(`(search_query.ilike.*${t}*,title.ilike.*${t}*)`)}`;
+}
+
+// The company a search may name, read by whole-name prefixes: "chick fil a" reads Chick-fil-A (the old
+// `company ilike *chick fil a*` never matched the hyphens), "target cashier" reads Target, "home depot" reads
+// "The Home Depot". Never ordered — an OR of patterns with ORDER BY measured 5 s. '' when nothing is long enough.
+export function companyFilter(query) {
+  const w = canonText(query).split(' ').filter(Boolean);
+  if (w[0] === 'the') w.shift();
+  const pats = new Set();
+  for (let k = 1; k <= Math.min(3, w.length); k++) {
+    const head = w.slice(0, k).join('*');
+    if (head.replace(/\*/g, '').length < 3) continue;
+    pats.add(`company.ilike.${head}*`);
+    pats.add(`company.ilike.the*${head}*`);
+  }
+  return pats.size ? `or=${encodeURIComponent(`(${[...pats].join(',')})`)}` : '';
+}
+
+// A state searched on its own: listings inside its box, or whose location text names it ("Phoenix, AZ", "Arizona").
+// The old path geocoded "Arizona" to one point and searched 25 miles around the middle of the state.
+export function stateScopeClause(box, parsed) {
+  const f = (n) => Number(n).toFixed(4);
+  const parts = [`and(lat.gte.${f(box.latMin)},lat.lte.${f(box.latMax)},lng.gte.${f(box.lngMin)},lng.lte.${f(box.lngMax)})`];
+  const name = parsed && parsed.stateName ? String(parsed.stateName).replace(/[(),*"\\]/g, '') : '';
+  const ab = parsed && parsed.stateAbbr ? String(parsed.stateAbbr).toUpperCase().replace(/[^A-Z]/g, '') : '';
+  if (name) parts.push(`location.ilike.*${name}*`);
+  if (ab) parts.push(`location.ilike."*, ${ab}*"`);
+  return `&or=${encodeURIComponent(`(${parts.join(',')})`)}`;
+}
+
+// Read a pool newest first; an ordered read that is slow (an OR the planner walks by date) is re-read unordered,
+// so ordering never costs a search more than 2.5 s. Never throws — [] on failure.
+async function poolRead(base, qs, headers, { ordered = true } = {}) {
+  if (!ordered) {
+    try { const r = await fetch(`${base}?${qs}`, { headers }); return r.ok ? await r.json() : []; } catch (_e) { return []; }
+  }
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 2500);
+  try {
+    const r = await fetch(`${base}?${qs}&order=created_at.desc`, { headers, signal: ctrl.signal });
+    if (r.ok) { const rows = await r.json(); clearTimeout(timer); return Array.isArray(rows) ? rows : []; }
+  } catch (_e) { /* slow or failed → unordered */ }
+  clearTimeout(timer);
+  try {
+    const r = await fetch(`${base}?${qs}`, { headers });
+    return r.ok ? await r.json() : [];
+  } catch (_e) { return []; }
+}
+
+// Relevance first, then what the search asked for with the role (part time, night shift, $20+/hr): the modifiers move
+// a listing up or down within the matches, never past a better match by much, and never hide one.
+function rankWithModifiers(list, q, opts, m) {
+  return list.map((j, i) => ({ j, s: relevanceScore(j, q, opts) + modifierBoost(j, m), i }))
+    .sort((a, b) => (b.s - a.s) || (a.i - b.i)).map((x) => x.j);
 }
 
 // ── Keyword fallback filter ───────────────────────────────────────────────────

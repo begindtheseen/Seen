@@ -27,6 +27,12 @@ const GENERIC_SYNONYM = new Set([
   'full', 'part', 'time', 'hybrid', 'onsite', 'trainee', 'apprentice',
 ]);
 
+// Words too common in titles to make a listing a match on their own when the search has other words too.
+const GENERIC_TOKEN = new Set([...GENERIC_SYNONYM, 'worker', 'workers', 'developer', 'engineer', 'support', 'technician', 'tech', 'analyst',
+  'data', 'social', 'entry', 'service', 'services', 'customer', 'care', 'health', 'medical', 'office', 'home', 'lead', 'specialist',
+  'it', 'hr', 'night', 'shift', 'day', 'remote', 'work', 'from', 'business', 'development', 'design', 'designer', 'systems', 'system',
+  'operations', 'product', 'project', 'program', 'account', 'technical', 'travel', 'store', 'retail', 'food', 'driver', 'nurse', 'aide']);
+
 // ── Curated role families — DETERMINISTIC query expansion (NO AI) ─────────────────
 // The single hardest problem in job search is the gap between what a seeker TYPES and what
 // employers TITLE the same job: "theft prevention" → "Asset Protection Specialist",
@@ -74,7 +80,50 @@ const ROLE_FAMILIES = [
   ['pharmacy technician', 'pharmacy tech', 'certified pharmacy technician', 'cpht'],
   // Retail management ("retail manager · Tucson" opened with "Case Manager (PRN/Pool)").
   ['retail manager', 'store manager', 'assistant store manager', 'retail store manager'],
+  // Acronyms people type for a role, with the titles that spell it out (audit 2026-10-27: "RN · Phoenix" served 59
+  // unrelated rows, "SWE" 52, "HR" 10 — the short word matched inside other words and nothing bridged it to the title).
+  ['registered nurse', 'rn', 'staff nurse', 'travel nurse', 'charge nurse', 'travel rn'],
+  ['licensed practical nurse', 'lpn', 'licensed vocational nurse', 'lvn'],
+  ['human resources', 'hr', 'hr generalist', 'hr coordinator', 'hr specialist', 'hr assistant', 'people operations', 'hr business partner'],
+  ['software engineer', 'swe', 'software developer', 'sde', 'software development engineer'],
+  ['quality assurance', 'qa', 'qa tester', 'qa engineer', 'qa analyst', 'test engineer', 'sdet', 'software tester'],
+  ['ux designer', 'ux', 'user experience designer', 'product designer', 'ui/ux designer', 'ux/ui designer', 'interaction designer'],
+  ['it support', 'help desk', 'helpdesk', 'desktop support', 'service desk', 'it technician', 'it specialist', 'it support specialist', 'technical support specialist'],
+  ['emt', 'emergency medical technician', 'paramedic', 'emt-b', 'ambulance'],
+  ['physical therapist', 'pt', 'dpt', 'physical therapy', 'physiotherapist'],
+  ['occupational therapist', 'ot', 'otr', 'occupational therapy'],
+  ['social worker', 'msw', 'lcsw', 'lmsw', 'medical social worker', 'clinical social worker'],
+  ['data entry', 'data entry clerk', 'data entry specialist', 'data clerk', 'typist', 'data entry operator'],
+  ['sdr', 'sales development representative', 'bdr', 'business development representative', 'sales development'],
+  ['frontend developer', 'front end developer', 'frontend engineer', 'front end engineer', 'ui developer', 'ui engineer', 'react developer'],
+  ['full stack developer', 'full stack', 'fullstack', 'full stack engineer', 'fullstack engineer', 'fullstack developer'],
+  ['devops', 'devops engineer', 'site reliability engineer', 'sre', 'platform engineer', 'infrastructure engineer'],
+  ['data analyst', 'business intelligence analyst', 'bi analyst', 'reporting analyst', 'analytics analyst', 'data analytics'],
+  ['medical assistant', 'ma', 'certified medical assistant', 'cma', 'clinical medical assistant'],
+  ['accountant', 'staff accountant', 'cpa', 'senior accountant', 'accounting associate', 'tax accountant'],
+  ['bookkeeper', 'accounting clerk', 'accounts payable', 'accounts receivable', 'ap clerk', 'ar clerk', 'bookkeeping'],
+  ['paralegal', 'legal assistant', 'litigation paralegal', 'legal secretary'],
+  ['recruiter', 'talent acquisition', 'technical recruiter', 'sourcer', 'recruiting coordinator', 'talent acquisition specialist'],
+  ['teacher', 'educator', 'classroom teacher', 'elementary teacher', 'high school teacher', 'special education teacher', 'substitute teacher'],
+  ['electrician', 'journeyman electrician', 'apprentice electrician', 'electrical technician', 'electrical apprentice'],
+  ['hvac technician', 'hvac', 'hvac tech', 'hvac installer', 'refrigeration technician', 'hvac service technician'],
+  ['truck driver', 'cdl driver', 'cdl a driver', 'class a driver', 'otr driver', 'regional driver', 'local cdl driver', 'cdl'],
+  ['front desk', 'front desk agent', 'guest service agent', 'front desk associate', 'hotel front desk', 'guest services agent'],
+  ['dental assistant', 'registered dental assistant', 'rda', 'dental assisting'],
+  ['stocker', 'overnight stocker', 'stock associate', 'stock clerk', 'replenishment associate', 'night stocker', 'merchandise associate'],
 ];
+
+// Lowercase words only — the form every phrase and company comparison uses, so "Chick-fil-A" and "chick fil a",
+// "In-N-Out" and "in n out", "Front-End" and "front end" are the same text.
+export function canonText(s) {
+  return String(s || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9+#]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+// Is `phrase` a whole run of words inside `text`? (Both canonText'ed.) The old `title.includes(query)` let "server"
+// match "Visual Observer", "intern" match "International", and "rn" match half the titles in the corpus.
+export function phraseIn(text, phrase) {
+  if (!text || !phrase) return false;
+  return (` ${text} `).includes(` ${phrase} `);
+}
 
 // Normalize a surface for family matching: lowercase, keep alnum/+#., collapse spaces.
 function _norm(s) {
@@ -92,7 +141,10 @@ function _familyFor(query) {
   const qn = _norm(query);
   if (!qn) return null;
   for (const fam of ROLE_FAMILIES) if (fam.includes(qn)) return fam;
-  if (qn.length >= 4) {
+  // containment only for a word that names one kind of work: "warehouse" → the warehouse family, but "engineer",
+  // "support", "data", "manager" sit inside many families' phrases and would pull a stranger's synonyms in
+  // ("engineer" → software developers; "support" → help desk)
+  if (qn.length >= 4 && !GENERIC_TOKEN.has(qn)) {
     for (const fam of ROLE_FAMILIES) for (const m of fam) {
       if (_phraseIn(m, qn) || _phraseIn(qn, m)) return fam;
     }
@@ -125,11 +177,13 @@ export function expandQueryTerms(query, max = 8) {
 // search_query. A bare single common word ("target", "apple", "overnight") does NOT: sources
 // full-text-match it inside unrelated descriptions, so a "target" search stamped a Nurse Manager.
 // Those fall back to company/title match only — which keeps the real Target jobs, drops the noise.
+// Only a search of two or more words: a one-word role search already has its family's titles as synonyms, and the
+// live pull's full-text match stamped it on ads that only mention the word ("bookkeeper" → a surrogacy ad, "cashier" →
+// "Flight Checker" — audit 2026-10-27).
 function _isSpecificQuery(query) {
   const qn = _norm(query);
   if (!qn) return false;
-  if (qn.split(' ').length >= 2) return true;
-  return _familyFor(qn) != null;
+  return qn.split(' ').length >= 2;
 }
 function _provenanceMatch(job, query, canonical) {
   const sq = _norm(job && job.search_query);
@@ -202,9 +256,34 @@ export function tokenInTitle(title, token) {
   return re.test(title);
 }
 
-// Whole-query company match (a company-name search like "stripe").
-function isCompanyMatch(company, qNorm) {
-  return !!qNorm && (company === qNorm || company.includes(qNorm) || (qNorm.length >= 4 && qNorm.includes(company) && company.length >= 4));
+// Words that end a job title. A search ending in one is a role search, never a search for a company that happens to
+// start with the same word ("recruiter" is not "Recruiter.com", "nurse" is not "Nurse Staffing LLC").
+const ROLE_NOUNS = new Set(['recruiter', 'recruiters', 'nurse', 'nurses', 'driver', 'drivers', 'manager', 'engineer', 'developer', 'technician',
+  'tech', 'assistant', 'associate', 'specialist', 'representative', 'rep', 'analyst', 'coordinator', 'cashier', 'server', 'cook', 'clerk',
+  'agent', 'officer', 'worker', 'teacher', 'therapist', 'designer', 'consultant', 'operator', 'mechanic', 'electrician', 'plumber', 'cleaner',
+  'guard', 'attendant', 'aide', 'barista', 'bartender', 'stocker', 'handler', 'picker', 'packer', 'installer', 'writer', 'editor', 'jobs', 'job']);
+// Legal and filler words a company name carries that nobody types.
+const COMPANY_FILLER = new Set(['inc', 'incorporated', 'llc', 'llp', 'lp', 'ltd', 'limited', 'corp', 'corporation', 'co', 'company', 'plc', 'the', 'pllc', 'pc']);
+function companyCore(company) {
+  return canonText(company).split(' ').filter((w) => w && !COMPANY_FILLER.has(w));
+}
+
+// Does the search name this company? Whole words only. The old test was `company.includes(query)`, so "RN" named
+// "Western Veterinary Partners" and "Marketech International", "SWE" named "Home Sweet Home Health" and "Newsweek",
+// "HR" named "Thrivent", and "ups" named every "… Groups" — each ranked +60 above the real matches (audit 2026-10-27).
+//  • the same name ("stripe", "chick fil a" = "Chick-fil-A", "innout" = "In-N-Out");
+//  • the search contains the company's whole name ("target cashier", "amazon warehouse");
+//  • the search is the start of the company's name ("in n out" → "In-N-Out Burger", "banner" → "Banner Health"),
+//    when it is at least 4 letters and does not end in a job word.
+export function isCompanyMatch(company, query) {
+  const c = companyCore(company);
+  const q = canonText(query).split(' ').filter(Boolean);
+  if (!c.length || !q.length) return false;
+  const cj = c.join(' '), qj = q.join(' ');
+  if (cj === qj || c.join('') === q.join('')) return true;
+  if (cj.replace(/ /g, '').length >= 3 && phraseIn(qj, cj)) return true;
+  if (qj.replace(/ /g, '').length >= 4 && cj.startsWith(`${qj} `) && !ROLE_NOUNS.has(q[q.length - 1])) return true;
+  return false;
 }
 
 // ── Seniority alignment ────────────────────────────────────────────────────────────────────
@@ -241,22 +320,23 @@ export function relevanceScore(job, query, { synonyms = [], canonical = '' } = {
   const tokens = tokenize(query);
   if (!tokens.length) return 1; // empty query: everything is "related"
   const title = String(job.title || '').toLowerCase();
-  const company = normalizeCompany(job.company);
+  const titleC = canonText(job.title);
+  const companyC = canonText(job.company);
   const desc = String(job.description || '').toLowerCase();
-  const qNorm = normalizeCompany(query);
+  const qC = canonText(query);
 
   let score = 0;
-  if (isCompanyMatch(company, qNorm)) score += 60;
+  if (isCompanyMatch(job.company, query)) score += 60;
   let titleHits = 0;
   for (const t of tokens) {
-    if (tokenInTitle(title, t)) { score += 12; titleHits++; }
-    else if (company.includes(t)) score += 8;
-    else if (desc.includes(t)) score += 3;
+    if (tokenOrAliasInTitle(title, t)) { score += 12; titleHits++; }
+    else if (phraseIn(companyC, canonText(t))) score += 8;
+    else if (t.length >= 4 && desc.includes(t)) score += 3;
   }
   // Every token in the title (not just some) is a stronger match than a scatter.
   if (tokens.length > 1 && titleHits === tokens.length) score += 10;
-  // Phrase bonus: the full query appears verbatim in the title.
-  if (qNorm && title.includes(qNorm)) score += 30;
+  // Phrase bonus: the full query appears in the title as whole words.
+  if (qC && phraseIn(titleC, qC)) score += 30;
   // True-synonym title match (e.g. "budtender" → a "Cannabis Dispensary Associate").
   for (const syn of effectiveSynonyms(query, synonyms)) {
     if (titleHasSynonym(title, syn)) score += 12;
@@ -279,12 +359,15 @@ export function isRelevant(job, query, { synonyms = [], canonical = '' } = {}) {
   const tokens = tokenize(query);
   if (!tokens.length) return true; // empty query: everything is "related"
   const title = String(job.title || '').toLowerCase();
-  const company = normalizeCompany(job.company);
-  const qNorm = normalizeCompany(query);
+  const qC = canonText(query);
 
-  if (isCompanyMatch(company, qNorm)) return true;
-  for (const t of tokens) { if (tokenInTitle(title, t)) return true; }
-  if (qNorm && title.includes(qNorm)) return true;
+  if (isCompanyMatch(job.company, query)) return true;
+  if (qC && phraseIn(canonText(job.title), qC)) return true;
+  // One word of a longer search is enough only when it says something on its own: "phlebotomy", "hygienist",
+  // "therapist" — never "worker", "developer", "support", "data" (audit 2026-10-27: "social worker" listed "Yard Worker"
+  // and "Paid Social"; "IT support" listed "Customer Support Lead"; "work from home data entry" listed data engineers).
+  const hits = tokens.filter((t) => tokenOrAliasInTitle(title, t));
+  if (hits.length && (tokens.length === 1 || hits.length === tokens.length || hits.some((t) => !GENERIC_TOKEN.has(t)))) return true;
   for (const syn of effectiveSynonyms(query, synonyms)) { if (titleHasSynonym(title, syn)) return true; }
   // Fetched by our aggregation FOR this exact query (search_query provenance) — the signal that
   // recovers "Asset Protection Specialist" for a "theft prevention" search. Not description, not a
@@ -316,6 +399,10 @@ const TOKEN_ALIASES = {
   administrative: ['admin'],
   administrator: ['admin'],
   developer: ['dev'],
+  frontend: ['front end'],
+  fullstack: ['full stack'],
+  'front-end': ['front end', 'frontend'],
+  'full-stack': ['full stack', 'fullstack'],
 };
 function tokenOrAliasInTitle(title, token) {
   if (tokenInTitle(title, token)) return true;
@@ -327,10 +414,9 @@ export function isTitleRelated(job, query, { canonical = '' } = {}) {
   const tokens = tokenize(query);
   if (!tokens.length) return true;
   const title = String(job.title || '').toLowerCase();
-  const company = normalizeCompany(job.company);
   const qNorm = normalizeCompany(query);
-  if (isCompanyMatch(company, qNorm)) return true;
-  if (qNorm && title.includes(qNorm)) return true;
+  if (isCompanyMatch(job.company, query)) return true;
+  if (phraseIn(canonText(job.title), canonText(query))) return true;
   if (tokens.every((t) => tokenOrAliasInTitle(title, t))) return true;
   const fam = [...(_familyFor(query) || [])];
   const cn = String(canonical || '').toLowerCase().trim();
