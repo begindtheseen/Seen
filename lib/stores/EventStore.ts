@@ -3,7 +3,7 @@
 import type { CheckType } from '../constants'
 import type { Application, DueCheck } from '../types'
 import { nextCheck, type NextCheck } from './checkSchedule'
-import { answeredFromEvents, isCheckType, pickDueCheck, snoozedUntilFromEvents } from './checkEvents'
+import { answeredFromEvents, impliedChecks, isCheckType, pickDueCheck, snoozedUntilFromEvents } from './checkEvents'
 
 // The device ledger of check-in answers (seen_hevents_v1) and snoozes (seen_check_snooze). Since
 // audit 3 (2026-10-24, H3) the TRUTH lives on the application: every answer is a `check_answered`
@@ -104,7 +104,7 @@ export const EventStore = {
    */
   nextCheck(app: Application, now = Date.now()): NextCheck | null {
     if (app.status !== 'active') return null
-    return nextCheck(app.appliedAt, this.answeredChecks(app), now)
+    return nextCheck(app.appliedAt, [...this.answeredChecks(app), ...impliedChecks(app.stage)], now)
   },
 
   /**

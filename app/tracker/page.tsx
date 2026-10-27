@@ -28,7 +28,7 @@ import { emptyForm, formFromApplication, toNewApplication, editChanges, type App
 import { nextCheckLine, daysSince } from '@/lib/stores/checkSchedule'
 import { splitOpenDuplicates } from '@/lib/stores/applicationDupes'
 import { sortApplications, filterApplications, SORT_MODES, PAGE_SIZE, type SortMode } from '@/lib/stores/applicationOrder'
-import { checkAnsweredEvent, checkSnoozedEvent, checkLabel, isSuperseded } from '@/lib/stores/checkEvents'
+import { checkAnsweredEvent, checkSnoozedEvent, checkLabel, impliedChecks, isSuperseded } from '@/lib/stores/checkEvents'
 import { responded } from '@/lib/stores/outcomes'
 import { companySlug } from '@/lib/cardCopy.js'
 import { cleanCompany } from '@/lib/signupIntent.js'
@@ -137,7 +137,7 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
   // put off with "Later" says when it comes back ("We'll ask again Oct 25 — …", audit 3 M6).
   const next = isActive && !check ? EventStore.nextCheck(app) : null
   const snoozedUntil = next?.due ? EventStore.snoozedUntil(app, next.type) : null
-  const nextLine = isActive && !check ? nextCheckLine(app.appliedAt, EventStore.answeredChecks(app), Date.now(), snoozedUntil) : null
+  const nextLine = isActive && !check ? nextCheckLine(app.appliedAt, [...EventStore.answeredChecks(app), ...impliedChecks(app.stage)], Date.now(), snoozedUntil) : null
   // The company page, by the ONE slug scheme (lib/cardCopy companySlug), re-encoded through safeHref.
   const coHref = app.company ? `/company/${slugSegment(companySlug(app.company))}` : null
   const fmt = (ms: number) => new Date(ms).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric' })
@@ -182,7 +182,7 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
           {app.score != null && (
             <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: app.score >= 70 ? 'var(--green)' : app.score >= 40 ? 'var(--amber)' : 'var(--red)', fontWeight: 500 }}>{app.score}</span>
           )}
-          {ghostRate != null && ghostRate > 0.3 && (
+          {ghostRate != null && ghostRate > 0.3 && !PREP_STAGES.includes(app.stage) && (
             <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: ghostRate > 0.55 ? 'var(--red)' : 'var(--amber)', background: ghostRate > 0.55 ? 'rgba(239,68,68,.08)' : 'rgba(245,158,11,.08)', border: `1px solid ${ghostRate > 0.55 ? 'rgba(239,68,68,.2)' : 'rgba(245,158,11,.2)'}`, borderRadius: 4, padding: '.1rem .3rem', marginTop: '.1rem' }}>
               <Icon name={ghostRate > 0.55 ? 'ghost' : 'triangle-alert'} size={12} /> {Math.round(ghostRate * 100)}% ghost
             </span>

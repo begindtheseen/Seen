@@ -243,6 +243,8 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
       // (round 4, Maria: the buyer's return landed on `cached:true` and the posting vanished)
       if (d.cached && jobText && !opts.refresh && !d.pack.job_text && !(d.pack.job_match || []).length) { void build({ refresh: true, jobText }); return }
       setPack(d.pack); setState('idle'); setPending(false); dropPosting(appId)
+      // the server built it but could not keep it: say so, never show a prep no other device will ever see
+      if (d.saved === false) setErr('Your prep was built but could not be saved just now — your other devices still have the earlier version. Press "Rebuild with this posting" again in a minute.')
     } catch {
       setState('error'); setErr('Network error — check your connection and try again.')
     }
@@ -285,11 +287,13 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
   // within a second of typing lost the box — the timer had not fired and nothing was sent)
   const hdrRef = useRef<Record<string, string> | null>(null)
   useEffect(() => { aiHeaders().then(h => { hdrRef.current = h as Record<string, string> }).catch(() => {}) }, [])
-  const saveFill = useCallback((q: string, values: string[]) => {
+  const saveFill = useCallback((q: string, values: string[], urgent = false) => {
     setPack(p => (p ? { ...p, fills: { ...(p.fills || {}), [q]: values }, notes: Object.fromEntries(Object.entries(p.notes || {}).filter(([k]) => k !== q)) } : p))
     const body = JSON.stringify({ action: 'fill', company, role, q, values })
-    if (document.visibilityState === 'hidden' && hdrRef.current) {
-      // the page is going away: one keepalive request, no queue to wait on
+    // the page is going away (pagehide fires BEFORE visibilitychange on a reload or a back tap — round 7, Tasha:
+    // the "hidden" check sent the save down the async path and nothing reached the server): one keepalive
+    // request with the headers already in hand, no queue to wait on
+    if ((urgent || document.visibilityState === 'hidden') && hdrRef.current) {
       try { void fetch('/api/interview-prep', { method: 'POST', headers: hdrRef.current, body, keepalive: true }) } catch { /* nothing more can be done here */ }
       return
     }
@@ -462,7 +466,7 @@ const MATCH_WORD = { shown: 'your résumé shows it', stated: 'listed, not shown
 // A box grows with what is typed; it starts two lines tall so the prompt inside it can be read (round 4: one-
 // line boxes clipped the only instruction, and three-sentence stories).
 function grow(el: HTMLTextAreaElement | null) { if (!el) return; el.style.height = 'auto'; el.style.height = `${Math.max(el.scrollHeight, 56)}px` }
-function AnswerEditor({ a, company, values, notes, onSave, defaultOpen, title, tagText, pre }: { a: Answer; company: string; values: string[]; notes?: string[]; onSave: (values: string[]) => void; defaultOpen: boolean; title?: string; tagText?: string; pre?: boolean }) {
+function AnswerEditor({ a, company, values, notes, onSave, defaultOpen, title, tagText, pre }: { a: Answer; company: string; values: string[]; notes?: string[]; onSave: (values: string[], urgent?: boolean) => void; defaultOpen: boolean; title?: string; tagText?: string; pre?: boolean }) {
   const [vals, setVals] = useState<string[]>(values)
   // What the account holds only replaces what is typed here when it is NEW (another device, a rebuild) —
   // never because the parent re-rendered with the same words, and never over a box still being typed in
@@ -488,12 +492,14 @@ function AnswerEditor({ a, company, values, notes, onSave, defaultOpen, title, t
   latest.current = vals
   // typing saves on its own after a pause, so a tab or a reload mid-answer loses nothing
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const flush = useCallback(() => { const v = latest.current; const key = v.join('\u0000'); if (key !== saved.current) { saved.current = key; onSave(v) } }, [onSave])
-  useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
+  const flush = useCallback((urgent = false) => { const v = latest.current; const key = v.join('\u0000'); if (key !== saved.current) { saved.current = key; onSave(v, urgent) } }, [onSave])
+  // unmounting (an in-app tab tap is a client-side navigation: no pagehide, no visibilitychange) saves what is typed
+  // (round 7, Ray: "Then I retrain the step right there…" typed, Dashboard tab tapped, gone)
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); flush(true) }, [flush])
   // leaving the page (a reload, a tab switch, the phone's back button) saves what is typed, timer or not
   useEffect(() => {
-    const onHide = () => { if (document.visibilityState === 'hidden') { if (timer.current) clearTimeout(timer.current); flush() } }
-    const onPageHide = () => { if (timer.current) clearTimeout(timer.current); flush() }
+    const onHide = () => { if (document.visibilityState === 'hidden') { if (timer.current) clearTimeout(timer.current); flush(true) } }
+    const onPageHide = () => { if (timer.current) clearTimeout(timer.current); flush(true) }
     document.addEventListener('visibilitychange', onHide); window.addEventListener('pagehide', onPageHide)
     return () => { document.removeEventListener('visibilitychange', onHide); window.removeEventListener('pagehide', onPageHide) }
   }, [flush])
@@ -504,7 +510,7 @@ function AnswerEditor({ a, company, values, notes, onSave, defaultOpen, title, t
   const touched = vals.some(v => v && v.trim())
   const tag = tagText || (a.exercise ? 'Practised at a keyboard, not answered out loud' : a.company ? `${company} question${a.principle ? ` · ${a.principle}` : ''}` : a.script ? 'From your résumé’s dates and the posting' : a.frame ? `No line on your résumé fits this one yet — answer in ${n} short lines` : 'From your résumé')
   const save = () => { if (timer.current) clearTimeout(timer.current); flush() }
-  const queue = () => { if (timer.current) clearTimeout(timer.current); timer.current = setTimeout(flush, 600) }
+  const queue = () => { if (timer.current) clearTimeout(timer.current); timer.current = setTimeout(() => flush(), 600) }
   return (
     <details className={`${s.answer}${finished && n ? ` ${s.done}` : ''}`} open={defaultOpen}>
       <summary>{a.company && <span className={s.chip}>{company}</span>}{title || a.q}{n > 0 && <span className={s.state}>{finished ? '✓ finished' : touched ? `${vals.filter(v => v?.trim()).length}/${n} filled` : `${n} ${n === 1 ? 'blank' : 'blanks'} to fill`}</span>}</summary>
@@ -526,7 +532,7 @@ function AnswerEditor({ a, company, values, notes, onSave, defaultOpen, title, t
       {!!notes?.length && (
         <div className={s.notes}>
           <div className={s.label}>Your words from before the rebuild</div>
-          <p className={s.dim} style={{ margin: '0 0 .3rem' }}>This answer changed when the posting was added, so what you typed is kept here for you to reuse — not shown as finished.</p>
+          <p className={s.dim} style={{ margin: '0 0 .3rem' }}>This answer changed when the posting changed, so what you typed is kept here for you to reuse — not shown as finished.</p>
           {notes.map((t, i) => <p key={i} className={s.prose}>{t}</p>)}
           <CopyBtn text={notes.join('\n')} />
         </div>
@@ -543,7 +549,7 @@ function AnswerEditor({ a, company, values, notes, onSave, defaultOpen, title, t
   )
 }
 
-function PackView({ pack, company, fu, onFill, onRebuild, building }: { pack: Pack; company: string; fu: FollowUp | null | undefined; onFill: (q: string, values: string[]) => void; onRebuild: (posting: string) => void; building: boolean }) {
+function PackView({ pack, company, fu, onFill, onRebuild, building }: { pack: Pack; company: string; fu: FollowUp | null | undefined; onFill: (q: string, values: string[], urgent?: boolean) => void; onRebuild: (posting: string) => void; building: boolean }) {
   const intro = pack.intro
   const fills = pack.fills || {}
   const notes = pack.notes || {}
@@ -584,7 +590,7 @@ function PackView({ pack, company, fu, onFill, onRebuild, building }: { pack: Pa
         <div className={s.block}>
           <div className={s.label}>Your 30-second intro</div>
           {blankCount(intro) ? (
-            <AnswerEditor a={{ q: INTRO_KEY, answer: intro, resume_fact: '' }} title="Tell me about yourself" tagText="From your résumé — finish the one line only you know" company={company} values={fills[INTRO_KEY] || []} notes={notes[INTRO_KEY]} onSave={vals => onFill(INTRO_KEY, vals)} defaultOpen />
+            <AnswerEditor a={{ q: INTRO_KEY, answer: intro, resume_fact: '' }} title="Tell me about yourself" tagText="From your résumé — finish the one line only you know" company={company} values={fills[INTRO_KEY] || []} notes={notes[INTRO_KEY]} onSave={(vals, urgent) => onFill(INTRO_KEY, vals, urgent)} defaultOpen />
           ) : (
             <><p className={s.prose}>{intro}</p><CopyBtn text={intro} /></>
           )}
@@ -594,7 +600,7 @@ function PackView({ pack, company, fu, onFill, onRebuild, building }: { pack: Pa
         <div className={s.label}>Your answers · {done}/{pack.answers.filter(a => !a.exercise).length} finished</div>
         <p className={s.dim} style={{ margin: '0 0 .45rem' }}>Every answer starts from your résumé or the posting. Type the part only you know into each blank, and the finished answer is yours — saved here, on every device.</p>
         {pack.answers.map((a, i) => (
-          <AnswerEditor key={a.q} a={a} company={company} values={fills[a.q] || []} notes={notes[a.q]} onSave={vals => onFill(a.q, vals)} defaultOpen={i === 0} />
+          <AnswerEditor key={a.q} a={a} company={company} values={fills[a.q] || []} notes={notes[a.q]} onSave={(vals, urgent) => onFill(a.q, vals, urgent)} defaultOpen={i === 0} />
         ))}
         {orphanNotes.length > 0 && (
           <div className={s.notes}>
@@ -651,9 +657,9 @@ function PackView({ pack, company, fu, onFill, onRebuild, building }: { pack: Pa
       <div className={s.block}>
         <div className={s.label}>Emails</div>
         <p className={s.mono}>Subject: {pack.emails.thankYou.subject}</p>
-        <AnswerEditor pre a={{ q: THANKS_KEY, answer: pack.emails.thankYou.body, resume_fact: '' }} title={`Thank-you · ${fu ? `send by ${day(fu.thankYouBy)}` : 'send within a day of the interview'}`} tagText="Fill in the name and the one thing they told you; the finished email is below" company={company} values={fills[THANKS_KEY] || []} notes={notes[THANKS_KEY]} onSave={vals => onFill(THANKS_KEY, vals)} defaultOpen={false} />
+        <AnswerEditor pre a={{ q: THANKS_KEY, answer: pack.emails.thankYou.body, resume_fact: '' }} title={`Thank-you · ${fu ? `send by ${day(fu.thankYouBy)}` : 'send within a day of the interview'}`} tagText="Fill in the name and the one thing they told you; the finished email is below" company={company} values={fills[THANKS_KEY] || []} notes={notes[THANKS_KEY]} onSave={(vals, urgent) => onFill(THANKS_KEY, vals, urgent)} defaultOpen={false} />
         <p className={s.mono}>Subject: {pack.emails.followUp.subject}</p>
-        <AnswerEditor pre a={{ q: FOLLOW_KEY, answer: pack.emails.followUp.body, resume_fact: '' }} title={`Follow-up · ${fu ? `send ${day(fu.followUpOn)}` : 'send 5 working days after'} if you have not heard back`} tagText="Fill in the name; the finished email is below" company={company} values={fills[FOLLOW_KEY] || []} notes={notes[FOLLOW_KEY]} onSave={vals => onFill(FOLLOW_KEY, vals)} defaultOpen={false} />
+        <AnswerEditor pre a={{ q: FOLLOW_KEY, answer: pack.emails.followUp.body, resume_fact: '' }} title={`Follow-up · ${fu ? `send ${day(fu.followUpOn)}` : 'send 5 working days after'} if you have not heard back`} tagText="Fill in the name; the finished email is below" company={company} values={fills[FOLLOW_KEY] || []} notes={notes[FOLLOW_KEY]} onSave={(vals, urgent) => onFill(FOLLOW_KEY, vals, urgent)} defaultOpen={false} />
       </div>
     </div>
   )

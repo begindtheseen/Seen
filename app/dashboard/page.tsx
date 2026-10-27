@@ -414,7 +414,7 @@ export default function DashboardPage() {
             {ratedCount > 0 && <p className={styles.caption}>Based on {ratedCount} tracked application{ratedCount !== 1 ? 's' : ''}{apps.length > ratedCount ? ` · ${apps.length - ratedCount} withdrawn not counted` : ''}</p>}
           </section>
 
-          <section className={`${styles.card}`}>
+          <section className={`${styles.card}${topMoves[0]?.icon === 'calendar' ? ` ${styles.leadMove}` : ''}`}>
             <div className={styles.cardHead}>
               <h2 className={styles.cardT}>Next best move</h2>
               {topMoves.length > 0 && <span className={styles.eyebrow}>{topMoves.length} action{topMoves.length !== 1 ? 's' : ''}</span>}
@@ -458,7 +458,13 @@ export default function DashboardPage() {
                 <p>Apply to a job and it appears here until you report what happened.</p>
                 <div className={styles.emptyBtns}><Link href="/jobs" className={styles.ghostBtn}>Find your next job →</Link></div>
               </div>
-            ) : sortApplications(active, 'attention', new Set(dueChecks.map(d => d.app.id))).slice(0, 4).map(app => {
+            ) : (() => {
+              // an interview is never off the pipeline: the four rows are the interviewing cards first, then the
+              // ones that need attention (round 7, Tasha: the one card with an interview was missing)
+              const ordered = sortApplications(active, 'attention', new Set(dueChecks.map(d => d.app.id)))
+              const iv = ordered.filter(a => ['Phone Screen', 'Interview', 'Final Round', 'Offer'].includes(a.stage))
+              return [...iv, ...ordered.filter(a => !iv.includes(a))].slice(0, 4)
+            })().map(app => {
               const days = daysSince(app.appliedAt)
               // beside a phone screen or an interview the row says when it is, not the day count and the ghost
               // rate the person has already beaten (round 6, Ray: "Day 22 · 25% reported ghost rate" beside Interview)

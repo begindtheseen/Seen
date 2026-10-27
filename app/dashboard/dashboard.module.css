@@ -44,6 +44,9 @@
 .row { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 1rem; }
 .row > * { animation: riseIn 0.6s var(--ease-out) backwards; }
 .row > *:nth-child(2) { animation-delay: 0.08s; }
+/* on a phone the row stacks; when the next move is an interview it leads, above the health card and the
+   getting-started badge (round 7, Ray: the interview sat one full scroll down) */
+@media (max-width: 768px) { .leadMove { order: -1; } }
 
 .card {
   border: 1px solid rgba(255, 255, 255, 0.09);
