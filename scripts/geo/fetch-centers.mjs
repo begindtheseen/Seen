@@ -9,7 +9,9 @@ import { US_PLACES } from '../../lib/geo/usPlaces.data.js';
 const MIN = Number(process.argv[2] || 150000);
 const here = path.dirname(new URL(import.meta.url).pathname);
 const outPath = path.join(here, 'centers.json');
-const out = fs.existsSync(outPath) ? JSON.parse(fs.readFileSync(outPath, 'utf8')) : {};
+// read once (no exists-then-read check, which can race with another writer); a missing file means none yet
+let out = {};
+try { out = JSON.parse(fs.readFileSync(outPath, 'utf8')); } catch (e) { if (e.code !== 'ENOENT') throw e; }
 const rows = US_PLACES.split('\n').map((l) => l.split('|')).filter((r) => Number(r[4]) >= MIN);
 const seen = new Set();
 for (const [st, name, lat, lng] of rows) {

@@ -84,7 +84,9 @@ for (const line of fs.readFileSync(gazPath, 'utf8').split('\n').slice(1)) {
 // downtown points for the larger cities (scripts/geo/fetch-centers.mjs → centers.json): a radius search centres on downtown,
 // not on the Census internal point (Phoenix's is 8.6 miles north of downtown; San Francisco's is out at the Farallon Islands)
 const centersPath = path.join(path.dirname(new URL(import.meta.url).pathname), 'centers.json');
-const centers = fs.existsSync(centersPath) ? JSON.parse(fs.readFileSync(centersPath, 'utf8')) : {};
+// read once (no exists-then-read check, which can race with another writer); a missing file means none yet
+let centers = {};
+try { centers = JSON.parse(fs.readFileSync(centersPath, 'utf8')); } catch (e) { if (e.code !== 'ENOENT') throw e; }
 let moved = 0;
 for (const p of places) {
   const c = centers[`${p.st}|${p.name}`] || centers[`${p.st}|${places.find((q) => q.st === p.st && q.pop === p.pop && q.lat === p.lat && q.name !== p.name)?.name}`];
