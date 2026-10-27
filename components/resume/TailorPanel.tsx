@@ -18,6 +18,9 @@ import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
 import { markQuiet } from '@/lib/quietWindow'
 import { RESUME_OPTIMIZE_COST, priceLabel } from '@/lib/creditRules'
 import { httpHref } from '@/lib/safeHref.js'
+import { ResumeDocStore } from '@/lib/stores/ResumeDocStore'
+
+const LINES_PER_PAGE = 46
 
 export interface TailorJob { title: string; company: string; description: string; jobId: string; url?: string }
 type Props = {
@@ -53,6 +56,24 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
   const [showAll, setShowAll] = useState(false)
 
   useEffect(() => { if (initialJob) setJob(initialJob) }, [initialJob])
+
+  // The last result comes back on a reload (it cost a credit): plan, the doc it was built for, and
+  // every overrule the person made. A new run replaces it.
+  const [restored, setRestored] = useState(false)
+  useEffect(() => {
+    if (restored) return
+    setRestored(true)
+    const rec = ResumeDocStore.getTailor(user?.id)
+    if (!rec) return
+    setPlan(rec.plan as TailorPlan); setBaseDoc(rec.baseDoc); setOverrides((rec.overrides || {}) as TailorOverrides); setAnswers(rec.answers || {})
+    const rj = rec.job as TailorJob | undefined
+    if (rj && !initialJob) setJob(rj)
+    setState('done')
+  }, [restored, user?.id, initialJob])
+  useEffect(() => {
+    if (state !== 'done' || !plan || !baseDoc) return
+    ResumeDocStore.putTailor(user?.id, { job, plan, baseDoc, overrides, answers })
+  }, [state, plan, baseDoc, overrides, answers, job, user?.id])
 
   function pickSaved(id: string) {
     setSavedId(id)
@@ -163,10 +184,11 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
                   <span style={{ color: scoreColor(plan.score.before) }}>{plan.score.before}</span>
                   <span className={s.arrow}>→</span>
                   <span style={{ color: scoreColor(plan.score.after) }}>{plan.score.after}</span>
-                  <span className={s.dim} style={{ fontWeight: 400, fontSize: '.62rem' }}>SeenFit match · {plan.job.familyLabel || plan.job.roleFamily} posting · {plan.score.requirementCount ?? plan.job.requirementCount} requirements read · {plan.strategy ? `${plan.strategy.estimatedLines} of ${plan.strategy.linesBudget} lines (${plan.strategy.pages} page${plan.strategy.pages === 1 ? '' : 's'})` : ''}</span>
+                  <span className={s.dim} style={{ fontWeight: 400, fontSize: '.62rem' }}>SeenFit match · {plan.job.familyLabel || plan.job.roleFamily} posting · {plan.score.requirementCount ?? plan.job.requirementCount} requirements read{plan.strategy ? ` · about ${plan.strategy.estimatedLines} lines · fits on ${Math.max(1, Math.ceil(plan.strategy.estimatedLines / LINES_PER_PAGE))} page${Math.max(1, Math.ceil(plan.strategy.estimatedLines / LINES_PER_PAGE)) === 1 ? '' : 's'}` : ''}</span>
                 </div>
                 {/* the same one-sentence why the Optimize modal and /resume show; the gate first */}
                 {plan.score.verdict && <p className={s.dim} style={{ marginTop: '.4rem', color: plan.score.verdict.gate ? 'var(--amber)' : undefined }}>{plan.score.verdict.sentence.replace(/^\d+ — /, '')}</p>}
+                {plan.summaryKept && <p className={s.dim} style={{ marginTop: '.3rem' }}>Your own summary stays — it scored higher against this posting than a rewritten one.</p>}
               </>
             )}
             <p className={s.dim} style={{ marginTop: '.5rem' }}>

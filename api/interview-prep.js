@@ -303,7 +303,7 @@ export default async function handler(req, res) {
       fills: {},
       notes: {},
     };
-    if (prior) { const carried = carryFills(prior, full); full.fills = carried.fills; full.notes = carried.notes; }
+    if (prior) { const carried = carryFills(prior, full); full.fills = carried.fills; full.notes = carried.notes; full.noteKeys = carried.noteKeys; }
     // Cache; a missing table only means the next open rebuilds it.
     await db('interview_preps?on_conflict=user_id,prep_key', {
       method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
@@ -331,7 +331,9 @@ export default async function handler(req, res) {
     // the person's own words replace a note for the same question
     const notes = { ...(cached.notes && typeof cached.notes === 'object' ? cached.notes : {}) };
     delete notes[q];
-    const pack = { ...cached, fills, notes };
+    const noteKeys = { ...(cached.noteKeys && typeof cached.noteKeys === 'object' ? cached.noteKeys : {}) };
+    delete noteKeys[q];
+    const pack = { ...cached, fills, notes, noteKeys };
     const w = await db(`interview_preps?user_id=eq.${encodeURIComponent(uid)}&prep_key=eq.${encodeURIComponent(prepKey(company, role))}`, {
       method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ pack, updated_at: new Date().toISOString() }),
     }).catch(() => null);

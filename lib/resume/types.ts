@@ -68,6 +68,8 @@ export interface TailorPlan {
   job: { title: string; company: string; jobId?: string; roleFamily: string; family?: string; familyLabel?: string; requirementCount: number }
   objective?: { before: TailorObjective; after: TailorObjective; evaluations: number }
   strategy?: { layout: 'chronological' | 'relevance'; pages: number; estimatedLines: number; linesBudget: number; order: string[]; summaryMode: string }
+  /** the person's own summary scored higher than the rewritten one, so it stayed */
+  summaryKept?: boolean
   decisions?: TailorDecision[]
   prompts?: TailorPrompt[]
   added?: TailorAdded[]
