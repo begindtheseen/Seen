@@ -17,6 +17,7 @@ import CreditConfirmDialog from '@/components/CreditConfirmDialog'
 import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
 import { markQuiet } from '@/lib/quietWindow'
 import { RESUME_OPTIMIZE_COST, priceLabel } from '@/lib/creditRules'
+import { httpHref } from '@/lib/safeHref.js'
 
 export interface TailorJob { title: string; company: string; description: string; jobId: string; url?: string }
 type Props = {
@@ -82,7 +83,8 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
       if (res.status === 422 && data.error === 'preview_only') {
         // Seen tried the listing's own link first (lib/server/fullPosting.js) and could not read the posting;
         // the person can open it and paste it into the box above
-        const link = (data as { apply_url?: string | null }).apply_url || job.url || ''
+        // re-serialized from a parsed URL (lib/safeHref.js) — the link came back from the server
+        const link = httpHref((data as { apply_url?: string | null }).apply_url || job.url || '') || ''
         setPreviewLink(link)
         setError(link ? 'Seen could only read a summary of this listing, and its page would not open from here. Open the listing, copy the posting, paste it into the Job description box above, and press again.' : (data.message || 'This listing only has a summary. Paste the full posting into the Job description box above, then press again.'))
         setState('idle'); return

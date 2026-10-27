@@ -560,7 +560,7 @@ function ResumePageInner() {
       })
       if (res.status === 403) { setFitState('disabled'); return false }
       const data = await res.json().catch(() => ({}))
-      if (res.status === 422 && data.error === 'preview_only') { setPreviewLink((data as { apply_url?: string | null }).apply_url || ''); setFitState('preview'); setShowManual(true); return false }
+      if (res.status === 422 && data.error === 'preview_only') { setPreviewLink(httpHref((data as { apply_url?: string | null }).apply_url) || ''); setFitState('preview'); setShowManual(true); return false }
       if (!res.ok || data.error) { setFitErrRef(data?.ref || ''); setFitState('error'); return false }
       setFitOut(data as OptimizerOutput); setFitState('done')
       return true

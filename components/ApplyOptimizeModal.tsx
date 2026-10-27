@@ -667,10 +667,17 @@ export default function ApplyOptimizeModal({
           {step === 'needs-posting' && (
             <div className="ai-stack">
               <div style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.22)', borderRadius: 10, padding: '.8rem .95rem' }}>
-                <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '.88rem', marginBottom: '.3rem' }}>This listing only has a summary</div>
+                <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '.88rem', marginBottom: '.3rem' }}>Seen could not read the full posting</div>
                 <div style={{ fontSize: 'var(--fs-72)', color: 'var(--sub)', lineHeight: 1.6 }}>
-                  Seen only holds a short preview of this posting, so there is nothing real to optimize against — and no credit was used. Open the posting, copy its full text, and paste it here.
+                  This source gives Seen only a short preview, and the listing&apos;s own page would not hand over the rest just now. No credit was used. Open the listing, select all of its text, and paste it here — the check is free.
                 </div>
+                {job.apply_url && (
+                  <a href={job.apply_url} target="_blank" rel="noopener noreferrer" data-testid="needs-posting-link"
+                    onClick={() => trackApplyClick(job)}
+                    style={{ display: 'inline-block', marginTop: '.55rem', fontSize: 'var(--fs-72)', fontWeight: 700, color: 'var(--accent)', textDecoration: 'none' }}>
+                    Open the listing ↗
+                  </a>
+                )}
               </div>
               <label style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.08em' }}>
                 Full job posting

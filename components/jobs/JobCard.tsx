@@ -45,11 +45,12 @@ export default function JobCard({ job, onSaveToggle, onOpen, onApply, onCheckCom
   const companyName = displayCompanyName(job.company) || job.company
   const logoLetter = (companyName || '?')[0].toUpperCase()
   const pay = displayPay(job)
-  // An Adzuna row is a ~500-char teaser of the posting, never its text: say so, link the full posting,
-  // and never sell an optimization of a text we do not have.
+  // An Adzuna row is a ~500-char teaser of the posting, never its text: say so and link the full posting.
+  // Optimize still shows: the server follows the row's own link for the posting before it ever asks the
+  // person to paste it (lib/server/fullPosting.js) — owner 2026-10-27, "the option to optimize is just gone".
   const preview = isDescriptionPreview(job)
   const applyHref = httpHref(job.apply_url)
-  const canOptimize = !takesSeenApply(job) && !!applyHref && !preview
+  const canOptimize = !takesSeenApply(job) && !!applyHref
   // This person already optimized this listing on this device within 7 days (a hint; the modal asks the
   // server cache before it ever offers to charge). Read after mount so server and client HTML agree.
   const [optimizedHere, setOptimizedHere] = useState(false)
