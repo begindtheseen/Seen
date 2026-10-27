@@ -4,7 +4,7 @@ import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { gateAI, resolveProAccess, resolveAuthedUser } from '../lib/server/credits.js';
 import { RESUME_OPTIMIZE_COST } from '../lib/server/creditRules.js';
-import { previewOnlyError } from '../lib/server/postingGate.js';
+import { previewOnlyOrFetch } from '../lib/server/postingGate.js';
 import { optimizeCacheKey, readCachedOptimize, writeCachedOptimize } from '../lib/server/optimizeCache.js';
 import { buildPaidOptimize, unoptimizableListing } from '../lib/server/optimizePackage.js';
 import { runAdvantage, requirementsStated, extractEmployment, extractCareerSignal, buildResumeDocument, resumeFileName } from '../lib/server/resumeAnalysis.js';
@@ -588,11 +588,12 @@ async function handleOptimizeTool(req, res, body) {
   try {
     const authed = await resolveAuthedUser(req);
     if (!authed?.uid) return res.status(401).json({ error: 'Sign in to use AI features', credits_required: true });
-    const { job, company, jobDescription, jobId } = body;
     if (!body.resume) return res.status(400).json({ error: 'Resume required' });
     if (!isReadableResume(body.resume)) return res.status(400).json({ error: 'RESUME_CORRUPTED' });
-    const preview = previewOnlyError(body);
+    // a teaser with a saved job behind it becomes the fetched posting on `body` (lib/server/fullPosting.js)
+    const preview = await previewOnlyOrFetch(body);
     if (preview) return res.status(preview.status).json({ ...preview.body, charged: false });
+    const { job, company, jobDescription, jobId } = body;
     // The canonical text and the shared taxonomy — the same inputs the free fit check and the Studio
     // score, so the three screens print one number (lib/resume/canonical.js, skillTaxonomy.js).
     const resume = canonicalResumeText(body.resume);
@@ -655,7 +656,7 @@ async function handleStudio(req, res, body) {
       case 'tailor': {
         // a posting that is only a preview is never charged (a title-only tailor stays allowed)
         if (String(body.jobDescription || '').trim()) {
-          const preview = previewOnlyError(body);
+          const preview = await previewOnlyOrFetch(body);
           if (preview) return res.status(preview.status).json({ ...preview.body, charged: false });
         }
         const [taxonomy, fit] = await Promise.all([loadSkillTaxonomy(), fitContext({ company: body.company, jobDescription: body.jobDescription })]);

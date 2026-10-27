@@ -38,6 +38,7 @@ function clone<T>(v: T): T { return JSON.parse(JSON.stringify(v)) as T }
 export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJob, onNeed, onUseVariant }: Props) {
   const { user } = useAuth()
   const [job, setJob] = useState<TailorJob>(initialJob || { title: '', company: '', description: '', jobId: '' })
+  const [previewLink, setPreviewLink] = useState('')
   // The first paid action on this account/device is confirmed once (lib/creditConfirm) — the
   // 2026-10-24 audits found the Tailor charging with no dialog while every other paid button asked.
   const [confirming, setConfirming] = useState(false)
@@ -78,7 +79,14 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
       if (res.status === 401 || res.status === 402 || data.credits_required || data.pro_required) { setState('idle'); onNeed(data.pro_required ? 'pro' : 'credits'); return }
       // A listing that is only a teaser (an Adzuna summary ending in "…") is refused BEFORE any
       // credit is spent — paste the full posting above and run again.
-      if (res.status === 422 && data.error === 'preview_only') { setError(data.message || 'This listing only has a summary. Paste the full posting to optimize for it.'); setState('idle'); return }
+      if (res.status === 422 && data.error === 'preview_only') {
+        // Seen tried the listing's own link first (lib/server/fullPosting.js) and could not read the posting;
+        // the person can open it and paste it into the box above
+        const link = (data as { apply_url?: string | null }).apply_url || job.url || ''
+        setPreviewLink(link)
+        setError(link ? 'Seen could only read a summary of this listing, and its page would not open from here. Open the listing, copy the posting, paste it into the Job description box above, and press again.' : (data.message || 'This listing only has a summary. Paste the full posting into the Job description box above, then press again.'))
+        setState('idle'); return
+      }
       if (!res.ok || !data.plan) { setError(data.error || 'Could not tailor this résumé. Try again.'); setState('error'); return }
       window.dispatchEvent(new Event('seen:credits-updated'))
       setPlan(data.plan); setBaseDoc(clone(doc)); setOverrides({}); setAnswers({})
@@ -133,13 +141,13 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
           <div><span className={s.label}>Company</span><input autoComplete="off" className={s.input} value={job.company} onChange={(e) => setJob({ ...job, company: e.target.value })} placeholder="GNC" /></div>
         </div>
         <span className={s.label}>Job description</span>
-        <textarea autoComplete="off" className={`${s.input} ${s.area}`} rows={5} value={job.description} onChange={(e) => setJob({ ...job, description: e.target.value })} placeholder="Paste the posting — requirements, responsibilities, the lot." />
+        <textarea autoComplete="off" className={`${s.input} ${s.area}`} rows={5} value={job.description} onChange={(e) => { setJob({ ...job, description: e.target.value }); if (previewLink || error) { setPreviewLink(''); setError('') } }} placeholder="Paste the posting — requirements, responsibilities, the lot." />
         <div className={s.opts} style={{ marginTop: '.6rem', justifyContent: 'flex-end' }}>
           <button type="button" className={s.btnPrimary} onClick={run} disabled={state === 'loading'}>
             {state === 'loading' ? 'Optimizing…' : plan ? 'Re-run for this job →' : 'Optimize for this job →'}<span style={{ marginLeft: '.45rem', fontSize: '.55rem', opacity: .7, fontFamily: 'var(--mono)', fontWeight: 400 }}>· {priceLabel(RESUME_OPTIMIZE_COST, pro)}</span>
           </button>
         </div>
-        {error && <div className={s.err} style={{ marginTop: '.6rem', marginBottom: 0 }}>{error}</div>}
+        {error && <div className={s.err} style={{ marginTop: '.6rem', marginBottom: 0 }}>{error}{previewLink && <> <a href={previewLink} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', fontWeight: 600 }}>Open the listing ↗</a></>}</div>}
       </div>
 
       {state === 'done' && plan && finalVariant && (

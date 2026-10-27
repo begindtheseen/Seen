@@ -18,7 +18,7 @@ import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { gateAI } from '../lib/server/credits.js';
 import { runOptimizer, ENGINE_VERSION } from '../lib/optimizer/index.js';
-import { previewOnlyError } from '../lib/server/postingGate.js';
+import { previewOnlyOrFetch } from '../lib/server/postingGate.js';
 import { freeDiagnostic } from '../lib/server/optimizePackage.js';
 import { extractJobFacts } from '../lib/optimizer/extractJobFacts.js';
 import { runHumanProof, HUMANPROOF_ENGINE_VERSION } from '../lib/humanizer/index.js';
@@ -452,16 +452,17 @@ export default async function handler(req, res) {
     }
 
     // ── optimize ────────────────────────────────────────────────────────────────
-    const { resumeText, jobId, jobTitle, company, jobDescription } = body;
+    const { resumeText, jobId, jobTitle, company } = body;
     if (!resumeText || String(resumeText).trim().length < 40) {
       return res.status(400).json({ error: 'RESUME_REQUIRED', message: 'Provide résumé text (at least 40 characters).' });
     }
-    // A preview-only listing (≤520-char teaser) has nothing to measure — same answer as the paid
-    // path, so the client shows ONE paste box for both (lib/server/postingGate.js).
-    if (String(jobDescription || '').trim()) {
-      const preview = previewOnlyError(body);
+    // A preview-only listing (≤520-char teaser) has nothing to measure — Seen first follows the saved job's own
+    // link for the posting (lib/server/fullPosting.js); only then the same paste box as the paid path.
+    if (String(body.jobDescription || '').trim()) {
+      const preview = await previewOnlyOrFetch(body);
       if (preview) return res.status(preview.status).json({ ...preview.body, charged: false });
     }
+    const jobDescription = body.jobDescription;
 
     const uid = haveDb ? await resolveUid(req, SUPABASE_URL, SERVICE_KEY) : null;
 
