@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, Fragment } from 'react'
+import { useState, useRef, useEffect, Fragment } from 'react'
+import { flushSync } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import type { Job } from '@/lib/types'
 import { trackApplyClick } from '@/lib/trackApply'
@@ -105,8 +106,35 @@ export default function JobsPage() {
   // hook's sort already puts every match first (lib/server/jobPriority.js), so one index splits them.
   const firstOther = typed ? grouped.findIndex(g => !isMatch(g.lead)) : -1
   // After a search with results, phones get a sticky one-line query bar (audit #25: the first card sat
-  // ~700px down under a three-row form). The location row reappears while the bar has focus.
+  // ~700px down under a three-row form). The location row comes back when the bar is opened (barOpen below).
   const searched = status === 'done' && filtered.length > 0
+  // The one-line bar opens when anything in it gets focus (or its location chip is tapped) and STAYS open until a
+  // search runs or a tap lands outside.
+  // It used to show the location row only while the bar had focus (`:focus-within`): iPhone Safari drops focus
+  // from the title box before it focuses the location box, so the row hid under the finger and the city could
+  // never be typed (owner report 2026-10-27).
+  const [barOpen, setBarOpen] = useState(false)
+  const barRef = useRef<HTMLDivElement>(null)
+  const locRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (!barOpen) return
+    const away = (e: PointerEvent) => { if (barRef.current && !barRef.current.contains(e.target as Node)) setBarOpen(false) }
+    document.addEventListener('pointerdown', away)
+    return () => document.removeEventListener('pointerdown', away)
+  }, [barOpen])
+  // The chip opens the row and focuses the city box inside the same tap: iPhone only raises the keyboard for a
+  // focus() made during the tap itself, so the row is rendered synchronously first.
+  function editLocation() {
+    flushSync(() => setBarOpen(true))
+    locRef.current?.focus()
+    locRef.current?.select()
+  }
+  function runSearch() {
+    setBarOpen(false)
+    const el = document.activeElement as HTMLElement | null
+    if (el && barRef.current?.contains(el)) el.blur()
+    searchJobs()
+  }
   const [copied, setCopied] = useState(false)
   async function copySearchLink() {
     try { await navigator.clipboard.writeText(window.location.href); setCopied(true); setTimeout(() => setCopied(false), 1800) }
@@ -128,7 +156,8 @@ export default function JobsPage() {
           />
 
           {/* Search bar — job titles AND company names in the same box. No autofill: Enter / Search runs it. */}
-          <div className={`${bar.wrap}${searched ? ' ' + bar.compact : ''}`} role="search">
+          <div ref={barRef} className={`${bar.wrap}${searched ? ' ' + bar.compact : ''}${searched && barOpen ? ' ' + bar.open : ''}`} role="search"
+            onFocus={() => setBarOpen(true)}>
             <div className={bar.query}>
             <input
               type="text"
@@ -143,10 +172,17 @@ export default function JobsPage() {
               spellCheck={false}
               enterKeyHint="search"
               onChange={e => setQuery(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') searchJobs() }}
+              onKeyDown={e => { if (e.key === 'Enter') runSearch() }}
             />
-            {/* Compact (phone, after a search): the one-line bar's own Search button. */}
-            <button type="button" className={bar.goIcon} onClick={() => searchJobs()} disabled={status === 'loading'} aria-label="Search">
+            {/* Compact (phone, after a search): the place being searched, one tap from changing it, and the bar's own Search button. */}
+            <button type="button" className={bar.locChip} onClick={editLocation}
+              /* no focus on press: a focused chip would open the bar (onFocus) and hide itself before the click */
+              onPointerDown={e => e.preventDefault()} onMouseDown={e => e.preventDefault()}
+              aria-label={hasCity ? `Location: ${location}. Change it` : 'Add a location'}>
+              <Icon name="map-pin" size={14} />
+              <span>{hasCity ? location.split(',')[0].trim() || location : 'Anywhere'}</span>
+            </button>
+            <button type="button" className={bar.goIcon} onClick={runSearch} disabled={status === 'loading'} aria-label="Search">
               <Icon name="search" size={18} />
             </button>
             </div>
@@ -157,6 +193,7 @@ export default function JobsPage() {
                   className={`${bar.input} ${bar.locInput}`}
                   placeholder="City or state..."
                   aria-label="City or state"
+                  ref={locRef}
                   value={location}
                   name="seen-job-location"
                   autoComplete="off"
@@ -164,7 +201,7 @@ export default function JobsPage() {
                   spellCheck={false}
                   enterKeyHint="search"
                   onChange={e => setLocation(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') searchJobs() }}
+                  onKeyDown={e => { if (e.key === 'Enter') runSearch() }}
                 />
                 <button
                   type="button"
@@ -200,7 +237,7 @@ export default function JobsPage() {
               <button
                 type="button"
                 className={bar.go}
-                onClick={() => searchJobs()}
+                onClick={runSearch}
                 disabled={status === 'loading'}
               >
                 {status === 'loading' ? 'Searching…' : 'Search'}
