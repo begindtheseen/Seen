@@ -50,6 +50,48 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-10-27 E: round 7 — 4/4 yes again, but #383 shipped two regressions; PRs #384, #385
+- **Round 7 (live, after #383/#384):** Maria 7/7 prep YES, Dev 7/5 Pass YES, Tasha 7/7 prep YES, Ray 8/6 prep YES. Worth-it
+  fell for Dev and Ray because all four hit the same two breaks, and three of them traced the cause themselves:
+  1. **A rebuild that parked a note was never saved.** `givenKey` used a NUL (`\u0000`) as the blank marker and #383
+     stored it in `pack.noteKeys`; Postgres jsonb refuses NUL (22P05); the build's upsert was `.catch(() => null)`, so the
+     API answered `cached:false` with a pack no device would ever see again (Tasha's row: `updated_at` = her last fill,
+     the rebuild's `built_at` never landed; Ray: the rebuild BACK to the original, with no notes, persisted). Fixed in
+     #385: marker `␣` (U+2423), write checked + one retry + `console.error('[interview-prep] prep write failed …')`, the
+     answer carries `saved`, the card says so. **Rule: never `.catch(() => null)` a write the user is told succeeded; and
+     any string that goes into jsonb must be NUL-free.**
+  2. **The save on leaving still took the async path.** Chromium fires `pagehide` BEFORE `visibilitychange` on a reload
+     or back tap (Dev measured: beforeunload → pagehide (visible) → hidden), so the round-6 "page is hidden" check sent the
+     save to the queue (`await aiHeaders()` → page gone). The `urgent` flag added for that was then DROPPED by the
+     editors' `onSave={vals => onFill(q, vals)}` lambdas — verified on the #385 preview (reload at 300 ms and back at
+     150 ms: 0 requests). Fixed: `onSave={(vals, urgent) => onFill(q, vals, urgent)}`, `saveFill(q, values, urgent)`
+     sends one keepalive request with cached headers, and the editor flushes on unmount (an in-app tab tap is a
+     client-side navigation with no pagehide — Ray).
+- **Also fixed in #385:** email marketing / testing / deliverability rows deduped into one (sameThing needs 2 shared
+  stems); the duty "Lead, train and develop associates" shown when training/leadership rows cover it; a years-requirement
+  row from `ctx.constraints` ("You show 5.6 years of supervisory experience (asks 2+)"); customer-service proof = the
+  complaints/refunds line (every distinct alias counts, SAME_THING += complaint/escalat/refund/resolv/satisfaction); hints
+  need a shared word or an outcome line with a number; résumé-fact evidence prefers the doing bullet over a trained-
+  others bullet (`extractResumeFacts`); a fraud/privacy footer is EEO text (`EEO_RE`), never "LinkedIn"/"sales"
+  requirements; `availabilityLine` drops on-call/travel/rotation; `OPTIMIZER_VERSION = 'optimizer_v4'` (round-5 cached
+  packages never served first); the composed summary keeps at most ONE old sentence; Strategy `postingReqs` uses the
+  anchors; `api/resume.js _seenIntel` and the Strategy timing note omit "average wait 0 days"; pay band parse strips a
+  trailing full stop; `impliedChecks(stage)` keeps "did they schedule any interviews?" and the ghost chip off interviewing
+  cards; dashboard pipeline leads with interviewing cards and the next-move card gets `.leadMove` (order −1 on phones)
+  when it names an interview; Studio gaps need the whole requirement to be "likely covered".
+- **#384 (merged 9ec46db, prod dpl_ju1UCRqf7SGHeBFHKar4QkvDrbVy):** engineering roles never credited with front-line
+  competencies (`HOURLY_ONLY` cap in relevance + jobCompetencies); a bounded title-match term (0.05) breaks near-ties so
+  Ledgerline leads; `ANCHOR_SKIP` += algorithms/data structures/problem solving/coding; "start with the parts that
+  touch X".
+- **Still open after round 7:** Stripe Adaptive Pricing (owner dashboard); Optimize "campaign management (related
+  experience)" shown with ✓; "scheduling · shows it" via a content calendar for email scheduling; "distributed systems"
+  cited to the transactions/day line; one Stripe line serving three answers; Studio "Make it stronger" prompts with no
+  question text; "Java · not on your résumé" when the posting says "one of Java, Scala, C++ or similar"; "machine
+  learning" read from an example sentence; guest-carry time shown stale on the card until reload; Studio Export before
+  "Use this version" downloads the base silently; greeting "Still up, Wtp." (persona profile name).
+- **Harness:** `pkill -f "next start"` matches the shell running it (exit 144) — kill by PID; a preview deployment is
+  reachable to Playwright after one visit to the `get_access_to_vercel_url` share link in the same context.
+
 ## Session 2026-10-27 D: round 6 — 4/4 "would have paid"; PR #383 (branch claude/wip-round9)
 - **Round 6 (same 4 personas, live, after #382):** Maria 7/8 prep YES, Dev 7/7 Pass YES, Tasha 6/7 prep YES, Ray 7/7 prep
   YES — the first round every persona said yes. What sold it: the dashboard's first move names the interview with date and
