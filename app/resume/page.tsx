@@ -319,11 +319,12 @@ function ProposalResultView({ d }: { d: ProposalResult }) {
   )
 }
 
-function ResultEmpty({ icon, text }: { icon: string; text: string }) {
+function ResultEmpty({ icon, text, link }: { icon: string; text: string; link?: { href: string; label: string } }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 220, color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-72)', textAlign: 'center', gap: '.75rem', whiteSpace: 'pre-line' }}>
       <div style={{ fontSize: '2.5rem' }}>{icon}</div>
       <div>{text}</div>
+      {link && <a href={link.href} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--blue)', fontWeight: 600, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}>{link.label}</a>}
     </div>
   )
 }
@@ -405,6 +406,8 @@ function ResumePageInner() {
   // A saved job carries its listing source so the server can tell an Adzuna teaser from a posting;
   // the moment the person edits the description it is THEIR pasted posting.
   const [jobSource, setJobSource] = useState<string | null>(null)
+  // The listing's link when Seen could only read a summary and its page would not open from the server.
+  const [previewLink, setPreviewLink] = useState('')
 
   // HumanProof
   const [hp, setHp] = useState<HumanProofResult | null>(null)
@@ -557,7 +560,7 @@ function ResumePageInner() {
       })
       if (res.status === 403) { setFitState('disabled'); return false }
       const data = await res.json().catch(() => ({}))
-      if (res.status === 422 && data.error === 'preview_only') { setFitState('preview'); setShowManual(true); return false }
+      if (res.status === 422 && data.error === 'preview_only') { setPreviewLink(httpHref((data as { apply_url?: string | null }).apply_url) || ''); setFitState('preview'); setShowManual(true); return false }
       if (!res.ok || data.error) { setFitErrRef(data?.ref || ''); setFitState('error'); return false }
       setFitOut(data as OptimizerOutput); setFitState('done')
       return true
@@ -900,14 +903,14 @@ function ResumePageInner() {
                   fitState === 'loading' ? <ResultEmpty icon="⏳" text={'Scoring your fit…'} />
                   : fitState === 'disabled' ? <ResultEmpty icon="🚧" text={'SeenFit is temporarily unavailable.'} />
                   : fitState === 'error' ? <div><ResultEmpty icon="⚠️" text={'Could not score your fit. Try again.'} />{fitErrRef && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', color: 'var(--dim)', marginTop: '.35rem' }}>Error ref: {fitErrRef} — share this if it keeps happening.</div>}<button onClick={() => runFit()} style={{ ...btnPrimary, marginTop: '.5rem' }}>Retry</button></div>
-                  : fitState === 'preview' ? <ResultEmpty icon="📄" text={'This listing only has a summary. Paste the full posting to optimize for it.'} />
+                  : fitState === 'preview' ? <ResultEmpty icon="📄" text={previewLink ? 'Seen could only read a summary of this listing, and its page would not open from here. Open the listing, copy the posting, and paste it into the job description box.' : 'This listing only has a summary. Paste the full posting into the job description box to optimize for it.'} link={previewLink ? { href: previewLink, label: 'Open the listing ↗' } : undefined} />
                   : fitOut ? <FitView out={fitOut} intel={companyIntel} jobCompany={jobCompany} insights={insights} /> : null
                 )}
 
                 {/* REWRITE — the paid plan (a strict superset of the free Fit tab) */}
                 {tab === 'rewrite' && (
                   fitState === 'loading' || paidState === 'checking' ? <ResultEmpty icon="⏳" text={'Checking for a plan you already built…'} />
-                  : paidState === 'preview' || fitState === 'preview' ? <ResultEmpty icon="📄" text={'This listing only has a summary. Paste the full posting to optimize for it — no credit is used for a preview.'} />
+                  : paidState === 'preview' || fitState === 'preview' ? <ResultEmpty icon="📄" text={previewLink ? 'Seen could only read a summary of this listing. Open it, copy the posting, paste it into the job description box — no credit is used for a preview.' : 'This listing only has a summary. Paste the full posting into the job description box to optimize for it — no credit is used for a preview.'} link={previewLink ? { href: previewLink, label: 'Open the listing ↗' } : undefined} />
                   : paidState === 'no_requirements' ? <ResultEmpty icon="📄" text={paidNote || NO_REQUIREMENTS_NOTE} />
                   : paidState === 'loading' ? <ResultEmpty icon="✍️" text={'Building your rewrite plan…'} />
                   : paidState === 'done' && paid ? <RewriteView out={paid} copy={copy} copied={copied} pro={pro} onRerun={() => { void runPaid(true) }} />

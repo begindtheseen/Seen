@@ -591,7 +591,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                     >
                       {takesSeenApply(job) ? 'Apply on their site' : preview ? 'Open the full posting' : 'Apply'}
                     </Button>
-                    {!takesSeenApply(job) && !preview && (
+                    {!takesSeenApply(job) && (
                       <Button variant="secondary" data-testid="detail-optimize-btn" onClick={() => setShowApplyModal(true)} title={`Optimize your résumé for this job · ${priceLabel(RESUME_OPTIMIZE_COST, pro)}`} className={d.grow}>
                         Optimize · {priceLabel(RESUME_OPTIMIZE_COST, pro).replace(' ', ' ')}
                       </Button>

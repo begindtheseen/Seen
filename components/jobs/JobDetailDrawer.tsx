@@ -416,7 +416,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
                     className={d.grow}
                     iconRight="arrow-up-right"
                   >{seenApply ? 'Apply on their site' : preview ? 'Open the full posting' : 'Apply'}</Button>
-                  {!seenApply && !preview && (
+                  {!seenApply && (
                     <Button variant="secondary" data-testid="drawer-optimize-btn" onClick={() => { onClose(); onApply(job) }} title={`Optimize your résumé for this job · ${priceLabel(RESUME_OPTIMIZE_COST, pro)}`} className={d.grow}>
                       Optimize · {priceLabel(RESUME_OPTIMIZE_COST, pro).replace(' ', ' ')}
                     </Button>
