@@ -100,7 +100,8 @@ export function joinDays(plan: CheckinEmail[]): string {
 }
 
 // ── The guest's application, carried by the sign-up ───────────────────────────────────────────────
-export interface PendingApplication { id: string; company: string; role: string; applied_at: string }
+export interface PendingApplication { id: string; company: string; role: string; applied_at: string; stage?: string; interview_at?: string }
+const INTERVIEW_STAGES = ['Phone Screen', 'Interview', 'Final Round']
 
 export const PENDING_APPS_MAX = 5
 const CLIENT_ID = /^app_\d{10,16}$/
@@ -116,7 +117,12 @@ export function cleanPending(v: unknown): PendingApplication | null {
   const role = clean(o.role, 120)
   const t = Date.parse(String(o.applied_at || ''))
   if (!CLIENT_ID.test(id) || !company || !role || !Number.isFinite(t)) return null
-  return { id, company, role, applied_at: new Date(t).toISOString() }
+  const out: PendingApplication = { id, company, role, applied_at: new Date(t).toISOString() }
+  // what the guest did on the card: an interview stage, and the interview date they entered
+  if (INTERVIEW_STAGES.includes(String(o.stage || ''))) out.stage = String(o.stage)
+  const iv = Date.parse(String(o.interview_at || ''))
+  if (Number.isFinite(iv)) out.interview_at = new Date(iv).toISOString()
+  return out
 }
 
 /** What a sign-up carries: this device's guest applications (never an account row), newest first. */
@@ -125,7 +131,8 @@ export function pendingFromGuestApps(apps: Array<Partial<Application>>, max = PE
   const list = [...(Array.isArray(apps) ? apps : [])].sort((a, b) => (b.appliedAt || 0) - (a.appliedAt || 0))
   for (const a of list) {
     if (!a || UUID.test(String(a.id || '')) || (a.status && a.status !== 'active')) continue
-    const p = cleanPending({ id: a.id, company: a.company, role: a.role, applied_at: a.appliedAt ? new Date(a.appliedAt).toISOString() : '' })
+    const sched = [...(a.events || [])].reverse().find(e => e.type === 'interview_scheduled' && typeof e.data?.at === 'string')
+    const p = cleanPending({ id: a.id, company: a.company, role: a.role, applied_at: a.appliedAt ? new Date(a.appliedAt).toISOString() : '', stage: a.stage, interview_at: sched ? String(sched.data!.at) : '' })
     if (p && !out.some(x => x.id === p.id)) out.push(p)
     if (out.length >= max) break
   }
@@ -155,5 +162,13 @@ export function pendingToCreate(pending: unknown, existing: Array<Partial<Applic
 /** The tracker record a pending application becomes (AppStore.add). */
 export function applicationFromPending(p: PendingApplication): Partial<Application> {
   const appliedAt = Date.parse(p.applied_at)
-  return { id: p.id, company: p.company, role: p.role, platform: 'Seen', stage: 'Applied', status: 'active', appliedAt }
+  const base: Partial<Application> = { id: p.id, company: p.company, role: p.role, platform: 'Seen', stage: p.stage || 'Applied', status: 'active', appliedAt }
+  if (p.interview_at) {
+    const now = Date.now()
+    base.events = [
+      { id: `ev_${now}`, type: 'application_submitted', date: appliedAt, source: 'user', confidence: 'low' },
+      { id: `ev_${now + 1}`, type: 'interview_scheduled', date: now, source: 'user', confidence: 'high', data: { at: p.interview_at } },
+    ]
+  }
+  return base
 }

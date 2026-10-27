@@ -3,31 +3,33 @@
 // Interview Prep on a tracker card (owner decision 2026-10-25). It appears the moment an application
 // reaches Phone Screen / Interview / Final Round — the one moment all four willingness-to-pay test users
 // said they would pay. The top half is FREE and comes from Seen's own data (what happened to applicants
-// after interviewing at this company, the pay on its listings, when to follow up). The prep pack itself —
-// questions, answers built from the person's résumé, intro, emails — is $9.99 once (14 days of Pro), or
-// free for anyone who already has Pro. Server: api/interview-prep.js, lib/server/interviewPrep.js.
+// after interviewing at this company, what they say the process involved, the pay on its listings, how this
+// company's interviews usually run, when to follow up). The prep pack itself — the company's known questions,
+// answers built from the person's résumé that they finish on the card, intro, emails — is $9.99 once (14 days
+// of Pro), or free for anyone who already has Pro. Server: api/interview-prep.js, lib/server/prepLocal.js,
+// lib/server/interviewGuides.js.
 //
-// The ask (owner decisions 2026-10-25 — Interview Prep is THE lead product): value before money. A
-// signed-in card shows a free PREVIEW first — 2 real questions for the role and 1 coached story from the
-// person's own résumé (action 'preview': deterministic, no model, no cost) — then "Get my prep — $9.99",
-// then the Job Search Pass as the alternative for someone interviewing at several places. Each step is
-// counted: offer_shown / offer_clicked (surface tracker_prep), prep_preview_shown (lib/funnel.ts).
-// This card only renders on ACTIVE applications at an interview stage — never on a rejected, ghosted or
-// withdrawn one (app/tracker/page.tsx).
+// Round 3 of the test (2026-10-26): nobody paid because the prep was "a worksheet" — résumé lines with
+// [blanks], nothing about the company, no pay, a posting pasted before paying was lost. So now: the blanks
+// are fields the person types into and the answer becomes theirs (saved with the prep, every device); the
+// company's own process and questions lead; the posting is kept through checkout and can be added after.
+// This card only renders on ACTIVE applications at an interview stage (app/tracker/page.tsx).
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { signupHref } from '@/lib/signupIntent.js'
 import { PREP, PASS, PREP_PRICE, PASS_PRICE, ONE_TIME_NOTE } from '@/lib/pricing'
 import { useCheckout } from '@/lib/useCheckout'
 import { funnelEvent } from '@/lib/funnel'
+import { splitAnswer, composeAnswer, isFinished, blankCount } from './prepAnswer'
 import s from './InterviewPrep.module.css'
 
 const SKU = PREP
 const PRICE = PREP_PRICE
 
-type Preview = { questions: { q: string; why: string }[]; answer: { q: string; answer: string; resume_fact: string } | null; has_resume: boolean }
+type Guide = { company: string; format: string; framework: { name: string; note: string } | null; questions: number; confidence?: string }
+type Preview = { questions: { q: string; why: string; company?: boolean }[]; answer: { q: string; answer: string; resume_fact: string } | null; has_resume: boolean; total_questions?: number; guide?: Guide | null }
 
 type Quote = { text: string; role: string | null; outcome: string; source: string | null; url: string | null }
 type InterviewRecord = {
@@ -39,23 +41,29 @@ type InterviewRecord = {
   rounds: number | null
   waitDays: number | null
   quotes: Quote[]
+  process?: { label: string; n: number }[]
 }
 type Pay = { unit: 'hour' | 'year'; low: number; high: number; listings: number; scope: 'role' | 'company' | 'market' }
 type FollowUp = { thankYouBy: string; followUpOn: string; lastCheckOn: string }
+type RecordData = { record: InterviewRecord; pay: Pay | null; follow_up: FollowUp; guide?: Guide | null }
+type Answer = { q: string; answer: string; resume_fact: string; coached?: boolean; script?: boolean; frame?: boolean; company?: boolean; principle?: string | null }
 type Pack = {
-  questions: { q: string; why: string }[]
-  answers: { q: string; answer: string; resume_fact: string; coached?: boolean; script?: boolean }[]
+  questions: { q: string; why: string; company?: boolean; principle?: string | null }[]
+  answers: Answer[]
   intro: string | null
   resume_check?: { line: string; note: string }[]
   job_match?: { label: string; status: 'shown' | 'stated' | 'gap' | 'expired' | 'in progress'; proof?: string; say: string; duty?: boolean }[]
-  ask_them?: { q: string }[]
+  ask_them?: { q: string; company?: boolean }[]
   format?: string
+  guide?: { company: string; confidence: string; framework: { name: string; note: string } | null; tips: string[]; watch: string } | null
   emails: { thankYou: { subject: string; body: string }; followUp: { subject: string; body: string } }
   follow_up: FollowUp
+  fills?: Record<string, string[]>
+  job_text?: string
 }
 
 // One read per company + role per page view, shared by every card that names it.
-const recordCache = new Map<string, Promise<{ record: InterviewRecord; pay: Pay | null; follow_up: FollowUp } | null>>()
+const recordCache = new Map<string, Promise<RecordData | null>>()
 function loadRecord(company: string, role: string, interviewAt: string) {
   const key = `${company.toLowerCase()}|${role.toLowerCase()}|${interviewAt}`
   if (!recordCache.has(key)) {
@@ -76,12 +84,36 @@ function afterLine(a: InterviewRecord['after']): string {
   if (a.waiting) parts.push(`${a.waiting} ${a.waiting === 1 ? 'is' : 'are'} still waiting`)
   return parts.join(', ')
 }
+// "a video interview (3), an online assessment (2) and a background check (2)"
+function processLine(p: { label: string; n: number }[]): string {
+  const top = p.slice(0, 3).map(x => `${x.label} (${x.n})`)
+  return top.length <= 1 ? top.join('') : `${top.slice(0, -1).join(', ')} and ${top[top.length - 1]}`
+}
 const article = (w: string) => (/^[aeiou]/i.test(w.trim()) ? 'an' : 'a')
 
 const day = (iso: string) => new Date(iso).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles', weekday: 'short', month: 'short', day: 'numeric' })
 const money = (p: Pay) => p.unit === 'hour'
   ? `$${p.low % 1 ? p.low.toFixed(2) : p.low}–$${p.high % 1 ? p.high.toFixed(2) : p.high}/hr`
   : `$${Math.round(p.low / 1000)}k–$${Math.round(p.high / 1000)}k/yr`
+
+// The interview's date and time as the person's own clock shows them (the browser is where they are).
+const pad = (n: number) => String(n).padStart(2, '0')
+function localDay(iso: string): string { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` }
+// A date with no time yet is stored at noon local with a 500 ms marker, so the day never shifts in any US
+// timezone and the time field stays empty until the person sets it.
+const NO_TIME_MS = 500
+function localTime(iso: string): string { const d = new Date(iso); return Number.isNaN(d.getTime()) || d.getMilliseconds() === NO_TIME_MS ? '' : `${pad(d.getHours())}:${pad(d.getMinutes())}` }
+function isoFrom(dayStr: string, timeStr: string): string {
+  const [y, m, d] = dayStr.split('-').map(Number)
+  const [hh, mm] = (timeStr || '12:00').split(':').map(Number)
+  return new Date(y, m - 1, d, hh, mm, 0, timeStr ? 0 : NO_TIME_MS).toISOString()
+}
+
+// The posting pasted before buying is kept on this device until the card comes back from Stripe.
+const postingKey = (appId: string) => `seen_prep_posting_${appId}`
+const stashPosting = (appId: string, text: string) => { try { if (text.trim()) localStorage.setItem(postingKey(appId), text.slice(0, 6000)); else localStorage.removeItem(postingKey(appId)) } catch { /* private mode */ } }
+const takePosting = (appId: string): string => { try { const v = localStorage.getItem(postingKey(appId)) || ''; return v } catch { return '' } }
+const dropPosting = (appId: string) => { try { localStorage.removeItem(postingKey(appId)) } catch { /* ignore */ } }
 
 function CopyBtn({ text, label = 'Copy' }: { text: string; label?: string }) {
   const [done, setDone] = useState(false)
@@ -111,7 +143,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
   /** Saves the interview date on the application (an interview_scheduled event). */
   onSchedule: (iso: string) => void
 }) {
-  const [data, setData] = useState<{ record: InterviewRecord; pay: Pay | null; follow_up: FollowUp } | null>(null)
+  const [data, setData] = useState<RecordData | null>(null)
   const [open, setOpen] = useState(true)
   const [pack, setPack] = useState<Pack | null>(null)
   const [state, setState] = useState<'idle' | 'building' | 'need_resume' | 'error'>('idle')
@@ -120,12 +152,22 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
   const built = useRef(false)
   const [hasResume, setHasResume] = useState<boolean | null>(null)
   const [posting, setPosting] = useState('')
+  const postingRef = useRef('')
+  const setPostingBoth = (v: string) => { postingRef.current = v; setPosting(v) }
 
   useEffect(() => {
     let live = true
     loadRecord(company, role, interviewAt).then(d => { if (live && d?.record) setData(d) })
     return () => { live = false }
   }, [company, role, interviewAt])
+
+  // The phone's floating "+ Track application" steps aside while a prep is open (round 3: it covered the
+  // fine print). The page counts open panels.
+  useEffect(() => {
+    if (!open) return
+    window.dispatchEvent(new CustomEvent('seen:prep-toggle', { detail: { open: true } }))
+    return () => { window.dispatchEvent(new CustomEvent('seen:prep-toggle', { detail: { open: false } })) }
+  }, [open])
 
   // A prep this person already has (bought, or built with Pro) shows on every device and after Pro ends.
   useEffect(() => {
@@ -142,8 +184,8 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
     return () => { live = false }
   }, [company, role, guest])
 
-  // The free preview: 2 role questions + 1 coached story from the résumé (no model, no cost). Signed in,
-  // no pack yet, not Pro (a Pro card builds the real thing in one tap).
+  // The free preview, from the same engine as the paid pack (no model, no cost): the company's own question
+  // when Seen has a guide, the stage's questions, and one story from the résumé.
   const [preview, setPreview] = useState<Preview | null>(null)
   useEffect(() => {
     let live = true
@@ -153,7 +195,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
       return fetch('/api/interview-prep', { method: 'POST', headers: h, body: JSON.stringify({ action: 'preview', company, role, stage }) }).then(r => (r.ok ? r.json() : null))
     }).then((d: (Preview & { ok?: boolean }) | null) => {
       if (!live || !d?.ok) return
-      setPreview({ questions: d.questions || [], answer: d.answer || null, has_resume: !!d.has_resume })
+      setPreview({ questions: d.questions || [], answer: d.answer || null, has_resume: !!d.has_resume, total_questions: d.total_questions, guide: d.guide || null })
       if (typeof d.has_resume === 'boolean') setHasResume(h => (h == null ? d.has_resume : h))
     }).catch(() => {})
     return () => { live = false }
@@ -180,38 +222,58 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
 
   const checkout = useCheckout('tracker_prep', { isLoggedIn: !guest, guestHref: () => signupHref({ intent: 'prep', company, next: '/tracker' }) })
 
-  async function build() {
+  const build = useCallback(async (opts: { refresh?: boolean; jobText?: string } = {}) => {
     setState('building'); setErr('')
     try {
       const h = await aiHeaders()
-      const r = await fetch('/api/interview-prep', { method: 'POST', headers: h, body: JSON.stringify({ action: 'build', company, role, application_id: appId, interview_at: interviewAt, job_id: jobId || '', job_text: posting.trim().slice(0, 6000), stage }) })
+      const jobText = (opts.jobText ?? postingRef.current).trim().slice(0, 6000)
+      const r = await fetch('/api/interview-prep', { method: 'POST', headers: h, body: JSON.stringify({ action: 'build', company, role, application_id: appId, interview_at: interviewAt, job_id: jobId || '', job_text: jobText, stage, ...(opts.refresh ? { refresh: true } : {}) }) })
       const d = await r.json().catch(() => ({}))
       if (r.status === 409 && d.need_resume) { setState('need_resume'); return }
       if (r.status === 402) { setState('idle'); setErr('This needs Interview Prep or Pro.'); return }
       if (!r.ok || !d.pack) { setState('error'); setErr(d.error || 'Could not build your prep right now — try again in a minute.'); return }
-      setPack(d.pack); setState('idle')
+      setPack(d.pack); setState('idle'); dropPosting(appId)
     } catch {
       setState('error'); setErr('Network error — check your connection and try again.')
     }
-  }
+  }, [appId, company, role, interviewAt, jobId, stage])
 
+  // Back from Stripe: the posting pasted before paying is still here (round 3: it was lost at checkout).
   useEffect(() => {
-    if (autoBuild && isPro && !built.current) { built.current = true; build() }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoBuild, isPro])
+    if (autoBuild && isPro && !built.current) {
+      built.current = true
+      const kept = takePosting(appId)
+      if (kept && !postingRef.current) setPostingBoth(kept)
+      void build({ jobText: kept || postingRef.current })
+    }
+  }, [autoBuild, isPro, appId, build])
 
   // Both products come back to THIS card with the prep building (api/stripe.js success_url ?prep=<id>).
-  const buy = (sku: 'interview' | 'pass30') => { setErr(''); void checkout.start(sku, { application_id: appId, company, role }) }
+  const buy = (sku: 'interview' | 'pass30') => { setErr(''); stashPosting(appId, postingRef.current); void checkout.start(sku, { application_id: appId, company, role }) }
+
+  // The person's words for an answer's blanks: shown at once, saved with the prep (every device).
+  const saveFill = useCallback(async (q: string, values: string[]) => {
+    setPack(p => (p ? { ...p, fills: { ...(p.fills || {}), [q]: values } } : p))
+    try {
+      const h = await aiHeaders()
+      await fetch('/api/interview-prep', { method: 'POST', headers: h, body: JSON.stringify({ action: 'fill', company, role, q, values }) })
+    } catch { /* kept on screen; saved on the next edit */ }
+  }, [company, role])
 
   const rec = data?.record
+  const guide = data?.guide || preview?.guide || null
   // Dated advice only for a dated interview (round 2: "send a thank-you by Mon" before a Thursday screen).
   const fu = interviewAt ? data?.follow_up : null
+  const dayVal = interviewAt ? localDay(interviewAt) : ''
+  const timeVal = interviewAt ? localTime(interviewAt) : ''
   const pickDay = (
-    <label className={s.dateRow}>
+    <div className={s.dateRow}>
       <span>When is your interview?</span>
-      <input type="date" className={s.date} value={interviewAt ? interviewAt.slice(0, 10) : ''}
-        onChange={e => { if (e.target.value) onSchedule(new Date(`${e.target.value}T19:00:00Z`).toISOString()) }} />
-    </label>
+      <input type="date" className={s.date} aria-label="Interview date" value={dayVal}
+        onChange={e => { if (e.target.value) onSchedule(isoFrom(e.target.value, timeVal)) }} />
+      <input type="time" className={s.date} aria-label="Interview time" value={dayVal ? timeVal : ''} disabled={!dayVal}
+        onChange={e => { if (dayVal && e.target.value) onSchedule(isoFrom(dayVal, e.target.value)) }} />
+    </div>
   )
   // One real question for free, so the offer is not a blind buy (round 2: "nothing to preview").
   const sample = data?.pay
@@ -230,9 +292,16 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
           {lead && !pack && <p className={s.leadLine} data-testid="prep-lead">They called you in. Here is what Seen knows about {company}&apos;s interviews, and a first look at your prep.</p>}
           {/* FREE — Seen's own data, for everyone */}
           <div className={s.facts}>
+            {guide && (
+              <div className={s.guide} data-testid="prep-guide">
+                <div className={s.label}>How {guide.company} interviews usually run</div>
+                <p className={s.fact}>{guide.format}</p>
+                {guide.framework && <p className={s.factDim}><b className={s.fw}>{guide.framework.name}.</b> {guide.framework.note}</p>}
+              </div>
+            )}
             {rec && rec.accounts > 0 ? (
               <p className={s.fact}>
-                <b>{rec.accounts} {rec.accounts === 1 ? 'account' : 'accounts'}</b> of interviewing at {company} on Seen
+                <b>{rec.accounts} applicant {rec.accounts === 1 ? 'account' : 'accounts'}</b> on Seen mention interviewing at {company}
                 {afterLine(rec.after) && <>: {afterLine(rec.after)}</>}.
                 {rec.ghostedAfterInterviewPct != null && rec.ghostedAfterInterviewPct >= 20 && <> {rec.ghostedAfterInterviewPct}% were ghosted after interviewing — follow up on time.</>}
                 {rec.rounds != null && rec.rounds > 1 && <> Usually {rec.rounds} rounds.</>}
@@ -241,6 +310,9 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
               <p className={s.fact}>No one has told Seen about interviewing at {company} yet. When you hear back, your answer helps the next person.</p>
             ) : (
               <p className={s.factDim}>Reading what applicants report about {company}…</p>
+            )}
+            {!!rec?.process?.length && (
+              <p className={s.fact}>Applicants to {company} mention {processLine(rec.process)}.</p>
             )}
             {data?.pay && (
               <p className={s.fact}>{data.pay.scope === 'market' ? <>Pay for this job at other employers on Seen ({company}&apos;s listings don&apos;t say): </> : <>Pay on {company}&apos;s {data.pay.scope === 'role' ? 'similar ' : ''}listings: </>}<b>{money(data.pay)}</b> <span className={s.dim}>({data.pay.listings} listings)</span></p>
@@ -266,19 +338,19 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
 
           {/* PAID — the prep pack */}
           {pack ? (
-            <PackView pack={pack} company={company} fu={fu} />
+            <PackView pack={pack} company={company} fu={fu} onFill={saveFill} onRebuild={(text) => { setPostingBoth(text); void build({ refresh: true, jobText: text }) }} building={state === 'building'} />
           ) : (
             <div className={s.offer}>
               <div className={s.offerTitle}>Walk in ready for {company}</div>
               {preview && preview.questions.length > 0 ? (
                 <div className={s.sample} data-testid="prep-preview">
-                  <div className={s.label}>Free preview of your prep</div>
+                  <div className={s.label}>Free preview of your prep{preview.total_questions ? ` · ${preview.total_questions} questions in the full prep` : ''}</div>
                   {preview.questions.map((q, i) => (
-                    <div key={i} className={s.previewQ}><b>{q.q}</b><span className={s.why}>{q.why}</span></div>
+                    <div key={i} className={s.previewQ}><b>{q.company && <span className={s.chip}>{company}</span>}{q.q}</b><span className={s.why}>{q.why}</span></div>
                   ))}
                   {preview.answer && (
                     <div className={s.previewA}>
-                      <div className={s.label}>A story from your résumé</div>
+                      <div className={s.label}>A story from your résumé — you finish the [blank] on the card</div>
                       <b>{preview.answer.q}</b>
                       <span className={s.prose}>{preview.answer.answer}</span>
                     </div>
@@ -293,15 +365,16 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
               )}
               <div className={s.label} style={{ marginTop: '.2rem' }}>The full prep</div>
               <ul className={s.list}>
-                <li>Likely questions for {role ? `${article(role)} ${role}` : 'this role'}, and what each one checks</li>
-                <li>Answers built from <b>your</b> résumé — no invented jobs or numbers</li>
+                {guide ? <li>{guide.questions} questions {guide.company} is known for{guide.framework ? `, each tied to ${guide.framework.name}` : ''}, plus the ones for {role ? `${article(role)} ${role}` : 'this role'}</li> : <li>Likely questions for {role ? `${article(role)} ${role}` : 'this role'}, and what each one checks</li>}
+                <li>Answers built from <b>your</b> résumé — no invented jobs or numbers. You finish each one in your own words on the card, and it stays yours</li>
                 <li>Your 30-second “tell me about yourself”</li>
+                <li>What the posting asks for, and your proof or your honest answer for each</li>
                 <li>Thank-you and follow-up emails, ready to send on the right day</li>
               </ul>
               {!jobId && !guest && (
                 <label className={s.paste}>
-                  <span>Paste the job posting (optional — it makes the questions match this exact job)</span>
-                  <textarea rows={3} value={posting} onChange={e => setPosting(e.target.value)} autoComplete="off" />
+                  <span>Paste the job posting (optional — it makes the questions match this exact job; it is kept if you buy)</span>
+                  <textarea rows={3} value={posting} onChange={e => setPostingBoth(e.target.value)} autoComplete="off" />
                 </label>
               )}
               {guest ? (
@@ -312,8 +385,8 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
               ) : state === 'need_resume' || hasResume === false ? (
                 <p className={s.fact}>Your answers are built from your résumé, so add it first (free). <Link href="/resume?back=tracker" className={s.link}>Add your résumé →</Link></p>
               ) : isPro ? (
-                <button type="button" className={s.cta} disabled={state === 'building'} onClick={build}>
-                  {state === 'building' ? 'Building and fact-checking your prep… (about a minute)' : 'Build my prep →'}
+                <button type="button" className={s.cta} disabled={state === 'building'} onClick={() => void build()}>
+                  {state === 'building' ? 'Building your prep…' : 'Build my prep →'}
                 </button>
               ) : (
                 <>
@@ -341,11 +414,64 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
 
 const MATCH_WORD = { shown: 'your résumé shows it', stated: 'listed, not shown in a line', gap: 'not on your résumé', expired: 'lapsed', 'in progress': 'in progress' } as const
 
-function PackView({ pack, company, fu }: { pack: Pack; company: string; fu: FollowUp | null | undefined }) {
+// One answer: the résumé's words as text, each [blank] as a field; the finished answer below once typed.
+function AnswerEditor({ a, company, values, onSave, defaultOpen }: { a: Answer; company: string; values: string[]; onSave: (values: string[]) => void; defaultOpen: boolean }) {
+  const [vals, setVals] = useState<string[]>(values)
+  useEffect(() => { setVals(values) }, [values])
+  const parts = splitAnswer(a.answer)
+  const n = blankCount(a.answer)
+  const finished = isFinished(a.answer, vals)
+  const composed = composeAnswer(a.answer, vals)
+  const touched = vals.some(v => v && v.trim())
+  const tag = a.company ? `${company} question${a.principle ? ` · ${a.principle}` : ''}` : a.script ? 'From your résumé’s dates and the posting' : a.frame ? `No line on your résumé fits this one yet — answer in ${n} short lines` : 'From your résumé'
+  const save = () => { if (vals.join('\u0000') !== values.join('\u0000')) onSave(vals) }
+  return (
+    <details className={`${s.answer}${finished && n ? ` ${s.done}` : ''}`} open={defaultOpen}>
+      <summary>{a.company && <span className={s.chip}>{company}</span>}{a.q}{n > 0 && <span className={s.state}>{finished ? '✓ finished' : touched ? `${vals.filter(v => v?.trim()).length}/${n} filled` : `${n} ${n === 1 ? 'blank' : 'blanks'} to fill`}</span>}</summary>
+      <p className={s.tag}>{tag}</p>
+      <div className={s.editor}>
+        {parts.map((p, i) => ('blank' in p ? (
+          <textarea key={i} className={s.fill} rows={1} value={vals[p.index] || ''} placeholder={p.blank} aria-label={p.blank}
+            onChange={e => { const next = [...vals]; next[p.index] = e.target.value; setVals(next) }} onBlur={save} />
+        ) : (
+          <span key={i} className={s.given}>{p.text}</span>
+        )))}
+      </div>
+      {touched && (
+        <div className={s.finished}>
+          <div className={s.label}>{finished ? 'Your finished answer' : 'Your answer so far'}</div>
+          <p className={s.prose}>{composed}</p>
+          <CopyBtn text={composed} />
+        </div>
+      )}
+      {a.resume_fact && <span className={s.dim}>Built on: “{a.resume_fact}”</span>}
+    </details>
+  )
+}
+
+function PackView({ pack, company, fu, onFill, onRebuild, building }: { pack: Pack; company: string; fu: FollowUp | null | undefined; onFill: (q: string, values: string[]) => void; onRebuild: (posting: string) => void; building: boolean }) {
   const intro = pack.intro
+  const fills = pack.fills || {}
+  const done = pack.answers.filter(a => isFinished(a.answer, fills[a.q] || [])).length
+  const [addPosting, setAddPosting] = useState('')
+  const needsPosting = !pack.job_text && !(pack.job_match && pack.job_match.length)
   return (
     <div className={s.pack}>
       <div className={s.offerTitle}>Your prep for {company}</div>
+      {pack.guide && (
+        <div className={s.block}>
+          <div className={s.label}>How {pack.guide.company} interviews</div>
+          {pack.format && <p className={s.prose}>{pack.format}</p>}
+          {pack.guide.framework && <p className={s.prose}><b>{pack.guide.framework.name}.</b> {pack.guide.framework.note}</p>}
+          {!!pack.guide.tips?.length && (
+            <ul className={s.qs}>
+              {pack.guide.tips.map((t, i) => <li key={i}>{t}</li>)}
+            </ul>
+          )}
+          {pack.guide.watch && <p className={s.watch}>Watch out: {pack.guide.watch}</p>}
+          <p className={s.dim}>From {pack.guide.company}&apos;s own hiring pages and consistent public accounts — how it usually runs, not a guarantee. Your recruiter&apos;s email wins.</p>
+        </div>
+      )}
       {!!pack.resume_check?.length && (
         <div className={s.block}>
           <div className={s.label}>Fix on your résumé before the interview</div>
@@ -364,22 +490,10 @@ function PackView({ pack, company, fu }: { pack: Pack; company: string; fu: Foll
         </div>
       )}
       <div className={s.block}>
-        <div className={s.label}>Likely questions · prepared by Seen for this role</div>
-        <ol className={s.qs}>
-          {pack.questions.map((q, i) => (
-            <li key={i}><b>{q.q}</b>{q.why && <span className={s.why}>{q.why}</span>}</li>
-          ))}
-        </ol>
-      </div>
-      <div className={s.block}>
-        <div className={s.label}>Your answers</div>
-        <p className={s.dim} style={{ margin: '0 0 .45rem' }}>Fill in anything in [brackets], practise them out loud, and change any detail that isn&apos;t exactly what happened.</p>
+        <div className={s.label}>Your answers · {done}/{pack.answers.length} finished</div>
+        <p className={s.dim} style={{ margin: '0 0 .45rem' }}>Every answer starts from your résumé or the posting. Type the part only you know into each blank, and the finished answer is yours — saved here, on every device.</p>
         {pack.answers.map((a, i) => (
-          <details key={i} className={s.answer} open={i === 0}>
-            <summary>{a.q}</summary>
-            <p className={s.prose}>{a.answer}</p>
-            {a.resume_fact ? <span className={s.dim}>Built on: “{a.resume_fact}”</span> : <span className={s.dim}>Built from your résumé&apos;s dates and the posting.</span>}
-          </details>
+          <AnswerEditor key={a.q} a={a} company={company} values={fills[a.q] || []} onSave={vals => onFill(a.q, vals)} defaultOpen={i === 0} />
         ))}
       </div>
       {!!pack.job_match?.length && (
@@ -395,7 +509,19 @@ function PackView({ pack, company, fu }: { pack: Pack; company: string; fu: Foll
           </ul>
         </div>
       )}
-      {!!pack.format && (
+      {needsPosting && (
+        <div className={s.block}>
+          <div className={s.label}>What this job asks for</div>
+          <label className={s.paste}>
+            <span>Paste the job posting and Seen adds each requirement with your proof line, or your honest answer for a gap, and rebuilds the questions to match. Your finished answers are kept.</span>
+            <textarea rows={3} value={addPosting} onChange={e => setAddPosting(e.target.value)} autoComplete="off" />
+          </label>
+          <button type="button" className={s.passBtn} disabled={building || addPosting.trim().length < 80} onClick={() => onRebuild(addPosting)}>
+            {building ? 'Rebuilding…' : 'Add the posting and rebuild →'}
+          </button>
+        </div>
+      )}
+      {!!pack.format && !pack.guide && (
         <div className={s.block}>
           <div className={s.label}>How this interview usually runs</div>
           <p className={s.prose}>{pack.format}</p>
@@ -405,7 +531,7 @@ function PackView({ pack, company, fu }: { pack: Pack; company: string; fu: Foll
         <div className={s.block}>
           <div className={s.label}>Questions to ask them</div>
           <ul className={s.qs}>
-            {pack.ask_them.map((q, i) => <li key={i}>{q.q}</li>)}
+            {pack.ask_them.map((q, i) => <li key={i}>{q.company && <span className={s.chip}>{company}</span>}{q.q}</li>)}
           </ul>
         </div>
       )}

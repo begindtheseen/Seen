@@ -29,6 +29,7 @@ import {
   interviewRecord, payRange, followUpPlan, guardPack, fallbackPack, prepEmails, prepKey, signOffName, prepFamily,
 } from '../lib/server/interviewPrep.js';
 import { CLIENT_EVENTS, funnelRow, recordFunnelEvent } from '../lib/server/funnelEvents.js';
+import { guideFor } from '../lib/server/interviewGuides.js';
 
 /** The events a browser may post here (checkout and build steps are written by the server). */
 export const FUNNEL_EVENTS = CLIENT_EVENTS;
@@ -43,16 +44,22 @@ const readableResume = (text) => String(text || '').replace(/\s+/g, ' ').length 
 export function previewFrom({ company, role, resumeText, stage = '' }) {
   const hasResume = readableResume(resumeText);
   const text = hasResume ? String(resumeText) : '';
-  const pack = guardPack({}, { company, role, resumeText: text, pay: null, stage });
-  const bank = new Set(fallbackPack({ company, role, resumeText: text }).questions.map((q) => q.q));
-  const roleQs = pack.questions.filter((q) => bank.has(q.q));
-  const questions = (roleQs.length >= 2 ? roleQs : pack.questions).slice(0, 2).map((q) => ({ q: q.q, why: q.why }));
-  const local = hasResume ? localPack({ company, role, resumeText: text, stage }) : null;
-  const a = local?.answers?.[0] || (hasResume ? pack.answers[0] : null);
+  const guide = guideFor(company, role);
+  // the same engine as the paid pack, so a phone screen previews recruiter questions and a company Seen knows
+  // previews one of ITS questions (round 3: the preview ignored the stage and said nothing about the company)
+  const local = localPack({ company, role, resumeText: text, stage });
+  const openers = /^(?:Tell me about yourself|Why do you want to work at|What questions do you have)/;
+  const pool = local.questions.filter((q) => !openers.test(q.q));
+  const companyQ = pool.find((q) => q.company);
+  const rest = pool.filter((q) => q !== companyQ);
+  const questions = [...(companyQ ? [companyQ] : []), ...rest].slice(0, companyQ ? 3 : 2).map((q) => ({ q: q.q, why: q.why, ...(q.company ? { company: true } : {}) }));
+  const a = hasResume ? local.answers.find((x) => !x.frame && !x.script) || null : null;
   return {
     questions,
     answer: a ? { q: a.q, answer: a.answer, resume_fact: a.resume_fact } : null,
     has_resume: hasResume,
+    total_questions: local.questions.length,
+    guide: guide ? { company: guide.company, format: guide.format, framework: guide.framework, questions: guide.questions.length } : null,
   };
 }
 
@@ -140,8 +147,10 @@ export default async function handler(req, res) {
     const out = await readRecord({ supabaseUrl: SUPABASE_URL, serviceKey: SERVICE_KEY, company, role });
     if (!out) return res.status(502).json({ error: 'Could not read reports right now' });
     const sku = ONE_TIME_SKUS.interview;
+    const guide = guideFor(company, role);
     return res.status(200).json({
       ok: true, company, role, ...out,
+      guide: guide ? { company: guide.company, format: guide.format, framework: guide.framework, questions: guide.questions.length, confidence: guide.confidence } : null,
       follow_up: followUpPlan(clean(body.interview_at, 40)),
       offer: { sku: 'interview', name: sku.name, amount_cents: sku.amount_cents, pro_days: sku.pro_days },
     });
@@ -195,10 +204,14 @@ export default async function handler(req, res) {
   if (action === 'build') {
     if (await applyRateLimit(req, res, 'interview-prep')) return;
     if (!company) return res.status(400).json({ error: 'company required' });
-    if (!body.refresh) {
+    let priorFills = null;
+    let priorJobText = '';
+    {
       const owner = await uidFromToken(req, SUPABASE_URL, SERVICE_KEY);
       const cached = owner ? await readCached(owner) : null;
-      if (cached) return res.status(200).json({ ok: true, cached: true, pack: cached });
+      if (cached && !body.refresh) return res.status(200).json({ ok: true, cached: true, pack: cached });
+      // a rebuild keeps what the person already typed into their answers, and the posting they pasted before
+      if (cached) { priorFills = cached.fills || null; priorJobText = String(cached.job_text || ''); }
     }
     // Signed in + Pro access. gateAI logs the use and never charges a credit to a Pro user.
     const gate = await gateAI(req, 'interview_prep', { proOnly: true });
@@ -220,7 +233,7 @@ export default async function handler(req, res) {
 
     // The posting: the card's own listing when it has one (round 2: the model was told "JOB POSTING: not
     // provided" while Seen held the exact listing), else what the client sent.
-    let jobText = cleanText(body.job_text, 6000);
+    let jobText = cleanText(body.job_text, 6000) || priorJobText;
     const jobId = String(body.job_id || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
     if (!jobText && jobId) {
       const jr = await db(`jobs?id=eq.${encodeURIComponent(jobId)}&select=title,company,description&limit=1`).catch(() => null);
@@ -242,6 +255,10 @@ export default async function handler(req, res) {
       record: recOut?.record || null,
       pay: recOut?.pay || null,
       follow_up: followUpPlan(clean(body.interview_at, 40)),
+      // the posting the prep was built from (so "Add the posting and rebuild" works on any device), and the
+      // person's own words for the blanks, keyed by question
+      job_text: jobText || '',
+      fills: priorFills && typeof priorFills === 'object' ? priorFills : {},
     };
     // Cache; a missing table only means the next open rebuilds it.
     await db('interview_preps?on_conflict=user_id,prep_key', {
@@ -250,6 +267,29 @@ export default async function handler(req, res) {
     }).catch(() => null);
     await db('funnel_events', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ user_id: uid, event: 'prep_built', company }) }).catch(() => null);
     return res.status(200).json({ ok: true, cached: false, pack: full });
+  }
+
+  // POST {action:'fill', company, role, q, values:[…]} — the person's words for one answer's blanks, saved with
+  // the prep so the finished answer is theirs on every device. Values are plain text, bounded; the prep must exist.
+  if (action === 'fill') {
+    if (await applyRateLimit(req, res, 'interview-record')) return;
+    if (!company) return res.status(400).json({ error: 'company required' });
+    const uid = await uidFromToken(req, SUPABASE_URL, SERVICE_KEY);
+    if (!uid) return res.status(401).json({ error: 'Sign in' });
+    const q = clean(body.q, 240);
+    const values = (Array.isArray(body.values) ? body.values : []).slice(0, 6).map((v) => cleanText(v, 400));
+    if (!q) return res.status(400).json({ error: 'q required' });
+    const cached = await readCached(uid);
+    if (!cached) return res.status(404).json({ error: 'No prep yet' });
+    if (!cached.answers?.some((a) => a.q === q)) return res.status(400).json({ error: 'Not a question in this prep' });
+    const fills = { ...(cached.fills && typeof cached.fills === 'object' ? cached.fills : {}) };
+    if (values.some((v) => v)) fills[q] = values; else delete fills[q];
+    const pack = { ...cached, fills };
+    const w = await db(`interview_preps?user_id=eq.${encodeURIComponent(uid)}&prep_key=eq.${encodeURIComponent(prepKey(company, role))}`, {
+      method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ pack, updated_at: new Date().toISOString() }),
+    }).catch(() => null);
+    if (!w || !w.ok) return res.status(502).json({ error: 'Could not save right now' });
+    return res.status(200).json({ ok: true, fills });
   }
 
   return res.status(400).json({ error: 'Unknown action' });

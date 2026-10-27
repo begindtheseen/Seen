@@ -128,7 +128,8 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
   const statusClass = STATUS_MAP[app.status] || ''
   const isActive = app.status === 'active'
   const ghostRate = intel?.ghost_rate
-  const watch = isActive ? ghostWatch(days, intel) : null
+  // "still in the normal window" is about waiting to hear back; a card at an interview stage has heard (round 3)
+  const watch = isActive && !PREP_STAGES.includes(app.stage) ? ghostWatch(days, intel) : null
   const listing = listingHref(app)
   // 40px hit area without growing the row (negative vertical margin).
   const linkStyle = { fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', minHeight: 40, padding: '0 .4rem', margin: '-8px -.4rem' } as const
@@ -453,6 +454,14 @@ function TrackerPage() {
   // The card that just reached an interview (a stage move or a check-in answer): its Interview Prep
   // leads, opened and scrolled to — the moment the offer is for (owner decision 2026-10-25).
   const [leadPrepId, setLeadPrepId] = useState('')
+  // How many Interview Prep panels are open: the phone's floating button hides while one is (round 3: it
+  // covered the prep's fine print).
+  const [prepOpen, setPrepOpen] = useState(0)
+  useEffect(() => {
+    const on = (e: Event) => setPrepOpen(n => Math.max(0, n + ((e as CustomEvent<{ open: boolean }>).detail?.open ? 1 : -1)))
+    window.addEventListener('seen:prep-toggle', on)
+    return () => window.removeEventListener('seen:prep-toggle', on)
+  }, [])
 
   // Pro access decides whether a card's Interview Prep builds right away or offers the $9.99 pack.
   const [isPro, setIsPro] = useState(false)
@@ -1203,7 +1212,7 @@ function TrackerPage() {
       </div>
     </div>
     {/* Phones: "+ Track application" floats above the tab bar so it is always one tap away */}
-    {apps.length > 0 && !showManual && !editing && !expandedId && (
+    {apps.length > 0 && !showManual && !editing && !expandedId && prepOpen === 0 && (
       <button type="button" className={s.fab} onClick={() => setShowManual(true)} aria-label="Track application">+ Track application</button>
     )}
     {showSurvey && surveyMode === 'resume' && (
