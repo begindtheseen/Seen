@@ -21,7 +21,7 @@ function mockResponse(body, { ok = true, status = 200 } = {}) {
   return { ok, status, async json() { return body; }, async text() { return JSON.stringify(body); } };
 }
 
-function installFetch({ pro = false, cached = null, resume = RESUME } = {}) {
+function installFetch({ pro = false, cached = null, resume = RESUME, failWrites = false } = {}) {
   const calls = [];
   globalThis.fetch = async (url, opts = {}) => {
     const u = new URL(String(url));
@@ -42,6 +42,7 @@ function installFetch({ pro = false, cached = null, resume = RESUME } = {}) {
     }
     if (u.pathname === '/rest/v1/jobs') return mockResponse([{ title: 'Assistant Store Manager', salary_min: 45000, salary_max: 55000 }, { title: 'Assistant Store Manager', salary_min: 48000, salary_max: 58000 }, { title: 'Store Manager', salary_min: 60000, salary_max: 70000 }]);
     if (u.pathname === '/rest/v1/interview_preps' && method === 'GET') return mockResponse(cached ? [{ pack: cached }] : []);
+    if (u.pathname === '/rest/v1/interview_preps' && method === 'POST' && failWrites) return mockResponse({ message: 'statement timeout' }, { ok: false, status: 500 });
     if (u.pathname === '/rest/v1/profiles') return mockResponse([{ resume_text: resume, name: 'Maria Lopez' }]);
     return mockResponse(null, { status: 201 });
   };
@@ -299,4 +300,16 @@ test('the posting pasted before checkout is kept on the server and used by the f
   assert.match(b.body.pack.job_text, /Shrink control/);
   assert.ok(b.body.pack.job_match.length >= 1);
   assert.equal((await call({ action: 'stash', company: 'Ross Stores', role: 'Assistant Store Manager', job_text: 'x'.repeat(300) }, { auth: false })).code, 401);
+});
+
+test('round 7: a build whose row write is refused says saved:false (and tried twice); a kept one says saved:true', async () => {
+  const bad = installFetch({ pro: true, failWrites: true });
+  const res = await call({ action: 'build', company: 'Ross Stores', role: 'Assistant Store Manager', application_id: 'app_1' });
+  assert.equal(res.code, 200);
+  assert.equal(res.body.cached, false);
+  assert.equal(res.body.saved, false, 'the card is told the rebuild was not kept');
+  assert.equal(bad.filter((c) => c.path === '/rest/v1/interview_preps' && c.method === 'POST').length, 2, 'one retry');
+  installFetch({ pro: true });
+  const ok = await call({ action: 'build', company: 'Ross Stores', role: 'Assistant Store Manager', application_id: 'app_1' });
+  assert.equal(ok.body.saved, true);
 });

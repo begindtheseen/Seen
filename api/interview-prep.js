@@ -304,13 +304,20 @@ export default async function handler(req, res) {
       notes: {},
     };
     if (prior) { const carried = carryFills(prior, full); full.fills = carried.fills; full.notes = carried.notes; full.noteKeys = carried.noteKeys; }
-    // Cache; a missing table only means the next open rebuilds it.
-    await db('interview_preps?on_conflict=user_id,prep_key', {
-      method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify({ user_id: uid, prep_key: key, company, role, application_id: clean(body.application_id, 80) || null, pack: full, updated_at: new Date().toISOString() }),
-    }).catch(() => null);
+    // Save it. The old write was fire-and-forget: a refused or timed-out upsert left the person looking at a
+    // rebuilt prep that no device would ever see again (round 7, Tasha: the rebuild answered cached:false and every
+    // later read returned the old pack). One retry, the failure logged, and the answer says `saved:false` so the
+    // card can say so instead of pretending.
+    const rowBody = JSON.stringify({ user_id: uid, prep_key: key, company, role, application_id: clean(body.application_id, 80) || null, pack: full, updated_at: new Date().toISOString() });
+    let saved = false;
+    for (let attempt = 0; attempt < 2 && !saved; attempt++) {
+      if (attempt) await new Promise((r) => setTimeout(r, 400));
+      const w = await db('interview_preps?on_conflict=user_id,prep_key', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: rowBody }).catch((e) => ({ ok: false, status: 0, text: async () => String(e && e.message || e) }));
+      if (w && w.ok) saved = true;
+      else { const detail = w ? await w.text().catch(() => '') : ''; console.error('[interview-prep] prep write failed', w ? w.status : 'no response', String(detail).replace(/[\r\n]+/g, ' ').slice(0, 300)); }
+    }
     await db('funnel_events', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ user_id: uid, event: 'prep_built', company }) }).catch(() => null);
-    return res.status(200).json({ ok: true, cached: false, pack: full });
+    return res.status(200).json({ ok: true, cached: false, pack: full, saved });
   }
 
   // POST {action:'fill', company, role, q, values:[…]} — the person's words for one answer's blanks, saved with

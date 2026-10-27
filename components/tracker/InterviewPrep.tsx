@@ -243,6 +243,8 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
       // (round 4, Maria: the buyer's return landed on `cached:true` and the posting vanished)
       if (d.cached && jobText && !opts.refresh && !d.pack.job_text && !(d.pack.job_match || []).length) { void build({ refresh: true, jobText }); return }
       setPack(d.pack); setState('idle'); setPending(false); dropPosting(appId)
+      // the server built it but could not keep it: say so, never show a prep no other device will ever see
+      if (d.saved === false) setErr('Your prep was built but could not be saved just now — your other devices still have the earlier version. Press "Rebuild with this posting" again in a minute.')
     } catch {
       setState('error'); setErr('Network error — check your connection and try again.')
     }
@@ -285,11 +287,13 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
   // within a second of typing lost the box — the timer had not fired and nothing was sent)
   const hdrRef = useRef<Record<string, string> | null>(null)
   useEffect(() => { aiHeaders().then(h => { hdrRef.current = h as Record<string, string> }).catch(() => {}) }, [])
-  const saveFill = useCallback((q: string, values: string[]) => {
+  const saveFill = useCallback((q: string, values: string[], urgent = false) => {
     setPack(p => (p ? { ...p, fills: { ...(p.fills || {}), [q]: values }, notes: Object.fromEntries(Object.entries(p.notes || {}).filter(([k]) => k !== q)) } : p))
     const body = JSON.stringify({ action: 'fill', company, role, q, values })
-    if (document.visibilityState === 'hidden' && hdrRef.current) {
-      // the page is going away: one keepalive request, no queue to wait on
+    // the page is going away (pagehide fires BEFORE visibilitychange on a reload or a back tap — round 7, Tasha:
+    // the "hidden" check sent the save down the async path and nothing reached the server): one keepalive
+    // request with the headers already in hand, no queue to wait on
+    if ((urgent || document.visibilityState === 'hidden') && hdrRef.current) {
       try { void fetch('/api/interview-prep', { method: 'POST', headers: hdrRef.current, body, keepalive: true }) } catch { /* nothing more can be done here */ }
       return
     }
@@ -462,7 +466,7 @@ const MATCH_WORD = { shown: 'your résumé shows it', stated: 'listed, not shown
 // A box grows with what is typed; it starts two lines tall so the prompt inside it can be read (round 4: one-
 // line boxes clipped the only instruction, and three-sentence stories).
 function grow(el: HTMLTextAreaElement | null) { if (!el) return; el.style.height = 'auto'; el.style.height = `${Math.max(el.scrollHeight, 56)}px` }
-function AnswerEditor({ a, company, values, notes, onSave, defaultOpen, title, tagText, pre }: { a: Answer; company: string; values: string[]; notes?: string[]; onSave: (values: string[]) => void; defaultOpen: boolean; title?: string; tagText?: string; pre?: boolean }) {
+function AnswerEditor({ a, company, values, notes, onSave, defaultOpen, title, tagText, pre }: { a: Answer; company: string; values: string[]; notes?: string[]; onSave: (values: string[], urgent?: boolean) => void; defaultOpen: boolean; title?: string; tagText?: string; pre?: boolean }) {
   const [vals, setVals] = useState<string[]>(values)
   // What the account holds only replaces what is typed here when it is NEW (another device, a rebuild) —
   // never because the parent re-rendered with the same words, and never over a box still being typed in
@@ -488,12 +492,12 @@ function AnswerEditor({ a, company, values, notes, onSave, defaultOpen, title, t
   latest.current = vals
   // typing saves on its own after a pause, so a tab or a reload mid-answer loses nothing
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const flush = useCallback(() => { const v = latest.current; const key = v.join('\u0000'); if (key !== saved.current) { saved.current = key; onSave(v) } }, [onSave])
+  const flush = useCallback((urgent = false) => { const v = latest.current; const key = v.join('\u0000'); if (key !== saved.current) { saved.current = key; onSave(v, urgent) } }, [onSave])
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
   // leaving the page (a reload, a tab switch, the phone's back button) saves what is typed, timer or not
   useEffect(() => {
-    const onHide = () => { if (document.visibilityState === 'hidden') { if (timer.current) clearTimeout(timer.current); flush() } }
-    const onPageHide = () => { if (timer.current) clearTimeout(timer.current); flush() }
+    const onHide = () => { if (document.visibilityState === 'hidden') { if (timer.current) clearTimeout(timer.current); flush(true) } }
+    const onPageHide = () => { if (timer.current) clearTimeout(timer.current); flush(true) }
     document.addEventListener('visibilitychange', onHide); window.addEventListener('pagehide', onPageHide)
     return () => { document.removeEventListener('visibilitychange', onHide); window.removeEventListener('pagehide', onPageHide) }
   }, [flush])
@@ -504,7 +508,7 @@ function AnswerEditor({ a, company, values, notes, onSave, defaultOpen, title, t
   const touched = vals.some(v => v && v.trim())
   const tag = tagText || (a.exercise ? 'Practised at a keyboard, not answered out loud' : a.company ? `${company} question${a.principle ? ` · ${a.principle}` : ''}` : a.script ? 'From your résumé’s dates and the posting' : a.frame ? `No line on your résumé fits this one yet — answer in ${n} short lines` : 'From your résumé')
   const save = () => { if (timer.current) clearTimeout(timer.current); flush() }
-  const queue = () => { if (timer.current) clearTimeout(timer.current); timer.current = setTimeout(flush, 600) }
+  const queue = () => { if (timer.current) clearTimeout(timer.current); timer.current = setTimeout(() => flush(), 600) }
   return (
     <details className={`${s.answer}${finished && n ? ` ${s.done}` : ''}`} open={defaultOpen}>
       <summary>{a.company && <span className={s.chip}>{company}</span>}{title || a.q}{n > 0 && <span className={s.state}>{finished ? '✓ finished' : touched ? `${vals.filter(v => v?.trim()).length}/${n} filled` : `${n} ${n === 1 ? 'blank' : 'blanks'} to fill`}</span>}</summary>
@@ -526,7 +530,7 @@ function AnswerEditor({ a, company, values, notes, onSave, defaultOpen, title, t
       {!!notes?.length && (
         <div className={s.notes}>
           <div className={s.label}>Your words from before the rebuild</div>
-          <p className={s.dim} style={{ margin: '0 0 .3rem' }}>This answer changed when the posting was added, so what you typed is kept here for you to reuse — not shown as finished.</p>
+          <p className={s.dim} style={{ margin: '0 0 .3rem' }}>This answer changed when the posting changed, so what you typed is kept here for you to reuse — not shown as finished.</p>
           {notes.map((t, i) => <p key={i} className={s.prose}>{t}</p>)}
           <CopyBtn text={notes.join('\n')} />
         </div>

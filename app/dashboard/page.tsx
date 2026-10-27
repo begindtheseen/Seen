@@ -458,7 +458,13 @@ export default function DashboardPage() {
                 <p>Apply to a job and it appears here until you report what happened.</p>
                 <div className={styles.emptyBtns}><Link href="/jobs" className={styles.ghostBtn}>Find your next job →</Link></div>
               </div>
-            ) : sortApplications(active, 'attention', new Set(dueChecks.map(d => d.app.id))).slice(0, 4).map(app => {
+            ) : (() => {
+              // an interview is never off the pipeline: the four rows are the interviewing cards first, then the
+              // ones that need attention (round 7, Tasha: the one card with an interview was missing)
+              const ordered = sortApplications(active, 'attention', new Set(dueChecks.map(d => d.app.id)))
+              const iv = ordered.filter(a => ['Phone Screen', 'Interview', 'Final Round', 'Offer'].includes(a.stage))
+              return [...iv, ...ordered.filter(a => !iv.includes(a))].slice(0, 4)
+            })().map(app => {
               const days = daysSince(app.appliedAt)
               // beside a phone screen or an interview the row says when it is, not the day count and the ghost
               // rate the person has already beaten (round 6, Ray: "Day 22 · 25% reported ghost rate" beside Interview)
