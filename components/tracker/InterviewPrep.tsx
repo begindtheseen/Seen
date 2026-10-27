@@ -30,7 +30,7 @@ const SKU = PREP
 const PRICE = PREP_PRICE
 
 type Guide = { company: string; format: string; framework: { name: string; note: string } | null; questions: number; confidence?: string }
-type Preview = { questions: { q: string; why: string; company?: boolean }[]; answer: { q: string; answer: string; resume_fact: string } | null; has_resume: boolean; total_questions?: number; guide?: Guide | null }
+type Preview = { questions: { q: string; why: string; company?: boolean }[]; answer: { q: string; answer: string; resume_fact: string } | null; has_resume: boolean; total_questions?: number; practice_items?: number; guide?: Guide | null }
 
 type Quote = { text: string; role: string | null; outcome: string; source: string | null; url: string | null }
 type InterviewRecord = {
@@ -200,7 +200,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
       return fetch('/api/interview-prep', { method: 'POST', headers: h, body: JSON.stringify({ action: 'preview', company, role, stage }) }).then(r => (r.ok ? r.json() : null))
     }).then((d: (Preview & { ok?: boolean }) | null) => {
       if (!live || !d?.ok) return
-      setPreview({ questions: d.questions || [], answer: d.answer || null, has_resume: !!d.has_resume, total_questions: d.total_questions, guide: d.guide || null })
+      setPreview({ questions: d.questions || [], answer: d.answer || null, has_resume: !!d.has_resume, total_questions: d.total_questions, practice_items: d.practice_items, guide: d.guide || null })
       if (typeof d.has_resume === 'boolean') setHasResume(h => (h == null ? d.has_resume : h))
     }).catch(() => {})
     return () => { live = false }
@@ -375,7 +375,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
               <div className={s.offerTitle}>Walk in ready for {company}</div>
               {preview && preview.questions.length > 0 ? (
                 <div className={s.sample} data-testid="prep-preview">
-                  <div className={s.label}>Free preview of your prep{preview.total_questions ? ` · ${preview.total_questions} questions in the full prep` : ''}</div>
+                  <div className={s.label}>Free preview of your prep{preview.total_questions ? ` · ${preview.total_questions} questions${preview.practice_items ? ` and ${preview.practice_items} practice ${preview.practice_items === 1 ? 'item' : 'items'}` : ''} in the full prep` : ''}</div>
                   {preview.questions.map((q, i) => (
                     <div key={i} className={s.previewQ}><b>{q.company && <span className={s.chip}>{company}</span>}{q.q}</b><span className={s.why}>{q.why}</span></div>
                   ))}

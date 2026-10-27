@@ -67,7 +67,8 @@ export function previewFrom({ company, role, resumeText, stage = '' }) {
     questions,
     answer: a ? { q: a.q, answer: a.answer, resume_fact: a.resume_fact } : null,
     has_resume: hasResume,
-    total_questions: local.questions.length,
+    total_questions: local.questions.filter((q) => !q.exercise).length,
+    practice_items: local.questions.filter((q) => q.exercise).length,
     guide: guide ? { company: guide.company, format: guide.format, framework: guide.framework, questions: guide.questions.length } : null,
   };
 }

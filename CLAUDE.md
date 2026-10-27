@@ -70,6 +70,15 @@ longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.m
   a build; posting pay line lives in the job-match block. Optimizer v3 `scoreFit`: a related match is `inferred`
   when the requirement is soft (counted for the score, never shown as proof — Verdict and the application message
   skip it) and is NOT a match when the evidence is a certification/course/education line.
+- **Dev round 5: 7/6 YES (Pass).** Round 7 (branch claude/wip-round7, after #380): a cited evidence line in section 1
+  must NAME the requirement or an alias ("experience with machine learning" ← a FastAPI line the reader cited for
+  Python); jobMatch ranks the proof line by SPECIFIC words (LOW_W: systems/data/handle… count ½) and a SAME_THING
+  alias hit (+2), with 'security' / 'sensitive data' aliases (PCI, SOC 2, row-level, encrypt, audit log); the bank
+  loop scores EVERY (question, line) pair and assigns best-first, a line serving a second field question once at
+  n ≥ 2 (incident ← the on-call line); STORY_RE adds resolved/fixed/shipped/designed/owned/migrated/automated/
+  delivered and counts +0.5 in the fit score; `pastWindow` is never "past" for Phone Screen / Interview / Final
+  Round / Offer (dashboard said "Stripe has been quiet for 23 days" beside a phone screen); the preview counts
+  questions and practice items apart.
 - **Still open from round 5:** loss prevention / payroll rows missing from job match (requirement extraction);
   Studio tailor result lost on reload + "(2 pages)" header; Strategy filler; "Walk me through one thing you did
   well at <old employer>"; Stripe "Choose currency MX$" (Stripe Adaptive Pricing — dashboard setting, owner).
