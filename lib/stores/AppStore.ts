@@ -199,6 +199,7 @@ export const AppStore = {
         // guest did on it: the interview stage and the interview date (round 3: Ray set the date as a guest,
         // signed in, and the account's older Amazon card had no date).
         const carried = local.filter(a => !isDbId(a.id) && !unsynced.includes(a) && !dbIds.has(a.id))
+        let carriedAny = false
         for (const g of carried) {
           const row = mapped.find(a => (g.jobId && a.jobId === g.jobId) || `${(a.company || '').toLowerCase()}|${(a.role || '').toLowerCase()}` === `${(g.company || '').toLowerCase()}|${(g.role || '').toLowerCase()}`)
           if (!row || row.status !== 'active') continue
@@ -209,11 +210,13 @@ export const AppStore = {
           // the guest's entry is newer than the card's (round 4, Ray: typed 8:00 as a guest, saw the account's
           // old date-only entry after sign-in)
           const newer = !!gDate && (!rowDate || (Number(gDate.date) || 0) > (Number(rowDate.date) || 0))
-          if (newer) { try { await this.update(row.id, higher, true, { markers: [{ ...gDate, id: eventId() }] }) } catch { /* the row keeps the account's version */ } }
-          else if (higher.stage) { try { await this.update(row.id, higher, true) } catch { /* same */ } }
+          if (newer) { try { await this.update(row.id, higher, true, { markers: [{ ...gDate, id: eventId() }] }); carriedAny = true } catch { /* the row keeps the account's version */ } }
+          else if (higher.stage) { try { await this.update(row.id, higher, true); carriedAny = true } catch { /* same */ } }
         }
         return {
-          applications: merged,
+          // update() wrote the carried stage / date into the local store: hand back THAT, not the rows read
+          // before the carry (round 5, Ray: the page kept the old row and re-sent the legacy date)
+          applications: carriedAny ? this.loadSync() : merged,
           credits: result.credits ?? null,
           recent_cos: Array.isArray(result.recent_cos) ? result.recent_cos : [],
           inbox: result.inbox && typeof result.inbox.ready === 'boolean' ? result.inbox : null,
