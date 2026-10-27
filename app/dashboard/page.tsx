@@ -460,6 +460,10 @@ export default function DashboardPage() {
               </div>
             ) : sortApplications(active, 'attention', new Set(dueChecks.map(d => d.app.id))).slice(0, 4).map(app => {
               const days = daysSince(app.appliedAt)
+              // beside a phone screen or an interview the row says when it is, not the day count and the ghost
+              // rate the person has already beaten (round 6, Ray: "Day 22 · 25% reported ghost rate" beside Interview)
+              const ivEv = ['Phone Screen', 'Interview', 'Final Round'].includes(app.stage) ? [...(app.events || [])].reverse().find(e => e.type === 'interview_scheduled' && typeof e.data?.at === 'string') : null
+              const ivAt = ivEv ? String(ivEv.data!.at) : ''
               const sc = coScores[app.company.toLowerCase()]
               const ghostPct = sc ? Math.round(sc.ghost_rate * 100) : null
               const tone = sc ? (sc.ghost_rate > 0.55 ? 'var(--red)' : sc.ghost_rate > 0.35 ? 'var(--amber)' : 'var(--green)') : undefined
@@ -469,7 +473,7 @@ export default function DashboardPage() {
                   <span className={styles.jobInfo}>
                     <b>{app.company}</b>
                     <small>{app.role || 'Role'}</small>
-                    <small className={styles.jobMeta}>Day {days}{ghostPct != null && <> · <span style={{ color: tone }}>{ghostPct}% reported ghost rate</span></>}</small>
+                    <small className={styles.jobMeta}>{ivAt ? `${app.stage} · ${whenLabel(ivAt)}` : ivEv === null && ['Phone Screen', 'Interview', 'Final Round'].includes(app.stage) ? `${app.stage} · add the date` : <>Day {days}{ghostPct != null && <> · <span style={{ color: tone }}>{ghostPct}% reported ghost rate</span></>}</>}</small>
                   </span>
                   <span className={styles.stage}>{app.stage}</span>
                 </Link>

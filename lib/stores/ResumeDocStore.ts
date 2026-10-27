@@ -12,6 +12,10 @@ import type { ResumeDoc } from '../resume/types'
 
 export const DOC_CACHE_PREFIX = 'seen_resume_doc_'
 export const VARIANTS_PREFIX = 'seen_resume_variants_'
+// the last Tailor result (plan + the doc it was built for + the person's overrides), so a reload of the
+// Studio shows the result they paid a credit for (round 5: "result gone on reload")
+export const TAILOR_PREFIX = 'seen_resume_tailor_'
+const TAILOR_TTL_MS = 7 * 24 * 3600 * 1000
 const MAX_VARIANTS = 12
 
 export function textHash(text: string): string {
@@ -27,6 +31,8 @@ function read<T>(key: string): T | null {
 function write(key: string, value: unknown): void {
   try { localStorage.setItem(key, JSON.stringify(value)) } catch { /* quota / private mode — the cache is optional */ }
 }
+
+export interface StoredTailor { job: unknown; plan: unknown; baseDoc: ResumeDoc; overrides: unknown; answers: Record<string, string>; at: string }
 
 export interface StoredVariant { id: string; label: string; role: string; company: string; jobId: string; createdAt: string; doc: ResumeDoc; baseHash: string; scoreBefore?: number; scoreAfter?: number }
 
@@ -51,7 +57,19 @@ export const ResumeDocStore = {
     write(`${VARIANTS_PREFIX}${userId || 'guest'}`, list)
     return list
   },
+  putTailor(userId: string | undefined, rec: Omit<StoredTailor, 'at'>): void {
+    write(`${TAILOR_PREFIX}${userId || 'guest'}`, { ...rec, at: new Date().toISOString() })
+  },
+  getTailor(userId: string | undefined): StoredTailor | null {
+    const rec = read<StoredTailor>(`${TAILOR_PREFIX}${userId || 'guest'}`)
+    if (!rec || !rec.plan || !rec.baseDoc) return null
+    const age = Date.now() - new Date(rec.at || 0).getTime()
+    return Number.isFinite(age) && age >= 0 && age < TAILOR_TTL_MS ? rec : null
+  },
+  clearTailor(userId: string | undefined): void {
+    try { localStorage.removeItem(`${TAILOR_PREFIX}${userId || 'guest'}`) } catch { /* ignore */ }
+  },
   clear(userId: string | undefined): void {
-    try { localStorage.removeItem(`${DOC_CACHE_PREFIX}${userId || 'guest'}`); localStorage.removeItem(`${VARIANTS_PREFIX}${userId || 'guest'}`) } catch { /* ignore */ }
+    try { localStorage.removeItem(`${DOC_CACHE_PREFIX}${userId || 'guest'}`); localStorage.removeItem(`${VARIANTS_PREFIX}${userId || 'guest'}`); localStorage.removeItem(`${TAILOR_PREFIX}${userId || 'guest'}`) } catch { /* ignore */ }
   },
 }

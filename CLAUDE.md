@@ -50,6 +50,47 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-10-27 D: round 6 — 4/4 "would have paid"; PR #383 (branch claude/wip-round9)
+- **Round 6 (same 4 personas, live, after #382):** Maria 7/8 prep YES, Dev 7/7 Pass YES, Tasha 6/7 prep YES, Ray 7/7 prep
+  YES — the first round every persona said yes. What sold it: the dashboard's first move names the interview with date and
+  time; the thank-you email is sendable as copied; the posting is editable after a build; typed words survive devices and
+  rebuilds; nothing invented. Reports: session scratchpad `wtp/<persona>/round6/`.
+- **Fixed in #383 (every item reproduced locally from the personas' real résumés/postings first):**
+  - Studio: the Tailor result persists per user (`ResumeDocStore.putTailor/getTailor`, key `seen_resume_tailor_<uid>`, 7-day
+    TTL, swept by the `seen_resume_` prefix); `pageBudget` = the résumé's own length (1 page ≤ 46 lines); `tailorResume` runs
+    the targeted summary, and when it scores below the base re-runs with `replaceSummary:false` and marks `plan.summaryKept`
+    (the paid package shows the person's summary with a why line); `planSkillEdits` reads the summary + bullets only, with
+    `INDUSTRY_WORD` and title words in `NOT_A_SKILL`; `plan.gaps` = `fitAfter.unsupported_requirements` (non-soft) + unmet
+    constraints (first clause) + held-or-not credential gaps (fatal) — never the sentence splitter; education parser:
+    "Coursework toward A.A.S. Business Management" → degree "Coursework toward A.A.S.", field "Business Management".
+  - Prep card: `AnswerEditor` flushes on `pagehide` / `visibilitychange` (saveFill sends one `keepalive` request with cached
+    headers when the page is hidden), 600 ms pause; the editor resets its boxes when `a.answer` (the sentence) changes;
+    `pack.noteKeys` remembers the sentence a note was typed into so `carryFills` restores it when a rebuild brings it back.
+  - prepLocal: row cap = 16 requirement rows, duty rows are the extra (payroll/receiving/bilingual were cut by 12); the
+    requirement word list drops stop words (`that` matched "SLOs that took…"); `teaches(x)`/`TEACH_LINE` — a trained/certified
+    line never proves or tells a non-training requirement (forklift ← the operator line; a SKILL_Q story with only a teaching
+    line is skipped); the must-have story's `tell()` weighs the label's own words (LOW6 half); `QSYN` adds know/measure/track →
+    insights/analytics/report/numbers (+0.75 `measured` bonus), post → instagram/reel/content, retur ↔ refun/excha;
+    GENERIC_Q adds wrote/write/owned/own; `KNOWN_VERBS` adds pull/gather/tabulate/photograph/stage/slot/scan/wrap/palletize;
+    cert sentence names the certification not the issuer ("I hold a Social Media Marketing certification from HubSpot
+    Academy."); "Walk me through one thing you did well at X" is removed from a guided card even as a story; hints: one line
+    per question, none for availability; ask_them dedupes "90 days"; frame copy drops "by the end of the shift".
+  - postingSections: a STRONG_CUE sentence inside the EEO block is a requirement (Tasha's appended Google Analytics line).
+  - Vocabulary: hourly `payroll` (+ `shrink control` alias), professional `security` (sensitive data, SOC 2, row-level
+    security, encryption…), `performance optimization` += p99/p95/latency/throughput.
+  - Optimize: `extractResumeFacts` adds a `leadership` fact from a led/supervised/managed-team bullet (LEAD_RE); `scoreFit`
+    marks a match whose evidence is a schooling line (education/certification/minor/degree) `inferred` (counted, never shown
+    as proof); `alreadyAnswered` checks every noun, the same per-unit rate ("200+ transactions per shift") and quality scores.
+  - Strategy: `ANCHOR_SKIP` (language, schedule, physical, retail/hospitality…) filters plan anchors and `matchedStrengths`.
+  - Dashboard pipeline row: an interviewing stage shows `Stage · whenLabel(at)` instead of "Day N · ghost rate".
+- **Verified:** suite 2372/2372, tsc, next build, Playwright Studio-reload smoke on the production build (restored result,
+  "fits on 1 page", summary-kept line, overrule survives reload, fresh guest sees nothing). Harness: kill servers by PID —
+  `pkill -f "next start"` killed the shell itself (exit 144) and a leftover next-server made the smoke fail for the wrong reason.
+- **Not fixed / owner:** Stripe Checkout "Choose currency" (Adaptive Pricing — dashboard setting; a code param was not tried
+  without a key to test against); Studio role ranking (H-E-B above Ledgerline, "sales ✓" on backend roles); Strategy filler
+  wording ("average wait near 0 days"); "distributed systems" row cited to the transactions/day line; one line serving three
+  Stripe answers; guest-carry time shown stale on the card until reload.
+
 ## Session 2026-10-27 C: round 5 verdicts (first "would have paid") → round 6 (branch claude/wip-round6)
 - **#379 merged** (b5898e9, prod dpl_H37iJifgjSXafww4VZhdn2J31psa). Round-4 preps backed up (`wtp/preps-backup-r4.json`)
   and deleted; Pro reset; round 5 ran live. Tasha 6/6 no; Maria 6/7 **YES** (Dev, Ray pending at the time of writing).

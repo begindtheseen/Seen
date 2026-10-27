@@ -62,6 +62,8 @@ type Pack = {
   fills?: Record<string, string[]>
   /** The person's words from a sentence a rebuild changed — theirs to copy, never shown as finished. */
   notes?: Record<string, string[]>
+  /** the sentence each note was typed into, so a rebuild that brings it back restores the answer */
+  noteKeys?: Record<string, string>
   job_text?: string
   posting_pay?: string | null
 }
@@ -279,12 +281,23 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
   // Saves run one after another: two quick saves on the same answer used to land out of order and the
   // shorter one won (round 4, Ray: a third line typed and lost).
   const saveQueue = useRef<Promise<unknown>>(Promise.resolve())
+  // the session headers, kept ready so a save fired as the page goes away needs no await (round 6: a reload
+  // within a second of typing lost the box — the timer had not fired and nothing was sent)
+  const hdrRef = useRef<Record<string, string> | null>(null)
+  useEffect(() => { aiHeaders().then(h => { hdrRef.current = h as Record<string, string> }).catch(() => {}) }, [])
   const saveFill = useCallback((q: string, values: string[]) => {
     setPack(p => (p ? { ...p, fills: { ...(p.fills || {}), [q]: values }, notes: Object.fromEntries(Object.entries(p.notes || {}).filter(([k]) => k !== q)) } : p))
+    const body = JSON.stringify({ action: 'fill', company, role, q, values })
+    if (document.visibilityState === 'hidden' && hdrRef.current) {
+      // the page is going away: one keepalive request, no queue to wait on
+      try { void fetch('/api/interview-prep', { method: 'POST', headers: hdrRef.current, body, keepalive: true }) } catch { /* nothing more can be done here */ }
+      return
+    }
     saveQueue.current = saveQueue.current.then(async () => {
       try {
         const h = await aiHeaders()
-        await fetch('/api/interview-prep', { method: 'POST', headers: h, body: JSON.stringify({ action: 'fill', company, role, q, values }) })
+        hdrRef.current = h as Record<string, string>
+        await fetch('/api/interview-prep', { method: 'POST', headers: h, body, keepalive: true })
       } catch { /* kept on screen; saved on the next edit */ }
     })
   }, [company, role])
@@ -456,18 +469,34 @@ function AnswerEditor({ a, company, values, notes, onSave, defaultOpen, title, t
   // (round 5, Ray: the first of three boxes typed in a row came back empty; a pay answer never saved).
   const seen = useRef(values.join('\u0000'))
   const saved = useRef(values.join('\u0000'))
+  // the sentence the boxes belong to: when a rebuild changes it, the words typed into the OLD sentence are not
+  // kept in the new one (round 6, Dev: a redrafted pay answer showed "✓ finished" with the old typed words while
+  // the server had moved them to notes — the screen lied until a reload)
+  const sentence = useRef(a.answer)
   useEffect(() => {
     const key = values.join('\u0000')
+    if (sentence.current !== a.answer) {
+      sentence.current = a.answer; seen.current = key; saved.current = key
+      setVals(values); latest.current = values
+      return
+    }
     if (key === seen.current) return
     seen.current = key
     setVals(prev => values.map((v, i) => (prev[i]?.trim() && !v?.trim() ? prev[i] : v)).concat(prev.slice(values.length)))
-  }, [values])
+  }, [values, a.answer])
   const latest = useRef(vals)
   latest.current = vals
   // typing saves on its own after a pause, so a tab or a reload mid-answer loses nothing
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const flush = useCallback(() => { const v = latest.current; const key = v.join('\u0000'); if (key !== saved.current) { saved.current = key; onSave(v) } }, [onSave])
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
+  // leaving the page (a reload, a tab switch, the phone's back button) saves what is typed, timer or not
+  useEffect(() => {
+    const onHide = () => { if (document.visibilityState === 'hidden') { if (timer.current) clearTimeout(timer.current); flush() } }
+    const onPageHide = () => { if (timer.current) clearTimeout(timer.current); flush() }
+    document.addEventListener('visibilitychange', onHide); window.addEventListener('pagehide', onPageHide)
+    return () => { document.removeEventListener('visibilitychange', onHide); window.removeEventListener('pagehide', onPageHide) }
+  }, [flush])
   const parts = splitAnswer(a.answer)
   const n = blankCount(a.answer)
   const finished = isFinished(a.answer, vals)
@@ -475,7 +504,7 @@ function AnswerEditor({ a, company, values, notes, onSave, defaultOpen, title, t
   const touched = vals.some(v => v && v.trim())
   const tag = tagText || (a.exercise ? 'Practised at a keyboard, not answered out loud' : a.company ? `${company} question${a.principle ? ` · ${a.principle}` : ''}` : a.script ? 'From your résumé’s dates and the posting' : a.frame ? `No line on your résumé fits this one yet — answer in ${n} short lines` : 'From your résumé')
   const save = () => { if (timer.current) clearTimeout(timer.current); flush() }
-  const queue = () => { if (timer.current) clearTimeout(timer.current); timer.current = setTimeout(flush, 900) }
+  const queue = () => { if (timer.current) clearTimeout(timer.current); timer.current = setTimeout(flush, 600) }
   return (
     <details className={`${s.answer}${finished && n ? ` ${s.done}` : ''}`} open={defaultOpen}>
       <summary>{a.company && <span className={s.chip}>{company}</span>}{title || a.q}{n > 0 && <span className={s.state}>{finished ? '✓ finished' : touched ? `${vals.filter(v => v?.trim()).length}/${n} filled` : `${n} ${n === 1 ? 'blank' : 'blanks'} to fill`}</span>}</summary>
