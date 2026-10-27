@@ -21,11 +21,15 @@ export const SORT_MODES: ReadonlyArray<{ value: SortMode; label: string }> = [
 export const REFERENCE_WINDOW_DAYS = 21
 
 /** Is this open application past its response window? `reference` = judged by the 21-day reference. */
-export function pastWindow(app: Pick<Application, 'status' | 'appliedAt'>, avgWaitDays: number | null | undefined, now = Date.now()): { past: boolean; reference: boolean; days: number; window: number } {
+const INTERVIEWING = new Set(['Phone Screen', 'Interview', 'Final Round', 'Offer'])
+export function pastWindow(app: Pick<Application, 'status' | 'appliedAt'> & { stage?: string }, avgWaitDays: number | null | undefined, now = Date.now()): { past: boolean; reference: boolean; days: number; window: number } {
   const days = daysSince(app.appliedAt, now)
   const reference = !(typeof avgWaitDays === 'number' && avgWaitDays > 0)
   const window = reference ? REFERENCE_WINDOW_DAYS : Math.round((avgWaitDays as number) * 1.4)
-  return { past: app.status === 'active' && days > window, reference, days, window }
+  // a card the company has already called in is not "quiet", however long ago the application went in
+  // (round 5, Dev: "Stripe has been quiet for 23 days — follow up" beside a phone screen on the calendar)
+  const heard = !!app.stage && INTERVIEWING.has(app.stage)
+  return { past: app.status === 'active' && !heard && days > window, reference, days, window }
 }
 
 /** Lower = needs attention sooner. 0 due check · 1 quiet · 2 open · 3 finished. */
