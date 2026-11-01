@@ -94,13 +94,38 @@ test('earn_credit never lowers a welcome balance and still earns below the cap',
 });
 
 test('submit_answer on a brand-new account: welcome row, answer stored, no phantom credit', async () => {
-  const { t } = install();
-  const r = await call({ action: 'submit_answer', question_key: 'ghost|walmart', answer: 'Still waiting' });
+  // Walmart is on this account's résumé, so "ghost|walmart" is a question it could have been asked.
+  const { t } = install({ resume_employment: [{ user_id: UID, company: 'Walmart', title: 'Cashier' }] });
+  const r = await call({ action: 'submit_answer', question_key: 'ghost|walmart', answer: 'Haven\'t applied there' });
   assert.equal(r.body.ok, true);
   assert.equal(r.body.credited, false);
   assert.equal(r.body.balance, WELCOME_CREDITS);
   assert.equal(t.answered_questions.length, 1);
   assert.deepEqual(t.credit_transactions.map((x) => x.reason), ['welcome_bonus']);
+});
+
+test('submit_answer refuses a question it never asked or an answer it never offered (audit 2026-11-01)', async () => {
+  const { t } = install({ resume_employment: [{ user_id: UID, company: 'Walmart', title: 'Cashier' }], reports: [] });
+  for (const [question_key, answer] of [
+    ['ghost|target', 'No, was ghosted'],            // Target is not on the résumé
+    ['ghost|walmart', 'They are terrible, avoid'],  // free text, not an option
+    ['made_up|walmart', 'No, was ghosted'],         // no such question type
+  ]) {
+    const r = await call({ action: 'submit_answer', question_key, answer });
+    assert.equal(r.status, 400, question_key);
+  }
+  assert.equal(t.answered_questions.length, 0);
+  assert.equal((t.reports || []).length, 0);
+});
+
+test('submit_answer writes the report as this user, through the anti-gaming check', async () => {
+  const { t } = install({ resume_employment: [{ user_id: UID, company: 'Walmart', title: 'Cashier' }], reports: [] });
+  const r = await call({ action: 'submit_answer', question_key: 'ghost|walmart', answer: 'No, was ghosted' });
+  assert.equal(r.body.ok, true);
+  assert.equal(t.reports.length, 1);
+  assert.equal(t.reports[0].user_id, UID);
+  assert.equal(t.reports[0].outcome, 'ghosted');
+  assert.equal(t.reports[0].trust_reason, 'direct_submission');
 });
 
 test('delete_account cancels live Stripe subscriptions before deleting anything', async () => {

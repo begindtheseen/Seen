@@ -53,7 +53,8 @@
 .odo{display:inline-flex;align-items:baseline;line-height:1;font-variant-numeric:tabular-nums;white-space:nowrap;vertical-align:baseline}
 .odo-d{display:inline-block;height:1.16em;overflow:hidden;position:relative;vertical-align:bottom;user-select:none}
 .odo-r{display:block;transform:translateY(calc(var(--n,0) * -1.16em));transition:transform .95s var(--ease-spring);transition-delay:calc(var(--c,0) * 55ms)}
-.odo-r>span{display:block;height:1.16em;line-height:1.16em}
+.odo-r::before{content:"0\A 1\A 2\A 3\A 4\A 5\A 6\A 7\A 8\A 9";display:block;white-space:pre;line-height:1.16em}
+.odo-s::before{content:attr(data-t)}
 .odo-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
 /* ── Scroll reveal: shorter travel, expo-out — snaps into place ──────────────── */

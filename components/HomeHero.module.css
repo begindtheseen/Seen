@@ -72,6 +72,11 @@
   margin: 1.25rem 0 1.9rem;
   max-width: 54ch;
 }
+/* A one-line sign-off under the lede: who made this and why. */
+.origin {
+  margin: calc(-1 * var(--sp-2)) auto var(--sp-5); max-width: 36rem;
+  font-family: var(--body); font-size: var(--fs-sm); font-style: italic; color: var(--dim); text-align: center;
+}
 
 /* ── One working search ── */
 .search {

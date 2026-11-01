@@ -9,8 +9,8 @@ import { useAuth } from '@/lib/auth'
 // state from the claim system; the current step gets the primary CTA.
 //
 // Step 1 (claim) is the gate: analytics/listings/updates only unlock once a claim is approved, so
-// steps 2+ show as locked until then. A work-email claim auto-approves instantly (see
-// api/employer-claims.js), so for most employers this checklist clears itself on the first step.
+// steps 2+ show as locked until then. Every claim is admin-approved (see
+// api/employer-claims.js); the checklist waits on that approval.
 
 type StepState = 'done' | 'current' | 'locked'
 
@@ -77,7 +77,7 @@ export default function EmployerActivationChecklist() {
       <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-meta)', lineHeight: 1.6, margin: '0 0 .6rem', maxWidth: 560 }}>
         {pending
           ? 'Once approved, your listings, analytics, and applicant updates unlock below — all scoped to your company.'
-          : 'Claim your company to unlock your listings, analytics, and the outcomes candidates reported about you. If you sign up with your work email, approval is instant.'}
+          : 'Claim your company to unlock your listings, analytics, and the outcomes candidates reported about you. Seen checks each claim by hand before it goes live.'}
       </p>
 
       <div style={{ borderTop: '1px solid var(--line)' }}>

@@ -19,6 +19,7 @@ import { isReadableResume } from '../lib/server/resumeReadability.js';
 import { deleteApplicantResumes } from '../lib/server/seenApplyStore.js';
 import { decodeThread } from '../lib/server/applicationThread.js';
 import { pacificDate } from '../lib/time/pacific.js';
+import { QUESTION_TYPES, TRACKER_OUTCOME_OPTIONS, VERIFY_OPTIONS, GENERIC_QUESTIONS, readAnswer, answerOutcome } from '../lib/server/intelQuestions.js';
 import { claimReferral, referralStatus, rewardReferralOnApplication } from '../lib/server/growthRewards.js';
 import { recordSignupAttribution } from '../lib/server/signupAttribution.js';
 import * as inbox from '../lib/server/inbox/store.js';
@@ -899,17 +900,11 @@ export default async function handler(req, res) {
     // Priority 1: Resume-based company questions
     const empRes = await db(`resume_employment?user_id=eq.${uid}&select=company,title&limit=10`);
     const employment = empRes.ok ? await empRes.json() : [];
-    const Q_TYPES = [
-      { type: 'ghost', q: (co) => `Did ${co} respond to your application?`, opts: ['Yes, they responded','No, was ghosted','Haven\'t applied there'] },
-      { type: 'timeline', q: (co) => `How long did ${co} take to first contact you?`, opts: ['Same day','1–3 days','4–7 days','1–2 weeks','2–4 weeks','Never heard back'] },
-      { type: 'rounds', q: (co) => `How many interview rounds did ${co} put you through?`, opts: ['None / auto-rejected','1 round','2 rounds','3 rounds','4+ rounds'] },
-      { type: 'return', q: (co) => `Would you apply to ${co} again?`, opts: ['Definitely yes','Probably yes','Probably not','Never again'] },
-    ];
     for (const emp of employment) {
-      for (const qt of Q_TYPES) {
+      for (const qt of QUESTION_TYPES) {
         const key = `${qt.type}|${emp.company.toLowerCase()}`;
         if (!answered.has(key)) {
-          return res.status(200).json({ question: { key, company: emp.company, prompt: `We noticed ${emp.company} on your resume.`, text: qt.q(emp.company), options: qt.opts, credit_value: 1, source: 'resume' } });
+          return res.status(200).json({ question: { key, company: emp.company, prompt: `We noticed ${emp.company} on your resume.`, text: qt.text(emp.company), options: qt.options, credit_value: 1, source: 'resume' } });
         }
       }
     }
@@ -921,7 +916,7 @@ export default async function handler(req, res) {
       const co = app.company_name; if (!co) continue;
       const key = `tracker_outcome|${co.toLowerCase()}`;
       if (!answered.has(key)) {
-        return res.status(200).json({ question: { key, company: co, prompt: `You applied to ${co}.`, text: `What happened with your application at ${co}?`, options: ['Hired 🎉','Got an interview','Rejected','Ghosted','Still waiting'], credit_value: 1, source: 'tracker' } });
+        return res.status(200).json({ question: { key, company: co, prompt: `You applied to ${co}.`, text: `What happened with your application at ${co}?`, options: TRACKER_OUTCOME_OPTIONS, credit_value: 1, source: 'tracker' } });
       }
     }
 
@@ -935,16 +930,12 @@ export default async function handler(req, res) {
     for (const co of lowCos) {
       const key = `verify_ghost|${co.name.toLowerCase()}`;
       if (!answered.has(key)) {
-        return res.status(200).json({ question: { key, company: co.name, prompt: `${co.name} isn't graded yet — we need more applicant reports.`, text: `Did ${co.name} respond to your application?`, options: ['Yes, they responded','No, was ghosted','I haven\'t applied there'], credit_value: 1, source: 'verification' } });
+        return res.status(200).json({ question: { key, company: co.name, prompt: `${co.name} isn't graded yet — we need more applicant reports.`, text: `Did ${co.name} respond to your application?`, options: VERIFY_OPTIONS, credit_value: 1, source: 'verification' } });
       }
     }
 
     // Fallback: generic
-    const generics = [
-      { key: 'generic|response_time', text: 'On average, how long do companies take to respond to you?', options: ['Under a week','1–2 weeks','2–4 weeks','Over a month','They rarely respond'] },
-      { key: 'generic|ghosting_stage', text: 'At what stage are you ghosted most often?', options: ['After applying','After phone screen','After interview','After final round','Rarely get ghosted'] },
-      { key: 'generic|apps_per_week', text: 'How many applications do you send per week?', options: ['1–5','6–10','11–20','20+','I\'m between searches'] },
-    ];
+    const generics = GENERIC_QUESTIONS;
     for (const g of generics) {
       if (!answered.has(g.key)) return res.status(200).json({ question: { ...g, company: null, prompt: null, credit_value: 1, source: 'generic' } });
     }
@@ -956,6 +947,25 @@ export default async function handler(req, res) {
   if (action === 'submit_answer') {
     const { question_key, answer } = body;
     if (!question_key || !answer) return res.status(400).json({ error: 'question_key and answer required' });
+    // Only a question this account could have been asked, answered with one of its own options.
+    const read = readAnswer(question_key, answer);
+    if (!read.ok) return res.status(400).json({ error: read.error });
+    if (read.needs) {
+      const co = read.company;
+      const rows = async (path) => { const r = await db(path); return r.ok ? await r.json() : null; };
+      let asked = false;
+      if (read.needs === 'resume') {
+        const emp = await rows(`resume_employment?user_id=eq.${uid}&select=company&limit=50`);
+        asked = Array.isArray(emp) && emp.some((e) => String(e.company || '').toLowerCase() === co);
+      } else if (read.needs === 'tracker') {
+        const apps = await rows(`applications?user_id=eq.${uid}&select=company_name&limit=500`);
+        asked = Array.isArray(apps) && apps.some((a) => String(a.company_name || '').toLowerCase() === co);
+      } else {
+        const cos = await rows(`company_scores?company_name=ilike.${encodeURIComponent(co.replace(/[%_*,()]/g, ''))}&report_count=lt.5&select=company_name&limit=5`);
+        asked = Array.isArray(cos) && cos.some((c) => String(c.company_name || '').toLowerCase() === co);
+      }
+      if (!asked) return res.status(400).json({ error: 'unknown_question' });
+    }
     const today = pacificDate();
 
     // Check daily earn cap
@@ -987,15 +997,14 @@ export default async function handler(req, res) {
     if (Object.keys(patch).length) await db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify(patch), headers: { Prefer: 'return=minimal' } });
     if (credited) await db('credit_transactions', { method: 'POST', body: JSON.stringify({ user_id: uid, delta: earned.gained, reason: 'earned_question', metadata: { question_key, answer } }), headers: { Prefer: 'return=minimal' } });
 
-    // Feed answer back into company intelligence (best-effort)
-    const [qtype, company] = question_key.split('|');
-    if (company && (qtype === 'ghost' || qtype === 'verify_ghost' || qtype === 'tracker_outcome')) {
-      const wasGhosted = answer.toLowerCase().includes('ghost') || answer.toLowerCase().includes('never');
-      const responded = answer.toLowerCase().includes('respond') || answer.toLowerCase().includes('interview') || answer.toLowerCase().includes('hired') || answer.toLowerCase().includes('rejected');
-      if (wasGhosted || responded) {
-        const outcome = wasGhosted ? 'ghosted' : 'human';
-        await db('reports', { method: 'POST', body: JSON.stringify({ company_name: company, outcome, experience_level: 'unspecified', platform: 'seen_intel', report_text: `[Intel] ${answer}` }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
-      }
+    // Feed the answer back into company intelligence (best-effort) — as THIS user's report, through the
+    // same anti-gaming check as every other first-party report (a second report on the same company in
+    // 30 days, or more than 15 in a day, is held for review at low weight).
+    const outcome = answerOutcome(read.qtype, answer);
+    if (read.company && outcome) {
+      const hdrs = { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' };
+      const trust = await assessSubmitTrust(SUPABASE_URL, hdrs, uid, `company_name=eq.${encodeURIComponent(read.company)}`);
+      await db('reports', { method: 'POST', body: JSON.stringify({ company_name: read.company, outcome, experience_level: 'unspecified', platform: 'seen_intel', report_text: `[Intel] ${answer}`, user_id: uid, trust_reason: trust.reason, outcome_weight: trust.weight, needs_review: trust.review }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
     }
 
     return res.status(200).json({ ok: true, credited, balance: isPro ? newBalance : newBalance + Math.max(0, cred.purchased_credits || 0), earned_today: newEarned });

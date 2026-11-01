@@ -9,8 +9,6 @@
 
 import { useEffect, useState, type CSSProperties } from 'react'
 
-const ROW = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
-
 type Props = {
   value: number
   prefix?: string
@@ -46,17 +44,19 @@ export default function Odometer({ value, prefix, suffix, start = true, delay = 
   const digits = String(n).padStart(Math.max(1, minDigits), '0').split('')
   const text = `${prefix ?? ''}${n}${suffix ?? ''}`
 
+  // The reels and the prefix/suffix are drawn by CSS (app/motion.css `.odo-r::before`, `.odo-s::before`),
+  // so the page TEXT holds only the real value: crawlers and copy-paste read "12%", never
+  // "01234567890123456789%" (owner 2026-11-01). Screen readers get the label.
   return (
     <span className={`odo${className ? ' ' + className : ''}`} style={style} role="img" aria-label={text}>
-      {prefix ? <span className="odo-s" aria-hidden="true">{prefix}</span> : null}
+      <span className="odo-sr">{text}</span>
+      {prefix ? <span className="odo-s" data-t={prefix} aria-hidden="true" /> : null}
       {digits.map((d, c) => (
         <span key={`${digits.length}-${c}`} className="odo-d" aria-hidden="true">
-          <span className="odo-r" style={{ '--n': armed ? Number(d) : 0, '--c': c } as CSSProperties}>
-            {ROW.map(x => <span key={x}>{x}</span>)}
-          </span>
+          <span className="odo-r" style={{ '--n': armed ? Number(d) : 0, '--c': c } as CSSProperties} />
         </span>
       ))}
-      {suffix ? <span className="odo-s" aria-hidden="true">{suffix}</span> : null}
+      {suffix ? <span className="odo-s" data-t={suffix} aria-hidden="true" /> : null}
     </span>
   )
 }

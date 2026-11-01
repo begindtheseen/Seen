@@ -58,8 +58,8 @@ export default function EmployersPage() {
             links (dashboard / analytics / notifications) carry it through as ?company= (#113). */}
         <EmployerCompanyProvider>
           {/* Claim your company (ADMIN-APPROVED CLAIMS, migration 053): a signed-in employer
-              requests a company; a matching work-email domain auto-approves instantly, otherwise an
-              admin approves; only then do the surfaces below auto-scope. Renders a quiet sign-in
+              requests a company; an admin approves every claim (no auto-approval since the 2026-11-01 audit), and
+              only then do the surfaces below auto-scope. Renders a quiet sign-in
               prompt for logged-out/seeker visitors. The #claim anchor is the dashboard checklist's
               "Claim your company" target. */}
           <div id="claim" style={{ scrollMarginTop: 80 }}>
