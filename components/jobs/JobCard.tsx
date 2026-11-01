@@ -12,7 +12,7 @@ import { notify } from '@/lib/notify'
 import type { Job } from '@/lib/types'
 import { takesSeenApply } from '@/lib/seenApplyMode'
 import { trackApplyClick } from '@/lib/trackApply'
-import { RESUME_OPTIMIZE_COST, priceLabel } from '@/lib/creditRules'
+import { RESUME_OPTIMIZE_COST, priceLabel, shortPriceLabel } from '@/lib/creditRules'
 import { useProStatus } from '@/lib/hooks/useProStatus'
 import ApplyCheckpoint from '@/components/ApplyCheckpoint'
 import { displayCompanyName } from '@/lib/companyDisplay'
@@ -197,7 +197,7 @@ export default function JobCard({ job, onSaveToggle, onOpen, onApply, onCheckCom
             onClick={e => { e.stopPropagation(); onApply(job) }}
           >
             {/* opening the modal never charges; it checks the server cache first (C2/E6) */}
-            {optimizedHere ? 'Optimize · cached' : <>Optimize · {priceLabel(RESUME_OPTIMIZE_COST, pro).replace(' ', ' ')}</>}
+            {optimizedHere ? 'Optimize · cached' : <>Optimize · {shortPriceLabel(RESUME_OPTIMIZE_COST, pro)}</>}
           </Button>
         )}
         {/* A real link to the listing's own page; the detail page probes the insight cache when it opens. */}

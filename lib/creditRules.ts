@@ -20,6 +20,7 @@ export {
   CREDIT_RESET_LABEL,
   creditCostLabel,
   priceLabel,
+  shortPriceLabel,
   usageLine,
   PRO_COST_LABEL,
   dailyResetLabel,

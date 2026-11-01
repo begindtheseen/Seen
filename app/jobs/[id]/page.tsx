@@ -25,7 +25,7 @@ import SeenApplyModal from '@/components/jobs/SeenApplyModal'
 import { takesSeenApply } from '@/lib/seenApplyMode'
 import CreditConfirmDialog from '@/components/CreditConfirmDialog'
 import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
-import { JOB_INSIGHTS_COST, RESUME_OPTIMIZE_COST, creditCostLabel, priceLabel, usageLine } from '@/lib/creditRules'
+import { JOB_INSIGHTS_COST, RESUME_OPTIMIZE_COST, creditCostLabel, priceLabel, shortPriceLabel, usageLine } from '@/lib/creditRules'
 import { useProStatus } from '@/lib/hooks/useProStatus'
 import { displayCompanyName } from '@/lib/companyDisplay'
 import { displayPay, payLabel } from '@/lib/jobs/pay.js'
@@ -592,7 +592,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                     </Button>
                     {!takesSeenApply(job) && (
                       <Button variant="secondary" data-testid="detail-optimize-btn" onClick={() => setShowApplyModal(true)} title={`Optimize your résumé for this job · ${priceLabel(RESUME_OPTIMIZE_COST, pro)}`} className={d.grow}>
-                        Optimize · {priceLabel(RESUME_OPTIMIZE_COST, pro).replace(' ', ' ')}
+                        <span className="ui-btn__stack"><span>Optimize</span><small>{shortPriceLabel(RESUME_OPTIMIZE_COST, pro)}</small></span>
                       </Button>
                     )}
                   </>

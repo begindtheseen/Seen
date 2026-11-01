@@ -13,7 +13,7 @@ import ApplyCheckpoint from '@/components/ApplyCheckpoint'
 import CreditConfirmDialog from '@/components/CreditConfirmDialog'
 import { trackApplyClick } from '@/lib/trackApply'
 import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
-import { JOB_INSIGHTS_COST, RESUME_OPTIMIZE_COST, creditCostLabel, dailyResetLabel, priceLabel, usageLine } from '@/lib/creditRules'
+import { JOB_INSIGHTS_COST, RESUME_OPTIMIZE_COST, creditCostLabel, dailyResetLabel, priceLabel, shortPriceLabel, usageLine } from '@/lib/creditRules'
 import { useProStatus } from '@/lib/hooks/useProStatus'
 import { displayCompanyName } from '@/lib/companyDisplay'
 import { displayPay, payLabel } from '@/lib/jobs/pay.js'
@@ -420,7 +420,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
                   >{seenApply ? 'Apply on their site' : preview ? 'Open the full posting' : 'Apply'}</Button>
                   {!seenApply && (
                     <Button variant="secondary" data-testid="drawer-optimize-btn" onClick={() => { onClose(); onApply(job) }} title={`Optimize your résumé for this job · ${priceLabel(RESUME_OPTIMIZE_COST, pro)}`} className={d.grow}>
-                      Optimize · {priceLabel(RESUME_OPTIMIZE_COST, pro).replace(' ', ' ')}
+                      <span className="ui-btn__stack"><span>Optimize</span><small>{shortPriceLabel(RESUME_OPTIMIZE_COST, pro)}</small></span>
                     </Button>
                   )}
                 </>
