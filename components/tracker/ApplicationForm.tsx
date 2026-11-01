@@ -49,7 +49,7 @@ export default function ApplicationForm({ title, initial, notice, submitLabel, b
   }
 
   return (
-    <ModalPortal>
+    <ModalPortal onBack={() => { if (!busy) onClose() }}>
       <div className={s.backdrop} onClick={e => { if (e.target === e.currentTarget && !busy) onClose() }}>
         <form role="dialog" aria-modal="true" aria-label={title} className={s.dialog} onSubmit={submit}>
           <div className={s.dialogHead}>

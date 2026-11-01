@@ -593,7 +593,7 @@ function LoginContent() {
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '.75rem' }}>
               {/* /reset is the working code-based flow (send code → verify → set password).
                   The old in-page step emailed a link that dead-ended on /dashboard. */}
-              <button type="button" className={`${styles.linkBtn} ${styles.linkDim}`} onClick={() => router.push('/reset')}>
+              <button type="button" className={`${styles.linkBtn} ${styles.linkDim}`} onClick={() => router.push(explicitReturn ? `/reset?return=${encodeURIComponent(explicitReturn)}` : '/reset')}>
                 Forgot password?
               </button>
             </div>

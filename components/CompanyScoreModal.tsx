@@ -6,6 +6,7 @@
 // the "vs your industry" benchmark, a one-tap track, and a link to the full report.
 
 import { useEffect, useRef, useState, useCallback } from 'react'
+import Link from 'next/link'
 import { useFocusTrap } from '@/lib/hooks/useFocusTrap'
 import { AppStore } from '@/lib/stores/AppStore'
 import { useAuth } from '@/lib/auth'
@@ -140,7 +141,7 @@ export default function CompanyScoreModal({ companyName, onClose }: { companyNam
             <p style={{ color: 'var(--sub)', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', lineHeight: 1.7, marginBottom: '1.25rem' }}>
               No score yet for “{shownName}”. Open the full report to research it.
             </p>
-            <a href={`/company/${slugify(companyName)}`} className={styles.full}>Open full report →</a>
+            <Link href={`/company/${slugify(companyName)}`} prefetch={false} className={styles.full}>Open full report →</Link>
           </div>
         ) : !graded ? (
           <>
@@ -162,7 +163,7 @@ export default function CompanyScoreModal({ companyName, onClose }: { companyNam
                   ✓ Tracked — follow up in your tracker
                 </div>
               )}
-              <a href={`/company/${slugify(companyName)}`} className={styles.full}>Open full report →</a>
+              <Link href={`/company/${slugify(companyName)}`} prefetch={false} className={styles.full}>Open full report →</Link>
             </div>
           </>
         ) : (
@@ -224,7 +225,7 @@ export default function CompanyScoreModal({ companyName, onClose }: { companyNam
                   ✓ Tracked — follow up in your tracker
                 </div>
               )}
-              <a href={`/company/${slugify(companyName)}`} className={styles.full}>Open full report →</a>
+              <Link href={`/company/${slugify(companyName)}`} prefetch={false} className={styles.full}>Open full report →</Link>
             </div>
           </>
         )}

@@ -4,7 +4,8 @@
 // driven by `openJobListing` (index.html:11213) + AI insights block (11260–11405).
 // Source of truth: origin/main. AI uses the existing /api/job-insights endpoint (unchanged).
 
-import { httpHref } from '@/lib/safeHref.js'
+import { httpHref, loginHref } from '@/lib/safeHref.js'
+import { useBack } from '@/lib/nav/backTrail'
 import { useState, useEffect, useCallback, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { JobCache } from '@/lib/stores/JobCache'
@@ -348,10 +349,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     }
   }
 
-  function goBack() {
-    if (window.history.length > 1) router.back()
-    else router.push('/jobs')
-  }
+  // Back to the Seen page this tab came from (the search, Saved, a company); else to Jobs.
+  const back = useBack('/jobs', 'jobs')
 
   // The listing's own title in the tab (the layout's server title can only say "Job listing").
   useEffect(() => {
@@ -361,7 +360,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   }, [job])
 
   const backBtn = (
-    <Button variant="ghost" size="sm" onClick={goBack} icon="arrow-left" className={d.back}>Back to jobs</Button>
+    <Button variant="ghost" size="sm" onClick={back.go} icon="arrow-left" className={d.back}>{back.label}</Button>
   )
 
   // Direct-link / refresh fallback — job not in this session's cache
@@ -494,7 +493,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               <p className={d.p}>
                 {isLoggedIn
                   ? (insightNote || "You're out of AI credits for now — insights will be available again soon.")
-                  : <>Sign in to generate AI insights ({creditCostLabel(insightPrice)}; free once cached). <a href="/login" className={d.link}>Sign in</a></>}
+                  : <>Sign in to generate AI insights ({creditCostLabel(insightPrice)}; free once cached). <a href={loginHref(`/jobs/${encodeURIComponent(id)}`)} className={d.link}>Sign in</a></>}
               </p>
             )}
             {insightsState === 'done' && insightNote && <p className={d.fine}>{insightNote}</p>}

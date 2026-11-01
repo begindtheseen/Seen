@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback } from 'react'
 import { LoadError } from '@/components/shell/LoadStates'
 import { useRouter } from 'next/navigation'
 import { AppStore } from '@/lib/stores/AppStore'
@@ -15,6 +15,7 @@ import Badge, { Chip } from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import Icon from '@/components/ui/Icon'
 import s from './companies.module.css'
+import { useUrlPlace, replaceParam, readParam, useScrollMemory } from '@/lib/nav/urlState'
 
 interface Company {
   id: string
@@ -64,6 +65,22 @@ const SORTS: Array<{ key: SortKey; label: string }> = [
 
 const slugOf = (name: string) => encodeURIComponent(name.trim().toLowerCase().replace(/\s+/g, '-'))
 
+// The board is the same for every visitor, so this tab keeps the last copy for a few minutes: Back
+// from a company page shows the same rows at once instead of a skeleton and a refetch.
+const BOARD_CACHE_KEY = 'seen_leaderboard_v1'
+const BOARD_CACHE_TTL = 10 * 60 * 1000
+function readBoardCache(): Company[] | null {
+  try {
+    const c = JSON.parse(sessionStorage.getItem(BOARD_CACHE_KEY) || 'null') as { t?: number; companies?: Company[] } | null
+    if (!c || !Array.isArray(c.companies) || typeof c.t !== 'number' || Date.now() - c.t > BOARD_CACHE_TTL) return null
+    return c.companies
+  } catch { return null }
+}
+function writeBoardCache(companies: Company[]) {
+  try { sessionStorage.setItem(BOARD_CACHE_KEY, JSON.stringify({ t: Date.now(), companies })) } catch { /* ignore */ }
+}
+const isSortKey = (v: string): v is SortKey => SORTS.some(o => o.key === v)
+
 export default function CompaniesPage() {
   const router = useRouter()
   const [companies, setCompanies] = useState<Company[]>([])
@@ -76,7 +93,12 @@ export default function CompaniesPage() {
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<SortKey>('score')
   const [appliedCos, setAppliedCos] = useState<Set<string>>(new Set())
-  const [modalCo, setModalCo] = useState<string | null>(null)
+  // The open company is a place in the URL (?co=<name>): Back closes it, and Back from the company's
+  // full page reopens it over the board.
+  const coPlace = useUrlPlace('co')
+  const modalCo = coPlace.value || null
+  // The search box and sort live in the URL (?q=, ?sort=) so Back brings them back.
+  const [hydrated, setHydrated] = useState(false)
 
   useEffect(() => {
     try {
@@ -85,7 +107,11 @@ export default function CompaniesPage() {
     } catch {}
   }, [])
 
-  const loadLeaderboard = useCallback(async () => {
+  const loadLeaderboard = useCallback(async (useCache = false) => {
+    if (useCache) {
+      const cached = readBoardCache()
+      if (cached) { setCompanies(cached); setLoadFailed(false); setLoading(false); return }
+    }
     setLoading(true)
     setLoadFailed(false)
     try {
@@ -96,14 +122,35 @@ export default function CompaniesPage() {
       if (!Array.isArray(d.companies)) throw new Error('bad payload')
       // Grade gate: the API already ranks only gradeable companies; filter again so a CDN-cached
       // pre-gate payload can never put an ungraded company on the board.
-      setCompanies(d.companies.filter((c) => isGradeableScore(c.score)))
+      const board = d.companies.filter((c) => isGradeableScore(c.score))
+      setCompanies(board)
+      writeBoardCache(board)
     } catch {
       setLoadFailed(true)
     } finally {
       setLoading(false)
     }
   }, [])
-  useEffect(() => { void loadLeaderboard() }, [loadLeaderboard])
+  // Layout effect: the URL and the cached board are read before the first paint, so Back shows the
+  // same rows with no skeleton flash.
+  useLayoutEffect(() => {
+    const q0 = readParam('q')
+    const s0 = readParam('sort')
+    if (q0) setQuery(q0)
+    if (isSortKey(s0)) setSort(s0)
+    setHydrated(true)
+    void loadLeaderboard(true)
+  }, [loadLeaderboard])
+  useEffect(() => {
+    if (!hydrated) return
+    const t = setTimeout(() => replaceParam('q', query.trim() || null), 250)
+    return () => clearTimeout(t)
+  }, [query, hydrated])
+  useEffect(() => {
+    if (!hydrated) return
+    replaceParam('sort', sort === 'score' ? null : sort)
+  }, [sort, hydrated])
+  useScrollMemory(hydrated && !loading)
 
   const q = query.trim()
   const filtered = useMemo(() => {
@@ -132,6 +179,7 @@ export default function CompaniesPage() {
   function lookUp(e: React.FormEvent) {
     e.preventDefault()
     if (!q) return
+    replaceParam('q', q) // the typing debounce may not have written it yet; Back should find it
     // An exact board match opens its page; anything else is looked up (and researched) by name.
     router.push(`/company/${slugOf(q)}`)
   }
@@ -178,7 +226,7 @@ export default function CompaniesPage() {
             {Array.from({ length: 9 }, (_, i) => <div key={i} className={`sk ${s.skCard}`} />)}
           </div>
         ) : loadFailed ? (
-          <LoadError what="the company scoreboard" detail="Seen could not be reached. You can still look up any company by name above." onRetry={loadLeaderboard} />
+          <LoadError what="the company scoreboard" detail="Seen could not be reached. You can still look up any company by name above." onRetry={() => loadLeaderboard()} />
         ) : filtered.length === 0 ? (
           <div className={s.empty}>
             {q ? (
@@ -215,7 +263,8 @@ export default function CompaniesPage() {
                         // native <a> behavior so "open in new tab" still works.
                         if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return
                         e.preventDefault()
-                        setModalCo(co.name)
+                        replaceParam('q', q || null)
+                        coPlace.open(co.name)
                       }}
                     >
                       <div className={s.cardTop}>
@@ -246,7 +295,7 @@ export default function CompaniesPage() {
         )}
       </div>
 
-      {modalCo && <CompanyScoreModal companyName={modalCo} onClose={() => setModalCo(null)} />}
+      {modalCo && <CompanyScoreModal companyName={modalCo} onClose={coPlace.close} />}
     </div>
   )
 }

@@ -14,6 +14,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { useBackDismiss } from '@/lib/nav/urlState'
 
 let lockCount = 0
 let saved: { htmlOverflow: string; bodyOverflow: string; bodyPaddingRight: string } | null = null
@@ -61,11 +62,18 @@ export function useScrollLock(active = true) {
   }, [active])
 }
 
-/** Render an overlay at <body> and lock the page behind it while mounted. */
-export default function ModalPortal({ children, lockScroll: lock = true }: { children: ReactNode; lockScroll?: boolean }) {
+const noop = () => {}
+
+/**
+ * Render an overlay at <body> and lock the page behind it while mounted. `onBack`: the phone's Back
+ * (and the browser's) closes this overlay instead of leaving the page — pass the overlay's own close.
+ * Leave it out for a step that must be answered, or an overlay whose open state lives in the URL.
+ */
+export default function ModalPortal({ children, lockScroll: lock = true, onBack }: { children: ReactNode; lockScroll?: boolean; onBack?: () => void }) {
   const [mounted, setMounted] = useState(false)
   useEffect(() => { setMounted(true) }, [])
   useScrollLock(mounted && lock)
+  useBackDismiss(mounted && !!onBack, onBack || noop)
   if (!mounted) return null
   return createPortal(children, document.body)
 }

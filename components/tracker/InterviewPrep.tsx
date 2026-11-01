@@ -113,6 +113,7 @@ const money = (p: Pay) => p.unit === 'hour'
 
 // The posting pasted before buying is kept on the SERVER (action 'stash', used by the first build on any
 // device — round 4: all four personas lost it); this device keeps a copy as a backstop for a stash that failed.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const postingKey = (appId: string) => `seen_prep_posting_${appId}`
 const stashPosting = (appId: string, text: string) => { try { if (text.trim()) localStorage.setItem(postingKey(appId), text.slice(0, 6000)); else localStorage.removeItem(postingKey(appId)) } catch { /* private mode */ } }
 const takePosting = (appId: string): string => { try { const v = localStorage.getItem(postingKey(appId)) || ''; return v } catch { return '' } }
@@ -227,7 +228,10 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
     return () => clearTimeout(t)
   }, [lead])
 
-  const checkout = useCheckout('tracker_prep', { isLoggedIn: !guest, guestHref: () => signupHref({ intent: 'prep', company, next: '/tracker' }) })
+  // After sign-up, come back to this card when its id is an account row (a uuid). A guest card's id
+  // is device-local and changes when the card moves to the account, so guests land on the tracker.
+  const nextPath = !guest && UUID_RE.test(appId) ? `/tracker?app=${encodeURIComponent(appId)}` : '/tracker'
+  const checkout = useCheckout('tracker_prep', { isLoggedIn: !guest, guestHref: () => signupHref({ intent: 'prep', company, next: nextPath }) })
 
   const build = useCallback(async (opts: { refresh?: boolean; jobText?: string } = {}) => {
     setState('building'); setErr('')
@@ -427,7 +431,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
               )}
               {guest ? (
                 <>
-                  <Link href={signupHref({ intent: 'prep', company, next: '/tracker' })} onClick={() => funnelEvent('offer_clicked', { surface: 'tracker_prep', sku: 'interview', company })} className={s.cta} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>Make a free account to get your prep →</Link>
+                  <Link href={signupHref({ intent: 'prep', company, next: nextPath })} onClick={() => funnelEvent('offer_clicked', { surface: 'tracker_prep', sku: 'interview', company })} className={s.cta} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>Make a free account to get your prep →</Link>
                   <p className={s.fine}>Free. Your tracker comes with you. The prep itself is {PRICE} once.</p>
                 </>
               ) : state === 'need_resume' || hasResume === false ? (

@@ -32,7 +32,8 @@ import { checkAnsweredEvent, checkSnoozedEvent, checkLabel, impliedChecks, isSup
 import { responded } from '@/lib/stores/outcomes'
 import { companySlug } from '@/lib/cardCopy.js'
 import { cleanCompany } from '@/lib/signupIntent.js'
-import { slugSegment } from '@/lib/safeHref.js'
+import { slugSegment, loginHref } from '@/lib/safeHref.js'
+import { replaceParam, useScrollMemory } from '@/lib/nav/urlState'
 import { showToast } from '@/lib/toast'
 import { _sync } from '@/lib/sync'
 import { aiHeaders } from '@/lib/aiHeaders'
@@ -414,7 +415,13 @@ function TrackerPage() {
   // Edit hit a 409: the form re-opens on the account's latest copy with this notice (audit 3 M5).
   const [editNotice, setEditNotice] = useState('')
   const [editKey, setEditKey] = useState(0)
-  const [expandedId, setExpandedId] = useState('')
+  // The open card is part of the URL (?app=<id>, replaced in place): Back from a company page, a report
+  // or the listing lands on the tracker with the same card open (owner 2026-11-01: "be more like Indeed").
+  const [expandedId, setExpandedIdState] = useState('')
+  const setExpandedId = useCallback((id: string) => {
+    setExpandedIdState(id)
+    replaceParam('app', id || null)
+  }, [])
   const [confirmClear, setConfirmClear] = useState(false)
   const [confirmDupes, setConfirmDupes] = useState(false)
   const [highlightId, setHighlightId] = useState('')
@@ -437,9 +444,16 @@ function TrackerPage() {
     if (!ready) return // wait for the session to resolve — redirecting early bounced signed-in users
     // A guest tracks on this device (GuestTracker below) — never a "Welcome back" sign-in wall for
     // someone who has never had an account (conversion audit 2026-10-24).
-    if (!isLoggedIn) return
+    if (!isLoggedIn) {
+      // A link to ONE account card (a check-in email, a purchase return) opened without a session —
+      // usually an email app's own browser: sign in, then come straight back to that card. Guest
+      // cards are `app_<ts>` ids and stay on this device's tracker.
+      const target = searchParams?.get('app') || searchParams?.get('prep') || ''
+      if (isDbId(target)) router.replace(loginHref(`/tracker?app=${encodeURIComponent(target)}`))
+      return
+    }
     if (!isSeeker) { router.replace('/'); return }
-  }, [ready, isLoggedIn, isSeeker, router])
+  }, [ready, isLoggedIn, isSeeker, router, searchParams])
 
   // ?add=1 (the dashboard's "+ Track application") opens the add-application form directly.
   // &company=<name>&stage=Interview (a company page's "Got an interview at X? Get your prep") fills the
@@ -449,6 +463,12 @@ function TrackerPage() {
     if (searchParams?.get('add') !== '1') return
     setAddPreset({ company: cleanCompany(searchParams.get('company')), interview: searchParams.get('stage') === 'Interview' })
     setShowManual(true)
+    // Handled once: a later URL change (opening a card writes ?app=) must not reopen the form.
+    try {
+      const u = new URL(window.location.href)
+      for (const k of ['add', 'company', 'stage']) u.searchParams.delete(k)
+      window.history.replaceState(null, '', `${u.pathname}${u.search}${u.hash}`)
+    } catch { /* ignore */ }
   }, [searchParams])
 
   // The card that just reached an interview (a stage move or a check-in answer): its Interview Prep
@@ -486,8 +506,10 @@ function TrackerPage() {
     prepHandled.current = true
     const done = () => {
       if (prep) setPrepReturn(prep)
-      try { window.history.replaceState(null, '', '/tracker') } catch { /* ignore */ }
-      if (prep) setTimeout(() => document.getElementById(`app_${prep}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 400)
+      // The purchase query is cleared (a reload must not confirm twice); the card stays named in ?app=
+      // so the list load reveals it however long the load takes or however far down it sits.
+      try { window.history.replaceState(null, '', prep ? `/tracker?app=${encodeURIComponent(prep)}` : '/tracker') } catch { /* ignore */ }
+      if (prep) { highlightedRef.current = ''; if (appsRef.current.length) revealRef.current(prep, appsRef.current, true) }
     }
     if (bought && sid.startsWith('cs_')) {
       aiHeaders()
@@ -526,8 +548,10 @@ function TrackerPage() {
 
   // Highlight one card and make sure it is on screen: it may sit past "Show 10 more" or under a filter,
   // so the list is opened as far as that card first (a new Day-0 card sorts after the waiting ones).
-  const reveal = useCallback((id: string, data: Application[]) => {
+  const reveal = useCallback((id: string, data: Application[], open = false) => {
     setHighlightId(id)
+    // A link that names the card opens it (its update buttons are what the email asked for).
+    if (open && data.some(a => a.id === id && a.status === 'active')) setExpandedId(id)
     const due = new Set(EventStore.dueChecks(data).map(d => d.app.id))
     const at = sortApplications(data, 'attention', due).findIndex(a => a.id === id)
     setFilterText(''); setSortMode('attention')
@@ -537,7 +561,7 @@ function TrackerPage() {
       if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }) }
       setTimeout(() => setHighlightId(''), 2800)
     }, 300)
-  }, [])
+  }, [setExpandedId])
 
   const loadApps = useCallback(async () => {
     const { apps: data, synced, inbox } = await AppStore.loadResult(isLoggedIn)
@@ -552,14 +576,25 @@ function TrackerPage() {
     }
     // Highlight + scroll to one card: the one just added (?new=1 — the DB returns it first), or the
     // one a notification points at (#app_<id>, from the bell in the Nav).
+    // ?app=<id> (a check-in email, the command palette, a purchase return, Back to an open card) opens it too.
     const hashId = typeof window !== 'undefined' && window.location.hash.startsWith('#app_') ? window.location.hash.slice(5) : ''
+    const qs = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
+    const appId = qs?.get('app') || qs?.get('prep') || ''
     const target = hashId && data.some(a => a.id === hashId) ? hashId
-      : searchParams?.get('new') === '1' && data.length > 0 ? data[0].id : ''
+      : appId && data.some(a => a.id === appId) ? appId
+      : qs?.get('new') === '1' && data.length > 0 ? data[0].id : ''
     if (target && highlightedRef.current !== target) {
       highlightedRef.current = target
-      reveal(target, data)
+      reveal(target, data, target === appId || target === hashId)
     }
-  }, [isLoggedIn, searchParams, pushLedger, reveal])
+  }, [isLoggedIn, pushLedger, reveal])
+  // For the purchase-return effect, which can finish before or after the list load.
+  const appsRef = useRef<Application[]>([]); appsRef.current = apps
+  const revealRef = useRef(reveal); revealRef.current = reveal
+
+  // Back to the tracker lands where the list was scrolled — unless the URL names a card to jump to.
+  const [deepLinked] = useState(() => typeof window !== 'undefined' && (/[?&](app|prep|new)=/.test(window.location.search) || window.location.hash.startsWith('#app_')))
+  useScrollMemory(!loading && !deepLinked)
 
   // A notification tapped while already on the tracker changes only the hash — re-run the jump.
   useEffect(() => {

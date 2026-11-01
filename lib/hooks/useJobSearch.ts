@@ -11,12 +11,44 @@ import type { Job } from '@/lib/types'
 import { isGradeableScore } from '@/lib/gradeGate'
 import { sortByPriority, isMatch } from '@/lib/server/jobPriority.js'
 import { searchQueryString, readSearchQuery } from '@/lib/jobs/searchUrl.js'
+import { replaceSearchKeepingPlaces } from '@/lib/nav/urlState'
 
 // In-memory search cache: `${query}|${location}|${radius}` → the page as it was shown (rows, whether
 // the server has more, and the honest note/label it carried), so a repeat of the same search — Enter
 // right after the auto-search, Back from a listing — is served without a second request.
 interface CachedSearch { jobs: Job[]; ts: number; hasMore: boolean; pages: number; notice: string | null; label: string | null }
 const searchCache = new Map<string, CachedSearch>()
+// The last few searches also live in this tab's sessionStorage, so Back from a listing, a company
+// page or the employer's site (a full page load, which empties the Map) shows the SAME list at once —
+// the Indeed behaviour — instead of a fresh search that reshuffles it (owner 2026-11-01).
+const SESSION_SEARCH_KEY = 'seen_search_cache_v1'
+const SESSION_SEARCHES = 3
+// A search restored from the URL (Back, reload) is shown as it was for this long without a refetch.
+const RESTORE_MS = 30 * 60 * 1000
+function readSessionSearches(): Record<string, CachedSearch> {
+  try { return JSON.parse(sessionStorage.getItem(SESSION_SEARCH_KEY) || '{}') || {} } catch { return {} }
+}
+function persistSearch(key: string, entry: CachedSearch) {
+  try {
+    const all = readSessionSearches()
+    all[key] = entry
+    const keys = Object.keys(all).sort((a, b) => all[b].ts - all[a].ts)
+    for (const k of keys.slice(SESSION_SEARCHES)) delete all[k]
+    try { sessionStorage.setItem(SESSION_SEARCH_KEY, JSON.stringify(all)) }
+    catch { sessionStorage.setItem(SESSION_SEARCH_KEY, JSON.stringify({ [key]: entry })) } // quota: keep the newest only
+  } catch { /* storage unavailable — the in-memory cache still works */ }
+}
+function cacheSearch(key: string, entry: CachedSearch) {
+  searchCache.set(key, entry)
+  persistSearch(key, entry)
+}
+function cachedSearch(key: string): CachedSearch | undefined {
+  const hit = searchCache.get(key)
+  if (hit) return hit
+  const stored = readSessionSearches()[key]
+  if (stored && Array.isArray(stored.jobs)) { searchCache.set(key, stored); return stored }
+  return undefined
+}
 // A repeat inside this window is answered from the cache alone (no background refresh).
 const FRESH_MS = 30 * 1000
 
@@ -204,10 +236,7 @@ export function useJobSearch() {
     if (!c || typeof window === 'undefined') return
     const f = filtersRef.current
     const qs = searchQueryString({ q: c.q, loc: c.loc, radius: over.radius ?? c.radius, sort: sortRef.current, niche: f.niche, level: f.level, type: f.jobType, posted: f.posted })
-    const next = qs ? `${window.location.pathname}?${qs}` : window.location.pathname
-    if (next !== `${window.location.pathname}${window.location.search}`) {
-      try { window.history.replaceState(null, '', next) } catch { /* ignore */ }
-    }
+    replaceSearchKeepingPlaces(qs)
   }
 
   function applySort(list: Job[], mode: SortMode): Job[] {
@@ -312,7 +341,7 @@ export function useJobSearch() {
         if (u.type) setJobType(u.type as TypeFilter)
         if (u.posted) setPosted(u.posted as PostedFilter)
         filtersRef.current = { niche: u.niche as NicheFilter, level: u.level as LevelFilter, jobType: u.type as TypeFilter, posted: u.posted as PostedFilter }
-        searchJobs(u.q, u.loc || '', { radius: u.radius })
+        searchJobs(u.q, u.loc || '', { radius: u.radius, restore: true })
       } else if (u.loc) {
         // A city with no title (the homepage box with only "City or remote" filled): pre-fill the
         // location and wait for a title — a search needs one. Claims the seed so nothing stomps it.
@@ -505,7 +534,7 @@ export function useJobSearch() {
    * call for a search already in flight, or one answered < 30 s ago, sends no request (audit L2: Enter
    * right after the auto-search fired the same POST twice and flashed the results).
    */
-  async function searchJobs(queryOverride?: string, locationOverride?: string, opts: { radius?: string; commit?: boolean } = {}) {
+  async function searchJobs(queryOverride?: string, locationOverride?: string, opts: { radius?: string; commit?: boolean; restore?: boolean } = {}) {
     const q = (queryOverride ?? queryRef.current).trim()
     const loc = (locationOverride ?? locationRef.current).trim()
     const rad = opts.radius ?? radiusRef.current
@@ -518,12 +547,13 @@ export function useJobSearch() {
     const cacheKey = `${q}|${loc}|${rad}`
     if (commit) { committedRef.current = { q, loc, radius: rad }; setCommittedQuery(q); writeUrl({ radius: rad }) }
     if (inflightKeyRef.current === cacheKey) return // the same search is already on its way
-    const cached = searchCache.get(cacheKey)
+    const cached = cachedSearch(cacheKey)
     const showCached = (c: CachedSearch, refreshing: boolean) => {
       if (abortRef.current) abortRef.current.abort() // drop any older in-flight search
       inflightKeyRef.current = null
       pagesRef.current = c.pages
       hasMoreRef.current = c.hasMore; setHasMore(c.hasMore)
+      JobCache.setMany(c.jobs) // an open listing (?job=) is looked up here after a full page load
       setJobs(c.jobs)
       updateDisplayRef.current(c.jobs, sortRef.current)
       setStatus('done')
@@ -531,7 +561,9 @@ export function useJobSearch() {
       if (c.label) setStatusMsg(c.label)
       else if (refreshing) setStatusMsg(`${c.jobs.length} result${c.jobs.length !== 1 ? 's' : ''} (from cache — refreshing…)`)
     }
-    if (cached && Date.now() - cached.ts < FRESH_MS) {
+    // Back to a search (or a reload of it) shows the list exactly as it was — same rows, same order,
+    // every "Show more" page — for RESTORE_MS; a NEW search of the same words keeps the 30 s rule.
+    if (cached && Date.now() - cached.ts < (opts.restore ? RESTORE_MS : FRESH_MS)) {
       ++searchSeqRef.current // a pending top-up refresh for an older search is dropped
       if (topupTimerRef.current) { clearTimeout(topupTimerRef.current); topupTimerRef.current = null }
       showCached(cached, false)
@@ -615,7 +647,7 @@ export function useJobSearch() {
         }
         if (label) setStatusMsg(label)
         setNotice(note)
-        searchCache.set(cacheKey, { jobs: raw, ts: Date.now(), hasMore: more, pages: 1, notice: note, label })
+        cacheSearch(cacheKey, { jobs: raw, ts: Date.now(), hasMore: more, pages: 1, notice: note, label })
         if (q) try { RecentSearchesStore.push(q, loc || undefined) } catch {}
         // The server answered instantly from our corpus and is pulling more listings in the
         // background (topup:'pending'). Re-read once, silently — no spinner, sort kept — and merge
@@ -635,7 +667,7 @@ export function useJobSearch() {
               if (seq !== searchSeqRef.current || pagesRef.current > 1 || fresh.length <= raw.length) return
               const more2 = d2.has_more === true
               hasMoreRef.current = more2; setHasMore(more2)
-              searchCache.set(cacheKey, { jobs: fresh, ts: Date.now(), hasMore: more2, pages: 1, notice: note, label })
+              cacheSearch(cacheKey, { jobs: fresh, ts: Date.now(), hasMore: more2, pages: 1, notice: note, label })
               JobCache.setMany(fresh)
               setJobs(fresh)
               updateDisplayRef.current(fresh, sortRef.current)
@@ -680,8 +712,8 @@ export function useJobSearch() {
       pagesRef.current += 1
       const more = data.has_more === true && added.length > 0
       hasMoreRef.current = more; setHasMore(more)
-      const prev = searchCache.get(key)
-      searchCache.set(key, { jobs: all, ts: Date.now(), hasMore: more, pages: pagesRef.current, notice: prev?.notice ?? null, label: prev?.label ?? null })
+      const prev = cachedSearch(key)
+      cacheSearch(key, { jobs: all, ts: Date.now(), hasMore: more, pages: pagesRef.current, notice: prev?.notice ?? null, label: prev?.label ?? null })
       JobCache.setMany(all)
       setJobs(all)
       updateDisplayRef.current(all, sortRef.current)
@@ -702,7 +734,9 @@ export function useJobSearch() {
 
   // The error state's Retry: re-run the same query and location (the inputs still hold them).
   function retrySearch() {
-    searchCache.delete(`${queryRef.current.trim()}|${locationRef.current.trim()}|${radiusRef.current}`)
+    const k = `${queryRef.current.trim()}|${locationRef.current.trim()}|${radiusRef.current}`
+    searchCache.delete(k)
+    try { const all = readSessionSearches(); delete all[k]; sessionStorage.setItem(SESSION_SEARCH_KEY, JSON.stringify(all)) } catch { /* ignore */ }
     inflightKeyRef.current = null
     void searchJobs()
   }

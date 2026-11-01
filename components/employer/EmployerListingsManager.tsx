@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { loginHref } from '@/lib/safeHref.js'
 import { useAuth } from '@/lib/auth'
 import FillListingPanel, { DeclineMessagePicker } from './FillListingPanel'
 import { declineTemplates } from '@/lib/server/seenApply.js'
@@ -317,7 +318,9 @@ export function EmployerListingsManager() {
           Once you&apos;re signed in with an approved employer claim, every listing on Seen for your
           company shows here — with a one-click way to post a new role or dispute a wrong one.
         </p>
-        <Link href="/login?type=employer" style={{ ...primaryBtn, display: 'inline-block', textDecoration: 'none' }}>Sign in as an employer →</Link>
+        {/* Opens the sign-in step (?type=employer opens employer sign-up) and comes back here; an
+            employer account is recognised from the account itself after sign-in. */}
+        <Link href={loginHref(typeof window !== 'undefined' ? `${window.location.pathname}${window.location.search}` : '/employers/dashboard?tab=listings')} style={{ ...primaryBtn, display: 'inline-block', textDecoration: 'none' }}>Sign in as an employer →</Link>
       </div>
     )
   }

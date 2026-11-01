@@ -1,12 +1,14 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
+import Link from 'next/link'
 import { AppStore } from '@/lib/stores/AppStore'
 import { isPublicDiscussion, reportDate, reportSourceBadge, reportSourceLink } from '@/lib/reportSource'
 import ReportSourceLink from '@/components/ReportSourceLink'
 import PageHeader from '@/components/shell/PageHeader'
 import { displayCompanyName, displayPlatform } from '@/lib/companyDisplay'
 import { collapseByCompany } from '@/lib/reports/feedFilter.js'
+import { replaceParam, readParam, useScrollMemory } from '@/lib/nav/urlState'
 
 type Filter = 'all' | 'ghosted' | 'rejected' | 'interviewing' | 'hired'
 
@@ -49,6 +51,30 @@ const FILTERS: { key: Filter; label: string }[] = [
 
 const PAGE_SIZE = 15
 
+// What this tab last showed per filter (rows + where "Load more" stands), so Back from a company page
+// lands on the same rows. The feed is public, so the copy is not per user.
+type FeedSnap = { rows: FeedReport[]; offset: number; hasMore: boolean; total: number; pages: number; t: number }
+const FEED_CACHE_KEY = 'seen_feed_v1'
+const FEED_REFRESH_AFTER = 3 * 60 * 1000  // older than this: shown, then refreshed in the background
+const FEED_DROP_AFTER = 30 * 60 * 1000    // older than this: not shown
+const FEED_MAX_ROWS = 150
+function readFeedSnap(f: Filter): FeedSnap | null {
+  try {
+    const all = JSON.parse(sessionStorage.getItem(FEED_CACHE_KEY) || '{}') as Record<string, FeedSnap>
+    const snap = all?.[f]
+    if (!snap || !Array.isArray(snap.rows) || typeof snap.t !== 'number' || Date.now() - snap.t > FEED_DROP_AFTER) return null
+    return snap
+  } catch { return null }
+}
+function writeFeedSnap(f: Filter, snap: FeedSnap) {
+  try {
+    const all = (JSON.parse(sessionStorage.getItem(FEED_CACHE_KEY) || '{}') || {}) as Record<string, FeedSnap>
+    all[f] = { ...snap, rows: snap.rows.slice(0, FEED_MAX_ROWS) }
+    sessionStorage.setItem(FEED_CACHE_KEY, JSON.stringify(all))
+  } catch { /* ignore */ }
+}
+const isFilter = (v: string): v is Filter => FILTERS.some(f => f.key === v)
+
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
   const mins = Math.floor(diff / 60000)
@@ -67,9 +93,19 @@ export default function FeedPage() {
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [appliedCos, setAppliedCos] = useState<Set<string>>(new Set())
+  // Pages read for the current filter (1 after the first load); a background refresh only replaces
+  // a single first page, never rows the person paged into.
+  const [pages, setPages] = useState(0)
+  // Which filter the rows on screen belong to (only those are saved).
+  const [rowsFor, setRowsFor] = useState<Filter | null>(null)
+  const [hydrated, setHydrated] = useState(false)
+  // The filter on screen and how many pages it shows, for answers that arrive after a switch.
+  const wantRef = useRef<Filter>('all')
+  const pagesRef = useRef(0)
+  pagesRef.current = pages
 
-  const loadFeed = useCallback(async (newFilter: Filter, newOffset: number, append = false) => {
-    if (newOffset === 0) setLoading(true); else setLoadingMore(true)
+  const loadFeed = useCallback(async (newFilter: Filter, newOffset: number, append = false, silent = false) => {
+    if (!silent) { if (newOffset === 0) setLoading(true); else setLoadingMore(true) }
     try {
       const res = await fetch('/api/reports', {
         method: 'POST',
@@ -83,6 +119,8 @@ export default function FeedPage() {
       })
       if (!res.ok) throw new Error('Failed')
       const data = await res.json() as { reports?: FeedReport[]; total?: number; next_offset?: number; has_more?: boolean }
+      // A late answer for another filter, or a background refresh after "Load more", is dropped.
+      if (newFilter !== wantRef.current || (silent && pagesRef.current > 1)) return
       // One card per company per page: a run of ten Albertsons imports becomes one card with "+9 more".
       const rows = collapseByCompany(data.reports || []) as FeedReport[]
       setTotal(data.total || 0)
@@ -90,8 +128,11 @@ export default function FeedPage() {
       setOffset(typeof data.next_offset === 'number' ? data.next_offset : newOffset + PAGE_SIZE)
       setHasMore(data.has_more ?? ((typeof data.next_offset === 'number' ? data.next_offset : newOffset + PAGE_SIZE) < (data.total || 0)))
       setReports(prev => append ? [...prev, ...rows] : rows)
+      setPages(p => append ? p + 1 : 1)
+      setRowsFor(newFilter)
     } catch {
-      if (!append) { setReports([]); setHasMore(false) }
+      if (newFilter !== wantRef.current) return
+      if (!append && !silent) { setReports([]); setHasMore(false); setPages(0); setRowsFor(null) }
     }
     setLoading(false)
     setLoadingMore(false)
@@ -104,10 +145,48 @@ export default function FeedPage() {
     } catch {}
   }, [])
 
-  useEffect(() => {
+  // The filter lives in the URL (?filter=) so Back brings it back. Read before the first paint.
+  // Show this tab's saved rows for a filter, or load them. A saved copy older than a few minutes is
+  // refreshed in the background, and only while it is a single first page.
+  const showFilter = useCallback((f: Filter) => {
+    wantRef.current = f
+    setLoadingMore(false)
+    const snap = readFeedSnap(f)
+    if (snap) {
+      setReports(snap.rows); setOffset(snap.offset); setHasMore(snap.hasMore); setTotal(snap.total); setPages(snap.pages)
+      setRowsFor(f)
+      setLoading(false)
+      if (Date.now() - snap.t > FEED_REFRESH_AFTER && snap.pages <= 1) void loadFeed(f, 0, false, true)
+      return
+    }
     setOffset(0)
-    loadFeed(filter, 0, false)
-  }, [filter, loadFeed])
+    void loadFeed(f, 0, false)
+  }, [loadFeed])
+
+  // The filter lives in the URL (?filter=) so Back brings it back. Read (and the saved rows shown)
+  // before the first paint, so Back has no loading flash.
+  useLayoutEffect(() => {
+    const p = readParam('filter')
+    const f: Filter = isFilter(p) ? p : 'all'
+    setFilter(f)
+    showFilter(f)
+    setHydrated(true)
+  }, [showFilter])
+
+  function changeFilter(f: Filter) {
+    if (f === filter) return
+    setFilter(f)
+    replaceParam('filter', f === 'all' ? null : f)
+    showFilter(f)
+  }
+
+  // Keep this tab's copy current after every load.
+  useEffect(() => {
+    if (!hydrated || loading || loadingMore || pages === 0 || rowsFor !== filter) return
+    writeFeedSnap(filter, { rows: reports, offset, hasMore, total, pages, t: Date.now() })
+  }, [hydrated, loading, loadingMore, pages, rowsFor, filter, reports, offset, hasMore, total])
+
+  useScrollMemory(hydrated && !loading)
 
   function loadMore() {
     loadFeed(filter, offset, true)
@@ -124,13 +203,13 @@ export default function FeedPage() {
         />
 
         {/* CTA strip — old HTML order: report CTA comes first */}
-        <div style={{ background: 'rgba(16,185,129,.06)', border: '1px solid rgba(16,185,129,.18)', borderRadius: 10, padding: '.75rem 1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.75rem', flexWrap: 'wrap', cursor: 'pointer', transition: 'background .15s' }} onClick={() => window.location.href = '/report'}>
+        <Link href="/report" style={{ background: 'rgba(16,185,129,.06)', border: '1px solid rgba(16,185,129,.18)', borderRadius: 10, padding: '.75rem 1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.75rem', flexWrap: 'wrap', cursor: 'pointer', transition: 'background .15s', textDecoration: 'none' }}>
           <div>
             <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', fontWeight: 500, marginBottom: '.1rem' }}>Your experience matters</div>
             <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', fontWeight: 400 }}>Had an interview? Got ghosted? Add your report — it shapes scores for every future applicant.</div>
           </div>
           <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', flexShrink: 0, whiteSpace: 'nowrap' }}>Add yours →</div>
-        </div>
+        </Link>
 
         {/* The old "ghost surges this week" banner here was any two companies with a ghosted row in the
             first page — no window, no threshold. Real surges (≥3 in 7 days) show on the dashboard. */}
@@ -140,7 +219,7 @@ export default function FeedPage() {
           {FILTERS.map(f => (
             <button
               key={f.key}
-              onClick={() => setFilter(f.key)}
+              onClick={() => changeFilter(f.key)}
               className={`feed-filter-btn${filter === f.key ? ' active' : ''}`}
             >
               {f.label}
@@ -170,9 +249,9 @@ export default function FeedPage() {
                     <div>
                       <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, color: 'var(--white)' }}>{oc.label}</span>
                       {r.company_name && (
-                        <a href={`/company/${encodeURIComponent(r.company_name.toLowerCase().replace(/\s+/g, '-'))}`} className="tap" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', marginLeft: '.5rem', textDecoration: 'none' }}>
+                        <Link href={`/company/${encodeURIComponent(r.company_name.toLowerCase().replace(/\s+/g, '-'))}`} prefetch={false} className="tap" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', marginLeft: '.5rem', textDecoration: 'none' }}>
                           @ {displayCompanyName(r.company_name)}
-                        </a>
+                        </Link>
                       )}
                       {r.company_name && appliedCos.has(r.company_name.toLowerCase().trim()) && (
                         <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', background: 'rgba(99,102,241,.12)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 4, padding: '.1rem .35rem', color: 'var(--indigo)', marginLeft: '.3rem', verticalAlign: 'middle' }}>
@@ -217,9 +296,9 @@ export default function FeedPage() {
                     </div>
                   )}
                   {(r.more_from_company ?? 0) > 0 && r.company_name && (
-                    <a href={`/company/${encodeURIComponent(r.company_name.toLowerCase().replace(/\s+/g, '-'))}#reports`} style={{ display: 'inline-block', marginTop: '.5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', textDecoration: 'none' }}>
+                    <Link href={`/company/${encodeURIComponent(r.company_name.toLowerCase().replace(/\s+/g, '-'))}#reports`} prefetch={false} style={{ display: 'inline-block', marginTop: '.5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', textDecoration: 'none' }}>
                       + {r.more_from_company} more from {displayCompanyName(r.company_name)} on its page →
-                    </a>
+                    </Link>
                   )}
                 </div>
               )
@@ -247,9 +326,9 @@ export default function FeedPage() {
           <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '1rem' }}>
             Takes 60 seconds. Helps the next applicant who checks this company.
           </p>
-          <a href="/report" style={{ display: 'inline-block', background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)', border: 'none', borderRadius: 8, padding: '.65rem 1.5rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', color: '#fff', textDecoration: 'none', boxShadow: '0 0 20px rgba(59,130,246,0.3)' }}>
+          <Link href="/report" style={{ display: 'inline-block', background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)', border: 'none', borderRadius: 8, padding: '.65rem 1.5rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', color: '#fff', textDecoration: 'none', boxShadow: '0 0 20px rgba(59,130,246,0.3)' }}>
             Submit your report →
-          </a>
+          </Link>
         </div>
       </div>
     </div>

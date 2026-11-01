@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
+import Link from 'next/link'
 import { useFocusTrap } from '@/lib/hooks/useFocusTrap'
 import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import { aiHeaders } from '@/lib/aiHeaders'
@@ -17,7 +18,8 @@ import { useProStatus } from '@/lib/hooks/useProStatus'
 import { displayCompanyName } from '@/lib/companyDisplay'
 import { displayPay, payLabel } from '@/lib/jobs/pay.js'
 import { paragraphs, isDescriptionPreview, stripDanglingEllipsis, endsCutOff } from '@/lib/jobs/descriptionText.js'
-import { httpHref } from '@/lib/safeHref.js'
+import { httpHref, loginHref } from '@/lib/safeHref.js'
+import { JobCache } from '@/lib/stores/JobCache'
 import { JOB_INSIGHTS_VERSION } from '@/lib/jobInsightsVersion.js'
 import ListingScoreRing from '@/components/jobs/ListingScoreRing'
 import PastePosting from '@/components/jobs/PastePosting'
@@ -262,7 +264,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
             <div className={w.barTitle}>{job.title}</div>
             <div className={w.barCo}>{companyName}</div>
           </div>
-          <a href={`/jobs/${encodeURIComponent(job.id)}`} className={w.barIcon} aria-label="Open the listing's own page" title="Open the listing's own page"><Icon name="external-link" size={18} /></a>
+          <Link href={`/jobs/${encodeURIComponent(job.id)}`} prefetch={false} onClick={() => JobCache.set(job)} className={w.barIcon} aria-label="Open the listing's own page" title="Open the listing's own page"><Icon name="external-link" size={18} /></Link>
           <button type="button" onClick={onClose} aria-label="Close" className={w.barIcon}><Icon name="x" size={20} /></button>
         </div>
 
@@ -331,7 +333,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
                 <p className={d.p}>
                   {isLoggedIn
                     ? <>{insightNote || 'Out of AI credits.'} <a href="/tracker" className={d.link}>Earn credits</a> · <a href="/pricing" className={d.link}>Pricing</a></>
-                    : <><a href="/login" className={d.link}>Sign in</a> to generate AI insights ({creditCostLabel(insightPrice)}; free once cached).</>}
+                    : <><a href={typeof window !== 'undefined' ? loginHref(`${window.location.pathname}${window.location.search}`) : '/login'} className={d.link}>Sign in</a> to generate AI insights ({creditCostLabel(insightPrice)}; free once cached).</>}
                 </p>
               )}
               {insightsState === 'done' && insights && (

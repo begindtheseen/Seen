@@ -50,6 +50,39 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-11-01: "be more like Indeed" — navigation that remembers where you came from (branch claude/like-indeed-nav)
+- **Owner bug:** the Day 7/14/30 check-in email ("Did X get back to you?") opened `/report?company=…`, not the
+  application. Now `trackerAppUrl(SITE, app.id)` → `/tracker?app=<id>` (`lib/server/outcomeEmails.js`); the tracker
+  reveals + EXPANDS that card. Signed out with a uuid `?app=`/`?prep=` → `/login?return=/tracker?app=<id>` (the
+  login's `safeNextPath` drops `#hash`, so return paths use query params, never `#app_`). Apply-on-Seen applicant
+  emails also link `/tracker?app=<id>`; employer emails `/employers/dashboard?tab=listings`.
+- **ONE navigation toolkit, `lib/nav/`:**
+  - `urlState.ts` — `useUrlPlace(name)`: an open item is a query param with a PUSHED entry (Back closes it; Back from
+    another page reopens it; close goes Back when this page pushed it, else clears in place). `replaceParam` for
+    tabs/filters/the tracker's open card. `replaceSearchKeepingPlaces` (useJobSearch.writeUrl) keeps `?job=`.
+    `useScrollMemory(ready)` saves scroll per URL (place params ignored) and restores once rows render; it does not
+    save before the restore (the router's scroll-to-top would overwrite it). `useBackDismiss(open, onClose)` /
+    `ModalPortal onBack=` / `Dialog` (dismissable) — a popup owns one same-URL entry so phone Back closes it.
+  - Closing a popup from inside NEVER calls history.back() (it raced a router.push made in the same tap): the entry
+    is marked `__seen_dead`, and `installBackOverClosedPopups` (NavMemory) steps Back over dead / orphaned popup
+    entries; the next popup or place reuses a dead entry. `closeParam` (drawer ✕) does go Back, and pushes made
+    meanwhile wait via `afterPendingBack`.
+  - Next 15's patched pushState only syncs its router when the state passed in has NO `__NA` — pass our own object
+    (`ourState()` copies only `__seen_*` keys), never `history.state`.
+  - `backTrail.ts` + `components/shell/NavMemory.tsx`: a per-tab trail of visited URLs → `useBack(fallback, label)`
+    ("Back to results", goes Back only when the previous page is Seen's — replaces `history.length > 1` /
+    `document.referrer`), `lastJobsHref()` (Nav/TabBar Jobs link brings back the last search).
+- **/jobs:** the open listing is `?job=<id>`; the last 3 searches (results, pages, labels) live in sessionStorage
+  `seen_search_cache_v1`, and a search restored from the URL is shown as it was for 30 min with no refetch;
+  `JobCache.setMany` merges (cap 300). Sign-out clears `SESSION_TAB_KEYS` (job cache, search cache, trail, last
+  search, scroll) from sessionStorage.
+- **Sign-in links carry the page** (Nav, TabBar, palette, drawer, job page, ApplyOptimize, GuestTracker, employer
+  listings, forgot-password → /reset?return=).
+- **Verified:** `scripts/nav-memory-smoke.mjs` (Playwright, 390px, every /api stubbed) 22/22 on `next start`:
+  open/Back/scroll, listing page → Back reopens over the same list with 0 new searches, full-page-load Back, popup
+  Back, ✕ then one Back leaves, drawer → company preview → Back, signed-out email link → sign-in with return.
+  NOT verified live: a signed-in tracker deep link (no session in the harness), a real email tap.
+
 ## Session 2026-10-27 E: round 7 — 4/4 yes again, but #383 shipped two regressions; PRs #384, #385
 - **Round 7 (live, after #383/#384):** Maria 7/7 prep YES, Dev 7/5 Pass YES, Tasha 7/7 prep YES, Ray 8/6 prep YES. Worth-it
   fell for Dev and Ray because all four hit the same two breaks, and three of them traced the cause themselves:

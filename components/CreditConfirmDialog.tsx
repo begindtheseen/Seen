@@ -50,7 +50,7 @@ export default function CreditConfirmDialog({ cost = 1, action, onConfirm, onCan
       : `This uses ${label}.`
 
   return (
-    <ModalPortal>
+    <ModalPortal onBack={onCancel}>
       <div role="dialog" aria-modal="true" aria-labelledby="credit-confirm-title" data-testid="credit-confirm"
         style={{ position: 'fixed', inset: 0, zIndex: 9950, background: 'rgba(0,0,0,.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
         onClick={onCancel}>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, Fragment } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Job } from '@/lib/types'
 import { trackApplyClick } from '@/lib/trackApply'
@@ -26,6 +26,8 @@ import Button from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Badge'
 import Icon from '@/components/ui/Icon'
 import j from './jobs.module.css'
+import { useUrlPlace, useScrollMemory } from '@/lib/nav/urlState'
+import { JobCache } from '@/lib/stores/JobCache'
 
 // Empty-state suggestions, most-held first. Live corpus counts by title (prod, read-only,
 // 2026-10-23): software engineer 3,960 · nurse 1,360 · sales associate 648 · customer service 489 ·
@@ -75,7 +77,15 @@ export default function JobsPage() {
 
   const [applyJob, setApplyJob] = useState<Job | null>(null)
   const [checkCompany, setCheckCompany] = useState<string | null>(null)
-  const [detailJob, setDetailJob] = useState<Job | null>(null)
+  // The open listing is a PLACE in the URL (?job=<id>, Indeed's ?vjk=): opening it adds a history entry,
+  // so Back closes it, and leaving for a company page / the listing page / the employer's site and
+  // pressing Back reopens it over the same list (owner 2026-11-01: "be more like Indeed").
+  const jobPlace = useUrlPlace('job')
+  const [detailJob, setDetailJobState] = useState<Job | null>(null)
+  function setDetailJob(job: Job | null) {
+    if (job) { JobCache.set(job); setDetailJobState(job); jobPlace.open(String(job.id)) }
+    else { setDetailJobState(null); jobPlace.close() }
+  }
   const [saveVersion, setSaveVersion] = useState(0)
   const [swipeMode, setSwipeMode] = useState(false)
   const [checkpointJob, setCheckpointJob] = useState<Job | null>(null)
@@ -107,6 +117,18 @@ export default function JobsPage() {
   // After a search with results, phones get a sticky one-line query bar (audit #25: the first card sat
   // ~700px down under a three-row form). The location row reappears while the bar has focus.
   const searched = status === 'done' && filtered.length > 0
+  // Follow the URL: Back/Forward open or close the listing; a page loaded on ?job= (Back from another
+  // page) reopens it once its row is known — from the results, the rail, or this tab's listing cache.
+  useEffect(() => {
+    const id = jobPlace.value
+    if (!id) { setDetailJobState(null); return }
+    setDetailJobState(cur => {
+      if (cur && String(cur.id) === id) return cur
+      return filtered.find(x => String(x.id) === id) || recommended.find(x => String(x.id) === id) || JobCache.get(id) || cur
+    })
+  }, [jobPlace.value, filtered, recommended])
+  // Back to the results lands where the list was scrolled (rows render after the restore).
+  useScrollMemory(status === 'done' || status === 'error' || (status === 'idle' && !query.trim()))
   const [copied, setCopied] = useState(false)
   async function copySearchLink() {
     try { await navigator.clipboard.writeText(window.location.href); setCopied(true); setTimeout(() => setCopied(false), 1800) }

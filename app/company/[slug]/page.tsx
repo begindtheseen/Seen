@@ -39,6 +39,8 @@ import { splitWebReviews, webResearchNote } from '@/lib/webReviewQuotes'
 import { replyTiming, REPORT_WHEN_YOU_HEAR } from '@/lib/replyTiming'
 import { useCompanySeed } from '@/components/CompanySeed'
 import { httpHref } from '@/lib/safeHref.js'
+import { replaceParam, readParam, useScrollMemory } from '@/lib/nav/urlState'
+import { useBack } from '@/lib/nav/backTrail'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -400,23 +402,40 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
     io.observe(el)
     return () => io.disconnect()
   }, [loading])
-  function goBack() {
-    let sameSite = false
-    try { sameSite = !!document.referrer && new URL(document.referrer).origin === window.location.origin } catch {}
-    if (sameSite && window.history.length > 1) window.history.back()
-    else window.location.href = '/companies'
-  }
+  // Back to the Seen page this one was opened from (search results, the scoreboard…), else Companies.
+  const back = useBack('/companies', 'Companies')
 
   const [showGradeCard, setShowGradeCard] = useState(false)
   const [myApp, setMyApp] = useState<{company: string; role: string; status: string; stage: string; appliedAt: number; daysSince: number} | null>(null)
 
-  // Deep link: /company/<slug>#reports opens that section on load.
+  // Deep link: /company/<slug>#reports opens that section on load. The sections open and the reports
+  // shown are also kept in the URL (?open=reports,roles&shown=15), so Back to this page reopens them
+  // and scroll memory lands in the right place; ?open= wins over the hash ('none' = all closed).
+  const [sectionsRead, setSectionsRead] = useState(false)
+  const hashSection = useRef<SectionKey | null>(null)
   useEffect(() => {
-    // the section name comes from the page's own list, never from the URL itself
+    // the section names come from the page's own list, never from the URL itself
+    const keys = Object.keys(open) as SectionKey[]
     const h = (window.location.hash || '').replace('#', '')
-    const key = (Object.keys(open) as SectionKey[]).find(k => k === h)
-    if (key) setOpen(prev => ({ ...prev, [key]: true }))
+    hashSection.current = keys.find(k => k === h) || null
+    const fromParam = readParam('open')
+    const want = fromParam
+      ? keys.filter(k => fromParam.split(',').includes(k))
+      : hashSection.current ? [hashSection.current] : []
+    if (want.length) setOpen(prev => { const next = { ...prev }; for (const k of want) next[k] = true; return next })
+    const shown = parseInt(readParam('shown'), 10)
+    if (Number.isFinite(shown) && shown > 5 && shown <= 500) setReportsShown(shown)
+    setSectionsRead(true)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!sectionsRead) return
+    const keys = (Object.keys(open) as SectionKey[]).filter(k => open[k])
+    replaceParam('open', keys.length ? keys.join(',') : hashSection.current ? 'none' : null)
+  }, [open, sectionsRead])
+  useEffect(() => {
+    if (!sectionsRead) return
+    replaceParam('shown', reportsShown > 5 ? String(reportsShown) : null)
+  }, [reportsShown, sectionsRead])
 
   // Load matching tracker entry for this company
   useEffect(() => {
@@ -526,6 +545,8 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
     void list
     return () => { alive = false }
   }, [companyName, location, reloadKey])
+  // Back to this page lands where it was scrolled, once the grade and the reports are on screen.
+  useScrollMemory(sectionsRead && !loading && !reportsLoading)
 
   // Industry benchmark — how this company ranks vs its sector on Seen (public aggregate). Turns a
   // bare score into authoritative context. Fail-soft: the page renders fine without it.
@@ -702,7 +723,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
         {mounted && createPortal(
           <div className={`co-sticky${stuck ? ' show' : ''}`} aria-hidden={!stuck}>
             <div className="co-sticky-in">
-              <button type="button" className="co-sticky-back" onClick={goBack} aria-label="Back" tabIndex={stuck ? 0 : -1}><Icon name="arrow-left" size={16} /></button>
+              <button type="button" className="co-sticky-back" onClick={back.go} aria-label={back.label} title={back.label} tabIndex={stuck ? 0 : -1}><Icon name="arrow-left" size={16} /></button>
               <span className="co-sticky-logo" aria-hidden>{logoLetter}</span>
               <span className="co-sticky-name">{displayName}</span>
               {graded && (

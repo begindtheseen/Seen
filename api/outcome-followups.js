@@ -16,7 +16,7 @@
 // crash or an overlapping run can't double-mail; a hard send failure releases the claim so the
 // next run retries. No RESEND_KEY → clean no-op (nothing sent, 200).
 
-import { dueMilestone, buildEmail, unsubToken } from '../lib/server/outcomeEmails.js';
+import { dueMilestone, buildEmail, unsubToken, trackerAppUrl } from '../lib/server/outcomeEmails.js';
 import { isVercelCron } from '../lib/server/cronAuth.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -89,7 +89,9 @@ export default async function handler(req, res) {
 
     const token = unsubToken(app.user_id, EMAIL_SECRET);
     const unsubUrl = `${SITE}/api/unsubscribe?uid=${encodeURIComponent(app.user_id)}&token=${token}`;
-    const reportUrl = `${SITE}/report?company=${encodeURIComponent(app.company || '')}`;
+    // The button opens THIS application on the tracker (owner 2026-11-01: the email used to land on
+    // a blank report form). A signed-out reader is sent through sign-in and back to the same card.
+    const reportUrl = trackerAppUrl(SITE, app.id);
     const { subject, html, text } = buildEmail(app, day, { reportUrl, unsubUrl });
 
     try {
