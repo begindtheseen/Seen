@@ -19,8 +19,6 @@
     0 16px 48px rgba(0, 0, 0, 0.5),
     0 0 40px rgba(99, 102, 241, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(24px) saturate(160%);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
   animation: microIn 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 

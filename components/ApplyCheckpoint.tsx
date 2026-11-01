@@ -188,9 +188,9 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
   const backdropStyle: React.CSSProperties = {
     position: 'fixed',
     inset: 0,
-    background: 'rgba(0,0,0,.65)',
-    backdropFilter: 'blur(4px)',
-    WebkitBackdropFilter: 'blur(4px)',
+    // Solid dim, no blur: a full-screen backdrop-filter can come back BLACK on iPhone after Seen returns
+    // from the employer's site (owner 2026-11-01: "back out … it's just a black screen").
+    background: 'rgba(2,4,10,.82)',
     zIndex: 9900,
     display: 'flex',
     alignItems: 'center',

@@ -15,6 +15,27 @@ export default function NavMemory() {
   const pathname = usePathname()
 
   useEffect(() => { installBackOverClosedPopups() }, [])
+
+  // While Seen is in the background (the employer's site opened over it), entrance animations finish
+  // instantly: an iPhone keeps a hidden tab's animations frozen at their first frame, so a popup that
+  // opened as the tab was hidden came back as an invisible panel on a dark backdrop — "a black screen,
+  // forced to refresh" (owner 2026-11-01). app/motion.css `html.tab-hidden`.
+  useEffect(() => {
+    const root = document.documentElement
+    const sync = () => {
+      if (document.visibilityState === 'hidden') { root.classList.add('tab-hidden'); return }
+      requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('tab-hidden')))
+    }
+    const onShow = (e: PageTransitionEvent) => { if (e.persisted) sync() }
+    sync()
+    document.addEventListener('visibilitychange', sync)
+    window.addEventListener('pagehide', () => root.classList.add('tab-hidden'))
+    window.addEventListener('pageshow', onShow)
+    return () => {
+      document.removeEventListener('visibilitychange', sync)
+      window.removeEventListener('pageshow', onShow)
+    }
+  }, [])
   useEffect(() => { recordArrival(here()) }, [pathname])
 
   useEffect(() => {

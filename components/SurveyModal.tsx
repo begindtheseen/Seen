@@ -203,9 +203,7 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
   const backdropStyle: React.CSSProperties = {
     position: 'fixed',
     inset: 0,
-    background: 'rgba(0,0,0,.85)',
-    backdropFilter: 'blur(8px)',
-    WebkitBackdropFilter: 'blur(8px)',
+    background: 'rgba(2,4,10,.9)', // solid — no full-screen blur (iPhone black-screen bug)
     zIndex: 9900,
     display: 'flex',
     alignItems: 'center',

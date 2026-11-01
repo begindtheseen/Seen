@@ -105,7 +105,7 @@ const isGuidance = (s: string) => /^\s*\(/.test(String(s || ''))
 
 const overlay: React.CSSProperties = {
   position: 'fixed', inset: 0, zIndex: 9000,
-  background: 'rgba(0,0,0,.8)', backdropFilter: 'blur(6px)',
+  background: 'rgba(2,4,10,.88)', // solid — no full-screen blur (iPhone black-screen bug)
   display: 'flex', alignItems: 'center', justifyContent: 'center',
   padding: '1rem',
 }

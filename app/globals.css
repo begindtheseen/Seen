@@ -307,7 +307,7 @@ html:not(.has-session) .session-first{display:none}
 /* ═══ SIDE MENU ═══ */
 .side-menu{position:fixed;left:0;top:0;bottom:0;width:260px;background:var(--void);border-right:1px solid var(--line);z-index:500;transform:translateX(-100%);transition:transform .25s ease;display:flex;flex-direction:column;padding:1.5rem 0}
 .side-menu.open{transform:translateX(0)}
-.side-menu-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:499;display:none;backdrop-filter:blur(4px)}
+.side-menu-overlay{position:fixed;inset:0;background:rgba(2,4,10,.6);z-index:499;display:none}
 .side-menu-overlay.open{display:block}
 .side-menu-logo{display:flex;align-items:center;gap:.5rem;padding:0 1.25rem 1.5rem;border-bottom:1px solid var(--line);margin-bottom:1rem}
 .side-menu-item{display:flex;align-items:center;gap:.75rem;padding:.75rem 1.25rem;font-family:var(--body);font-size:var(--fs-ui);color:var(--sub);cursor:pointer;transition:all .15s;border:none;background:none;width:100%;text-align:left}
@@ -552,7 +552,7 @@ select.fi,select.fs,select.fi-r,select.fs-r{background-image:url("data:image/svg
 
 /* MODAL */
 
-.modal{background:rgba(12,15,26,0.92);border:1px solid rgba(255,255,255,0.1);border-radius:20px;width:100%;max-width:720px;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 40px 120px rgba(0,0,0,.75),0 0 80px rgba(99,102,241,0.18),0 0 160px rgba(124,58,237,0.08);animation:fadeUp .18s ease;backdrop-filter:blur(24px)}
+.modal{background:rgba(12,15,26,0.92);border:1px solid rgba(255,255,255,0.1);border-radius:20px;width:100%;max-width:720px;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 40px 120px rgba(0,0,0,.75),0 0 80px rgba(99,102,241,0.18),0 0 160px rgba(124,58,237,0.08);animation:fadeUp .18s ease}
 
 /* DISCLAIMER */
 .disc{background:var(--void);border-bottom:1px solid var(--line);padding:.45rem 2rem;text-align:center;font-family:var(--mono);font-size:var(--fs-meta);color:var(--muted)}
@@ -717,7 +717,7 @@ details[open] .dt-chev{transform:rotate(180deg)}
 /* ── PRO UPGRADE MODAL ── */
 #proModalOv{
   position:fixed;inset:0;z-index:9100;display:none;
-  background:rgba(0,0,0,.75);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  background:rgba(2,4,10,.88);
   align-items:center;justify-content:center;padding:1rem;
 }
 #proModalOv.open{display:flex}
@@ -766,7 +766,7 @@ details[open] .dt-chev{transform:rotate(180deg)}
 .side-menu-toggle:hover{color:var(--white);background:var(--raised)}
 .side-menu{position:fixed;left:0;top:0;bottom:0;width:270px;max-width:82vw;background:var(--void);border-right:1px solid var(--line);z-index:9100;transform:translateX(-100%);transition:transform .25s ease;display:flex;flex-direction:column;padding:1.5rem 0;overflow-y:auto}
 .side-menu.open{transform:translateX(0)}
-.side-menu-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9050;display:none;backdrop-filter:blur(4px)}
+.side-menu-overlay{position:fixed;inset:0;background:rgba(2,4,10,.6);z-index:9050;display:none}
 .side-menu-overlay.open{display:block}
 .side-menu-logo{display:flex;align-items:center;gap:.5rem;padding:0 1.25rem 1.5rem;border-bottom:1px solid var(--line);margin-bottom:1rem}
 .side-menu-item{display:flex;align-items:center;gap:.75rem;padding:.8rem 1.25rem;font-family:var(--body);font-size:var(--fs-ui);color:var(--sub);cursor:pointer;transition:all .15s;border:none;background:none;width:100%;text-align:left;text-decoration:none}
@@ -996,7 +996,7 @@ details[open] .dt-chev{transform:rotate(180deg)}
 /* Advanced tools */
 
 /* Manage-accounts modal */
-.ac-modal{position:fixed;inset:0;background:rgba(0,0,0,.72);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:400;display:flex;align-items:flex-end;justify-content:center}
+.ac-modal{position:fixed;inset:0;background:rgba(2,4,10,.82);z-index:400;display:flex;align-items:flex-end;justify-content:center}
 @media(min-width:640px){.ac-modal{align-items:center}}
 .ac-modal-card{background:var(--surface);border:1px solid var(--line);border-radius:14px 14px 0 0;width:100%;max-width:560px;max-height:86vh;display:flex;flex-direction:column;animation:fadeUp .22s ease backwards;box-sizing:border-box}
 @media(min-width:640px){.ac-modal-card{border-radius:14px}}

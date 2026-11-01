@@ -149,3 +149,12 @@ html.seen-first nav::after{content:'';position:absolute;left:0;right:0;bottom:-1
   html.seen-first .logo-pulse{animation:none}
   html.seen-first nav::after{display:none}
 }
+
+/* ── A hidden tab finishes every entrance at once (components/shell/NavMemory.tsx sets .tab-hidden while
+   Seen is in the background). An iPhone freezes a hidden tab's animations at their first frame, so a
+   popup that opened as the employer's site took over came back invisible on a dark backdrop. ── */
+html.tab-hidden *, html.tab-hidden *::before, html.tab-hidden *::after {
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+  transition-duration: 0s !important;
+}
