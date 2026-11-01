@@ -78,6 +78,9 @@ longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.m
   2026-10-20 but these older rows still count), ~20% Reddit, ~0.5% Seen users. Meta description now says "public
   applicant accounts and reports from Seen users".
 - Verified: suite 2470/2470, tsc, next build, nav smoke 28/28, overlap sweep clean, job-page buttons 320–390px.
+- **Fonts ship with the site** (`app/fonts/*.woff2` via `next/font/local`, OFL): on Vercel, Next 15.5.28's
+  `next/font/google` loader threw on a Google font link with no file extension and failed the build twice. Never
+  go back to build-time Google font downloads.
 
 ## Session 2026-11-01: "be more like Indeed" — navigation that remembers where you came from (branch claude/like-indeed-nav)
 - **Owner bug:** the Day 7/14/30 check-in email ("Did X get back to you?") opened `/report?company=…`, not the
