@@ -89,6 +89,13 @@ longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.m
 - **Black screen after Apply (iPhone):** Apply opens the employer's site AND the "Did you apply?" popup; its full-screen
   backdrop-filter + an entrance animation started while hidden left a dark overlay with nothing on it. Rules: NO
   backdrop-filter on any full-screen overlay (solid dim); `html.tab-hidden` (NavMemory) finishes animations while hidden.
+- **Saved résumés (owner 2026-11-01):** `public.resumes` (migration `20261101140000_resumes.sql`, NOT applied; server-only,
+  backfills one default per profile). Free 1 / Pro 5 (`MAX_RESUMES_FREE/PRO`); Pro = any active `ai_credits.pro_until`
+  (Interview Prep 14 d, Pass 30 d — there is no monthly Pro any more). Lapsed Pro: nothing deleted, only the default usable.
+  The default is MIRRORED into `profiles.resume_text` so every old reader is unchanged. `lib/server/resumes.js`
+  (`handleResumeAction`, `resumeForApply`), user-sync `resumes_list|resume_get|resume_create|resume_rename|resume_delete|
+  resume_set_default`; UI `components/resume/{ResumeLibraryPanel,ResumePicker,ResumeView}.tsx`; picker in the Optimize sheet,
+  /resume and Apply-on-Seen (`resume_id`, checked server-side).
 
 ## Session 2026-11-01: "be more like Indeed" — navigation that remembers where you came from (branch claude/like-indeed-nav)
 - **Owner bug:** the Day 7/14/30 check-in email ("Did X get back to you?") opened `/report?company=…`, not the
