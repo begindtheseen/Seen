@@ -23,6 +23,7 @@ import { claimReferral, referralStatus, rewardReferralOnApplication } from '../l
 import { recordSignupAttribution } from '../lib/server/signupAttribution.js';
 import * as inbox from '../lib/server/inbox/store.js';
 import { PROFILE_LIMITS, PROFILE_NAME_REQUIRED } from '../lib/profileLimits.js';
+import { cleanMode, cleanAlertsInput, prefsFromRow, isRemotePlace, MAX_ALERTS, ALERT_RADII } from '../lib/server/jobAlerts.js';
 import { sanitizeEvents, clientApplicationId, casWindow, timelineAnomalies, naturalKeyQuery, isMissingColumn, cleanText, COMPANY_MAX, ROLE_MAX, CITY_MAX, PLATFORM_MAX } from '../lib/server/trackerWrites.js';
 
 // Does applications.client_id exist yet (migration 20261024130000)? Probed on use; a "no" is
@@ -84,7 +85,7 @@ export default async function handler(req, res) {
   console.log(`[user-sync] action=${action} uid=${uid} auth=${who.via}`);
 
   // Rate-limit mutating actions per user (not reads — those are cheap DB fetches)
-  const WRITE_ACTIONS = new Set(['claim_referral','record_attribution','add_application','update_application','remove_application','save_job','unsave_job','save_profile','save_resume','delete_account','submit_resume_survey','report_job_availability']);
+  const WRITE_ACTIONS = new Set(['claim_referral','record_attribution','add_application','update_application','remove_application','save_job','unsave_job','save_profile','save_resume','delete_account','submit_resume_survey','report_job_availability','job_alerts_save']);
   if (WRITE_ACTIONS.has(action)) {
     const windowHour = Math.floor(Date.now() / 3_600_000);
     const rlKey = `${uid}:user-sync:${windowHour}`;
@@ -129,6 +130,58 @@ export default async function handler(req, res) {
       console.error('[user-sync] inbox: %s', String(e.message || e).replace(/\n|\r/g, ' ').replace(/[^\x20-\x7e]/g, '').slice(0, 200));
       return res.status(500).json({ error: String(e.message || 'inbox error').slice(0, 200) });
     }
+  }
+
+  // ── JOB ALERTS — which job-match emails this person gets (lib/server/jobAlerts.js) ─────────────────
+  // get  → { ready, mode: 'resume'|'alerts'|'off', alerts, has_resume, max, radii }
+  // save { mode, alerts: [{ keywords, place, miles }] } → the same shape, or 400 { error, index, field }.
+  // 'off' is the job-match unsubscribe (email_prefs.job_match_opt_out). { ready: false } until
+  // migration 20261101120000 adds email_prefs.job_match_mode / job_alerts.
+  if (action === 'job_alerts_get' || action === 'job_alerts_save') {
+    const prefsRead = async () => {
+      const r = await db(`email_prefs?user_id=eq.${uid}&select=job_match_opt_out,job_match_mode,job_alerts&limit=1`).catch(() => null);
+      if (!r) return { error: true };
+      if (!r.ok) { const e = await r.json().catch(() => null); return isMissingColumn(e) ? { missing: true } : { error: true }; }
+      const list = await r.json().catch(() => null);
+      return Array.isArray(list) ? { row: list[0] || null } : { error: true };
+    };
+    const answer = async () => {
+      const [p, pr] = await Promise.all([
+        prefsRead(),
+        db(`profiles?id=eq.${uid}&resume_text=not.is.null&select=id&limit=1`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      ]);
+      if (p.missing) return res.status(200).json({ ready: false });
+      if (p.error) return res.status(502).json({ error: 'Could not load your alerts — try again.' });
+      const prefs = prefsFromRow(p.row);
+      return res.status(200).json({
+        ready: true, mode: prefs.mode, saved_mode: prefs.savedMode, alerts: prefs.alerts,
+        has_resume: Array.isArray(pr) ? pr.length > 0 : null, max: MAX_ALERTS, radii: ALERT_RADII,
+      });
+    };
+    if (action === 'job_alerts_get') return answer();
+
+    const mode = cleanMode(body.mode);
+    if (!mode) return res.status(400).json({ error: 'Choose résumé matches, only my alerts, or off.' });
+    if (!Array.isArray(body.alerts)) return res.status(400).json({ error: 'Alerts must be a list.' });
+    let geo = null;
+    if (body.alerts.some((a) => a && typeof a === 'object' && !isRemotePlace(a.place))) {
+      try { geo = await import('../lib/geo/usPlaces.js'); } catch { geo = null; }
+      if (!geo || typeof geo.geocodePlace !== 'function') return res.status(503).json({ error: 'Places are not available right now — try again shortly.' });
+    }
+    const cleaned = cleanAlertsInput(body.alerts, { geocodePlace: geo ? geo.geocodePlace : () => null });
+    if (!cleaned.ok) return res.status(400).json({ error: cleaned.error, index: cleaned.index ?? null, field: cleaned.field ?? null });
+    if (mode === 'alerts' && !cleaned.alerts.length) return res.status(400).json({ error: 'Add at least one alert, or choose résumé matches.' });
+    const row = { user_id: uid, job_alerts: cleaned.alerts, job_match_opt_out: mode === 'off', updated_at: new Date().toISOString() };
+    if (mode !== 'off') row.job_match_mode = mode; // 'off' keeps the last mode for when they turn it back on
+    const w = await db('email_prefs?on_conflict=user_id', {
+      method: 'POST', body: JSON.stringify(row), headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    }).catch(() => null);
+    if (!w || !w.ok) {
+      const e = w ? await w.json().catch(() => null) : null;
+      if (isMissingColumn(e)) return res.status(200).json({ ready: false });
+      return res.status(502).json({ error: 'Could not save your alerts — try again.' });
+    }
+    return answer();
   }
 
   // ── LOAD — applications + saved jobs + recent cos + credits + feature flags ──

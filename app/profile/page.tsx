@@ -12,6 +12,7 @@ import { ResumeStore } from '@/lib/stores/ResumeStore'
 import { parseResumeFile } from '@/lib/resumeUploadClient'
 import PageHeader from '@/components/shell/PageHeader'
 import InviteCard from '@/components/growth/InviteCard'
+import JobAlertsCard from '@/components/settings/JobAlertsCard'
 import DangerConfirmDialog from '@/components/DangerConfirmDialog'
 import DeleteAccountDialog from '@/components/profile/DeleteAccountDialog'
 import { PROFILE_LIMITS, PROFILE_NAME_REQUIRED, clampProfileField } from '@/lib/profileLimits.js'
@@ -63,6 +64,7 @@ export default function ProfilePage() {
   // Interview Sprint). It ends on its own; nothing renews, so the subscription copy must not show.
   const [proUntil, setProUntil] = useState<string | null>(null)
   const [inviteReady, setInviteReady] = useState(false)
+  const [alertsReady, setAlertsReady] = useState(false)
   // Already "loaded" if we have a cached copy (instant render); otherwise show a skeleton
   // for the one-time first load rather than an empty flash.
   const [loaded, setLoaded] = useState(!!_cache)
@@ -334,7 +336,7 @@ export default function ProfilePage() {
           tone="indigo"
           title="Settings"
           crumbLabel="Settings"
-          sub="Your profile, résumé, security and plan — one place. Changes save when you say so."
+          sub="Your profile, résumé, job alerts, security and plan — one place. Changes save when you say so."
         />
 
         <div className={styles.layout}>
@@ -352,6 +354,7 @@ export default function ProfilePage() {
             <div className={styles.jumps} role="navigation" aria-label="Settings sections">
               <a href="#profile" className={styles.jump}><span>👤</span>Profile</a>
               <a href="#resume" className={styles.jump}><span>📄</span>Résumé</a>
+              {alertsReady && <a href="#alerts" className={styles.jump}><span>🔔</span>Job alerts</a>}
               <a href="#security" className={styles.jump}><span>🔒</span>Security</a>
               <a href="#plan" className={styles.jump}><span>◈</span>Plan &amp; billing</a>
               {inviteReady && <a href="#invite" className={styles.jump}><span>↗</span>Invite friends</a>}
@@ -446,6 +449,9 @@ export default function ProfilePage() {
               <div className={styles.hint}>PDF, Word or .txt. {RESUME_PARSE_COST === 0 ? 'Free — no AI credit used.' : `Parsing uses ${RESUME_PARSE_COST} AI credit.`}</div>
               {resumeMsg && <div className={`${styles.msg} ${resumeMsgOk ? styles.ok : styles.err}`}>{resumeMsg}</div>}
             </section>
+
+            {/* ── Job alerts: what the job-match email is about (hidden until its migration is applied) ── */}
+            {ready && isLoggedIn && <JobAlertsCard id="alerts" onReady={setAlertsReady} />}
 
             {/* ── Security ── */}
             <section id="security" className={styles.card}>

@@ -283,9 +283,10 @@ export default async function handler(req, res) {
     let relatedTerms = [];
 
     // ── Radius ───────────────────────────────────────────────────────────────
-    // Real distance search: clamp the requested radius, geocode the searched place once
-    // (cached), and pass the distance to Adzuna so the live pull is already scoped. `center`
-    // is filled in during the DB-first Promise.all below (overlapped with the DB reads).
+    // Real distance search: clamp the requested radius, place the searched location, and pass the
+    // distance to Adzuna so the live pull is already scoped. The place comes from the vendored US
+    // places table (lib/geo/usPlaces.js — no network); only a name it does not know goes to
+    // geocodeLocation (geocode_cache, then Nominatim) in the DB-first Promise.all below.
     // radius === '0'/'remote' means REMOTE: skip geo filtering entirely and search remote
     // listings — the old clamp silently turned "Remote" into an ordinary 25-mile search.
     const isRemote = String(radius) === '0' || String(radius).toLowerCase() === 'remote';
@@ -293,18 +294,22 @@ export default async function handler(req, res) {
     if (isRemote) { loc = 'remote'; }
     const radiusMiles = isRemote ? Infinity : Math.min(500, Math.max(5, parseInt(radius, 10) || 25));
     const distanceKm = isRemote ? null : milesToKm(radiusMiles);
-    let center = null; // { lat, lng } | null (null → geocode unavailable, fall back to city/state)
+    const searchedPlace = loc && !isRemote ? geocodePlace(loc) : null;
+    // A whole-state search ("Texas") is a state filter, not a circle around the state's middle.
+    const searchState = searchedPlace && searchedPlace.stateOnly ? searchedPlace.state : null;
+    let center = searchedPlace && !searchState ? { lat: searchedPlace.lat, lng: searchedPlace.lng } : null; // null → fall back to city/state text
 
     // Is a listing inside the searched area? ONE predicate, used to filter the in-radius page, to
     // stamp `in_radius` on every served row (the client never reorders in-radius rows below the
     // fill-ins) and to count `in_radius` for the honest banner.
     //  • Remote search → only listings that say remote. (Partitioning "remote first, keep the rest"
     //    served 58 non-remote Dallas/Phoenix rows as a "Remote" result.)
-    //  • Usable coords → exact-circle haversine (1 mi buffer for border rounding).
-    //  • NULL / (0,0) coords are UNKNOWN, not a point: such a row is in the area only when its own
-    //    location text names the searched city (an ATS-board row saying "Phoenix, AZ" IS in Phoenix;
-    //    before, every one of them was dropped and "customer service · Phoenix" showed one HVAC tech).
-    //  • Search geocode failed (no center) → coarse city / same-state text match (honest degrade).
+    //  • A point for the row (its own coords, else its location text placed by usPlaces) → great-circle
+    //    distance from the searched point (1 mi buffer for border rounding). A row whose text says only
+    //    a state ("Arizona") has no point: it is never inside a city radius.
+    //  • No point at all → in the area only when its own text names the searched city.
+    //  • Whole-state search → the row's text places it in that state.
+    //  • Search location could not be placed (no center) → coarse city / same-state text match.
     // Order is NOT changed here: in-radius rows keep their relevance order (relevance first,
     // transparency score as the tiebreak) instead of nearest-first, which scrambled matches.
     const parsedLoc = parseLocation(loc);
@@ -312,8 +317,10 @@ export default async function handler(req, res) {
     const nearSearch = (j) => {
       if (!loc) return true;
       if (isRemote) return isRemoteListing(j);
+      if (searchState) return inState(j, searchState) || locationScore(j.location, parsedLoc) >= 2;
       if (!center) return locationScore(j.location, parsedLoc) >= 2;
-      if (hasUsableCoords(j)) return haversineMiles(center, j) <= radiusMiles + 1;
+      const p = rowPoint(j);
+      if (p) return haversineMiles(center, p) <= radiusMiles + 1;
       return namesSearchedCity(j);
     };
     const applyRadius = (list) => (Array.isArray(list) ? list : []).filter(nearSearch);

@@ -16,6 +16,11 @@
 // plan allows 100 emails a day shared with sign-up confirmations and outcome check-ins.
 // Addresses on JOB_MATCH_SKIP_DOMAINS (default seenjobs.io: the audit/test accounts) are skipped, as
 // are unconfirmed addresses and anyone who opted out.
+//
+// Job alerts (2026-11-01, lib/server/jobAlerts.js): a person whose email_prefs.job_match_mode is
+// 'alerts' gets ONLY listings whose title has an alert's words AND that sit within the alert's radius
+// (or are remote, for a Remote alert), added to Seen in the last ALERT_NEW_DAYS days. They need no
+// résumé. Before migration 20261101120000 the columns do not exist: everyone stays on résumé matches.
 
 import { isVercelCron, hasCronSecret, hasAdminSession } from '../lib/server/cronAuth.js';
 import { findResumeMatches } from '../lib/server/resumeMatches.js';
@@ -26,11 +31,70 @@ import { unsubToken } from '../lib/server/outcomeEmails.js';
 import { loadTenantNames, withTenantName } from '../lib/server/tenantNames.js';
 import { pacificDayStart } from '../lib/time/pacific.js';
 import { logError } from '../lib/server/errlog.js';
+import { boundingBox } from '../lib/server/geo.js';
+import { scoreRow } from '../lib/server/jobScore.js';
+import { prefsFromRow, matchAlerts, alertDbTerm, ALERT_NEW_DAYS } from '../lib/server/jobAlerts.js';
 
 const SITE = 'https://seenjobs.io';
 const BUDGET_MS = 240_000;
+const ALERT_COLS = 'id,title,company,location,salary,apply_url,description,type,level,source,score,waste_score,lat,lng,ats_tenant,created_at';
 
-export default async function handler(req, res) {
+// lib/geo/usPlaces.js, loaded only when someone has alerts (tests pass their own).
+async function loadUsPlaces() {
+  try { return await import('../lib/geo/usPlaces.js'); } catch { return null; }
+}
+
+/**
+ * PostgREST pre-filter for a local alert: its bounding box OR a nearby place named in the location
+ * text (most rows have no coordinates). Only a pre-filter: matchAlerts decides the radius.
+ */
+export function alertScopeClause(alert, geo) {
+  const parts = [];
+  const b = boundingBox({ lat: alert.lat, lng: alert.lng }, alert.miles);
+  const f = (n) => n.toFixed(6);
+  if (b) parts.push(`and(lat.gte.${f(b.latMin)},lat.lte.${f(b.latMax)},lng.gte.${f(b.lngMin)},lng.lte.${f(b.lngMax)})`);
+  const clean = (x) => String(x || '').replace(/[(),*\\]/g, '').replace(/\./g, '*').trim();
+  const names = new Set([clean(String(alert.place || '').split(',')[0])]);
+  let near = [];
+  try { near = typeof geo?.placesWithin === 'function' ? geo.placesWithin({ lat: alert.lat, lng: alert.lng }, alert.miles, { limit: 12 }) : []; } catch { near = []; }
+  for (const pl of near) names.add(clean(pl.name));
+  for (const n of names) if (n.length >= 3) parts.push(`location.ilike.*${n}*`);
+  return parts.length ? `&or=${encodeURIComponent(`(${parts.join(',')})`)}` : null;
+}
+
+/**
+ * Listings for a person's alerts, matched (title words + radius) and ranked by the listing's own
+ * score. null when every read failed (the caller skips the person rather than guess).
+ */
+async function findAlertMatches(alerts, geo, rows) {
+  const now = encodeURIComponent(new Date().toISOString());
+  const since = encodeURIComponent(new Date(Date.now() - ALERT_NEW_DAYS * 86_400_000).toISOString());
+  const usableAlerts = alerts.map((a) => {
+    if (a.remote || (a.lat != null && a.lng != null)) return a;
+    const g = (() => { try { return geo.geocodePlace(a.place); } catch { return null; } })();
+    return g && Number.isFinite(Number(g.lat)) ? { ...a, lat: Number(g.lat), lng: Number(g.lng) } : null;
+  });
+  const reads = usableAlerts.map((a) => {
+    if (!a) return Promise.resolve([]);
+    const term = alertDbTerm(a);
+    const scope = a.remote ? '&location=ilike.*remote*' : alertScopeClause(a, geo);
+    if (!term || scope == null) return Promise.resolve([]);
+    return rows(`jobs?title=ilike.*${encodeURIComponent(term)}*${scope}&expires_at=gt.${now}&created_at=gte.${since}&select=${ALERT_COLS}&order=created_at.desc&limit=100`);
+  });
+  const results = await Promise.all(reads);
+  if (results.length && results.every((r) => r === null)) return null;
+  const matched = matchAlerts(results.flatMap((r) => r || []), usableAlerts.map((a) => a || { keywords: '' }), geo);
+  return matched
+    .map((j) => ({ ...j, _matchScore: scoreRow(j).score || 0 }))
+    .sort((a, b) => b._matchScore - a._matchScore);
+}
+
+export default function handler(req, res) { return run(req, res, { loadGeo: loadUsPlaces }); }
+
+/** The handler with its geocoder swapped (tests). */
+export function makeHandler({ loadGeo = loadUsPlaces } = {}) { return (req, res) => run(req, res, { loadGeo }); }
+
+async function run(req, res, { loadGeo }) {
   if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' });
   const cron = req.method === 'GET' && isVercelCron(req);
   const manual = !cron && (hasCronSecret(req) || await hasAdminSession(req));
@@ -71,11 +135,30 @@ export default async function handler(req, res) {
       if (page.length < 1000) break;
       after = page[page.length - 1].id;
     }
-    summary.users = users.length;
 
     const optRows = await rows('email_prefs?select=user_id&job_match_opt_out=eq.true&limit=10000');
     if (!optRows) return res.status(200).json({ ok: false, reason: 'prefs_unreadable' });
     const optOut = new Set(optRows.map((r) => r.user_id));
+
+    // People on "only my job alerts" (they need no résumé). A missing column = migration not applied.
+    const alertPrefs = new Map();
+    const ar = await q('email_prefs?select=user_id,job_match_mode,job_alerts,job_match_opt_out&job_match_mode=eq.alerts&job_match_opt_out=eq.false&limit=10000').catch(() => null);
+    if (ar && ar.ok) {
+      const list = await ar.json().catch(() => null);
+      if (!Array.isArray(list)) return res.status(200).json({ ok: false, reason: 'prefs_unreadable' });
+      for (const r of list) alertPrefs.set(r.user_id, prefsFromRow(r));
+      summary.alerts_ready = true;
+    } else {
+      const err = ar ? await ar.json().catch(() => null) : null;
+      const code = String(err?.code || '');
+      if (code !== '42703' && code !== 'PGRST204') return res.status(200).json({ ok: false, reason: 'prefs_unreadable' });
+      summary.alerts_ready = false; // columns not there yet: everyone stays on résumé matches
+    }
+    const known = new Set(users);
+    for (const id of alertPrefs.keys()) if (!known.has(id)) users.push(id);
+    summary.users = users.length;
+    summary.alert_users = alertPrefs.size;
+    const geo = alertPrefs.size ? await loadGeo() : null;
     const tenantNames = await loadTenantNames(SUPABASE_URL, headers).catch(() => new Map());
 
     for (const uid of users) {
@@ -95,10 +178,22 @@ export default async function handler(req, res) {
       const todays = log.filter((r) => Date.parse(r.sent_at) >= dayStartMs);
       if (!canSendNow({ sentToday: todays.length, lastSentAt: log[0]?.sent_at || null })) { skip('user_limit'); continue; }
 
-      const m = await findResumeMatches({ supabaseUrl: SUPABASE_URL, serviceKey: SERVICE_KEY, userId: uid, allowFloor: false });
-      if (m.heal) await m.heal;
-      if (m.reason) { skip(m.reason); continue; }
-      const ranked = m.ranked.map((j) => withTenantName(j, tenantNames));
+      const prefs = alertPrefs.get(uid) || null;
+      let found;
+      let city = null;
+      if (prefs) {
+        if (!prefs.alerts.length) { skip('no_alerts'); continue; }
+        if (!geo) { skip('geo_unavailable'); continue; }
+        found = await findAlertMatches(prefs.alerts, geo, rows);
+        if (!found) { skip('jobs_unreadable'); continue; }
+      } else {
+        const m = await findResumeMatches({ supabaseUrl: SUPABASE_URL, serviceKey: SERVICE_KEY, userId: uid, allowFloor: false });
+        if (m.heal) await m.heal;
+        if (m.reason) { skip(m.reason); continue; }
+        found = m.ranked;
+        city = m.city;
+      }
+      const ranked = found.map((j) => withTenantName(j, tenantNames));
       if (!ranked.length) { skip('no_matches'); continue; }
 
       // The employers' Seen grades, for the D/F gate and the email's verdict line.
@@ -119,6 +214,7 @@ export default async function handler(req, res) {
         savedJobIds: new Set(saved.map((s) => s.job_id).filter(Boolean).map(String)),
         companiesToday: new Set(todays.map((r) => companyScoreKey(r.company))),
         scores,
+        alertMode: !!prefs,
       });
       if (!pick) { skip('no_good_match'); continue; }
       const { job } = pick;
@@ -134,12 +230,14 @@ export default async function handler(req, res) {
       const domain = email.split('@')[1]?.toLowerCase() || '';
       if (skipDomains.includes(domain)) { skip('test_domain'); continue; }
 
-      const utm = 'utm_source=email&utm_medium=job_match&utm_campaign=resume_match';
+      const alert = prefs ? prefs.alerts[job._alert] || null : null;
+      const utm = `utm_source=email&utm_medium=job_match&utm_campaign=${alert ? 'job_alert' : 'resume_match'}`;
       const applyUrl = `${SITE}/jobs/${encodeURIComponent(String(job.id))}?${utm}`;
       const companyPageUrl = verdict ? `${SITE}/company/${encodeURIComponent(String(job.company).toLowerCase().replace(/\s+/g, '-'))}?${utm}` : null;
       const unsubUrl = `${SITE}/api/unsubscribe?list=job_matches&uid=${u}&token=${unsubToken(uid, EMAIL_SECRET, 'job_matches')}`;
-      const mail = buildJobMatchEmail({ job, verdict, city: m.city, applyUrl, unsubUrl, companyPageUrl });
-      const report = { user: uid.slice(0, 8), job_id: job.id, title: job.title, company: job.company, location: job.location, phrase: job._phrase, grade: verdict?.letter || null, subject: mail.subject };
+      const settingsUrl = alert ? `${SITE}/profile?${utm}#alerts` : null;
+      const mail = buildJobMatchEmail({ job, verdict, city, applyUrl, unsubUrl, companyPageUrl, alert, settingsUrl });
+      const report = { user: uid.slice(0, 8), job_id: job.id, title: job.title, company: job.company, location: job.location, phrase: job._phrase, alert: alert ? alert.keywords : null, grade: verdict?.letter || null, subject: mail.subject };
 
       if (dry) { summary.picked.push(report); continue; }
 
@@ -175,3 +273,4 @@ export default async function handler(req, res) {
     return res.status(500).json({ ok: false, error: String(e.message || e).slice(0, 200), ...summary });
   }
 }
+

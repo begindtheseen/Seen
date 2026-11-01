@@ -32,7 +32,7 @@ beforeEach(() => {
     resume: resumeFor('Cashier'), resumeUpdatedAt: '2026-10-24T00:00:00Z', city: 'Norwalk, CA',
     email: 'jordan@example.com', confirmed: true,
     jobs: [listing('j1', 'Cashier', 'walmart'), listing('j2', 'Cashier - Part Time', 'target'), listing('j3', 'Warehouse Associate', 'amazon')],
-    log: [], prefs: [], apps: [], saved: [], scores: [], logReadable: true, resendStatus: 200,
+    log: [], prefs: [], alertPrefs: [], alertColumns: true, apps: [], saved: [], scores: [], logReadable: true, resendStatus: 200,
     sends: [], claims: [], deletes: 0,
   };
 });
@@ -63,7 +63,10 @@ globalThis.fetch = async (url, opts = {}) => {
     if (path.includes('resume_text=not.is.null')) return json(st.resume ? [{ id: UID }] : []);
     return json([{ resume_text: st.resume, resume_updated_at: st.resumeUpdatedAt, city: st.city }]);
   }
-  if (table === 'email_prefs') return json(st.prefs);
+  if (table === 'email_prefs') {
+    if (path.includes('job_match_mode=eq.alerts')) return st.alertColumns ? json(st.alertPrefs) : json({ code: '42703', message: 'column email_prefs.job_match_mode does not exist' }, 400);
+    return json(st.prefs);
+  }
   if (table === 'applications') return json(st.apps);
   if (table === 'saved_jobs') return json(st.saved);
   if (table === 'company_scores') return json(st.scores);
@@ -76,11 +79,22 @@ globalThis.fetch = async (url, opts = {}) => {
   }
   return json([]);
 };
-const { default: handler } = await import('./cron-job-matches.js');
+const { default: handler, makeHandler } = await import('./cron-job-matches.js');
 
-function run({ auth = 'Bearer cron-secret', query = {}, method = 'GET', headers = {} } = {}) {
+// lib/geo/usPlaces.js interface, stubbed (tiny place table + great-circle miles).
+const PLACES = { 'phoenix, az': { lat: 33.4484, lng: -112.074, name: 'Phoenix', state: 'AZ' }, 'tempe, az': { lat: 33.4255, lng: -111.94, name: 'Tempe', state: 'AZ' }, 'tucson, az': { lat: 32.2226, lng: -110.9747, name: 'Tucson', state: 'AZ' } };
+const mi = (a, b) => { const r = (d) => (d * Math.PI) / 180; const h = Math.sin(r(b.lat - a.lat) / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(r(b.lng - a.lng) / 2) ** 2; return 2 * 3958.76 * Math.asin(Math.sqrt(h)); };
+const geo = {
+  geocodePlace: (t) => PLACES[String(t || '').toLowerCase().trim()] || null,
+  distanceMiles: mi,
+  withinMiles: (loc, o, m) => { const p = geo.geocodePlace(loc); return p ? mi(p, o) <= m : null; },
+};
+const alertsHandler = makeHandler({ loadGeo: async () => geo });
+const PHX_ALERT = { keywords: 'cashier', place: 'Phoenix, AZ', remote: false, miles: 25, lat: 33.4484, lng: -112.074 };
+
+function run({ auth = 'Bearer cron-secret', query = {}, method = 'GET', headers = {}, h = handler } = {}) {
   const res = { code: 200, body: null, status(c) { this.code = c; return this; }, json(o) { this.body = o; return this; } };
-  return handler({ method, query, headers: { ...(auth ? { authorization: auth } : {}), ...headers } }, res).then(() => res);
+  return h({ method, query, headers: { ...(auth ? { authorization: auth } : {}), ...headers } }, res).then(() => res);
 }
 
 test('only Vercel\'s bearer (or the secret / an admin) runs it; the spoofable header does not', async () => {
@@ -173,4 +187,59 @@ test('the daily cap across all users holds', async () => {
     assert.equal(res.body.skipped.daily_cap, 1);
     assert.equal(st.sends.length, 0);
   } finally { delete process.env.JOB_MATCH_DAILY_CAP; }
+});
+
+test('alerts mode: only listings whose title has the words AND sit inside the radius; no résumé needed', async () => {
+  st.resume = null;
+  st.alertPrefs = [{ user_id: UID, job_match_mode: 'alerts', job_match_opt_out: false, job_alerts: [PHX_ALERT] }];
+  st.jobs = [
+    listing('far', 'Cashier', 'walmart', { location: 'Tucson, AZ' }),
+    listing('unplaced', 'Cashier', 'kroger', { location: 'Somewhere' }),
+    listing('remote', 'Cashier', 'chewy', { location: 'Remote' }),
+    listing('other', 'Stocker', 'target', { location: 'Tempe, AZ' }),
+    listing('near', 'Cashier - Part Time', 'target', { location: 'Tempe, AZ' }),
+  ];
+  const res = await run({ h: alertsHandler });
+  assert.equal(res.body.sent, 1, JSON.stringify(res.body));
+  assert.equal(res.body.alert_users, 1);
+  const mail = st.sends[0];
+  assert.match(mail.text, /\/jobs\/near\?utm_source=email&utm_medium=job_match&utm_campaign=job_alert/);
+  assert.equal(mail.subject, 'New cashier job within 25 mi of Phoenix, AZ: Cashier - Part Time at Target');
+  assert.match(mail.text, /Matches your job alert “cashier”/);
+  assert.match(mail.text, /8 miles from Phoenix, AZ/);
+  assert.match(mail.text, /seenjobs\.io\/profile\?.*#alerts/);
+  assert.ok(!/résumé lists/.test(mail.text), 'never claims a résumé match');
+  assert.match(mail.headers['List-Unsubscribe'], /list=job_matches/, 'the same unsubscribe still works');
+  // Next eligible run: the far / unplaced / remote / non-matching listings are never sent.
+  st.log[0].sent_at = new Date(Date.now() - 5 * 3600e3).toISOString();
+  const again = await run({ h: alertsHandler });
+  assert.equal(again.body.sent, 0);
+  assert.equal(again.body.skipped.no_good_match, 1, 'only the already-sent listing matched');
+});
+
+test('alerts mode: a Remote alert takes remote listings; a résumé user beside them is unchanged', async () => {
+  st.alertPrefs = [{ user_id: UID, job_match_mode: 'alerts', job_match_opt_out: false, job_alerts: [{ keywords: 'cashier', place: 'Remote', remote: true, miles: null }] }];
+  st.jobs = [listing('j1', 'Cashier', 'walmart'), listing('rem', 'Cashier', 'chewy', { location: 'Remote - US' })];
+  const res = await run({ h: alertsHandler });
+  assert.equal(res.body.sent, 1, JSON.stringify(res.body));
+  assert.match(st.sends[0].html, /\/jobs\/rem\?/);
+  assert.match(st.sends[0].subject, /^New remote cashier job: Cashier at Chewy$/);
+});
+
+test('alerts mode with no alerts sends nothing; no geo module sends nothing', async () => {
+  st.alertPrefs = [{ user_id: UID, job_match_mode: 'alerts', job_match_opt_out: false, job_alerts: [] }];
+  assert.equal((await run({ h: alertsHandler })).body.skipped.no_alerts, 1);
+  st.alertPrefs = [{ user_id: UID, job_match_mode: 'alerts', job_match_opt_out: false, job_alerts: [PHX_ALERT] }];
+  const noGeo = makeHandler({ loadGeo: async () => null });
+  assert.equal((await run({ h: noGeo })).body.skipped.geo_unavailable, 1);
+  assert.equal(st.sends.length, 0);
+});
+
+test('before the alerts migration (no columns) everyone stays on résumé matches', async () => {
+  st.alertColumns = false;
+  const res = await run({ h: alertsHandler });
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.alerts_ready, false);
+  assert.equal(res.body.sent, 1);
+  assert.match(st.sends[0].subject, /matches your résumé$/);
 });
