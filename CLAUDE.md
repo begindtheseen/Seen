@@ -29,6 +29,11 @@ stand instead of re-reading everything — that is the token save.**
    history and authoritative credential attribution. If you skip this, the next session pays the
    context cost you just saved.
 
+## OWNER RULE: SQL is always a copy-paste block (2026-11-01)
+When the owner needs to run SQL (migrations, fixes, queries), NEVER send a .sql file or point at a file
+path. Put the SQL in the chat as a plain fenced code block he can copy straight into the Supabase SQL
+Editor — comments stripped, one block per migration, and say which to run first.
+
 ## North Star
 Read SEEN_STRATEGY.md at the start of every session. That document is the product strategy.
 Every code change must serve the strategy. When in doubt, re-read it.
