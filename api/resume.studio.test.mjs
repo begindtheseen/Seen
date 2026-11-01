@@ -86,3 +86,14 @@ test('download_resume (legacy action) renders through the structured renderer wi
   const none = await call({ action: 'download_resume', resume: 'x'.repeat(40) });
   assert.ok(none.code === 400 || none.code === 422);
 });
+
+test('download_resume prints the résumé only — never Seen\'s optimizer notes, even when the client sends them', async () => {
+  const res = await call({
+    action: 'download_resume', resume: RESUME, job: 'Production Associate', company: 'Acme',
+    optimizedBullets: ['Tailored bullet to review.'], confirmWarnings: ['Add a bullet with a real detail for: microsoft office'],
+    applicationMessage: 'Hello Acme hiring team.', fitScore: 39, jobTitle: 'Production Associate',
+  });
+  assert.equal(res.code, 200, JSON.stringify(res.body));
+  const ex = await extractResumeFile({ buffer: res.body, fileName: 'r.pdf' });
+  for (const s of ['OPTIMIZED FOR', 'SeenFit', 'Tailored bullet to review.', 'CONFIRM BEFORE USING', 'Add a bullet', 'Hello Acme hiring team.', 'APPLICATION MESSAGE']) assert.ok(!ex.text.includes(s), s);
+});

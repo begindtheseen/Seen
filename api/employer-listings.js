@@ -56,6 +56,7 @@ import {
 import { seenApplyAvailable, signResumeUrl, sendApplicationUpdateEmail, threadAvailable, sendEmployerMessageEmail, lifecycleAvailable } from '../lib/server/seenApplyStore.js';
 import { appendThreadEntry, cleanMessage } from '../lib/server/applicationThread.js';
 import { daysUntilCleared, RETENTION_DAYS } from '../lib/server/applicationRetention.js';
+import { ilikeContains, inList } from '../lib/server/pgrest.js';
 
 const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
 const LISTING_TTL_DAYS = 60; // employer-posted listings live 60 days, matching paste-a-link imports.
@@ -68,11 +69,6 @@ function cors(req, res) {
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-}
-
-// A PostgREST ilike substring that's safe against the query metacharacters.
-function ilikeContains(v) {
-  return `*${String(v || '').replace(/[%,()*]/g, ' ').trim()}*`;
 }
 
 export default async function handler(req, res) {
@@ -114,6 +110,12 @@ async function route(req, res) {
 
   const action = req.method === 'GET' ? 'list' : (body.action || 'list');
   const ctx = { db, body, uid, claim };
+  // These two can email an applicant: a per-employer cap so a compromised or careless account can't
+  // flood people who applied (security audit 2026-11-01).
+  if (action === 'application_status' || action === 'application_message') {
+    const rl = await rateLimit(req, 'employer-applicant-email', { bucketKey: `user:${uid}` });
+    if (!rl.allowed) return res.status(429).json({ error: 'Too many updates this hour — try again later.' });
+  }
 
   if (action === 'list') return listListings(res, ctx);
   if (action === 'create') return createListing(res, ctx);
@@ -143,13 +145,13 @@ async function listListings(res, { db, uid, claim }) {
   // All of this company's listings (active + stale + expired so inactive ones can be disputed),
   // newest first. NOT gated on expires_at — the employer manages the whole set.
   const [jobsRes, dispRes, evRes, appRes] = await Promise.all([
-    db(`jobs?company=ilike.${encodeURIComponent(nameFilter)}` +
+    db(`jobs?company=ilike.${nameFilter}` +
        `&select=id,title,company,location,city,apply_url,source,availability_status,expires_at,created_at,is_employer_posted,employer_user_id${seenApply ? ',apply_mode' : ''}${life ? ',edited_at,status' : ''}` +
        `&order=created_at.desc&limit=300`),
     db(`listing_disputes?employer_user_id=eq.${encodeURIComponent(uid)}&status=eq.open` +
        `&select=id,job_id,kind,status,created_at&order=created_at.desc&limit=300`),
     db(`apply_events?company_key=eq.${encodeURIComponent(companyKey)}&select=job_id,user_id,role&limit=5000`),
-    db(`applications?company_name=ilike.${encodeURIComponent(nameFilter)}&select=job_id,user_id,role&limit=5000`),
+    db(`applications?company_name=ilike.${nameFilter}&select=job_id,user_id,role&limit=5000`),
   ]);
 
   const jobs = jobsRes.ok ? await jobsRes.json() : [];
@@ -170,7 +172,7 @@ async function listListings(res, { db, uid, claim }) {
     const jobIdList = [...new Set(jobs.map(j => j.id).filter(Boolean))].slice(0, 300);
     const [supRes, resolvedRes] = await Promise.all([
       applyUrls.length
-        ? db(`suppressed_listings?apply_url=in.(${applyUrls.map(encodeURIComponent).join(',')})&select=apply_url,reason,created_at&limit=400`)
+        ? db(`suppressed_listings?apply_url=in.${inList(applyUrls)}&select=apply_url,reason,created_at&limit=400`)
         : Promise.resolve({ ok: true, json: async () => [] }),
       jobIdList.length
         ? db(`listing_disputes?job_id=in.(${jobIdList.map(encodeURIComponent).join(',')})&status=in.(approved,denied)&select=id,job_id,kind,status,admin_note,reviewed_at&order=reviewed_at.desc&limit=300`)

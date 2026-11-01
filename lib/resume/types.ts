@@ -5,7 +5,7 @@
 export interface ResumeLink { kind: 'linkedin' | 'github' | 'portfolio' | 'other'; url: string; label: string }
 export interface ResumeBasics { name: string; headline: string; email: string; phone: string; location: string; links: ResumeLink[]; summary: string }
 export interface ResumeBullet { id: string; text: string }
-export interface ResumeExperience { id: string; title: string; company: string; location: string; employmentType: string; start: string; end: string; dateText: string; summary: string; bullets: ResumeBullet[] }
+export interface ResumeExperience { id: string; title: string; company: string; location: string; employmentType: string; start: string; end: string; dateText: string; summary: string; bullets: ResumeBullet[]; group?: string }
 export interface ResumeEducation { id: string; school: string; degree: string; field: string; location: string; start: string; end: string; dateText: string; gpa: string; details: ResumeBullet[] }
 export interface ResumeSkillGroup { id: string; label: string; items: string[] }
 export interface ResumeCertification { id: string; name: string; issuer: string; date: string; text: string }

@@ -16,6 +16,7 @@ import {
 import { SEC_PHRASES, fetchEdgarGroup } from '../lib/server/secEdgar.js';
 import { pacificDate } from '../lib/time/pacific.js';
 import { isVercelCron } from '../lib/server/cronAuth.js';
+import { likeLiteral } from '../lib/server/pgrest.js';
 
 const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
 
@@ -73,10 +74,9 @@ async function route(req, res) {
   const q = new URLSearchParams({
     // Case-insensitive exact match: the company page derives its name from the URL slug
     // (lowercased), but signals are stored under our companies.name (often upper/mixed case).
-    // ilike with no % wildcards = exact match, case-insensitive. Escape ILIKE specials so a
-    // company name can't act as a pattern — backslash FIRST (it's ILIKE's escape char), then
-    // % and _ ; the single char-class handles all three in one pass.
-    company: `ilike.${company.replace(/[\\%_]/g, '\\$&')}`,
+    // ilike with no wildcards = exact match, case-insensitive (likeLiteral escapes % _ \ and
+    // neutralises *, which PostgREST would turn into %). URLSearchParams does the encoding.
+    company: `ilike.${likeLiteral(company)}`,
     status: 'eq.active',
     match_confidence: 'eq.high',
     select: 'source,event_type,title,detail,event_date,location,source_url,source_label',

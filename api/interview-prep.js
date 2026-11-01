@@ -39,6 +39,7 @@ import {
 import { CLIENT_EVENTS, funnelRow, recordFunnelEvent } from '../lib/server/funnelEvents.js';
 import { guideFor } from '../lib/server/interviewGuides.js';
 import { carryFills, fillTarget, SPECIAL_FILL_KEYS } from '../lib/server/prepFills.js';
+import { inList, ilikeExact } from '../lib/server/pgrest.js';
 
 /** The events a browser may post here (checkout and build steps are written by the server). */
 export const FUNNEL_EVENTS = CLIENT_EVENTS;
@@ -83,15 +84,14 @@ function nameVariants(company) {
   const stripped = base.replace(SUFFIX_RE, '').trim();
   return [...new Set([base, stripped].filter(Boolean))];
 }
-const inList = (vals) => encodeURIComponent(vals.map((v) => `"${v.replace(/["\\]/g, '')}"`).join(','));
 
 export async function readRecord({ supabaseUrl, serviceKey, company, role }) {
   const h = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` };
   const names = nameVariants(company);
   if (!names.length) return null;
   const [repRes, jobRes] = await Promise.all([
-    fetch(`${supabaseUrl}/rest/v1/reports?company_name=in.(${inList(names)})&${SCORABLE_REPORTS_FILTER}&select=outcome,rounds,wait_days,report_text,role,platform,ghost_stage&order=created_at.desc&limit=1000`, { headers: h }).catch(() => null),
-    fetch(`${supabaseUrl}/rest/v1/jobs?company=ilike.${encodeURIComponent(names[names.length - 1])}&or=${encodeURIComponent('(salary_min.not.is.null,salary.not.is.null)')}&select=title,salary,salary_min,salary_max&limit=600`, { headers: h }).catch(() => null),
+    fetch(`${supabaseUrl}/rest/v1/reports?company_name=in.${inList(names)}&${SCORABLE_REPORTS_FILTER}&select=outcome,rounds,wait_days,report_text,role,platform,ghost_stage&order=created_at.desc&limit=1000`, { headers: h }).catch(() => null),
+    fetch(`${supabaseUrl}/rest/v1/jobs?company=ilike.${ilikeExact(names[names.length - 1])}&or=${encodeURIComponent('(salary_min.not.is.null,salary.not.is.null)')}&select=title,salary,salary_min,salary_max&limit=600`, { headers: h }).catch(() => null),
   ]);
   if (!repRes || !repRes.ok) return null;
   const reports = await repRes.json().catch(() => []);

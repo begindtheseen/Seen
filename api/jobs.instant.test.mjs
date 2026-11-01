@@ -109,7 +109,7 @@ test('"customer service": the plain CSR outranks the Director; ServiceNow is not
   assert.equal(res.body.fallback, 'outside_radius');
 });
 
-test('the pool reads scope by bounding box OR the city named in the row text', async () => {
+test('the pool reads scope by bounding box OR the city — or a nearby place — named in the row text', async () => {
   const seen = [];
   const orig = globalThis.fetch;
   globalThis.fetch = async (url, opts) => { seen.push(decodeURIComponent(String(url))); return orig(url, opts); };
@@ -118,5 +118,7 @@ test('the pool reads scope by bounding box OR the city named in the row text', a
   } finally { globalThis.fetch = orig; }
   const scoped = seen.filter((u) => u.includes('/rest/v1/jobs') && u.includes('lat.gte.'));
   assert.ok(scoped.length > 0, 'at least one bbox-scoped pool read');
-  assert.ok(scoped.every((u) => /or=\(and\(lat\.gte\.[-\d.]+,lat\.lte\.[-\d.]+,lng\.gte\.[-\d.]+,lng\.lte\.[-\d.]+\),location\.ilike\.\*austin\*\)/.test(u)), scoped[0]);
+  assert.ok(scoped.every((u) => /or=\(and\(lat\.gte\.[-\d.]+,lat\.lte\.[-\d.]+,lng\.gte\.[-\d.]+,lng\.lte\.[-\d.]+\),location\.ilike\.\*austin\*(,location\.ilike\.\*[a-z .]+_ [a-z ]+\*)*\)/.test(u)), scoped[0]);
+  // Coordinate-less rows in nearby towns are read too ("Round Rock, TX"), state-anchored.
+  assert.ok(scoped.every((u) => u.includes('location.ilike.*round rock_ tx*') && u.includes('location.ilike.*round rock_ texas*')), scoped[0]);
 });

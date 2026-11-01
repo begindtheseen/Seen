@@ -511,13 +511,7 @@ export default function ApplyOptimizeModal({
           job: job.title,
           company: job.company,
           jobDescription: job.description || '',
-          // Optimized package appendix — additive, never edits the résumé body.
-          optimizedBullets: realBullets.map(b => b.optimized),
-          humanproofBullets: hp ? hp.package.bullets.map(b => b.humanized_text) : undefined,
-          confirmWarnings: confirmItems(),
-          applicationMessage: applicationMessage() || undefined,
-          fitScore: fitScore ?? undefined,
-          jobTitle: job.title,
+          // the résumé only — Seen's optimizer notes stay on screen, never in the PDF
         }),
       })
       if (!res.ok) {
@@ -592,7 +586,7 @@ export default function ApplyOptimizeModal({
           jobUrl: job.apply_url,
           bullets,
           keywords: gaps,
-          // Optimized-package fields (additive appendix in the emailed PDF).
+          // Optimized-package fields (shown in the email body, never inside the attached résumé).
           optimizedBullets: realBullets.map(b => b.optimized),
           humanproofBullets: hp ? hp.package.bullets.map(b => b.humanized_text) : undefined,
           confirmWarnings: confirmItems(),

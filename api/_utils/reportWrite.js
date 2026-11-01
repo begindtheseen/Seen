@@ -11,6 +11,7 @@ import { SCORABLE_REPORTS_FILTER } from '../../lib/server/reportCounts.js';
 import { EMPLOYEE_REVIEWS_FILTER, employeeReviewSignal } from '../../lib/server/employeeReviews.js';
 import { broadcastActivity } from '../../lib/server/realtime.js';
 import { notifyCompanyRecomputed } from '../../lib/server/indexNow.js';
+import { ilikeExact, ilikeContains, eqValue } from '../../lib/server/pgrest.js';
 
 const _SCORE_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 
@@ -52,14 +53,14 @@ export function isValidCompanyName(name) {
 export async function resolveOrCreateCompany(SUPABASE_URL, hdrs, rawName) {
   const safeCo = String(rawName).trim().slice(0, 200);
   const coNorm = normalizeCompany(safeCo);
-  const coWord = encodeURIComponent(safeCo.split(/\s+/)[0]);
+  const coWord = ilikeContains(safeCo.split(/\s+/)[0]);
   // Exact (case-insensitive) name first. The first-word wildcard below keeps only 20 rows, and a
   // common first word ("Home", "The", "American") has far more than 20 matches, so the existing
   // company was never in the page and a duplicate was created (2026-10-20: a third "Home Depot").
-  const exact = await fetch(`${SUPABASE_URL}/rest/v1/companies?name=ilike.${encodeURIComponent(safeCo.replace(/[%_*\\]/g, ''))}&select=id,name&order=created_at.asc&limit=1`, { headers: hdrs });
+  const exact = await fetch(`${SUPABASE_URL}/rest/v1/companies?name=ilike.${ilikeExact(safeCo)}&select=id,name&order=created_at.asc&limit=1`, { headers: hdrs });
   const exactRows = exact.ok ? await exact.json().catch(() => []) : [];
   if (exactRows?.[0]?.id) return exactRows[0].id;
-  const coSearch = await fetch(`${SUPABASE_URL}/rest/v1/companies?name=ilike.*${coWord}*&select=id,name&limit=20`, { headers: hdrs });
+  const coSearch = await fetch(`${SUPABASE_URL}/rest/v1/companies?name=ilike.${coWord}&select=id,name&limit=20`, { headers: hdrs });
   const coRows = coSearch.ok ? await coSearch.json() : [];
   let cid = (coRows || []).find(c => normalizeCompany(c.name) === coNorm)?.id
     || (coRows || []).find(c => c.name.toLowerCase() === safeCo.toLowerCase())?.id
@@ -75,7 +76,7 @@ export async function resolveOrCreateCompany(SUPABASE_URL, hdrs, rawName) {
     });
     if (insRes.ok) { const insRows = await insRes.json().catch(() => null); cid = Array.isArray(insRows) ? insRows[0]?.id : insRows?.id; }
     if (!cid) {
-      const retry = await fetch(`${SUPABASE_URL}/rest/v1/companies?name=ilike.${encodeURIComponent(safeCo)}&select=id&limit=1`, { headers: hdrs });
+      const retry = await fetch(`${SUPABASE_URL}/rest/v1/companies?name=ilike.${ilikeExact(safeCo)}&select=id&limit=1`, { headers: hdrs });
       if (retry.ok) { const r = await retry.json(); cid = r?.[0]?.id || null; }
     }
   }
@@ -86,7 +87,7 @@ export async function resolveOrCreateCompany(SUPABASE_URL, hdrs, rawName) {
 export async function resolveOrCreateLocation(SUPABASE_URL, hdrs, cid, rawLoc) {
   const safeLoc = rawLoc ? String(rawLoc).trim().slice(0, 200) : '';
   if (!safeLoc) return null;
-  const locSearch = await fetch(`${SUPABASE_URL}/rest/v1/company_locations?company_id=eq.${cid}&city=ilike.${encodeURIComponent(safeLoc)}&select=id&limit=1`, { headers: hdrs });
+  const locSearch = await fetch(`${SUPABASE_URL}/rest/v1/company_locations?company_id=eq.${cid}&city=ilike.${ilikeExact(safeLoc)}&select=id&limit=1`, { headers: hdrs });
   const locRows = locSearch.ok ? await locSearch.json() : [];
   let lid = locRows?.[0]?.id || null;
   if (!lid) {
@@ -138,7 +139,7 @@ export async function assessSubmitTrust(SUPABASE_URL, hdrs, uid, dupFilter) {
 export async function fetchConfirmedStaleCount(SUPABASE_URL, hdrs, companyName) {
   try {
     if (!SUPABASE_URL || !hdrs?.apikey || !companyName) return 0;
-    const enc = encodeURIComponent(String(companyName).toLowerCase().trim());
+    const enc = ilikeExact(String(companyName).toLowerCase().trim());
     const r = await fetch(
       `${SUPABASE_URL}/rest/v1/suppressed_listings?company=ilike.${enc}&select=apply_url&limit=100`,
       { headers: hdrs },
@@ -164,14 +165,15 @@ export async function fetchEmployeeReviewSignal(SUPABASE_URL, hdrs, pattern) {
 export async function recomputeCompanyScoreFromReports(SUPABASE_URL, hdrs, companyName) {
   try {
     if (!SUPABASE_URL || !hdrs?.apikey || !companyName) return false;
-    const enc = encodeURIComponent(String(companyName).toLowerCase().trim());
+    const key = String(companyName).toLowerCase().trim();
+    const enc = ilikeExact(key);
     // Same corpus the score path uses (lib/server/reportCounts.js SCORABLE_REPORTS_FILTER): every
     // report at its trust weight; only the anti-gaming holds (anonymous/duplicate/velocity) wait.
     // Reports + "what people are saying" (the stored web_reviews), fetched together.
     // Every read here is independent of the others — one round trip of wall time, not two.
     const [r, scoreRows, withMentions, employeeReviews, withEmployeeCount, confirmedStaleListings] = await Promise.all([
       fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${enc}&${SCORABLE_REPORTS_FILTER}&select=outcome,platform,trust_reason,wait_days,rounds&limit=2000`, { headers: hdrs }),
-      fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=eq.${enc}&select=web_reviews,web_report_count,data_source,ghost_rate,response_rate,avg_wait_days,avg_rounds,unpaid_rate&limit=1`, { headers: hdrs })
+      fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=eq.${eqValue(key)}&select=web_reviews,web_report_count,data_source,ghost_rate,response_rate,avg_wait_days,avg_rounds,unpaid_rate&limit=1`, { headers: hdrs })
         .then((x) => (x.ok ? x.json() : [])).catch(() => []),
       hasMentionCount(SUPABASE_URL, hdrs),
       fetchEmployeeReviewSignal(SUPABASE_URL, hdrs, enc),

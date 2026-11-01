@@ -14,7 +14,7 @@ import { isReadableResume } from '../lib/server/resumeReadability.js';
 import { deriveResumeJobQuery, pullResumeJobFloor } from '../lib/server/resumeJobMatch.js';
 import { firstPartyReportCount, isGradeable } from '../lib/server/reportCounts.js';
 import { structureAction, healthAction, rewriteAction, tailorAction, atsCheckAction, exportAction, templatesAction, structureText, StudioError } from '../lib/server/resumeStudio.js';
-import { renderPdf } from '../lib/resume/render/pdf.js';
+import { renderPdf, sanitizeForStandardFont } from '../lib/resume/render/pdf.js';
 import { parseResume } from '../lib/resume/parse/index.js';
 import { normalizeDoc, docIsEmpty } from '../lib/resume/model.js';
 import { loadSkillTaxonomy } from '../lib/server/skillTaxonomy.js';
@@ -53,8 +53,8 @@ function _intelStats(ci) {
 }
 
 // Normalize the OPTIONAL optimized-package fields that download_resume / email_analysis may
-// receive. Returns null when none are present (→ behavior identical to today). Never touches
-// the base résumé — these only feed the clearly-separated "Optimized for …" export section.
+// receive. Returns null when none are present. Used for the email BODY only — never printed in
+// the résumé PDF itself.
 function _normalizeOptimizedPackage(body) {
   const strOf = (x) => (typeof x === 'string' ? x : (x && (x.optimized || x.humanized || x.text || x.original || x.warning || x.reason)) || '');
   const toList = (arr) => (Array.isArray(arr) ? arr.map(strOf).map((s) => String(s || '').trim()).filter(Boolean) : []);
@@ -241,7 +241,8 @@ async function handleParseResume(req, res, body) {
     const { base64, fileName, mimeType, location } = body;
     // Keyless file→text extraction + quality gates (PDF / Word / plain-text). See resumeUpload.js.
     const extracted = await extractUploadText({ base64, fileName, mimeType });
-    if (!extracted.ok) return res.status(extracted.status).json({ error: extracted.error });
+    // A refused upload (decompression bomb, encrypted/damaged file) carries a machine `code`.
+    if (!extracted.ok) return res.status(extracted.status).json({ error: extracted.error, ...(extracted.code ? { code: extracted.code } : {}) });
     const { text: extractedText, fileType, wordCount, lines, layout, warnings } = extracted;
 
     // Extract structured employment history — deterministic regex/heuristics.
@@ -297,7 +298,9 @@ async function handleParseResume(req, res, body) {
 // no text baked into images. `meta` may carry the target role/company for a
 // subtle context line; it is omitted when blank.
 export function buildResumePDF(document, meta = {}) {
-  const d = document || {};
+  // Times is a built-in WinAnsi font: every string goes through the same sanitizer the structured
+  // renderer uses, so a glyph Times lacks never prints as a different character.
+  const d = sanitizeDeep(document || {});
   const MARGIN = 58;
   const FOOTER_BAND = 40;          // reserved band at page bottom for the footer
   return new Promise((resolve, reject) => {
@@ -348,7 +351,7 @@ export function buildResumePDF(document, meta = {}) {
       gap(14);
       ensure(18 + followNeed);
       doc.fillColor(INK).font('Times-Bold').fontSize(11.5)
-         .text(text.toUpperCase(), LEFT, doc.y, { width: W, characterSpacing: 1.2, lineBreak: false });
+         .text(text.toUpperCase(), LEFT, doc.y, { width: W, lineBreak: false });
       doc.moveDown(0.18);
       const ruleY = doc.y;
       doc.save().lineWidth(0.9).strokeColor(RULE)
@@ -361,11 +364,11 @@ export function buildResumePDF(document, meta = {}) {
     const contactBits = [c.phone, c.email, c.location, c.linkedin].filter(Boolean);
     if (d.name) {
       doc.fillColor(INK).font('Times-Bold').fontSize(20)
-         .text(d.name, LEFT, doc.y, { width: W, align: 'center', characterSpacing: 0.5 });
+         .text(d.name, LEFT, doc.y, { width: W, align: 'center' });
       doc.moveDown(0.22);
     }
     // Subtle target-role context line (only when we know it) — not fabricated.
-    const targetLine = [meta.role, meta.company].filter(Boolean).join('   ·   ');
+    const targetLine = sanitizeForStandardFont([meta.role, meta.company].filter(Boolean).join('   ·   '));
     if (targetLine) {
       doc.fillColor(META).font('Times-Italic').fontSize(10.5)
          .text(targetLine, LEFT, doc.y, { width: W, align: 'center' });
@@ -458,35 +461,6 @@ export function buildResumePDF(document, meta = {}) {
       drawBody(doc, skills.join('   ·   '), LEFT, W, INK, CONTENT_BOTTOM, newPage);
     }
 
-    // ── Optimized-for appendix (ONLY when an optimized package is supplied) ──
-    // A clearly-separated section at the END of the résumé. It NEVER edits the base résumé
-    // body above — SeenFit-optimized bullets, a fit summary, an application message, and
-    // any "confirm before using" items are surfaced here so the user reviews and copies
-    // them deliberately. Confirm items carry an explicit textual marker (no color needed).
-    const opt = meta.optimized || null;
-    if (opt && ((opt.bullets && opt.bullets.length) || (opt.confirmItems && opt.confirmItems.length) || opt.message)) {
-      const roleLine = [opt.role, opt.company ? `at ${opt.company}` : ''].filter(Boolean).join(' ');
-      sectionHeading(roleLine ? `Optimized for ${roleLine}` : 'Optimized for this role');
-      if (opt.fitScore != null && !Number.isNaN(Number(opt.fitScore))) {
-        drawBody(doc, `SeenFit match: ${Math.round(Number(opt.fitScore))}/100. The bullets below are tailored to this role and grounded in your résumé — review, then copy the ones that fit.`, LEFT, W, META, CONTENT_BOTTOM, newPage);
-      }
-      for (const b of (opt.bullets || [])) drawBullet(doc, b, LEFT, W, INK, CONTENT_BOTTOM, newPage);
-      if (opt.confirmItems && opt.confirmItems.length) {
-        gap(6);
-        doc.fillColor(META).font('Times-Bold').fontSize(10).text('CONFIRM BEFORE USING', LEFT, doc.y, { width: W, characterSpacing: 0.5, lineBreak: false });
-        doc.y += 13;
-        doc.fillColor(META).font('Times-Italic').fontSize(9.5).text('These add specifics we could not verify from your résumé. Only use them if they are true — fill in the real detail first.', LEFT, doc.y, { width: W, lineGap: 1.5 });
-        doc.moveDown(0.2);
-        for (const c of opt.confirmItems) drawBullet(doc, `⚠ ${c}`, LEFT, W, META, CONTENT_BOTTOM, newPage);
-      }
-      if (opt.message && String(opt.message).trim()) {
-        gap(6);
-        doc.fillColor(INK).font('Times-Bold').fontSize(10).text('APPLICATION MESSAGE', LEFT, doc.y, { width: W, characterSpacing: 0.5, lineBreak: false });
-        doc.y += 13;
-        drawBody(doc, String(opt.message).trim(), LEFT, W, INK, CONTENT_BOTTOM, newPage);
-      }
-    }
-
     // ── Footer on every page (drawn after content, via buffered pages) ──
     // Free/anonymous exports carry the "seenjobs.io" wordmark footer; Pro users get a
     // clean, unbranded résumé. meta.pro === true suppresses the footer entirely. The
@@ -503,6 +477,13 @@ export function buildResumePDF(document, meta = {}) {
 
     doc.end();
   });
+}
+
+function sanitizeDeep(v) {
+  if (typeof v === 'string') return sanitizeForStandardFont(v);
+  if (Array.isArray(v)) return v.map(sanitizeDeep);
+  if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, sanitizeDeep(x)]));
+  return v;
 }
 
 // Measure how tall a single hanging-indent bullet will be at width W.
@@ -571,7 +552,7 @@ function drawFooter(doc, LEFT, W, RULE, FOOT, footerBand) {
   doc.save().lineWidth(0.8).strokeColor(RULE)
      .moveTo(LEFT, footY).lineTo(LEFT + W, footY).stroke().restore();
   doc.fillColor(FOOT).font('Times-Roman').fontSize(8.5)
-     .text('Optimized with Seen  ·  seenjobs.io', LEFT, footY + 9, { width: W, align: 'center', characterSpacing: 0.3, lineBreak: false });
+     .text('Optimized with Seen  ·  seenjobs.io', LEFT, footY + 9, { width: W, align: 'center', lineBreak: false });
 }
 
 // ── tool:optimize — the paid optimizer (1 credit, cached 7 days) ─────────────────────────────
@@ -687,18 +668,18 @@ async function handleStudio(req, res, body) {
 // into a document, else the legacy Harvard builder as the safety net. A caller that already holds
 // a structured `doc` (the Studio) sends it and skips re-parsing. Returns null when there is
 // nothing renderable.
-async function buildExportPdf({ resume, doc: docIn, job, company, jobDescription, template, optimized, pro }) {
+async function buildExportPdf({ resume, doc: docIn, job, company, jobDescription, template, pro }) {
   let doc = docIn && typeof docIn === 'object' ? normalizeDoc(docIn) : null;
   if (!doc || docIsEmpty(doc)) { try { doc = parseResume({ text: String(resume || ''), source: 'text' }); } catch { doc = null; } }
   if (doc && !docIsEmpty(doc) && (doc.experience.length || doc.skills.length || doc.basics.summary)) {
     // The target role becomes the headline only when the candidate wrote none (never the company).
-    const r = await renderPdf(doc, { template: template || 'classic', pro, appendix: optimized || null, targetLine: !doc.basics.headline && job ? String(job).slice(0, 120) : '' });
+    const r = await renderPdf(doc, { template: template || 'classic', pro, targetLine: !doc.basics.headline && job ? String(job).slice(0, 120) : '' });
     return { buffer: r.buffer, name: doc.basics.name || '', pages: r.pages, template: r.template };
   }
   const legacy = buildResumeDocument({ resume, jobDescription, job, company });
   const hasContent = legacy.name || legacy.summary || (legacy.experience && legacy.experience.length) || (legacy.skills && legacy.skills.length) || (legacy.education && legacy.education.length);
   if (!hasContent) return null;
-  return { buffer: await buildResumePDF(legacy, { role: job, company, optimized, pro }), name: legacy.name || '', pages: null, template: 'legacy' };
+  return { buffer: await buildResumePDF(legacy, { role: job, company, pro }), name: legacy.name || '', pages: null, template: 'legacy' };
 }
 
 // ── Email analysis handler ─────────────────────────────────────────────────────
@@ -729,9 +710,8 @@ async function handleEmailAnalysis(req, res, body, pro = false) {
     let pdfBase64 = null;
     let attachName = `Seen Resume.pdf`;
     try {
-      // Optional optimized-package appendix (additive) — never edits the base résumé body.
-      const optimized = _normalizeOptimizedPackage(body);
-      const built = await buildExportPdf({ resume, doc: body.doc, job: role, company: co, jobDescription, template: body.template, optimized, pro });
+      // The attachment is the résumé only; the optimized package goes in this email's body below.
+      const built = await buildExportPdf({ resume, doc: body.doc, job: role, company: co, jobDescription, template: body.template, pro });
       if (built) {
         pdfBase64 = built.buffer.toString('base64');
         attachName = resumeFileName({ name: built.name, role });
@@ -821,8 +801,8 @@ async function handleEmailAnalysis(req, res, body, pro = false) {
             Open the PDF attached to this email.
           </p>
           <p style="font-size:13px;color:#6b7280;margin:0 0 24px;line-height:1.7;">
-            Copy the rewritten bullets into your resume before you submit your application.
-            The PDF has your before/after rewrites and every keyword that was added.
+            The PDF is your résumé, ready to send. Your before/after rewrites and the details to
+            confirm are below — copy the ones that are true into your résumé before you apply.
           </p>
 
           <!-- Before/after rewrites (or guidance when there are none) -->
@@ -913,9 +893,10 @@ async function handleDownloadResume(req, res, body) {
     // callers get the "seenjobs.io" footer; Pro users get a clean, unbranded résumé.
     const { pro } = await resolveProAccess(req);
 
-    // Optional optimized-package appendix (additive) — never edits the base résumé body.
-    const optimized = _normalizeOptimizedPackage(body);
-    const built = await buildExportPdf({ resume, doc: body.doc, job, company, jobDescription, template: body.template, optimized, pro });
+    // The résumé only. Seen's optimizer notes (fit score, tailored bullets to review, "confirm before
+    // using" prompts) are guidance for the person, never content a recruiter should receive — the
+    // owner's Starlink download printed them as a résumé section (2026-11-01). They stay on screen.
+    const built = await buildExportPdf({ resume, doc: body.doc, job, company, jobDescription, template: body.template, pro });
     if (!built) {
       return res.status(422).json({ error: 'Could not read enough structure from this résumé to build a document. Make sure it has your roles and bullet points.' });
     }

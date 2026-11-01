@@ -25,7 +25,7 @@
 // Population is only used to pick between places that share a name ("Springfield" → the biggest),
 // so mixing vintages is fine for that job. `unzip` must be on PATH.
 
-import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, statSync, createReadStream } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, statSync, createReadStream, rmSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
@@ -241,7 +241,9 @@ async function build(dir) {
 }
 
 const fromIdx = process.argv.indexOf('--from');
-let dir;
-if (fromIdx > -1) dir = process.argv[fromIdx + 1];
-else { dir = mkdtempSync(join(tmpdir(), 'us-places-')); await download(dir); }
-await build(dir);
+if (fromIdx > -1) {
+  await build(process.argv[fromIdx + 1]);
+} else {
+  const dir = mkdtempSync(join(tmpdir(), 'us-places-'));
+  try { await download(dir); await build(dir); } finally { rmSync(dir, { recursive: true, force: true }); }
+}

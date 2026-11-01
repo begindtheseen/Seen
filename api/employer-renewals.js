@@ -10,13 +10,15 @@
 
 import { pickRenewalReminders } from '../lib/server/renewalReminders.js';
 import { isVercelCron, hasCronSecret, hasAdminSession } from '../lib/server/cronAuth.js';
+import { ilikeExact } from '../lib/server/pgrest.js';
+import { escapeHtml } from '../lib/server/escapeHtml.js';
 
 const WINDOW_DAYS = 7;
 
 async function sendReminderEmail(to, company, items) {
   const RESEND_KEY = process.env.RESEND_KEY || process.env.RESEND_API_KEY;
   if (!RESEND_KEY || !to) return false; // no-op until email is configured / no address on file
-  const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const esc = escapeHtml;
   const soonest = items[0];
   const lines = items.map(i => `<li>${esc(i.label)} — expires in ${i.daysLeft} day${i.daysLeft === 1 ? '' : 's'}</li>`).join('');
   const subject = `Your Seen ${items.length > 1 ? 'placements are' : `${soonest.label} is`} expiring soon`;
@@ -70,7 +72,7 @@ export default async function handler(req, res) {
       // Latest purchaser email for this company (perks.company is lowercased; ilike = case-insensitive exact).
       let to = null;
       try {
-        const er = await db(`employer_purchases?company=ilike.${encodeURIComponent(rem.company)}&email=not.is.null&select=email&order=created_at.desc&limit=1`);
+        const er = await db(`employer_purchases?company=ilike.${ilikeExact(rem.company)}&email=not.is.null&select=email&order=created_at.desc&limit=1`);
         if (er.ok) to = (await er.json())[0]?.email || null;
       } catch { /* fall through — no email */ }
 

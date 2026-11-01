@@ -796,12 +796,8 @@ function ResumePageInner() {
         method: 'POST', headers: await aiHeaders(),
         body: JSON.stringify({
           action: 'download_resume', resume: resumeText, job: jobTitle, company: jobCompany, jobDescription: jobJD, template: pdfTemplate,
-          optimizedBullets: finalBullets(),
-          humanproofBullets: hp ? hp.package.bullets.map(b => b.humanized_text) : undefined,
-          confirmWarnings: confirmList(),
-          applicationMessage: finalMessage() || undefined,
-          fitScore: fitOut?.fit_score ?? undefined,
-          jobTitle,
+          // the résumé only — Seen's optimizer notes (fit score, bullets to review, details to
+          // confirm) stay on screen and in the email body, never in the PDF a recruiter gets
         }),
       })
       if (!res.ok) { const d = await res.json().catch(() => ({})) as { error?: string }; setError(d.error || 'Could not build your résumé PDF.'); setDownloading(false); return }
@@ -1146,7 +1142,7 @@ function ResumePageInner() {
                           <button key={t} type="button" onClick={() => setPdfTemplate(t)} style={{ background: pdfTemplate === t ? 'var(--gdim)' : 'none', border: `1px solid ${pdfTemplate === t ? 'var(--gmid)' : 'var(--line2)'}`, color: pdfTemplate === t ? 'var(--green)' : 'var(--dim)', borderRadius: 6, padding: '.25rem .6rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', cursor: 'pointer', textTransform: 'capitalize' }}>{t}</button>
                         ))}
                       </div>
-                      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', color: 'var(--muted)', lineHeight: 1.5 }}>The PDF is a complete, ATS-ready résumé built from your own text, with the optimized bullets as a clearly-marked appendix · free.</div>
+                      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', color: 'var(--muted)', lineHeight: 1.5 }}>The PDF is a complete, ATS-ready résumé built from your own text — only the résumé, none of Seen's notes · free.</div>
                       <button type="button" onClick={openStudioForJob} style={{ marginTop: '.7rem', background: 'none', border: '1px solid var(--imid)', color: '#c7d2fe', borderRadius: 8, padding: '.5rem .85rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-64)', cursor: 'pointer', width: '100%' }}>✦ Tailor the whole résumé to this job in Résumé Studio →</button>
                     </Card>
 

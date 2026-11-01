@@ -31,6 +31,16 @@ tailor → render → check**. Every stage is deterministic and keyless. No mode
 - **Credits/Pro (locked):** parse = 1 credit (unchanged), tailor = 1 credit, exports
   free with the "Optimized with Seen · seenjobs.io" line and unbranded for Pro; structure / health /
   rewrite / ATS check are free (CPU only, rate-limited).
+- **Exports are the résumé only.** No renderer prints Seen's optimizer notes (fit score, bullets to
+  review, "confirm before using", "add a bullet for …"); `renderPdf` has no `appendix` and
+  `download_resume` / `email_analysis` ignore the package for the PDF (the email body still shows it).
+  The owner's Starlink download printed them as a résumé section (2026-11-01).
+- **Two experience headings stay two.** A heading ending in an experience noun with any qualifier
+  ("Relevant Automotive and EV Experience", "Additional Professional Experience") is an experience
+  section; with ≥ 2 distinct ones every role carries `group` (its heading) and `experienceGroups(d)`
+  in `model.js` is the one grouping the serializer and every renderer use (the tailor variant clears
+  groups — it lays out its own sections). A list section never swallows roles: a date-range line in
+  SKILLS starts an experience section, and a sentence in SKILLS is kept whole, never comma-split.
 - **Fabrication firewall** guards every text-producing path: rewrites, the tailored summary, skill
   additions (résumé-own surfaces only).
 - **Vercel:** `vercel.json` adds `includeFiles: node_modules/pdfjs-dist/**` to `api/resume.js`

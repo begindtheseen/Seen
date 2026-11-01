@@ -463,10 +463,21 @@ export default async function handler(req, res) {
   // ── SAVE PROFILE ────────────────────────────────────────────────────────────
   if (action === 'save_profile') {
     const p = body.profile || {};
-    // Only include columns guaranteed to exist — survey fields saved separately
-    const SAFE_FIELDS = ['email','name','type','city','industry','experience','survey_completed','onboarding_survey'];
+    // Only columns the person may edit. `email`, `type` and `account_type` are NOT client-writable
+    // (security audit 2026-11-01): the sign-up trigger sets them from the verified auth user, the
+    // account type gates employer features, and an editable email must never decide who gets mail.
+    const SAFE_FIELDS = ['name','city','industry','experience','survey_completed','onboarding_survey'];
     const row = { id: uid };
     SAFE_FIELDS.forEach(f => { if (p[f] !== undefined) row[f] = p[f]; });
+    if (row.experience !== undefined && row.experience !== null) {
+      if (typeof row.experience !== 'string') return res.status(400).json({ ok: false, error: 'experience must be text' });
+      row.experience = row.experience.trim().slice(0, 60);
+    }
+    if (row.survey_completed !== undefined) row.survey_completed = row.survey_completed === true;
+    if (row.onboarding_survey !== undefined && row.onboarding_survey !== null
+        && JSON.stringify(row.onboarding_survey).length > 8000) {
+      return res.status(400).json({ ok: false, error: 'onboarding_survey too large' });
+    }
     // Input hygiene (audit 2026-10-24, P1): the free-text fields are trimmed and capped (same limits as
     // the Settings form, lib/profileLimits.js), and a name that is present but blank is refused —
     // signup requires one, and the dashboard greeting has nowhere to fall back to.

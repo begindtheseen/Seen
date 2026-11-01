@@ -50,6 +50,35 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-11-01 B: job alerts, free radius data, upload + security hardening (PR #389, stacked on #388)
+- **Radius:** `lib/geo/usPlaces.js` (+ `lib/geo/data/us-places.json`, `us-zips.json`; public-domain Census 2024
+  Gazetteer + USGS GNIS, rebuilt by `scripts/geo/build-us-places.mjs`) places location TEXT locally; api/jobs.js
+  measures every row (own coords, else its text) and reads nearby towns from the DB; `upsertJobs` fills missing
+  lat/lng. Old rows: `scripts/geo/backfill-job-coords.mjs --write` (not run). vercel.json `includeFiles` carries
+  `lib/geo/data/**` for every function that reaches it. Not yet using it: resumeJobMatch `jobNearCity`,
+  resumeMatches `geoScopeClause`, demand.js.
+- **Job alerts:** Settings → résumé matches / only my alerts (≤5: keywords + place + 10/25/50/100 mi) / off.
+  `lib/server/jobAlerts.js`, user-sync `job_alerts_get|save`, cron-job-matches alert mode. Migration
+  `20261101120000_job_alerts.sql` NOT applied (section hidden until it is).
+- **Uploads:** `lib/server/archiveGuard.js` (DOCX: 10 MB unpacked, 1,000 entries, 100:1, 5 s, CRC, no nested zips);
+  PDF pre-scan + pdf.js in a worker killed at 5 s (`lib/resume/extract/pdfWorker.js`). Python deliverable in
+  `security/zip_guard/`.
+- **Security (audit, partly cut off by a safeguard; finished as a fix-only pass):** employer claims never auto-approve
+  (verified auth email shown to the admin); submit_answer only takes questions the account was asked;
+  `save_profile` no longer takes email/type; migration `20261101130000_profiles_server_write_only.sql` (profiles
+  writes service-only — NOT applied); `lib/server/pgrest.js` for every user value in a PostgREST filter
+  (`orLiteral` inside or=()); `lib/server/safeFetch.js` for user-supplied URLs (connect-time IP check, redirects
+  re-checked, size/time caps); `lib/server/escapeHtml.js` for email HTML; legacy apply mails only the verified
+  account email, per-user limit; next 15.5.28.
+- **Résumé export:** qualified experience headings ("Relevant … Experience") + two experience sections kept
+  (`role.group`, `experienceGroups`); optimizer notes never printed in a résumé (no `appendix`); built-in font text
+  always sanitized.
+- **Data fact (owner decision pending):** live scored reports = ~79% `web_search_public_review` paraphrases of
+  public review pages (≈3,200 Glassdoor, 466 Blind, 90 Indeed — Glassdoor/Indeed are EXCLUDED sources since
+  2026-10-20 but these older rows still count), ~20% Reddit, ~0.5% Seen users. Meta description now says "public
+  applicant accounts and reports from Seen users".
+- Verified: suite 2470/2470, tsc, next build, nav smoke 28/28, overlap sweep clean, job-page buttons 320–390px.
+
 ## Session 2026-11-01: "be more like Indeed" — navigation that remembers where you came from (branch claude/like-indeed-nav)
 - **Owner bug:** the Day 7/14/30 check-in email ("Did X get back to you?") opened `/report?company=…`, not the
   application. Now `trackerAppUrl(SITE, app.id)` → `/tracker?app=<id>` (`lib/server/outcomeEmails.js`); the tracker

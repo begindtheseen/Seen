@@ -145,10 +145,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(merged)
 
       // Backfill the DB with the user's OWN signup name if the row is missing it — never
-      // from a shared local cache. Preserve the row's REAL type — hardcoding 'seeker' here
-      // would silently demote an employer whose row happened to be missing a name.
+      // from a shared local cache. Email and account type are set by the sign-up trigger and
+      // are not client-writable (the server ignores them).
       if (data && !data.name && metaName) {
-        _sync('save_profile', { profile: { email: currentUser.email || '', type: data.account_type || data.type || 'seeker', name: metaName } }).catch(() => {})
+        _sync('save_profile', { profile: { name: metaName } }).catch(() => {})
       }
     } catch {
       setProfile(prev => prev || { name: metaName, city: '', experience: '' })

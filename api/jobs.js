@@ -1,3 +1,4 @@
+import { orLiteral, ilikeContains } from '../lib/server/pgrest.js';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { getQueryExpansion } from '../lib/server/expand.js';
 import { applyRateLimit, rateLimit, rateLimitGlobal, resolveRateBucket } from '../lib/server/ratelimit.js';
@@ -14,10 +15,72 @@ import { aggregateWithSources } from '../lib/jobs/expand.js';
 import { scoreJob, wasteScore, scoreRow, explainListingScore } from '../lib/server/jobScore.js';
 import { computeListingFreshness } from '../lib/server/listingFreshness.js';
 import { listingSignals } from '../lib/server/listingSignals.js';
-import { geocodeLocation, haversineMiles, milesToKm, hasUsableCoords, sanitizeCoords } from '../lib/server/geo.js';
-import { findResumeMatches, geoScopeClause } from '../lib/server/resumeMatches.js';
+import { geocodeLocation, haversineMiles, milesToKm, hasUsableCoords, sanitizeCoords, boundingBox } from '../lib/server/geo.js';
+import { findResumeMatches } from '../lib/server/resumeMatches.js';
+import { geocodePlace, placesWithin } from '../lib/geo/usPlaces.js';
 
-// DB-side scope for a place search (box OR city text): geoScopeClause in lib/server/resumeMatches.js.
+// ── Where a listing is ──────────────────────────────────────────────────────────────────────
+// A row's point: its own coordinates, else its location text placed by the vendored US places
+// table (lib/geo/usPlaces.js). Text naming only a state ("Arizona", "Remote - TX") has no point,
+// and neither does a non-US line. Exported for the tests.
+export function rowPoint(j) {
+  if (!j) return null;
+  const text = j.location || '';
+  if (text && locationScope(text) === 'non_us') return null;
+  const placed = text ? geocodePlace(text) : null;
+  if (placed && placed.stateOnly) return null; // coords on a state-only row are the state's middle
+  if (hasUsableCoords(j)) return { lat: Number(j.lat), lng: Number(j.lng) };
+  return placed;
+}
+const inState = (j, state) => { const g = j && j.location ? geocodePlace(j.location) : null; return !!g && g.state === state; };
+
+// PostgREST-safe ilike value: no logic-tree punctuation; a "." matches anything ("St. Louis" / "St Louis").
+const ilikeTerm = (s) => String(s || '').replace(/[(),*\\:"]/g, ' ').replace(/\./g, '*').replace(/\s+/g, ' ').trim().toLowerCase();
+const NEARBY_PLACE_TERMS = 10;
+
+// DB-side scope for a radius search: the bounding box, OR the row's location text naming the
+// searched city, OR one of the biggest places inside the radius written "<Place>, <ST>" or
+// "<Place>, <State>" (state-anchored so "Mesa" does not read every "Costa Mesa"). nearSearch then
+// measures every row it returns. Two `or=` params on one read are ANDed (verified 2026-10-23).
+export function placeScopeClause(center, miles, cityTerm) {
+  const parts = [];
+  const b = boundingBox(center, miles);
+  const f = (n) => n.toFixed(6);
+  if (b) parts.push(`and(lat.gte.${f(b.latMin)},lat.lte.${f(b.latMax)},lng.gte.${f(b.lngMin)},lng.lte.${f(b.lngMax)})`);
+  const city = ilikeTerm(cityTerm);
+  const terms = new Set();
+  if (city.length >= 2) terms.add(`location.ilike.*${city}*`);
+  for (const p of placesWithin(center, miles, { limit: NEARBY_PLACE_TERMS, minPop: 2000 })) {
+    const name = ilikeTerm(p.name);
+    if (name.length < 3 || name === city) continue;
+    // `_` (any one character) stands for the comma: a comma would split PostgREST's or=() list.
+    terms.add(`location.ilike.*${name}_ ${p.state.toLowerCase()}*`);
+    const full = STATE_NAMES[p.state];
+    if (full) terms.add(`location.ilike.*${name}_ ${full}*`);
+  }
+  parts.push(...terms);
+  return parts.length ? `&or=${encodeURIComponent(`(${parts.join(',')})`)}` : '';
+}
+
+// DB-side scope for a whole-state search: the state's name, or its code after a comma, at the end
+// or followed by one more character ("Austin, TX", "Austin, TX 78701", "Austin, TX, US").
+export function stateScopeClause(state) {
+  const full = STATE_NAMES[state];
+  const code = state.toLowerCase();
+  const parts = [`location.ilike.*_ ${code}`, `location.ilike.*_ ${code}_*`];
+  if (full) parts.push(`location.ilike.*${full}*`);
+  return `&or=${encodeURIComponent(`(${parts.join(',')})`)}`;
+}
+const STATE_NAMES = {
+  AL: 'alabama', AK: 'alaska', AZ: 'arizona', AR: 'arkansas', CA: 'california', CO: 'colorado', CT: 'connecticut',
+  DE: 'delaware', DC: 'district of columbia', FL: 'florida', GA: 'georgia', HI: 'hawaii', ID: 'idaho', IL: 'illinois',
+  IN: 'indiana', IA: 'iowa', KS: 'kansas', KY: 'kentucky', LA: 'louisiana', ME: 'maine', MD: 'maryland',
+  MA: 'massachusetts', MI: 'michigan', MN: 'minnesota', MS: 'mississippi', MO: 'missouri', MT: 'montana',
+  NE: 'nebraska', NV: 'nevada', NH: 'new hampshire', NJ: 'new jersey', NM: 'new mexico', NY: 'new york',
+  NC: 'north carolina', ND: 'north dakota', OH: 'ohio', OK: 'oklahoma', OR: 'oregon', PA: 'pennsylvania',
+  PR: 'puerto rico', RI: 'rhode island', SC: 'south carolina', SD: 'south dakota', TN: 'tennessee', TX: 'texas',
+  UT: 'utah', VT: 'vermont', VA: 'virginia', WA: 'washington', WV: 'west virginia', WI: 'wisconsin', WY: 'wyoming',
+};
 
 // ── Suppressed listings (migration 047) ─────────────────────────────────────────────────────
 // Admins can "delete" an ephemeral (live-search) listing they've confirmed dead; its apply_url
@@ -379,36 +442,36 @@ export default async function handler(req, res) {
       try {
         const now = encodeURIComponent(new Date().toISOString());
         const t3filter = buildFallbackFilter(qNorm);
-        const qEnc = encodeURIComponent(qNorm);
 
-        // Geocode the searched place FIRST (cached in geocode_cache — usually one fast DB read)
-        // so the DB query itself is geo-scoped. THE SCALE FIX: we never fetch the whole ~22k
-        // corpus and haversine it in Node. Overlap the geocode with the cheap expansion +
-        // aggregation-target reads that don't depend on it.
+        // Place the searched location FIRST so the DB query itself is geo-scoped. THE SCALE FIX:
+        // we never fetch the whole corpus and haversine it in Node. A place the vendored table
+        // does not know goes to geocodeLocation (geocode_cache, then Nominatim), overlapped with
+        // the cheap expansion + aggregation-target reads that don't depend on it.
         const [expansion, tgtRows, centerResolved] = await Promise.all([
           getQueryExpansion(qNorm, SUPABASE_URL, dbHeaders),
           // Admin-tunable aggregation target (feature_flags.job_search_target.percentage).
           fetch(`${SUPABASE_URL}/rest/v1/feature_flags?flag_name=eq.job_search_target&select=percentage&limit=1`, { headers: dbHeaders })
             .then(r => r.ok ? r.json() : []).catch(() => []),
-          // 'remote' is not a place: skip geocoding (a null center + remote loc also skips the
-          // distance filter below).
-          loc && !isRemote ? geocodeLocation(loc, SUPABASE_URL, SUPABASE_SERVICE_KEY) : Promise.resolve(null),
+          // 'remote' is not a place, and a whole state is a filter, not a point.
+          loc && !isRemote && !searchedPlace ? geocodeLocation(loc, SUPABASE_URL, SUPABASE_SERVICE_KEY) : Promise.resolve(center),
         ]);
         center = centerResolved;
 
         // DB-side geo scope applied to EVERY pool query:
-        //  • center resolved → indexed bounding-box range scan (jobs_latlng_idx, migration 033),
-        //    NULL/(0,0) excluded. The DB returns only rows near the point — Node never loads the
-        //    corpus; the exact-circle haversine refine (applyRadius) runs on the ≤60-row page.
-        //  • geocode failed  → coarse `location ilike city/state` text (honest degrade).
+        //  • center → indexed bounding-box range scan (jobs_latlng_idx, migration 033) OR the row's
+        //    location text naming the searched city or one of the biggest places inside the radius
+        //    (placeScopeClause). Many rows have no coordinates (497 of 509 coordinate-less Phoenix
+        //    rows on 2026-10-23 were ATS-board rows saying "Phoenix, AZ"); the text half reads them,
+        //    nearSearch then measures each from its placed text.
+        //  • whole-state search → the state's name or ", XX" in the location text.
+        //  • location not placed → coarse `location ilike city/state` text (honest degrade).
         //  • remote/national → no geo scope.
-        // The box (not the old exact-city text) is what lets a radius search surface NEARBY
-        // cities — Irvine/Santa Ana for a "Tustin" search — instead of only name matches.
-        // The box is OR'd with the city named in the row's own location text (geoScopeClause) so
-        // coordinate-less ATS-board rows in the searched city are read too.
         const locTerm = locationDbTerm(loc);
         const textClause = locTerm ? `&location=ilike.*${encodeURIComponent(locTerm)}*` : '';
-        const geoClause = isRemote ? '' : (center ? geoScopeClause(center, radiusMiles, parsedLoc && parsedLoc.city) : textClause);
+        const geoClause = isRemote ? ''
+          : searchState ? stateScopeClause(searchState)
+          : center ? placeScopeClause(center, radiusMiles, parsedLoc && parsedLoc.city)
+          : textClause;
 
         // Below TARGET related listings → top up from the live API. Admin lowers this
         // to calm aggregation, raises it to aggregate harder. Clamped to a sane range.
@@ -445,13 +508,14 @@ export default async function handler(req, res) {
             ? fetch(`${SUPABASE_URL}/rest/v1/jobs?${t3filter}${geoClause}&expires_at=gt.${now}&limit=${poolLimit}`, { headers: dbHeaders })
                 .then(r => r.ok ? r.json() : []).catch(() => [])
             : Promise.resolve([]),
-          fetch(`${SUPABASE_URL}/rest/v1/jobs?company=ilike.*${qEnc}*${geoClause}&expires_at=gt.${now}&limit=${poolLimit}`, { headers: dbHeaders })
+          fetch(`${SUPABASE_URL}/rest/v1/jobs?company=ilike.${ilikeContains(qNorm)}${geoClause}&expires_at=gt.${now}&limit=${poolLimit}`, { headers: dbHeaders })
             .then(r => r.ok ? r.json() : []).catch(() => []),
         ]),
           // Search both search_query and title columns so jobs cached under different
           // query keys still surface for synonymous searches.
           Promise.all(searchTerms.map(term => {
-            const orFilter = `or=${encodeURIComponent(`(search_query.ilike.*${term}*,title.ilike.*${term}*)`)}`;
+            const tl = orLiteral(term); // a comma/paren in the search can never add an OR clause
+            const orFilter = `or=${encodeURIComponent(`(search_query.ilike.*${tl}*,title.ilike.*${tl}*)`)}`;
             return fetch(`${SUPABASE_URL}/rest/v1/jobs?${orFilter}${geoClause}&expires_at=gt.${now}&limit=${poolLimit}`, { headers: dbHeaders })
               .then(r => r.ok ? r.json() : []).catch(() => []);
           })),
@@ -658,7 +722,8 @@ async function corpusRelevant({ supabaseUrl, dbHeaders, terms, query, canonical,
   if (!uniq.length) return [];
   try {
     const arrays = await Promise.all(uniq.map(t => {
-      const orf = `or=${encodeURIComponent(`(company.ilike.*${t}*,title.ilike.*${t}*,search_query.ilike.*${t}*)`)}`;
+      const tl = orLiteral(t);
+      const orf = `or=${encodeURIComponent(`(company.ilike.*${tl}*,title.ilike.*${tl}*,search_query.ilike.*${tl}*)`)}`;
       return fetch(`${supabaseUrl}/rest/v1/jobs?${orf}&expires_at=gt.${now}&select=${cols}&limit=120`, { headers: dbHeaders })
         .then(r => r.ok ? r.json() : []).catch(() => []);
     }));
@@ -670,9 +735,9 @@ async function corpusRelevant({ supabaseUrl, dbHeaders, terms, query, canonical,
       pool.push(row);
     }
     let rel = filterAndRank(pool, query, { synonyms, canonical });
-    // Nearest-first (unknown coords last), relevance order as the tiebreak.
+    // Nearest-first (rows we cannot place last), relevance order as the tiebreak.
     if (center && hasUsableCoords(center)) {
-      rel = rel.map((j, i) => ({ j, d: hasUsableCoords(j) ? haversineMiles(center, j) : Infinity, i }))
+      rel = rel.map((j, i) => { const p = rowPoint(j); return { j, d: p ? haversineMiles(center, p) : Infinity, i }; })
         .sort((a, b) => (a.d - b.d) || (a.i - b.i)).map(x => x.j);
     } else if (loc) {
       rel = sortByProximity(rel, loc);

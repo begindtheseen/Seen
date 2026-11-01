@@ -16,6 +16,7 @@
 import { resolveEmployerUid, resolveApprovedClaim } from '../lib/server/employerAuth.js';
 import { deriveEmployerNotifications } from '../lib/server/employerNotifications.js';
 import { mergeFeed } from '../lib/server/employerNotificationsStore.js';
+import { ilikeContains } from '../lib/server/pgrest.js';
 
 const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
 
@@ -26,10 +27,6 @@ function cors(req, res) {
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-}
-
-function ilikeContains(v) {
-  return `*${String(v || '').replace(/[%,()*]/g, ' ').trim()}*`;
 }
 
 export default async function handler(req, res) {
@@ -80,9 +77,9 @@ async function listFeed(res, { db, claim }) {
   const [notifRes, jobsRes, appsRes] = await Promise.all([
     db(`employer_notifications?company_key=eq.${encodeURIComponent(companyKey)}` +
        `&select=id,kind,severity,title,body,job_id,meta,read_at,created_at&order=created_at.desc&limit=200`),
-    db(`jobs?company=ilike.${encodeURIComponent(nameFilter)}` +
+    db(`jobs?company=ilike.${nameFilter}` +
        `&select=id,title,company,city,availability_status,last_seen_at,created_at,is_employer_posted,source,expires_at&order=last_seen_at.asc&limit=200`),
-    db(`applications?company_name=ilike.${encodeURIComponent(nameFilter)}` +
+    db(`applications?company_name=ilike.${nameFilter}` +
        `&select=role,city,status,created_at&order=created_at.desc&limit=200`),
   ]);
 
