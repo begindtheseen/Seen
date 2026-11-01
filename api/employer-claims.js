@@ -157,8 +157,8 @@ async function employerRoute(req, res, { db, body, uid }) {
     // ("walmart-careers.com" → Walmart, "target.dev" → Target), and an approved claim hands over that
     // company's listings and its applicants' résumés. The admin now sees the VERIFIED sign-in email and
     // a hint when its domain looks like the company's — the decision is a person's.
-    const verified = await verifiedAuthEmail(uid)
-    const domainHint = verified && emailDomainMatchesCompany(verified, rawName)
+    const verified = await verifiedAuthEmail(uid);
+    const domainHint = verified && emailDomainMatchesCompany(verified, rawName);
     const insertRow = {
       user_id: uid,
       company_name: canonical,
@@ -191,14 +191,14 @@ async function employerRoute(req, res, { db, body, uid }) {
 
 /** The account's sign-in email when Supabase has confirmed it, else null. */
 async function verifiedAuthEmail(uid) {
-  const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_KEY
-  if (!url || !key || !uid) return null
+  const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_KEY;
+  if (!url || !key || !uid) return null;
   try {
-    const r = await fetch(`${url}/auth/v1/admin/users/${encodeURIComponent(uid)}`, { headers: { apikey: key, Authorization: `Bearer ${key}` } })
-    if (!r.ok) return null
-    const u = await r.json()
-    return u && u.email && u.email_confirmed_at ? String(u.email) : null
-  } catch { return null }
+    const r = await fetch(`${url}/auth/v1/admin/users/${encodeURIComponent(uid)}`, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
+    if (!r.ok) return null;
+    const u = await r.json();
+    return u && u.email && u.email_confirmed_at ? String(u.email) : null;
+  } catch { return null; }
 }
 
 async function listClaimsForUser(db, uid) {
@@ -304,7 +304,7 @@ async function attachEmployerEmails(db, claims) {
     const rows = r.ok ? await r.json() : [];
     const byId = new Map(rows.map(p => [p.id, p]));
     // The sign-in email (verified by Supabase), never profiles.email, which the account can edit.
-    const verified = new Map(await Promise.all(ids.map(async id => [id, await verifiedAuthEmail(id)])))
+    const verified = new Map(await Promise.all(ids.map(async id => [id, await verifiedAuthEmail(id)])));
     return claims.map(c => ({
       ...c,
       email: verified.get(c.user_id) || null,
