@@ -162,6 +162,29 @@ if (await coBtn.count()) {
   console.log('SKIP drawer → company preview (no such button in the drawer)');
 }
 
+// ── 6 ── after a search (phone), the location can be changed: the row opens and stays open
+await page.goto(`${BASE}/jobs?q=cashier&loc=Phoenix%2C+AZ`, { waitUntil: 'networkidle' });
+await page.locator('article [role="button"]').first().waitFor();
+const loc = page.locator('input[aria-label="City or state"]');
+check('after a search the location row is tucked into a "where" line', !(await loc.isVisible()) && (await page.getByRole('button', { name: /Change location/ }).isVisible()));
+await page.getByRole('button', { name: /Change location/ }).tap();
+await wait(300);
+check('tapping it opens the location field', await loc.isVisible());
+await page.locator('input[aria-label="Job title, role or company"]').tap();
+await wait(200);
+await loc.tap();
+await wait(300);
+check('moving between the title and city boxes keeps it open', await loc.isVisible());
+await page.locator('select[aria-label="Distance"]').focus();
+await wait(200);
+check('…and so does the distance control', await loc.isVisible());
+const callsLoc = searchCalls;
+await loc.fill('Tucson, AZ');
+await loc.press('Enter');
+await wait(1200);
+check('a new area searches', searchCalls > callsLoc && new URL(page.url()).searchParams.get('loc') === 'Tucson, AZ', page.url());
+check('…and the row tucks away again', !(await loc.isVisible()));
+
 // ── 5 ── signed-out check-in email link
 const uuid = '9f1c2d3e-0000-4000-8000-000000000001';
 await page.goto(`${BASE}/tracker?app=${uuid}`, { waitUntil: 'networkidle' });

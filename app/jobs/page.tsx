@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, Fragment } from 'react'
+import { useState, useEffect, useRef, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Job } from '@/lib/types'
 import { trackApplyClick } from '@/lib/trackApply'
@@ -117,6 +117,22 @@ export default function JobsPage() {
   // After a search with results, phones get a sticky one-line query bar (audit #25: the first card sat
   // ~700px down under a three-row form). The location row reappears while the bar has focus.
   const searched = status === 'done' && filtered.length > 0
+  // The compact bar's location row is opened by STATE, not by CSS :focus-within — moving focus from the
+  // title box to the city box (or tapping the 📍 / distance controls) dropped focus-within for a frame,
+  // the row vanished under the finger and the city could not be changed (owner 2026-11-01). It stays
+  // open until a search runs.
+  const [whereOpen, setWhereOpen] = useState(false)
+  const locRef = useRef<HTMLInputElement>(null)
+  function runSearch() {
+    setWhereOpen(false)
+    try { (document.activeElement as HTMLElement | null)?.blur?.() } catch { /* ignore */ }
+    searchJobs()
+  }
+  function openWhere() {
+    setWhereOpen(true)
+    setTimeout(() => locRef.current?.focus(), 0)
+  }
+  const radiusLabel = radius === '0' ? 'Remote' : hasCity ? `${radius} mi` : 'Anywhere'
   // Follow the URL: Back/Forward open or close the listing; a page loaded on ?job= (Back from another
   // page) reopens it once its row is known — from the results, the rail, or this tab's listing cache.
   useEffect(() => {
@@ -150,7 +166,7 @@ export default function JobsPage() {
           />
 
           {/* Search bar — job titles AND company names in the same box. No autofill: Enter / Search runs it. */}
-          <div className={`${bar.wrap}${searched ? ' ' + bar.compact : ''}`} role="search">
+          <div className={`${bar.wrap}${searched ? ' ' + bar.compact : ''}${whereOpen ? ' ' + bar.whereOpen : ''}`} role="search">
             <div className={bar.query}>
             <input
               type="text"
@@ -165,17 +181,25 @@ export default function JobsPage() {
               spellCheck={false}
               enterKeyHint="search"
               onChange={e => setQuery(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') searchJobs() }}
+              onFocus={() => { if (searched) setWhereOpen(true) }}
+              onKeyDown={e => { if (e.key === 'Enter') runSearch() }}
             />
             {/* Compact (phone, after a search): the one-line bar's own Search button. */}
-            <button type="button" className={bar.goIcon} onClick={() => searchJobs()} disabled={status === 'loading'} aria-label="Search">
+            <button type="button" className={bar.goIcon} onClick={runSearch} disabled={status === 'loading'} aria-label="Search">
               <Icon name="search" size={18} />
             </button>
             </div>
-            <div className={bar.row}>
+            {/* Compact: where the search is, as one tap target that opens the location row. */}
+            <button type="button" className={bar.whereChip} onClick={openWhere} aria-label={`Change location: ${location.trim() || 'anywhere'}, ${radiusLabel}`}>
+              <Icon name="map-pin" size={14} />
+              <span className={bar.whereText}>{location.trim() || 'Anywhere'} · {radiusLabel}</span>
+              <span className={bar.whereEdit}>Change</span>
+            </button>
+            <div className={bar.row} onPointerDownCapture={() => { if (searched) setWhereOpen(true) }}>
               <div className={bar.loc}>
                 <input
                   type="text"
+                  ref={locRef}
                   className={`${bar.input} ${bar.locInput}`}
                   placeholder="City or state..."
                   aria-label="City or state"
@@ -186,7 +210,8 @@ export default function JobsPage() {
                   spellCheck={false}
                   enterKeyHint="search"
                   onChange={e => setLocation(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') searchJobs() }}
+                  onFocus={() => { if (searched) setWhereOpen(true) }}
+                  onKeyDown={e => { if (e.key === 'Enter') runSearch() }}
                 />
                 <button
                   type="button"
@@ -222,7 +247,7 @@ export default function JobsPage() {
               <button
                 type="button"
                 className={bar.go}
-                onClick={() => searchJobs()}
+                onClick={runSearch}
                 disabled={status === 'loading'}
               >
                 {status === 'loading' ? 'Searching…' : 'Search'}

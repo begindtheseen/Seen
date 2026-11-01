@@ -592,6 +592,20 @@ function TrackerPage() {
   const appsRef = useRef<Application[]>([]); appsRef.current = apps
   const revealRef = useRef(reveal); revealRef.current = reveal
 
+  // The phone "+" hides while the list scrolls down (reading) and returns on scroll up / near the top.
+  const [fabTucked, setFabTucked] = useState(false)
+  useEffect(() => {
+    let last = window.scrollY
+    const onScroll = () => {
+      const y = window.scrollY
+      if (Math.abs(y - last) < 8) return
+      setFabTucked(y > last && y > 120)
+      last = y
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
   // Back to the tracker lands where the list was scrolled — unless the URL names a card to jump to.
   const [deepLinked] = useState(() => typeof window !== 'undefined' && (/[?&](app|prep|new)=/.test(window.location.search) || window.location.hash.startsWith('#app_')))
   useScrollMemory(!loading && !deepLinked)
@@ -1246,9 +1260,11 @@ function TrackerPage() {
 
       </div>
     </div>
-    {/* Phones: "+ Track application" floats above the tab bar so it is always one tap away */}
+    {/* Phones: a round "+" above the tab bar — tucked away while scrolling down so it never sits on a
+        card's words, back on the first scroll up (owner 2026-11-01: "this button overlaps everything"). */}
+    {apps.length > 0 && <div className={s.fabSpace} aria-hidden />}
     {apps.length > 0 && !showManual && !editing && !expandedId && prepOpen === 0 && (
-      <button type="button" className={s.fab} onClick={() => setShowManual(true)} aria-label="Track application">+ Track application</button>
+      <button type="button" className={`${s.fab}${fabTucked ? ' ' + s.fabTucked : ''}`} onClick={() => setShowManual(true)} aria-label="Track application" title="Track application"><Icon name="plus" size={24} /></button>
     )}
     {showSurvey && surveyMode === 'resume' && (
       <ResumeSurveyModal

@@ -196,8 +196,13 @@
 }
 
 
-/* ── After a search, on phones: ONE sticky line (title box + Search). The location row comes back while
-   the bar has focus, so it can still be changed (audit #25). Solid surface, never glass. ── */
+/* The compact bar's "where" line — hidden except in the compact bar on phones. */
+.whereChip { display: none; }
+
+/* ── After a search, on phones: ONE sticky line (title box + Search) and a "where" line under it that
+   opens the location row (audit #25). The row is opened by state (.whereOpen), never by :focus-within —
+   that dropped for a frame between fields and hid the row under the finger (owner 2026-11-01). Solid
+   surface, never glass. ── */
 @media (max-width: 768px) {
   .compact {
     position: sticky; top: 58px; z-index: 30;
@@ -211,6 +216,13 @@
     background: var(--cta-gradient); color: #fff; cursor: pointer;
   }
   .compact .row { display: none; }
-  .compact:focus-within .row { display: flex; }
-  .compact:focus-within .go { display: none; }
+  .compact.whereOpen .row { display: flex; }
+  .compact.whereOpen .go { display: none; }
+  .compact:not(.whereOpen) .whereChip {
+    display: flex; align-items: center; gap: var(--sp-2); width: 100%; min-height: 44px;
+    margin-top: var(--sp-1); padding: 0 var(--sp-1); border: 0; background: none;
+    color: var(--sub); font: inherit; font-size: var(--fs-meta); text-align: left; cursor: pointer;
+  }
+  .whereText { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .whereEdit { flex: none; color: var(--accent, #7c9cff); font-weight: 600; }
 }

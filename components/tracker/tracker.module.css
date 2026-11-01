@@ -95,15 +95,25 @@
 .manage > * { flex: 1 1 auto; }
 
 /* ── Floating add button (phones) ── */
+/* A 56px round "+" (the long "+ Track application" pill covered card text). Tucked off-screen while the
+   list scrolls down; the list ends with room for it (.list padding below). */
 .fab {
   position: fixed; right: 16px; z-index: 540;
   bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-  display: none; align-items: center; gap: .4rem; min-height: 48px; padding: .6rem 1.05rem; border-radius: 999px; border: none; cursor: pointer;
-  background: linear-gradient(135deg,#1d4ed8 0%,#7c3aed 55%,#a855f7 100%); color: #fff; font-family: var(--body); font-weight: 600; font-size: var(--fs-sm);
+  display: none; align-items: center; justify-content: center; width: 56px; height: 56px; padding: 0; border-radius: 50%; border: none; cursor: pointer;
+  background: linear-gradient(135deg,#1d4ed8 0%,#7c3aed 55%,#a855f7 100%); color: #fff;
   box-shadow: 0 10px 30px rgba(0,0,0,.45), 0 0 28px rgba(124,58,237,.45);
+  transition: transform .25s ease, opacity .25s ease;
 }
+.fabSpace { display: none; }
+.fabTucked { transform: translateY(calc(100% + 96px)); opacity: 0; pointer-events: none; }
 :global(html.tabbar) .fab { bottom: calc(64px + 14px + env(safe-area-inset-bottom, 0px)); }
-@media (max-width: 768px) { .fab { display: inline-flex; } }
+@media (max-width: 768px) {
+  .fab { display: inline-flex; }
+  /* The last card can scroll clear of the round button. */
+  .fabSpace { display: block; height: 72px; }
+}
+@media (prefers-reduced-motion: reduce) { .fab { transition: none; } }
 
 /* ── Modal (add / edit / confirm) ── */
 .backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.88); z-index: 9000; display: flex; align-items: flex-start; justify-content: center; padding: 6vh 1rem; overflow-y: auto; box-sizing: border-box; }
