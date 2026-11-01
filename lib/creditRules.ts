@@ -34,6 +34,8 @@ export {
   PRO_DAYS_STACK,
   skuPrice,
   ONE_TIME_NOTE,
+  MAX_RESUMES_FREE,
+  MAX_RESUMES_PRO,
   hasProAccess,
   creditBalance,
   firstCreditsRow,

@@ -29,7 +29,8 @@ export const ResumeStore = {
     localStorage.setItem(key, text)
     localStorage.setItem(metaKey, JSON.stringify({ fileName, wordCount }))
     if (loggedIn) {
-      _sync('save_resume', { text, fileName, wordCount }).catch(e =>
+      // Awaited so a caller that re-reads the account (the saved-résumés list) sees this save.
+      await _sync('save_resume', { text, fileName, wordCount }).catch(e =>
         console.warn('Resume DB save (non-fatal):', e)
       )
     }
@@ -88,11 +89,11 @@ export const ResumeStore = {
     return null
   },
 
-  clear(userId?: string, loggedIn = false): void {
+  async clear(userId?: string, loggedIn = false): Promise<void> {
     localStorage.removeItem(getKey(userId))
     localStorage.removeItem(getMetaKey(userId))
     if (loggedIn) {
-      _sync('clear_resume').catch(e => console.warn('ResumeStore.clear:', e))
+      await _sync('clear_resume').catch(e => console.warn('ResumeStore.clear:', e))
     }
   },
 }

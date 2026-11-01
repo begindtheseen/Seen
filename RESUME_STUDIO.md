@@ -157,6 +157,20 @@ chronological with nothing dropped and nothing added.
 - `node lib/resume/fixtures/makePdfFixtures.mjs` — regenerate the checked-in PDF fixtures.
 - `node scripts/resume-studio-smoke.mjs` — the end-to-end browser smoke test (needs `next start`).
 
+## Saved résumés (2026-11-01)
+
+- `public.resumes` (migration `20261101140000_resumes.sql`, server-only, RLS on with no policies): up to
+  `MAX_RESUMES_FREE` (1) / `MAX_RESUMES_PRO` (5) per account (`lib/server/creditRules.js`). The DEFAULT row
+  is mirrored into `profiles.resume_text` (+ file name, word count, updated at) on every change, so every
+  reader of `profiles.resume_text` is unchanged. Studio, uploads and `save_resume` write the default.
+- Rules + store: `lib/server/resumes.js`; actions `resumes_list | resume_get | resume_create | resume_rename |
+  resume_delete | resume_set_default` in `api/user-sync.js`. Pro lapsed: nothing is deleted; only the
+  default is `usable` (optimize / apply); adding past the free cap is refused with the upsell.
+- Before the migration every action answers `{ ready: false }` and the UI shows the single résumé.
+- UI: "Your résumé(s)" panel + viewer on `/resume` (`components/resume/ResumeLibraryPanel.tsx`,
+  `ResumeView.tsx`), the "Résumé: <name>" picker (`ResumePicker.tsx`) on `/resume`, the Optimize sheet and
+  Apply on Seen (`resume_id`, checked server-side by `resumeForApply`).
+
 ## Follow-ups (not in this PR)
 
 - Server-side variant persistence (a `resume_documents` table) if cross-device tailored versions

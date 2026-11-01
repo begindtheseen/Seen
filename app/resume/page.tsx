@@ -21,11 +21,15 @@ import dynamic from 'next/dynamic'
 import { VerdictCard, WhyYouMatch, MissingList, Checklist, PaidPlanView, type Verdict, type ConstraintRow, type PaidPlan } from '@/components/optimizer/Verdict'
 import CreditConfirmDialog from '@/components/CreditConfirmDialog'
 import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
-import { RESUME_OPTIMIZE_COST, creditCostLabel, priceLabel } from '@/lib/creditRules'
+import { RESUME_OPTIMIZE_COST, creditCostLabel, priceLabel, MAX_RESUMES_PRO } from '@/lib/creditRules'
 import { markQuiet } from '@/lib/quietWindow'
 import { MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
 import PageHeader from '@/components/shell/PageHeader'
 import { replaceParam, readParam, useScrollMemory } from '@/lib/nav/urlState'
+import ResumeLibraryPanel from '@/components/resume/ResumeLibraryPanel'
+import ResumePicker from '@/components/resume/ResumePicker'
+import { ResumeLibrary, useResumeList, type SavedResume } from '@/lib/resumeLibrary'
+import { chooseResumeId, pickerMode } from '@/lib/resumeChoice.js'
 
 const ResumeSurveyModal = dynamic(() => import('@/components/ResumeSurveyModal'), { ssr: false })
 
@@ -350,13 +354,15 @@ function ResultEmpty({ icon, text, link }: { icon: string; text: string; link?: 
   )
 }
 
-function ResumeInput({ resumeText, setResumeText, resumeMeta, onUpload, onClear, onFileDrop }: {
+function ResumeInput({ resumeText, setResumeText, resumeMeta, onUpload, onClear, onFileDrop, managed }: {
   resumeText: string
   setResumeText: (t: string) => void
   resumeMeta: { fileName: string; wordCount: number } | null
   onUpload: (e: React.ChangeEvent<HTMLInputElement>) => void
   onClear: () => void
   onFileDrop: (file: File) => void
+  /** Several saved résumés: they are added and removed in "Your résumés", not here. */
+  managed?: boolean
 }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [isDragging, setIsDragging] = useState(false)
@@ -364,10 +370,10 @@ function ResumeInput({ resumeText, setResumeText, resumeMeta, onUpload, onClear,
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.4rem', flexWrap: 'wrap', gap: '.4rem' }}>
         {label('Your resume')}
-        <div style={{ display: 'flex', gap: '.5rem' }}>
+        {!managed && <div style={{ display: 'flex', gap: '.5rem' }}>
           <button onClick={() => fileRef.current?.click()} title="Upload is free — no AI credit used" style={{ background: 'none', border: '1px solid var(--line2)', color: 'var(--dim)', borderRadius: 6, padding: '.25rem .65rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', cursor: 'pointer' }}>Upload PDF/Word/txt · free</button>
           {resumeText && <button onClick={onClear} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', cursor: 'pointer' }}>Clear</button>}
-        </div>
+        </div>}
         <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,.txt,.md,text/plain" onChange={onUpload} style={{ display: 'none' }} />
       </div>
       {resumeMeta ? (
@@ -395,6 +401,11 @@ function ResumePageInner() {
 
   const [resumeText, setResumeText] = useState('')
   const [resumeMeta, setResumeMeta] = useState<{ fileName: string; wordCount: number } | null>(null)
+  // Saved résumés (lib/resumeLibrary): the list, and which one this page optimizes with (null = the
+  // résumé on file, i.e. the default). ready:false = not live yet → the single résumé, as before.
+  const { list: resumeList, setList: setResumeList, reload: reloadResumes } = useResumeList(isLoggedIn, user?.id)
+  const [resumeId, setResumeId] = useState<string | null>(null)
+  const [reanalyzeSeq, setReanalyzeSeq] = useState(0)
 
   const [jobTitle, setJobTitle] = useState(params?.get('role') ?? '')
   const [jobCompany, setJobCompany] = useState(params?.get('company') ?? '')
@@ -465,11 +476,49 @@ function ResumePageInner() {
     return () => { cancelled = true }
   }, [isLoggedIn, user?.id])
 
+  function loadOnFile() {
+    return ResumeStore.load(user?.id, isLoggedIn).then(data => {
+      if (data) { setResumeMeta({ fileName: data.fileName, wordCount: data.wordCount }); setResumeText(data.text) }
+      else { setResumeMeta(null); setResumeText('') }
+    })
+  }
   useEffect(() => {
     ResumeStore.load(user?.id, isLoggedIn).then(data => {
       if (data) { setResumeMeta({ fileName: data.fileName, wordCount: data.wordCount }); setResumeText(data.text) }
     })
   }, [user?.id, isLoggedIn])
+
+  // The résumé on file is the default; select it once the list is known (and again if the selected
+  // one went away or can no longer be used).
+  useEffect(() => {
+    if (!resumeList || !resumeList.ready) { setResumeId(null); return }
+    const next = chooseResumeId(resumeList, resumeId)
+    if (next !== resumeId) setResumeId(next)
+  }, [resumeList]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Picking another résumé after an analysis re-runs the FREE check with it (never a credit).
+  function applyResume(r: SavedResume, text: string) {
+    setResumeId(r.id)
+    setResumeText(text)
+    setResumeMeta({ fileName: r.name, wordCount: r.word_count || countWords(text) })
+    if (analyzed) setReanalyzeSeq(n => n + 1)
+  }
+  async function pickResume(r: SavedResume) {
+    if (r.id === resumeId || !r.usable) return
+    const text = await ResumeLibrary.text(r.id)
+    if (text == null) { setError('Could not open that résumé — try again.'); return }
+    applyResume(r, text)
+  }
+  useEffect(() => {
+    if (reanalyzeSeq) void analyze() // runs after the render that holds the picked text
+  }, [reanalyzeSeq]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The default changed (made default, deleted, first added): the résumé on file follows it.
+  async function onDefaultChanged() {
+    await loadOnFile()
+    const l = await reloadResumes()
+    setResumeId(l && l.ready ? chooseResumeId(l, null) : null)
+  }
 
   useEffect(() => { SavedJobsStore.load(isLoggedIn).then(setSavedJobs).catch(() => {}) }, [isLoggedIn])
 
@@ -604,13 +653,18 @@ function ResumePageInner() {
         // Résumé Studio reuses the server's layout-aware parse instead of re-parsing the text.
         if (r.doc) ResumeDocStore.putParsed(user?.id, r.text, r.doc as ResumeDoc)
         setResumeText(r.text); setResumeMeta({ fileName: r.fileName, wordCount: wc }); setError('')
+        if (resumeList?.ready) void reloadResumes() // the upload replaced the default résumé
       } else {
         setError(r.error || 'Could not read this file. Paste your résumé text into the box instead.')
       }
     } catch { setError('Failed to parse file. Try pasting text instead.') }
   }
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) { const f = e.target.files?.[0]; if (f) await uploadFile(f) }
-  function clearResume() { ResumeStore.clear(user?.id, isLoggedIn); setResumeText(''); setResumeMeta(null) }
+  async function clearResume() {
+    setResumeText(''); setResumeMeta(null)
+    await ResumeStore.clear(user?.id, isLoggedIn)
+    if (resumeList?.ready) await onDefaultChanged() // another saved résumé may have become the default
+  }
 
   // ── ANALYZE — the one action. Runs the free deterministic SeenFit engine, then loads
   //    read-only insights. HumanProof + Strategy stay on-demand (credit/Pro-gated). ──
@@ -621,7 +675,7 @@ function ResumePageInner() {
     // Persist a pasted résumé so every surface (and future sessions) can reuse it.
     if (!resumeMeta && resumeText.trim().length >= 40) {
       const wc = countWords(resumeText)
-      ResumeStore.save(resumeText, 'Pasted résumé', wc, user?.id, isLoggedIn).catch(() => {})
+      ResumeStore.save(resumeText, 'Pasted résumé', wc, user?.id, isLoggedIn).then(() => { if (resumeList?.ready) void reloadResumes() }).catch(() => {})
       setResumeMeta({ fileName: 'Pasted résumé', wordCount: wc })
     }
     setAnalyzed(true)
@@ -906,10 +960,23 @@ function ResumePageInner() {
           </div>
         )}
 
+        <ResumeLibraryPanel
+          isLoggedIn={isLoggedIn}
+          list={resumeList}
+          setList={setResumeList}
+          single={resumeMeta && resumeText ? { text: resumeText, fileName: resumeMeta.fileName, wordCount: resumeMeta.wordCount } : null}
+          selectedId={resumeId}
+          onUse={applyResume}
+          onDefaultChanged={() => { void onDefaultChanged() }}
+          onUpsell={() => { setUpgradeReason('pro'); setUpgradeFeature(`up to ${MAX_RESUMES_PRO} résumés`); setShowUpgrade(true) }}
+          location={profile?.city || ''}
+        />
+
         <div className="resume-layout">
           {/* Left: inputs */}
           <div>
-            <ResumeInput resumeText={resumeText} setResumeText={setResumeText} resumeMeta={resumeMeta} onUpload={handleUpload} onFileDrop={uploadFile} onClear={clearResume} />
+            <ResumePicker list={resumeList} selectedId={resumeId} onPick={r => { void pickResume(r) }} disabled={fitState === 'loading'} note={analyzed ? 'Switching re-checks your fit · free' : undefined} />
+            <ResumeInput resumeText={resumeText} setResumeText={setResumeText} resumeMeta={resumeMeta} onUpload={handleUpload} onFileDrop={uploadFile} onClear={() => { void clearResume() }} managed={pickerMode(resumeList) === 'select'} />
 
             <div style={{ marginTop: '1rem' }}>
               {label('Which job?')}

@@ -16,6 +16,7 @@ import { cancelLiveSubscriptions } from '../lib/server/stripeCancel.js';
 import { normalizeClaimCompany } from '../lib/server/employerClaims.js';
 import { buildNotificationRow } from '../lib/server/employerNotificationsStore.js';
 import { isReadableResume } from '../lib/server/resumeReadability.js';
+import { RESUME_ACTIONS, RESUME_WRITE_ACTIONS, handleResumeAction, saveDefaultResume, clearDefaultResume } from '../lib/server/resumes.js';
 import { deleteApplicantResumes } from '../lib/server/seenApplyStore.js';
 import { decodeThread } from '../lib/server/applicationThread.js';
 import { pacificDate } from '../lib/time/pacific.js';
@@ -87,7 +88,7 @@ export default async function handler(req, res) {
 
   // Rate-limit mutating actions per user (not reads — those are cheap DB fetches)
   const WRITE_ACTIONS = new Set(['claim_referral','record_attribution','add_application','update_application','remove_application','save_job','unsave_job','save_profile','save_resume','delete_account','submit_resume_survey','report_job_availability','job_alerts_save']);
-  if (WRITE_ACTIONS.has(action)) {
+  if (WRITE_ACTIONS.has(action) || RESUME_WRITE_ACTIONS.has(action)) {
     const windowHour = Math.floor(Date.now() / 3_600_000);
     const rlKey = `${uid}:user-sync:${windowHour}`;
     try {
@@ -101,6 +102,19 @@ export default async function handler(req, res) {
         if (count > 300) return res.status(429).json({ error: 'Too many requests — slow down.' });
       }
     } catch(_) { /* fail open */ }
+  }
+
+  // ── SAVED RÉSUMÉS (lib/server/resumes.js) — list / get / create / rename / delete / set_default ──
+  // Free keeps MAX_RESUMES_FREE, Pro MAX_RESUMES_PRO; the default is mirrored into profiles.resume_text.
+  // { ready: false } before migration 20261101140000 (the page keeps the single résumé).
+  if (RESUME_ACTIONS.has(action)) {
+    try {
+      const out = await handleResumeAction({ db, uid, action, body: body || {} });
+      return res.status(out.status).json(out.body);
+    } catch (e) {
+      console.error('[user-sync] resumes: %s', String(e.message || e).replace(/\n|\r/g, ' ').replace(/[^\x20-\x7e]/g, '').slice(0, 200));
+      return res.status(500).json({ error: 'Something went wrong with your résumés — try again.' });
+    }
   }
 
   // ── INBOX AUTOPILOT — the user's own controls (lib/server/inbox/store.js) ───────────────────────────
@@ -501,13 +515,24 @@ export default async function handler(req, res) {
 
   // ── SAVE RESUME — upsert so it works even if profile row doesn't exist yet ──
   if (action === 'save_resume') {
-    const { text, fileName, wordCount } = body;
+    const { fileName, wordCount } = body;
+    if (body.text != null && typeof body.text !== 'string') return res.status(400).json({ ok: false, error: 'text must be text' });
+    const text = body.text ? body.text.replace(/\u0000/g, '') : body.text; // Postgres text refuses NUL
     // AUTHORITATIVE readability gate: unreadable text (glyph codes, binary spill) must NEVER
     // reach profiles.resume_text — the DB is the source of truth for signed-in users, so one
     // poisoned save corrupts the résumé on EVERY device (the 2026-07-03 cross-device incident).
     // Same canonical predicate as the upload + optimize gates (lib/server/resumeReadability.js).
     if (text && !isReadableResume(text)) {
       return res.status(400).json({ ok: false, error: 'RESUME_UNREADABLE' });
+    }
+    // Saved résumés: the text replaces the DEFAULT résumé (lib/server/resumes.js), then the profiles
+    // mirror below is written as before. Before the migration the table is missing and only profiles is.
+    if (text) {
+      const saved = await saveDefaultResume(db, uid, { text, fileName, wordCount });
+      if (saved === false) return res.status(502).json({ ok: false, error: 'Could not save your résumé — try again.' });
+    } else {
+      const cleared = await clearDefaultResume(db, uid);
+      if (cleared !== 'missing') return res.status(cleared ? 200 : 502).json({ ok: !!cleared });
     }
     const r = await db('profiles?on_conflict=id', {
       method: 'POST',
@@ -529,6 +554,9 @@ export default async function handler(req, res) {
 
   // ── CLEAR RESUME ────────────────────────────────────────────────────────────
   if (action === 'clear_resume') {
+    // With saved résumés the default goes and the newest other one takes over (and is mirrored).
+    const cleared = await clearDefaultResume(db, uid);
+    if (cleared !== 'missing') return res.status(200).json({ ok: !!cleared });
     await db(`profiles?id=eq.${uid}`, {
       method: 'PATCH',
       body: JSON.stringify({ resume_text: null, resume_file_name: null, resume_word_count: null }),
@@ -572,6 +600,8 @@ export default async function handler(req, res) {
       // Email preferences and send history (045, 20261024190000) and Inbox Autopilot (20261022120000):
       // the Privacy Policy promises these go with the account.
       'email_prefs', 'outcome_email_log', 'job_match_email_log', 'inbox_events', 'inbox_addresses', 'interview_preps',
+      // Saved résumés (migration 20261101140000; also cascade with the auth user).
+      'resumes',
     ];
     await Promise.all([
       ...userTables.map(t =>

@@ -17,6 +17,7 @@ import {
   recomputeCompanyScoreFromReports,
 } from './_utils/reportWrite.js';
 import { extractUploadText } from '../lib/server/resumeUpload.js';
+import { readResumes, readPro, resumeListItem, sortResumes, resumeForApply } from '../lib/server/resumes.js';
 
 // Best-effort: record the observed apply CLICK (the only thing observable on a redirect apply) and
 // enqueue an "apply_activity" notification for the company's employer (migrations 057/058). NEVER
@@ -287,12 +288,16 @@ async function seenApplyStatus(req, res, uid) {
   const jobId = String((req.body || {}).job_id || '');
   const { job } = await loadSeenJob(db, jobId);
   if (!job) return res.status(200).json({ ok: true, available: true, accepts_seen: false });
-  const [prof, dup, email] = await Promise.all([
+  const [prof, dup, email, saved, pro] = await Promise.all([
     db(`profiles?id=eq.${uid}&select=name,email,resume_text,resume_file_name&limit=1`).then(r => r.ok ? r.json() : []).catch(() => []),
     db(`seen_applications?job_id=eq.${encodeURIComponent(job.id)}&applicant_user_id=eq.${uid}&select=id,created_at,status&limit=1`).then(r => r.ok ? r.json() : []).catch(() => []),
     authUserEmail({ SUPABASE_URL, SERVICE_KEY, uid }),
+    readResumes(db, uid).catch(() => ({ error: true })),
+    readPro(db, uid).catch(() => false),
   ]);
   const p = prof[0] || {};
+  // Saved résumés (lib/server/resumes.js): offered as a choice only when there is more than one.
+  const resumes = saved.rows && saved.rows.length > 1 ? sortResumes(saved.rows).map(r => resumeListItem(r, pro)) : null;
   return res.status(200).json({
     ok: true,
     available: true,
@@ -305,6 +310,7 @@ async function seenApplyStatus(req, res, uid) {
       email: email || p.email || '',
       has_saved_resume: !!(p.resume_text && p.resume_text.length >= 50),
       saved_resume_file_name: p.resume_file_name || null,
+      resumes,
     },
   });
 }
@@ -340,7 +346,13 @@ async function seenApply(req, res, uid) {
   // Résumé: the saved Seen résumé (profiles.resume_text) or an uploaded file (kept as the original
   // file in the PRIVATE application-resumes bucket + its extracted text).
   let resumeText = null, resumePath = null, resumeFileName = null, resumeMime = null;
-  if (app.resumeSource === 'saved') {
+  if (app.resumeSource === 'saved' && body.resume_id) {
+    // One of the account's saved résumés; a non-default one only while Pro is on.
+    const pick = await resumeForApply(db, uid, String(body.resume_id));
+    if (pick.error) return res.status(pick.status).json({ error: pick.error, ...(pick.reason ? { reason: pick.reason } : {}) });
+    resumeText = pick.text;
+    resumeFileName = pick.fileName;
+  } else if (app.resumeSource === 'saved') {
     const pr = await db(`profiles?id=eq.${uid}&select=resume_text,resume_file_name&limit=1`);
     const p = pr.ok ? (await pr.json())[0] : null;
     if (!p || !p.resume_text || p.resume_text.length < 50) return res.status(400).json({ error: 'You don’t have a résumé saved on Seen — attach one instead' });

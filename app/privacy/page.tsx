@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { LegalMeta, LegalFooter, LEGAL_CONTACT, LEGAL_OPERATOR } from '@/components/legal/LegalBits'
 
 // Privacy Policy. Reviewed against the code 2026-10-24; each item names what implements it:
-//   account + profile: profiles, auth (Supabase) · résumé: profiles.resume_text, resume_skills,
+//   account + profile: profiles, auth (Supabase) · résumé: resumes, profiles.resume_text, resume_skills,
 //   resumes bucket · Apply on Seen: seen_applications + application-resumes bucket, read by the employer
 //   (api/employer-listings.js); declined/withdrawn copies cleared after 30 days
 //   (lib/server/applicationRetention.js RETENTION_DAYS) · sign-in security: login_signals (IP + user
@@ -70,7 +70,7 @@ export default function PrivacyPage() {
             <li style={li}><strong>Account:</strong> your email address and password or sign-in link, handled by our authentication provider.</li>
             <li style={li}><strong>Profile:</strong> name, city, experience level and any optional survey answers you choose to give.</li>
             <li style={li}><strong>Your job search:</strong> applications you track (company, role, city, dates, stage and what happened), saved jobs, and companies you recently viewed.</li>
-            <li style={li}><strong>Résumé:</strong> the résumé text or file you upload or edit, and the job titles and skills we read from it to match you with listings.</li>
+            <li style={li}><strong>Résumé:</strong> the résumé text or file you upload or edit (more than one if you keep several), and the job titles and skills we read from it to match you with listings.</li>
             <li style={li}><strong>Applying through Seen:</strong> when you apply to a listing using Seen&apos;s own application form, the name, email, phone number (optional), résumé and answers you submit.</li>
             <li style={li}><strong>Reports:</strong> hiring outcomes you report about companies, and anything you write in them.</li>
             <li style={li}><strong>Inbox Autopilot</strong> (only if you turn it on): from emails you forward to your private Seen address we keep only the facts — company, role, what happened, the sender&apos;s name and domain, and the date — never the email&apos;s text, subject or attachments.</li>

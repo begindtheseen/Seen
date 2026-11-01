@@ -262,7 +262,9 @@ async function handleParseResume(req, res, body) {
     // parsed résumé is the strongest job-seeking signal we get — act on it. BOTH steps are
     // best-effort and NEVER block the parse response (the analysis returns instantly below);
     // the pull is cooldown + global-budget guarded, so a flood of uploads can't stampede spend.
-    Promise.race([
+    // `signal: false` = an extra saved résumé that is not the default: it must not become the job
+    // rail's signal (the rail follows the default — lib/server/resumes.js).
+    if (body.signal !== false) Promise.race([
       storeCareerSignals(extractedText, employment, req)
         .then(signal => warmResumeJobs(signal, employment, location)),
       new Promise(r => setTimeout(r, 8000)),

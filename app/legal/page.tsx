@@ -36,12 +36,13 @@ export default function LegalPage() {
   //     price uses the same cents); fulfilled once by lib/server/stripeFulfillment.js;
   //   no new subscription or trial → api/stripe.js checkout refuses a request without a sellable sku;
   //   an earlier subscription → api/stripe.js cancel_subscription, Settings → Plan & billing;
-  //   résumé → profiles.resume_text via save_resume / delete via delete_resume + delete_account.
+  //   résumés → public.resumes (default mirrored into profiles.resume_text) via save_resume / resume_*;
+  //   delete via resume_delete + delete_account.
   const facts = [
     'Company grades, the tracker and its check-ins, job search and résumé match are free, with no card.',
     `${offerLine()} ${prep.name} also opens ${prep.pro_days} days of Pro, and the ${pass.name} is ${pass.pro_days} days of Pro; when the time ends, access simply ends and nothing is charged again.`,
     'Seen no longer starts subscriptions or free trials. A Seen Pro subscription started before October 25, 2026 keeps its price and renewal date until you cancel it in Settings → Plan & billing; access continues to the end of the period you paid for.',
-    'Your résumé is stored on your profile until you replace it or delete your account, and is used for your own tools (job matching, fit scores, rewrites). It is never sold, and an employer sees it only if you send it with an application through Seen.',
+    'Your résumés are stored on your account until you replace or delete them or delete your account, and are used for your own tools (job matching, fit scores, rewrites). They are never sold, and an employer sees one only if you send it with an application through Seen.',
     'We do not sell personal data. Company scores and reports are aggregated applicant claims and public discussion, not verified facts, and nothing on Seen is legal, employment or financial advice.',
   ]
 

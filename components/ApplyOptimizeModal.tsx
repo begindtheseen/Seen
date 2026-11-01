@@ -20,6 +20,9 @@ import { uniqueKeywords } from '@/lib/optimizer/rewriteGuard.js'
 import { markQuiet } from '@/lib/quietWindow'
 import { markOptimized } from '@/lib/optimizedJobs'
 import { VerdictCard, WhyYouMatch, MissingList, Checklist, PaidPlanView, type Verdict, type RequirementRow, type ConstraintRow, type PaidPlan } from './optimizer/Verdict'
+import ResumePicker from './resume/ResumePicker'
+import { ResumeLibrary, useResumeList, type SavedResume } from '@/lib/resumeLibrary'
+import { chooseResumeId } from '@/lib/resumeChoice.js'
 
 // The optimizer's price, rendered from the credit rules — the same literal the server charges.
 const OPTIMIZE_PRICE = creditCostLabel(RESUME_OPTIMIZE_COST)
@@ -201,6 +204,10 @@ export default function ApplyOptimizeModal({
   useFocusTrap(sheetRef, true)
   const [step, setStep] = useState<Step>('loading-resume')
   const [resumeText, setResumeText] = useState('')
+  // Saved résumés: which one this optimize uses (the default until the person picks another).
+  const { list: resumeList } = useResumeList(isLoggedIn, user?.id)
+  const [resumeId, setResumeId] = useState<string | null>(null)
+  const [pickErr, setPickErr] = useState('')
   const [result, setResult] = useState<OptimizeResult | null>(null)
   const [error, setError] = useState('')
   const [showUpgrade, setShowUpgrade] = useState(false)
@@ -253,6 +260,26 @@ export default function ApplyOptimizeModal({
       }
     })
   }, [isLoggedIn, user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The résumé loaded above is the default: select it once the list is known.
+  useEffect(() => {
+    if (!resumeList || !resumeList.ready) return
+    setResumeId(id => chooseResumeId(resumeList, id))
+  }, [resumeList])
+
+  // Another résumé picked: re-run the FREE diagnosis + cache probe with it. Never charges.
+  async function pickResume(r: SavedResume) {
+    if (r.id === resumeId || !r.usable) return
+    setPickErr('')
+    const text = await ResumeLibrary.text(r.id)
+    if (!text || text.length <= 50) { setPickErr('Could not open that résumé — try again.'); return }
+    setResumeId(r.id)
+    setResumeText(text)
+    setResult(null); setDiag(null); setHp(null); setHpState('idle'); setPdfBlob(null); setPdfFailed(false)
+    prepare(text, posting)
+  }
+  // Where the picker shows: the steps that act on a résumé, never while something is running.
+  const showPicker = ['choose', 'review', 'needs-posting', 'no-requirements', 'resume-corrupted'].includes(step)
 
   // Esc closes the sheet (M9) — unless a stacked dialog is up, which handles its own Esc.
   useEffect(() => {
@@ -655,6 +682,9 @@ export default function ApplyOptimizeModal({
         </div>
 
         <div className="ai-safe-bottom" style={{ paddingTop: '1.1rem', paddingLeft: '1.1rem', paddingRight: '1.1rem', minHeight: 240 }}>
+
+          {showPicker && <ResumePicker list={resumeList} selectedId={resumeId} onPick={r => { void pickResume(r) }} note="Switching re-checks your fit · free" />}
+          {showPicker && pickErr && <div role="alert" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-65)', color: 'var(--red)', marginBottom: '.6rem' }}>{pickErr}</div>}
 
           {/* ── loading-resume / checking (free) / confirm (the dialog sits above) ── */}
           {(step === 'loading-resume' || step === 'checking' || step === 'confirm') && <LoadingDots />}

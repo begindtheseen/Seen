@@ -11,7 +11,7 @@
  *   Job Search Pass — $19.99 for 30 days of everything, including Interview Prep for every interview.
  * Both are one-time and never renew. There is no subscription and no trial to start.
  */
-import { ONE_TIME_SKUS, ONE_TIME_NOTE, skuPrice } from './server/creditRules.js'
+import { ONE_TIME_SKUS, ONE_TIME_NOTE, skuPrice, MAX_RESUMES_PRO } from './server/creditRules.js'
 
 export type OfferSku = 'interview' | 'pass30'
 
@@ -44,8 +44,8 @@ export const PREP_INCLUDES: string[] = [
  * The Job Search Pass — described by what the person gets for their search, not by credits. Every line
  * is something Pro access grants in code: Interview Prep builds (gateAI proOnly), résumé optimize /
  * tailor / scan and job insights with no daily cap (gateAI, Pro bypasses the cap), HumanProof
- * (api/optimizer.js proOnly; Pro optimize results also come back in that voice) and unbranded Résumé
- * Studio downloads (lib/server/resumeStudio.js).
+ * (api/optimizer.js proOnly; Pro optimize results also come back in that voice), unbranded Résumé
+ * Studio downloads (lib/server/resumeStudio.js) and more saved résumés (lib/server/resumes.js).
  */
 export const PASS_INCLUDES: string[] = [
   'Interview Prep for every interview in those 30 days',
@@ -53,6 +53,7 @@ export const PASS_INCLUDES: string[] = [
   'What each job asks for, on any listing with a full description',
   'HumanProof: your bullets rewritten so they sound like you, nothing invented',
   'Résumé Studio downloads without the Seen footer',
+  `Up to ${MAX_RESUMES_PRO} saved résumés — pick which one each application uses`,
 ]
 
 /** "$9.99 — for one interview" */

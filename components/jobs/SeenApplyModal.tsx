@@ -11,6 +11,9 @@ import Link from 'next/link'
 import ModalPortal from '@/components/ModalPortal'
 import { useAuth } from '@/lib/auth'
 import { AppStore } from '@/lib/stores/AppStore'
+import ResumePicker from '@/components/resume/ResumePicker'
+import type { SavedResume } from '@/lib/resumeLibrary'
+import { chooseResumeId } from '@/lib/resumeChoice.js'
 
 const MAX_BYTES = 3 * 1024 * 1024
 
@@ -19,7 +22,7 @@ type Status = {
   accepts_seen?: boolean
   company?: string | null
   already_applied?: { at: string } | null
-  prefill?: { name: string; email: string; has_saved_resume: boolean; saved_resume_file_name: string | null }
+  prefill?: { name: string; email: string; has_saved_resume: boolean; saved_resume_file_name: string | null; resumes?: SavedResume[] | null }
 }
 
 export default function SeenApplyModal({ job, onClose, onApplied }: {
@@ -35,6 +38,8 @@ export default function SeenApplyModal({ job, onClose, onApplied }: {
   const [phone, setPhone] = useState('')
   const [note, setNote] = useState('')
   const [source, setSource] = useState<'saved' | 'upload'>('upload')
+  // Several saved résumés: which one to send (the default unless the person picks another).
+  const [resumeId, setResumeId] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [consent, setConsent] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -67,6 +72,7 @@ export default function SeenApplyModal({ job, onClose, onApplied }: {
           setName(d.prefill.name || '')
           setEmail(d.prefill.email || '')
           if (d.prefill.has_saved_resume) setSource('saved')
+          if (d.prefill.resumes && d.prefill.resumes.length > 1) setResumeId(chooseResumeId({ ready: true, resumes: d.prefill.resumes }, null))
         }
       } catch { if (!cancelled) setLoadErr('Could not load the application form') }
     })()
@@ -95,7 +101,7 @@ export default function SeenApplyModal({ job, onClose, onApplied }: {
         headers: { 'Content-Type': 'application/json', ...(t ? { Authorization: `Bearer ${t}` } : {}) },
         body: JSON.stringify({
           action: 'seen_apply', job_id: job.id, name, email, phone, note,
-          resume_source: source, file_base64, file_name: file?.name, mime_type: file?.type, consent,
+          resume_source: source, ...(source === 'saved' && resumeId ? { resume_id: resumeId } : {}), file_base64, file_name: file?.name, mime_type: file?.type, consent,
         }),
       })
       const d = await r.json().catch(() => ({})) as { ok?: boolean; error?: string; reason?: string }
@@ -152,6 +158,7 @@ export default function SeenApplyModal({ job, onClose, onApplied }: {
     )
   } else {
     const hasSaved = !!status.prefill?.has_saved_resume
+    const savedList = status.prefill?.resumes && status.prefill.resumes.length > 1 ? { ready: true, pro: false, max: 0, resumes: status.prefill.resumes } : null
     content = (
       <>
         <label style={label} htmlFor="sa-name">Full name</label>
@@ -165,8 +172,11 @@ export default function SeenApplyModal({ job, onClose, onApplied }: {
         {hasSaved && (
           <label style={{ display: 'flex', gap: '.5rem', alignItems: 'center', fontSize: 'var(--fs-sm)', color: 'var(--sub)', marginBottom: '.35rem', cursor: 'pointer' }}>
             <input type="radio" name="sa-src" checked={source === 'saved'} onChange={() => setSource('saved')} />
-            Use my résumé on Seen{status.prefill?.saved_resume_file_name ? ` (${status.prefill.saved_resume_file_name})` : ''}
+            {savedList ? 'Use one of my résumés on Seen' : <>Use my résumé on Seen{status.prefill?.saved_resume_file_name ? ` (${status.prefill.saved_resume_file_name})` : ''}</>}
           </label>
+        )}
+        {hasSaved && savedList && source === 'saved' && (
+          <ResumePicker list={savedList} selectedId={resumeId} onPick={r => setResumeId(r.id)} />
         )}
         <label style={{ display: 'flex', gap: '.5rem', alignItems: 'center', fontSize: 'var(--fs-sm)', color: 'var(--sub)', cursor: 'pointer' }}>
           {hasSaved && <input type="radio" name="sa-src" checked={source === 'upload'} onChange={() => setSource('upload')} />}
