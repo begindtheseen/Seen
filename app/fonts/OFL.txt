@@ -1,0 +1,4 @@
+The font files in this folder are licensed under the SIL Open Font License, Version 1.1
+(https://openfontlicense.org): Syne (Copyright 2017 The Syne Project Authors), Instrument Sans
+(Copyright 2022 The Instrument Sans Project Authors) and DM Mono (Copyright 2020 The DM Mono Project
+Authors). Downloaded from Google Fonts (latin subset) on 2026-11-01.

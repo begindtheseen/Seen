@@ -11,18 +11,33 @@ import TabBar from '@/components/shell/TabBar'
 import CommandPalette from '@/components/shell/CommandPalette'
 import RouteProgress from '@/components/shell/RouteProgress'
 import NavMemory from '@/components/shell/NavMemory'
-import { Syne, Instrument_Sans, DM_Mono } from 'next/font/google'
+import localFont from 'next/font/local'
 import './globals.css'
 import '@/components/ui/ui.css'
 import './motion.css'
 
-// Exactly the faces the type scale uses (app/globals.css tokens) — self-hosted by next/font, so no
-// render-blocking Google Fonts stylesheet and no faux bold: a weight that is not listed here must not
-// be rendered (the type codemod capped every rule to these). Fallback metrics stay hand-tuned per
-// weight in globals.css (Syne 800 is 176% of Arial's width), hence adjustFontFallback: false.
-const syne = Syne({ subsets: ['latin'], weight: ['700', '800'], display: 'swap', variable: '--font-syne', adjustFontFallback: false })
-const instrument = Instrument_Sans({ subsets: ['latin'], weight: ['400', '500', '600'], display: 'swap', variable: '--font-instrument', adjustFontFallback: false })
-const dmMono = DM_Mono({ subsets: ['latin'], weight: ['400', '500'], display: 'swap', variable: '--font-dm-mono', adjustFontFallback: false })
+// Exactly the faces the type scale uses (app/globals.css tokens), shipped WITH the site from app/fonts
+// (latin subset, one woff2 per weight; SIL Open Font License — app/fonts/OFL.txt). They used to be
+// downloaded from Google at build time (next/font/google), which failed the Vercel build on Next 15.5.28
+// when Google answered with a font link the loader could not read (2026-11-01) — a build must not depend
+// on a third party. No faux bold: a weight that is not listed here must not be rendered. Fallback metrics
+// stay hand-tuned per weight in globals.css (Syne 800 is 176% of Arial's width), hence adjustFontFallback: false.
+const syne = localFont({
+  src: [{ path: './fonts/syne-700.woff2', weight: '700' }, { path: './fonts/syne-800.woff2', weight: '800' }],
+  display: 'swap', variable: '--font-syne', adjustFontFallback: false,
+})
+const instrument = localFont({
+  src: [
+    { path: './fonts/instrument-sans-400.woff2', weight: '400' },
+    { path: './fonts/instrument-sans-500.woff2', weight: '500' },
+    { path: './fonts/instrument-sans-600.woff2', weight: '600' },
+  ],
+  display: 'swap', variable: '--font-instrument', adjustFontFallback: false,
+})
+const dmMono = localFont({
+  src: [{ path: './fonts/dm-mono-400.woff2', weight: '400' }, { path: './fonts/dm-mono-500.woff2', weight: '500' }],
+  display: 'swap', variable: '--font-dm-mono', adjustFontFallback: false,
+})
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://seenjobs.io'),
