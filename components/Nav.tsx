@@ -106,9 +106,9 @@ export default function Nav() {
     setJobsHref(lastJobsHref())
   }, [])
   useEffect(() => { syncLinks() }, [pathname, syncLinks])
-  const returnTo = here && here !== '/' ? loginHref(here) : '/login'
-  const signInHref = returnTo
-  const getStartedHref = returnTo === '/login' ? '/login?signup=1' : returnTo.replace('/login?', '/login?signup=1&')
+  // loginHref decides itself when there is nothing to come back to (home, sign-in pages, unsafe paths).
+  const signInHref = loginHref(here)
+  const getStartedHref = signInHref.replace(/^\/login\??/, '/login?signup=1&').replace(/&$/, '')
   const fresh = { onPointerDown: syncLinks, onFocus: syncLinks }
 
   const fetchBalance = useCallback(async () => {

@@ -57,7 +57,7 @@ export default function TabBar() {
   }, [])
   useEffect(() => { syncLinks() }, [pathname, syncLinks])
   const hrefFor = (href: string) =>
-    href === '/jobs' ? jobsHref : href === '/login' ? (here && here !== '/' ? loginHref(here) : '/login') : href
+    href === '/jobs' ? jobsHref : href === '/login' ? loginHref(here) : href
 
   // Pages pad their bottom for the bar via html.tabbar (globals.css); the keyboard hides it.
   useEffect(() => {
