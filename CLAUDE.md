@@ -57,6 +57,40 @@ Editor — comments stripped, one block per migration, and say which to run firs
 - **Skill:** `.claude/skills/ui-ux-pro-max/` (UX rules, patterns, charts, WCAG — Python search over local CSVs) is for
   decisions INSIDE this system; never use its `--design-system` output to pick a palette or font.
 
+## Session 2026-11-02: design system locked + persona acceptance rounds (PR #389, branch claude/alerts-radius-security)
+- **Owner asks, in order:** ditch the purple gradient ("vibecode slop") → do it with the ui-ux-pro-max skill and the five
+  anti-slop rules without losing the look → "run the whole layout through the skill… test with agents until they approve
+  and perceive a legitimate company; every feature must be tested." The design system is `DESIGN.md` (section above).
+- **Acceptance rounds** (reusable pattern): four personas — Maria (retail lead, phone 390), Dev (backend engineer,
+  desktop 1280), Tasha (newcomer, fresh signup, phone), Jules (senior designer, both widths) — each with a brief in the
+  session scratchpad `roundN/BRIEF.md`, a real account (`<name>.r1@seenjobs.io`, password in `round1/.password`, never in
+  chat/files), real résumés in `lib/fixtures/personas/`, Playwright against the PR's Vercel PREVIEW via
+  `get_access_to_vercel_url` share link (visit it once per context), outcomes only on "Northwind Test Labs", no payments.
+  Score table (legitimate company? trust? taste? come back? APPROVE?) + feature table + ranked top 10 + bugs. **ONE
+  browser context per persona, signed in once** — several contexts sharing one Supabase refresh token rotate each other
+  out and read as "session expired".
+- **Round 1 (dpl_3toMfD9m): 4× NO, legitimacy 6/10 each.** What cost trust (all fixed in 10858e0…41610a7): counts that
+  disagreed page to page (home / data / ghost-report totals; Amazon 26/49/43), any string rendering a full company page,
+  emoji icons, blue eyebrows on ~16 pages, 7 filled buttons on /employers, a 9-target jobs card, lime swipe deck,
+  three-brand auth emails, Remote search with non-remote/non-US rows, Adzuna estimate shown as pay, Tailor charging for
+  70→70, "Aaa"/"Group On" casing, a share-card popup after a rejection, day-one upsell crowding, guest saves vanishing at
+  sign-in. Fixers ran in parallel on disjoint file sets; every rule they enforced became a test
+  (`lib/ui/designRules.test.mjs`, 13 tests) or an audit check (`npm run design:audit`, 24 pages × 2 widths).
+- **Durable product rules added:** every count on a page says what it counts; unknown companies get an empty state with no
+  CTAs and are not remembered; the homepage total is the open dataset's (same as /data); a Tailor that cannot raise the
+  score is free and says so (`no_gain`); guest device data is offered (Keep/Discard), never auto-imported; nothing opens
+  itself after an outcome; Interview Prep is collapsed to one line until tapped; `honestSalary()` hides pre-2026-10-20
+  Adzuna rows' pay and sub-wage lines; Remote = location/type or a plain statement near the top of the text;
+  `adaptive_pricing[enabled]=false` on every Checkout session; the fixed nav is solid when scrolled.
+- **Round-1 items still owner-side:** Supabase auth email templates (`supabase/email-templates/` + README; the Management
+  API token in the cloud env answers 401); confirm-email landing on prod; Stripe currency verified only by code.
+- **CodeQL:** the design commit touched 100+ files, so scanning surfaced 51 old alerts. Every data-driven link now goes
+  through `httpHref`/`pathSegment`; the EmployerGradeChip sink was the TITLE text (found only by running CodeQL locally:
+  bundle in the scratchpad + a `{"type":"commonjs"}` package.json beside it when the scratchpad has an ESM package.json).
+- **Harness:** `git add -A` swept the testers' scripts into a commit → `scripts/_*` is git-ignored; `pgrep -f "next start"`
+  matches your own shell (exit 144) — use `pgrep -f "^next-server"`; killing the npx wrapper leaves next-server alive on
+  the port and a stale server serves HTML whose CSS hashes 400 (check every CSS bundle is 200 before trusting a run).
+
 ## North Star
 Read SEEN_STRATEGY.md at the start of every session. That document is the product strategy.
 Every code change must serve the strategy. When in doubt, re-read it.
