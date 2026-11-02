@@ -49,6 +49,7 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
   const [savedId, setSavedId] = useState('')
   const [state, setState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
   const [error, setError] = useState('')
+  const [note, setNote] = useState('') // the server's own sentence when a tailor ran free (no_gain)
   const [plan, setPlan] = useState<TailorPlan | null>(null)
   const [baseDoc, setBaseDoc] = useState<ResumeDoc | null>(null) // the doc the plan was built for
   const [overrides, setOverrides] = useState<TailorOverrides>({})
@@ -110,8 +111,11 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
         setError(link ? 'Seen could only read a summary of this listing, and its page would not open from here. Open the listing, copy the posting, paste it into the Job description box above, and press again.' : (data.message || 'This listing only has a summary. Paste the full posting into the Job description box above, then press again.'))
         setState('idle'); return
       }
+      // A posting that states no requirements is refused free, before the credit gate (api/resume.js) — say so in words.
+      if (res.status === 422 && data.error === 'no_requirements') { setError('This posting lists no requirements to tailor against. Paste the full posting — the responsibilities and requirements — and run again. No credit was used.'); setState('idle'); return }
       if (!res.ok || !data.plan) { setError(data.error || 'Could not tailor this résumé. Try again.'); setState('error'); return }
       window.dispatchEvent(new Event('seen:credits-updated'))
+      setNote((data as { no_gain?: boolean; note?: string }).no_gain ? ((data as { note?: string }).note || 'This posting already scores as high as your résumé goes — no credit was used.') : '')
       setPlan(data.plan); setBaseDoc(clone(doc)); setOverrides({}); setAnswers({})
       setState('done')
       markQuiet() // nothing optional pops over a result the person just paid for
@@ -160,8 +164,8 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
           </div>
         )}
         <div className={s.row}>
-          <div><span className={s.label}>Job title</span><input autoComplete="off" className={s.input} value={job.title} onChange={(e) => setJob({ ...job, title: e.target.value })} placeholder="Sales Associate" /></div>
-          <div><span className={s.label}>Company</span><input autoComplete="off" className={s.input} value={job.company} onChange={(e) => setJob({ ...job, company: e.target.value })} placeholder="GNC" /></div>
+          <div><span className={s.label}>Job title</span><input autoComplete="off" className={s.input} value={job.title} onChange={(e) => setJob({ ...job, title: e.target.value })} placeholder="Job title" /></div>
+          <div><span className={s.label}>Company</span><input autoComplete="off" className={s.input} value={job.company} onChange={(e) => setJob({ ...job, company: e.target.value })} placeholder="Company" /></div>
         </div>
         <span className={s.label}>Job description</span>
         <textarea autoComplete="off" className={`${s.input} ${s.area}`} rows={5} value={job.description} onChange={(e) => { setJob({ ...job, description: e.target.value }); if (previewLink || error) { setPreviewLink(''); setError('') } }} placeholder="Paste the posting — requirements, responsibilities, the lot." />
@@ -188,6 +192,7 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
                 </div>
                 {/* the same one-sentence why the Optimize modal and /resume show; the gate first */}
                 {plan.score.verdict && <p className={s.dim} style={{ marginTop: '.5rem', color: plan.score.verdict.gate ? 'var(--amber)' : undefined }}>{plan.score.verdict.sentence.replace(/^\d+ — /, '')}</p>}
+                {note && <p className={s.dim} style={{ marginTop: '.5rem' }}>{note}</p>}
                 {plan.summaryKept && <p className={s.dim} style={{ marginTop: '.25rem' }}>Your own summary stays — it scored higher against this posting than a rewritten one.</p>}
               </>
             )}

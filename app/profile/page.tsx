@@ -103,10 +103,11 @@ export default function ProfilePage() {
     // Instant fill from this user's cache (now that the user id is known), then the DB wins.
     const fill = (p: CachedProfile) => {
       // A name equal to the email's local part came from a sign-up default, not the person (round 1: FIRST NAME = email prefix).
-      if (!touched.current.name) setName(p.name && p.name.toLowerCase() === String(user?.email || '').split('@')[0].toLowerCase() ? '' : p.name)
+      const shownName = p.name && p.name.toLowerCase() === String(user?.email || '').split('@')[0].toLowerCase() ? '' : p.name
+      if (!touched.current.name) setName(shownName)
       if (!touched.current.city) setCity(p.city)
       if (!touched.current.experience) setExperience(p.experience)
-      setInitName(p.name); setInitCity(p.city); setInitExperience(p.experience)
+      setInitName(shownName); setInitCity(p.city); setInitExperience(p.experience)
     }
     const cached = readProfileCache(user?.id)
     if (cached) { fill(cached); setLoaded(true) }

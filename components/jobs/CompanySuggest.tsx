@@ -60,7 +60,9 @@ function GradeBit({ c }: { c: CompanyCandidate }) {
 
 /** Card above the results when the search names a company. */
 export function CompanyResultCard({ items, searched }: { items: CompanyCandidate[]; searched: string }) {
-  const c = items.find((x) => queryNamesCompany(x.name, searched))
+  // Only a graded company earns a card over the results: a bare row that happens to share a word with the
+  // search ("Backend", two public accounts) read as a company banner on every backend-engineer search (round 2).
+  const c = items.find((x) => queryNamesCompany(x.name, searched) && x.gradeable !== false && typeof x.overall_score === 'number')
   if (!c) return null
   return (
     <Link href={`/company/${slugOf(c.name)}`} style={{ display: 'flex', alignItems: 'center', gap: '.75rem', padding: '.75rem 1rem', margin: '.75rem 0', background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 12, textDecoration: 'none' }}>

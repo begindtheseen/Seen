@@ -64,7 +64,7 @@
 .inlineActions { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: 0 0 var(--sp-4); }
 .check { flex: 0 1 auto; min-width: 0; max-width: 44%; }
 .footRow { max-width: var(--w-narrow); margin: 0 auto; display: flex; gap: var(--sp-2); align-items: stretch; }
-.grow { flex: 1 1 0; min-width: 0; }
+.grow { flex: 2 1 0; min-width: 0; } /* the one filled button takes the row's width first; its label never ellipsises */
 .iconBtn { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; width: 44px; min-height: 44px; border-radius: var(--r-control); border: 1px solid var(--border-2); background: transparent; color: var(--text-3); cursor: pointer; }
 .iconBtn:hover { color: var(--text-1); border-color: var(--border-3); }
 .iconBtn[data-on="1"] { color: var(--bad-text); border-color: var(--bad-line); background: var(--bad-tint); }

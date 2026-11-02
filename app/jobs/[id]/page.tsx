@@ -600,7 +600,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                     className={d.grow}
                     iconRight="arrow-up-right"
                   >
-                    {takesSeenApply(job) ? 'Apply on their site' : preview ? 'Open the full posting' : 'Apply'}
+                    {takesSeenApply(job) ? 'Apply on their site' : preview ? 'Open posting' : 'Apply'}
                   </Button>
                 )
               : !takesSeenApply(job) && <Button variant="secondary" disabled className={d.grow}>No apply link</Button>

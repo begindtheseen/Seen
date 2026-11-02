@@ -556,6 +556,7 @@ export function useJobSearch() {
       pagesRef.current = c.pages
       hasMoreRef.current = c.hasMore; setHasMore(c.hasMore)
       JobCache.setMany(c.jobs) // an open listing (?job=) is looked up here after a full page load
+      lastResultRef.current = { key: `${q}|${loc}`, radius: rad, ids: c.jobs.slice(0, 12).map((j) => j.id).join(',') }
       setJobs(c.jobs)
       updateDisplayRef.current(c.jobs, sortRef.current)
       setStatus('done')
@@ -649,11 +650,11 @@ export function useJobSearch() {
         }
         // A radius change that brought back exactly the same rows must say so (round 1: 25 → 50 mi in Austin
         // looked ignored — it was not, there was nothing more to find).
-        const ids = raw.map((j) => j.id).join(',')
+        const ids = raw.slice(0, 12).map((j) => j.id).join(',') // the leading rows are what a person compares
         const prev = lastResultRef.current
         if (!note && placeSearch && prev && prev.key === `${q}|${loc}` && prev.radius !== rad && prev.ids === ids && raw.length) {
           const a = parseInt(prev.radius, 10), b = parseInt(rad, 10)
-          note = `Same ${raw.length} results at ${rad} mi as at ${prev.radius} mi — nothing more between ${Math.min(a, b)} and ${Math.max(a, b)} miles of ${loc}.`
+          note = `Same listings lead at ${rad} mi as at ${prev.radius} mi — nothing closer turned up between ${Math.min(a, b)} and ${Math.max(a, b)} miles of ${loc}.`
         }
         lastResultRef.current = { key: `${q}|${loc}`, radius: rad, ids }
         if (label) setStatusMsg(label)

@@ -106,6 +106,7 @@ const isSortKey = (v: string): v is SortKey => SORTS.some(o => o.key === v)
 export default function CompaniesPage() {
   const router = useRouter()
   const [companies, setCompanies] = useState<Company[]>([])
+  const [gradedTotal, setGradedTotal] = useState<number | null>(null) // every graded company, not just the 150 shown
   const [loading, setLoading] = useState(true)
   // The leaderboard request failed (API down / 500 / bad JSON): an error with Retry, never
   // "No company data yet" (R-1).
@@ -140,7 +141,8 @@ export default function CompaniesPage() {
       // GET: the board is identical for every visitor and the edge serves it (lib/server/publicRead.js).
       const r = await fetch('/api/reports?type=leaderboard')
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
-      const d = await r.json() as { companies?: Company[] }
+      const d = await r.json() as { companies?: Company[]; graded_total?: number | null }
+      if (typeof d.graded_total === 'number') setGradedTotal(d.graded_total)
       if (!Array.isArray(d.companies)) throw new Error('bad payload')
       // Grade gate: the API already ranks only gradeable companies; filter again so a CDN-cached
       // pre-gate payload can never put an ungraded company on the board.
@@ -249,7 +251,7 @@ export default function CompaniesPage() {
 
         <div className={s.controls} role="group" aria-label="Sort the scoreboard">
           {SORTS.map(o => <Chip key={o.key} selected={sort === o.key} onClick={() => setSort(o.key)}>{o.label}</Chip>)}
-          {!loading && !loadFailed && <span className={s.total}>{q ? `${filtered.length} of ${companies.length}` : `${companies.length} graded companies`}</span>}
+          {!loading && !loadFailed && <span className={s.total}>{q ? `${filtered.length} of ${companies.length}` : (gradedTotal && gradedTotal > companies.length ? `Top ${companies.length} of ${gradedTotal} graded companies` : `${companies.length} graded companies`)}</span>}
         </div>
 
         {loading ? (

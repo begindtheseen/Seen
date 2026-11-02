@@ -109,7 +109,7 @@ export default async function GhostReportPage() {
               <StatTile label="Applicant accounts" value={h.reportsTotal} note="in this report" instant />
               <StatTile label="Companies" value={h.companiesTracked} note="with reports" instant />
               {h.avgGhostRatePct != null && <StatTile label="Avg ghost rate" value={h.avgGhostRatePct} suffix="%" tone={avgGhostTone} toneWord={ghostRateWord(avgGhostTone)} note="reported" instant />}
-              {h.avgWaitDays != null && <StatTile label="Avg wait to silence" value={h.avgWaitDays} suffix="d" note="reported" instant />}
+              {h.avgWaitDays != null && h.avgWaitDays >= 2 && <StatTile label="Avg wait to silence" value={h.avgWaitDays} suffix="d" note="reported" instant />}
               {h.agenciesTracked > 0 && <StatTile label="Staffing agencies" value={h.agenciesTracked} note="tracked" instant />}
             </div>
 

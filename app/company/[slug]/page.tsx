@@ -480,11 +480,10 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
     try {
       const apps = AppStore.loadSync()
       // Match by slug: normalize app.company to slug format and compare
-      const match = apps.find(a => {
-        const appSlug = a.company.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
-        const pageSlug = slug.replace(/[^a-z0-9-]/g, '')
-        return appSlug === pageSlug || a.company.toLowerCase().includes(slug.replace(/-/g, ' ')) || slug.replace(/-/g, ' ').includes(a.company.toLowerCase())
-      })
+      // Exact company only (round 2: /company/lab showed a "Northwind Test Labs" application as "your application").
+      const norm = (v: string) => v.toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim()
+      const pageName = norm(decodeURIComponent(slug).replace(/-/g, ' '))
+      const match = apps.find(a => norm(a.company) === pageName)
       if (match) {
         setMyApp({
           company: match.company,

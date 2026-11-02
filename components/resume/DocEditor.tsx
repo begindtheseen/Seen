@@ -295,7 +295,7 @@ function RoleEditor({ role, index, count, highlightId, onChange, onMove, onRemov
       </div>
       <div className={s.row}>
         <Field label="Title" value={role.title} onChange={(v) => set({ title: v })} placeholder="Job title" />
-        <Field label="Company" value={role.company} onChange={(v) => set({ company: v })} placeholder="Desert Power Solutions" />
+        <Field label="Company" value={role.company} onChange={(v) => set({ company: v })} placeholder="Company" />
       </div>
       <div className={s.row}>
         <Field label="Location" value={role.location} onChange={(v) => set({ location: v })} placeholder="Phoenix, AZ" />

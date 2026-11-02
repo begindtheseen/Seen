@@ -320,6 +320,10 @@ export default async function handler(req, res) {
       // In parallel: the Seen-user reports (one small read), so every card can say how many of its
       // applicant accounts were filed with Seen and how many are public posts (audit #3). A failed
       // read leaves the split unknown (null) — cards then show no split, never a wrong one.
+      // How many companies are graded in all (the board shows the top 150): the same gate over every
+      // candidate row, small columns only. /companies said "150 graded" while /data said 401 (round 2).
+      const gradedTotalP = fetch(`${SUPABASE_URL}/rest/v1/company_scores?select=company_name,overall_score,report_count,first_party_report_count&first_party_report_count=gte.1&limit=5000`, { headers: hdrsBase })
+        .then(async (x) => (x.ok ? (await x.json()).filter((c) => isGradeable(c)).length : null)).catch(() => null);
       const [r, seenRes] = await Promise.all([
         fetch(
           `${SUPABASE_URL}/rest/v1/company_scores?select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,waste_score,report_count,first_party_report_count${await mentionSel(SUPABASE_URL, hdrsBase)},web_report_count,data_source,data_quality,verification_status,industry&first_party_report_count=gte.1&order=${order}&limit=150`,
@@ -359,7 +363,7 @@ export default async function handler(req, res) {
       // Identical for every visitor and only changes when the score cron runs — let the
       // CDN serve it so a popular leaderboard page doesn't hit the DB on every load.
       setPublicCache(res, 'leaderboard');
-      return res.status(200).json({ ok: true, companies });
+      return res.status(200).json({ ok: true, companies, graded_total: await gradedTotalP });
     } catch(e) { return res.status(200).json({ companies: [] }); }
   }
 

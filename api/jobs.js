@@ -24,6 +24,7 @@ export function honestSalary(j) {
     const hourly = /\/\s*h(?:ou)?r\b|per hour|hourly/i.test(s);
     const top = Math.max(...nums);
     if (hourly ? top < 7 : top < 12000) return null;
+    if (!hourly && /^adzuna$/i.test(String(j?.source || '')) && top > 350000) return null; // an hourly contractor rate × 2080
   }
   return s;
 }
@@ -33,7 +34,9 @@ export function honestSalary(j) {
 function titleNamesNonUs(title) {
   const t = String(title || '');
   const m = t.match(/(?:[-–—|(]\s*)([A-Z][\w .'-]*,\s*[A-Z][\w .'-]+)\)?\s*$/);
-  return !!(m && locationScope(m[1]) === 'non_us');
+  if (m && locationScope(m[1]) === 'non_us') return true;
+  const paren = t.match(/\(([A-Z][A-Za-z .'-]{2,30})\)\s*$/); // "(Canada)", "(United Kingdom)"
+  return !!(paren && locationScope(paren[1]) === 'non_us');
 }
 import { locationScope } from '../lib/jobs/usLocation.js';
 import { preferFullText } from '../lib/jobs/listingTwins.js';
