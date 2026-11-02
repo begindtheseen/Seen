@@ -47,7 +47,8 @@ function evidenceLabel(sc: Company['score']): string {
   if (fp <= 0) return 'web-research estimate'
   const seen = sc.seen_user_report_count
   if (seen == null) return accountsLabel(fp)
-  return `${accountsLabel(fp)} · ${seen === 1 ? '1 from a Seen user' : `${seen} from Seen users`}`
+  // A zero is said as what the accounts ARE (public posts), not as a missing thing on every row (round 2: "0 from Seen users" on all 150).
+  return `${accountsLabel(fp)} · ${seen === 0 ? 'all from public posts' : seen === 1 ? '1 from a Seen user' : `${seen} from Seen users`}`
 }
 
 // The top of the board is reserved for well-evidenced grades: a company needs this many applicant

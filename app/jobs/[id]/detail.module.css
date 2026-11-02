@@ -13,7 +13,7 @@
 @media (max-width: 480px) { .head { grid-template-columns: 40px minmax(0, 1fr) auto; gap: var(--sp-3); padding: var(--sp-4); border-radius: var(--r-card); } .logo { width: 40px !important; height: 40px !important; } }
 .logo { width: 52px; height: 52px; border-radius: var(--r-control); background: var(--surface-2); border: 1px solid var(--border-2); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: var(--fs-h3); color: var(--text-1); }
 .headText { min-width: 0; }
-.title { margin: 0; font-family: var(--display); font-weight: 700; font-size: var(--fs-xl); line-height: var(--lh-snug); letter-spacing: var(--ls-heading); color: var(--text-1); overflow-wrap: anywhere; }
+.title { margin: 0; font-family: var(--display); font-weight: 700; font-size: var(--fs-xl); line-height: var(--lh-snug); letter-spacing: var(--ls-heading); color: var(--text-1); overflow-wrap: anywhere; text-wrap: balance; }
 .meta { margin: var(--sp-2) 0 0; display: flex; flex-wrap: wrap; gap: 2px var(--sp-3); align-items: center; font-size: var(--fs-sm); color: var(--text-3); }
 .co { color: var(--text-2); font-weight: 600; }
 .place { display: inline-flex; align-items: center; gap: 4px; }

@@ -426,7 +426,7 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
 
             <button
               style={secondaryBtnStyle}
-              onClick={() => setStep('not_yet')}
+              onClick={() => { saveSkipReason(companyName, job.title, 'not yet', 'not_yet'); showToast(`Okay — we'll remind you to check back on ${companyName}.`); onClose() }}
             >
               Not yet
             </button>

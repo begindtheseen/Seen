@@ -19,6 +19,7 @@ import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import Icon from '@/components/ui/Icon'
 import s from './JobCard.module.css'
+import { displayLocation } from '@/lib/jobs/displayLocation.js'
 
 export default function JobCard({ job, onSaveToggle, onOpen, onCheckCompany, alreadyApplied, more = [], employerScore = null }: {
   job: Job
@@ -83,7 +84,7 @@ export default function JobCard({ job, onSaveToggle, onOpen, onCheckCompany, alr
           <h3 className={s.title}>{job.title}</h3>
           <p className={s.meta}>
             <span className={s.co}>{companyName}</span>
-            {job.location && <span className={s.place}><Icon name="map-pin" size={12} />{job.location}</span>}
+            {job.location && <span className={s.place} title={job.location}><Icon name="map-pin" size={12} />{displayLocation(job.location)}</span>}
             {pay && <span className="tnum">{pay}</span>}
             {job.type && <span>{job.type}</span>}
           </p>

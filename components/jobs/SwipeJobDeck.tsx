@@ -8,6 +8,7 @@ import HiringProbability from '@/components/HiringProbability'
 import { displayCompanyName } from '@/lib/companyDisplay'
 import { displayPay } from '@/lib/jobs/pay.js'
 import { roleSnippet, isDescriptionPreview } from '@/lib/jobs/descriptionText.js'
+import { displayLocation } from '@/lib/jobs/displayLocation.js'
 import ListingScoreRing from '@/components/jobs/ListingScoreRing'
 import Button from '@/components/ui/Button'
 import Icon from '@/components/ui/Icon'
@@ -251,7 +252,7 @@ export default function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply,
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-body)', fontWeight: 600, color: 'var(--text-1)', letterSpacing: '-.02em', lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topJob.title}</div>
-            <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--text-3)', marginTop: 2 }}>{displayCompanyName(topJob.company)}{topJob.location ? ` · ${topJob.location}` : ''}</div>
+            <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--text-3)', marginTop: 2 }}>{displayCompanyName(topJob.company)}{topJob.location ? ` · ${displayLocation(topJob.location)}` : ''}</div>
           </div>
           <ListingScoreRing score={topJob.score} size={40} />
         </div>
@@ -265,8 +266,8 @@ export default function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply,
         {/* The first thing the posting says about the ROLE — not the employer's mission paragraph
             that 302 SpaceX rows share (lib/jobs/descriptionText.js roleSnippet). */}
         {topJob.description && (
-          <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--text-3)', lineHeight: 1.55, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-            {roleSnippet(topJob.description, topJob.company, topJob.title, 220)}
+          <div className={m.excerpt}>
+            {roleSnippet(topJob.description, topJob.company, topJob.title, 440)}
             {isDescriptionPreview(topJob) && <span style={{ color: 'var(--text-4)' }}> (preview — full posting on the employer&apos;s site)</span>}
           </div>
         )}

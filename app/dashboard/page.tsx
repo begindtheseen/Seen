@@ -23,6 +23,7 @@ import Odometer from '@/components/motion/Odometer'
 import { LoadError, PageSkeleton } from '@/components/shell/LoadStates'
 import styles from './dashboard.module.css'
 import Icon, { type IconName } from '@/components/ui/Icon'
+import Badge, { type BadgeTone } from '@/components/ui/Badge'
 
 // BadgeStore's ids drawn with the shared icon set (the store's emoji stay for share cards).
 const BADGE_ICON: Record<string, IconName> = {
@@ -261,8 +262,10 @@ export default function DashboardPage() {
       const ratio = hi ? v / Math.max(avg, 1) : avg / Math.max(v, 1)
       return Math.min(99, Math.max(1, Math.round(50 * ratio)))
     }
-    const col = (v: number, avg: number | null, hi: boolean) => v === 0 || avg == null ? 'var(--muted)' : (hi ? (v >= avg ? 'var(--green)' : 'var(--amber)') : (v <= avg ? 'var(--green)' : v < avg * 1.4 ? 'var(--amber)' : 'var(--red)'))
-    const row = (lbl: string, v: number, avg: number | null, hi: boolean) => ({ lbl, val: `${v}%`, pct: avg == null ? 50 : pct(v, avg, hi), avg: avg == null ? 'reference pending' : `${avg}% reference`, col: col(v, avg, hi) })
+    // The figure is ink; the one tone signal on a tile is a Badge (word + icon), decided here by the reference.
+    const tone = (v: number, avg: number | null, hi: boolean): BadgeTone | null => v === 0 || avg == null ? null : (hi ? (v >= avg ? 'good' : 'caution') : (v <= avg ? 'good' : v < avg * 1.4 ? 'caution' : 'bad'))
+    const toneWord = (t: BadgeTone | null) => t === 'good' ? 'Ahead' : t === 'caution' ? 'Behind' : t === 'bad' ? 'Well behind' : ''
+    const row = (lbl: string, v: number, avg: number | null, hi: boolean) => { const t = tone(v, avg, hi); return { lbl, val: `${v}%`, pct: avg == null ? 50 : pct(v, avg, hi), avg: avg == null ? 'reference pending' : `${avg}% reference`, tone: t, word: toneWord(t) } }
     return {
       n,
       hasRef: !!AVG,
@@ -289,8 +292,8 @@ export default function DashboardPage() {
   // a red "50" next to "too early" read as a bad verdict (audit 2026-10-23).
   // No number at all until two real outcomes exist (audit 3 M1: "58" next to "Too early to call", drifting
   // 58 → 56 → 53 as Day-0 cards were added).
+  // The ring and the figure are ink; the card's one tone signal is the Badge beside the eyebrow.
   const healthReal = !!health && health.terminal >= HEALTH_MIN_OUTCOMES
-  const healthColor = health && healthReal ? (health.score >= 75 ? 'var(--green)' : health.score >= 55 ? 'var(--amber)' : 'var(--red)') : 'var(--muted)'
   const healthDeg = health && healthReal ? Math.round((health.score / 100) * 360) : 0
 
   // Status line — "open" = currently in-progress; distinct from "tracked total" (all-time).
@@ -337,14 +340,14 @@ export default function DashboardPage() {
 
   // Health headline: one plain sentence instead of a caption line.
   const healthHead = !health
-    ? { t: 'Your score unlocks soon.', s: healthUnlockLine(apps.length), badge: 'Getting started', tone: 'muted' }
+    ? { t: 'Your score unlocks soon.', s: healthUnlockLine(apps.length), badge: 'Getting started', tone: 'neutral' as BadgeTone }
     : !healthReal
-      ? { t: 'Too early to call.', s: `Your score appears once ${HEALTH_MIN_OUTCOMES} applications have a real outcome (hired, rejected or ghosted) — ${health.terminal} so far.`, badge: 'Early days', tone: 'muted' }
+      ? { t: 'Too early to call.', s: `Your score appears once ${HEALTH_MIN_OUTCOMES} applications have a real outcome (hired, rejected or ghosted) — ${health.terminal} so far.`, badge: 'Early days', tone: 'neutral' as BadgeTone }
       : health.score >= 75
-        ? { t: "You're getting noticed.", s: `${health.interviewRate}% of your applications reached an interview and ${health.responseRate}% got a reply. Keep doing what works.`, badge: 'Strong', tone: 'green' }
+        ? { t: "You're getting noticed.", s: `${health.interviewRate}% of your applications reached an interview and ${health.responseRate}% got a reply. Keep doing what works.`, badge: 'Strong', tone: 'good' as BadgeTone }
         : health.score >= 55
-          ? { t: "You're on track.", s: `${health.responseRate}% of your applications got a reply. A follow-up on the quiet ones could tip it.`, badge: 'On track', tone: 'amber' }
-          : { t: 'Room to improve.', s: `${health.ghostRate}% of your applications went silent. Check a company's ghost rate before applying and tailor your résumé.`, badge: 'Needs attention', tone: 'red' }
+          ? { t: "You're on track.", s: `${health.responseRate}% of your applications got a reply. A follow-up on the quiet ones could tip it.`, badge: 'Mixed', tone: 'caution' as BadgeTone }
+          : { t: 'Room to improve.', s: `${health.ghostRate}% of your applications went silent. Check a company's ghost rate before applying and tailor your résumé.`, badge: 'Needs attention', tone: 'bad' as BadgeTone }
   const signalCount = alertCount + (surveyInsight ? 1 : 0)
   // A fresh account (nothing tracked, and not because the load failed): the empty health / pipeline / signals
   // boxes collapse into one row with the one button (DESIGN.md §5).
@@ -416,11 +419,11 @@ export default function DashboardPage() {
           <section className={`${styles.card} ${styles.health}`}>
             <div className={styles.cardHead}>
               <span className={styles.eyebrow}>Job search health</span>
-              <span className={`${styles.badge} ${styles[healthHead.tone]}`}>● {healthHead.badge}</span>
+              <Badge tone={healthHead.tone}>{healthHead.badge}</Badge>
             </div>
             <div className={styles.healthBody}>
-              <div className={styles.ring} style={{ background: `conic-gradient(${healthColor} ${healthDeg}deg, rgba(255,255,255,.1) 0deg)` }}>
-                <span style={{ color: healthColor }} aria-label={healthReal ? undefined : 'No score yet'}>{health && healthReal ? <Odometer value={health.score} /> : '—'}</span>
+              <div className={styles.ring} style={{ background: `conic-gradient(var(--text-2) ${healthDeg}deg, var(--border-2) 0deg)` }}>
+                <span aria-label={healthReal ? undefined : 'No score yet'}>{health && healthReal ? <Odometer value={health.score} /> : '—'}</span>
               </div>
               <div style={{ minWidth: 0 }}>
                 <h2 className={styles.healthT}>{healthHead.t}</h2>
@@ -429,10 +432,10 @@ export default function DashboardPage() {
             </div>
             {/* No numbers from a failed load with nothing local: "0 / 0 / 0" under an error reads as a verdict (R-1). */}
             <div className={styles.pills}>
-              <div className={styles.pill}><small>Open</small><b style={{ color: 'var(--info-text)' }}>{noData ? '—' : <Odometer value={active.length} />}</b></div>
-              <div className={styles.pill}><small>Response</small><b style={{ color: 'var(--accent)' }}>{noData || responseNum == null ? '—' : <Odometer value={responseNum} suffix="%" />}</b></div>
-              <div className={styles.pill}><small>Hired</small><b style={{ color: 'var(--green)' }}>{noData ? '—' : <Odometer value={hired.length} />}</b></div>
-              <div className={styles.pill}><small>Ghosted</small><b style={{ color: 'var(--bad-text)' }}>{noData ? '—' : <Odometer value={ghosted.length} />}</b></div>
+              <div className={styles.pill}><small>Open</small><b>{noData ? '—' : <Odometer value={active.length} />}</b></div>
+              <div className={styles.pill}><small>Response</small><b>{noData || responseNum == null ? '—' : <Odometer value={responseNum} suffix="%" />}</b></div>
+              <div className={styles.pill}><small>Hired</small><b>{noData ? '—' : <Odometer value={hired.length} />}</b></div>
+              <div className={styles.pill}><small>Ghosted</small><b>{noData ? '—' : <Odometer value={ghosted.length} />}</b></div>
             </div>
             {ratedCount > 0 && <p className={styles.caption}>Based on {ratedCount} tracked application{ratedCount !== 1 ? 's' : ''}{apps.length > ratedCount ? ` · ${apps.length - ratedCount} withdrawn not counted` : ''}</p>}
           </section>
@@ -495,14 +498,13 @@ export default function DashboardPage() {
               const ivAt = ivEv ? String(ivEv.data!.at) : ''
               const sc = coScores[app.company.toLowerCase()]
               const ghostPct = sc ? Math.round(sc.ghost_rate * 100) : null
-              const tone = sc ? (sc.ghost_rate > 0.55 ? 'var(--red)' : sc.ghost_rate > 0.35 ? 'var(--amber)' : 'var(--green)') : undefined
               return (
                 <Link key={app.id} href={`/tracker#app_${pathSegment(app.id)}`} className={styles.job}>
                   <span className={styles.jobIco}>{(app.company || '?').charAt(0).toUpperCase()}</span>
                   <span className={styles.jobInfo}>
                     <b>{app.company}</b>
                     <small>{app.role || 'Role'}</small>
-                    <small className={styles.jobMeta}>{ivAt ? `${app.stage} · ${whenLabel(ivAt)}` : ivEv === null && ['Phone Screen', 'Interview', 'Final Round'].includes(app.stage) ? `${app.stage} · add the date` : <>Day {days}{ghostPct != null && <> · <span style={{ color: tone }}>{ghostPct}% reported ghost rate</span></>}</>}</small>
+                    <small className={styles.jobMeta}>{ivAt ? `${app.stage} · ${whenLabel(ivAt)}` : ivEv === null && ['Phone Screen', 'Interview', 'Final Round'].includes(app.stage) ? `${app.stage} · add the date` : <>Day {days}{ghostPct != null && <> · <span className={styles.ghostPct}>{ghostPct}% reported ghost rate</span></>}</>}</small>
                   </span>
                   <span className={styles.stage}>{app.stage}</span>
                 </Link>
@@ -513,7 +515,7 @@ export default function DashboardPage() {
           <section className={`${styles.card} ${styles.tight}`}>
             <div className={styles.cardHead}>
               <h2 className={styles.cardT}>Signals</h2>
-              {signalCount > 0 && <span className={`${styles.badge} ${styles.red}`}>{signalCount} to review</span>}
+              {signalCount > 0 && <Badge tone="bad">{signalCount} to review</Badge>}
             </div>
             {signalCount === 0 && <p className={styles.allClear}>All clear. Nothing needs you right now.</p>}
             {surveyInsight && (
@@ -560,8 +562,9 @@ export default function DashboardPage() {
               {benchmarks.metrics.map(m => (
                 <div key={m.lbl} className={styles.metric}>
                   <span className={styles.eyebrow}>{m.lbl}</span>
-                  <b style={{ color: m.col }}>{m.val}</b>
+                  <b>{m.val}</b>
                   <small>{m.avg}</small>
+                  {m.tone && <Badge tone={m.tone}>{m.word}</Badge>}
                 </div>
               ))}
             </div>

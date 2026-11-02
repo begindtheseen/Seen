@@ -30,6 +30,7 @@ import { useProStatus } from '@/lib/hooks/useProStatus'
 import { displayCompanyName } from '@/lib/companyDisplay'
 import { displayPay, payLabel } from '@/lib/jobs/pay.js'
 import { paragraphs, isDescriptionPreview, stripDanglingEllipsis, endsCutOff } from '@/lib/jobs/descriptionText.js'
+import { displayLocation } from '@/lib/jobs/displayLocation.js'
 import { isGradeableScore } from '@/lib/gradeGate'
 import ListingScoreRing from '@/components/jobs/ListingScoreRing'
 import EmployerGradeChip from '@/components/jobs/EmployerGradeChip'
@@ -416,7 +417,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             <h1 className={d.title}>{job.title}</h1>
             <p className={d.meta}>
               <span className={d.co}>{companyName}</span>
-              {job.location && <span className={d.place}><Icon name="map-pin" size={14} />{job.location}</span>}
+              {job.location && <span className={d.place} title={job.location}><Icon name="map-pin" size={14} />{displayLocation(job.location)}</span>}
               {metaBits.map(m => <span key={m}>{m}</span>)}
             </p>
             {/* Fixed-height slot: the employer's grade arrives after a fetch and must not push the page (CLS). */}
