@@ -65,8 +65,8 @@ function CityCard({ city }: { city: DemandCity }) {
         <div>
           <div className="dc-city">{city.city}</div>
           {/* Honest vintage chip: live-from-corpus vs modeled-from-BLS — never both as "Live" */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '.45rem', marginTop: '.18rem', flexWrap: 'wrap' }}>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, letterSpacing: '.06em', color: live ? 'var(--green)' : 'var(--blue)', border: `1px solid ${live ? 'rgba(16,185,129,.35)' : 'var(--info-line)'}`, borderRadius: 4, padding: '.08rem .35rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginTop: '.25rem', flexWrap: 'wrap' }}>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, letterSpacing: '.06em', color: live ? 'var(--green)' : 'var(--blue)', border: `1px solid ${live ? 'rgba(16,185,129,.35)' : 'var(--info-line)'}`, borderRadius: 4, padding: '.0625rem .25rem' }}>
               {live ? '● LIVE · Seen listings' : '≈ MODELED · BLS blend'}
             </span>
             <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>
@@ -74,7 +74,7 @@ function CityCard({ city }: { city: DemandCity }) {
             </span>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexShrink: 0 }}>
           <a
             href="/companies"
             style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', textDecoration: 'none' }}
@@ -100,7 +100,7 @@ function CityCard({ city }: { city: DemandCity }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginTop: '.25rem' }}>
                 <DemandBar di={job.di} />
                 <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', flexShrink: 0 }}>{job.l}</span>
-                {(() => { const dl = diLabel(job.di); return <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: dl.color, marginLeft: '.4rem', fontWeight: 500 }}>{dl.label}</span>; })()}
+                {(() => { const dl = diLabel(job.di); return <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: dl.color, marginLeft: '.5rem', fontWeight: 500 }}>{dl.label}</span>; })()}
               </div>
             </div>
             {/* Live counts are exact Seen listings; BLS counts are model estimates — say so. */}
@@ -195,7 +195,7 @@ export default function DemandPage() {
     background: 'var(--surface)',
     border: '1.5px solid var(--line2)',
     borderRadius: 8,
-    padding: '.55rem .9rem',
+    padding: '.5rem 1rem',
     color: 'var(--white)',
     fontFamily: 'var(--mono)',
     fontSize: 'var(--fs-meta)',
@@ -244,7 +244,7 @@ export default function DemandPage() {
             {(locFilter || nicheFilter || expFilter) && (
               <button
                 onClick={() => { setLocFilter(''); setNicheFilter(''); setExpFilter('') }}
-                style={{ background: 'none', border: '1px solid var(--line2)', color: 'var(--muted)', borderRadius: 8, padding: '.55rem .9rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', cursor: 'pointer', flexShrink: 0 }}
+                style={{ background: 'none', border: '1px solid var(--line2)', color: 'var(--muted)', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', cursor: 'pointer', flexShrink: 0 }}
               >
                 ✕ Clear
               </button>
@@ -255,7 +255,7 @@ export default function DemandPage() {
         {/* Freshness, said out loud: the BLS blend is refreshed monthly by cron; when that has not
             happened for 65+ days the data is stale and the page says so instead of hiding it. */}
         {fresh.stale && (
-          <div style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.3)', borderRadius: 10, padding: '.65rem 1rem', marginBottom: '1rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--amber)', lineHeight: 1.6 }}>
+          <div style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.3)', borderRadius: 10, padding: '.75rem 1rem', marginBottom: '1rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--amber)', lineHeight: 1.6 }}>
             ⚠ Modeled figures last refreshed {fresh.updatedAt ? relAgo(fresh.updatedAt) : 'a while ago'}{blsPeriod ? ` (BLS ${blsPeriod})` : ''}. Treat them as a vintage, not a live reading.
           </div>
         )}
@@ -283,7 +283,7 @@ export default function DemandPage() {
             {[0, 1, 2, 3].map(i => (
               <div key={i} className="dcity" style={{ minHeight: 180, opacity: 0.55 }}>
                 <div style={{ height: 12, width: `${58 - i * 6}%`, background: 'var(--line2)', borderRadius: 4, margin: '1rem' }} />
-                {[0, 1, 2].map(j => <div key={j} style={{ height: 9, width: `${80 - j * 14}%`, background: 'var(--line)', borderRadius: 4, margin: '.8rem 1rem' }} />)}
+                {[0, 1, 2].map(j => <div key={j} style={{ height: 9, width: `${80 - j * 14}%`, background: 'var(--line)', borderRadius: 4, margin: '.75rem 1rem' }} />)}
               </div>
             ))}
           </div>
@@ -304,12 +304,12 @@ export default function DemandPage() {
                 <button
                   onClick={generateCity}
                   disabled={genState === 'loading'}
-                  style={{ background: 'rgba(16,185,129,.08)', border: '1px solid rgba(16,185,129,.35)', color: 'var(--green)', borderRadius: 8, padding: '.65rem 1.2rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', cursor: genState === 'loading' ? 'wait' : 'pointer' }}
+                  style={{ background: 'rgba(16,185,129,.08)', border: '1px solid rgba(16,185,129,.35)', color: 'var(--green)', borderRadius: 8, padding: '.75rem 1.25rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', cursor: genState === 'loading' ? 'wait' : 'pointer' }}
                 >
                   {genState === 'loading' ? `Scanning live listings near ${locFilter.trim()}…` : `⚡ Generate demand for “${locFilter.trim()}” from live Seen listings`}
                 </button>
                 {genState === 'failed' && genMsg && (
-                  <div style={{ marginTop: '.9rem', color: 'var(--amber)', fontSize: 'var(--fs-meta)' }}>{genMsg}</div>
+                  <div style={{ marginTop: '1rem', color: 'var(--amber)', fontSize: 'var(--fs-meta)' }}>{genMsg}</div>
                 )}
               </>
             ) : (

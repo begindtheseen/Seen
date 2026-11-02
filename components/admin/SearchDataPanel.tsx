@@ -25,9 +25,9 @@ type Out = {
 }
 
 const mono: React.CSSProperties = { fontFamily: 'var(--mono)' }
-const row: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: '.6rem', alignItems: 'baseline', padding: '.35rem 0', borderTop: '1px solid var(--line)' }
+const row: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: '.5rem', alignItems: 'baseline', padding: '.25rem 0', borderTop: '1px solid var(--line)' }
 const ell: React.CSSProperties = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }
-const label: React.CSSProperties = { ...mono, fontSize: 'var(--fs-55)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.1em', margin: '.85rem 0 .3rem' }
+const label: React.CSSProperties = { ...mono, fontSize: 'var(--fs-55)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.1em', margin: '.75rem 0 .25rem' }
 const pathOf = (u: string) => { try { return new URL(u).pathname } catch { return u } }
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`
 const signed = (n: number) => (n > 0 ? `+${n}` : String(n))
@@ -60,8 +60,8 @@ export function SearchDataPanel({ token }: { token: string }) {
   const dg = data?.digest
   const intents = Object.entries(data?.intents || {}).filter(([, v]) => v.impressions > 0).sort((a, b) => b[1].impressions - a[1].impressions)
   return (
-    <Card style={{ marginBottom: '.65rem' }}>
-      <CardHeader title="Search demand" action={<button onClick={load} disabled={busy} style={{ ...mono, fontSize: 'var(--fs-60)', background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.35rem .8rem', color: 'var(--blue)', cursor: 'pointer' }}>{busy ? 'Loading…' : data ? 'Refresh' : 'Load'}</button>} />
+    <Card style={{ marginBottom: '.75rem' }}>
+      <CardHeader title="Search demand" action={<button onClick={load} disabled={busy} style={{ ...mono, fontSize: 'var(--fs-60)', background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.25rem .75rem', color: 'var(--blue)', cursor: 'pointer' }}>{busy ? 'Loading…' : data ? 'Refresh' : 'Load'}</button>} />
       <div style={{ ...mono, fontSize: 'var(--fs-60)', color: 'var(--sub)', lineHeight: 1.6 }}>
         What people searched on Google and Bing before they saw a Seen page, last 28 days. Pulled daily at 6:20 AM PT (5:20 AM in winter).
       </div>
@@ -73,7 +73,7 @@ export function SearchDataPanel({ token }: { token: string }) {
             Google through {data.freshness?.google || 'no data'} · Bing through {data.freshness?.bing || 'no data'}{data.freshness?.stale ? ' · the daily pull looks stopped' : ''}
           </div>
           {data.totals && data.window && (
-            <div style={{ ...mono, fontSize: 'var(--fs-62)', color: 'var(--white)', marginTop: '.35rem' }}>
+            <div style={{ ...mono, fontSize: 'var(--fs-62)', color: 'var(--white)', marginTop: '.25rem' }}>
               {data.totals.impressions.toLocaleString()} impressions · {data.totals.clicks.toLocaleString()} clicks · {data.totals.queries.toLocaleString()} queries · {data.window.from} to {data.window.to}
             </div>
           )}
@@ -124,9 +124,9 @@ export function SearchDataPanel({ token }: { token: string }) {
           </Section>
 
           <Section title="What searchers ask" empty={!intents.length}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.4rem' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.5rem' }}>
               {intents.map(([k, v]) => (
-                <span key={k} style={{ ...mono, fontSize: 'var(--fs-60)', padding: '.3rem .6rem', borderRadius: 6, border: '1px solid var(--line)', color: 'var(--sub)' }}>{k.replace(/_/g, ' ')}: {v.impressions.toLocaleString()}</span>
+                <span key={k} style={{ ...mono, fontSize: 'var(--fs-60)', padding: '.25rem .5rem', borderRadius: 6, border: '1px solid var(--line)', color: 'var(--sub)' }}>{k.replace(/_/g, ' ')}: {v.impressions.toLocaleString()}</span>
               ))}
             </div>
           </Section>

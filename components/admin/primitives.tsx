@@ -14,12 +14,12 @@ export function Card({ children, style }: { children: React.ReactNode; style?: R
 
 export function CardHeader({ title, badge, action }: { title: string; badge?: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <div className="adm-panel-hdr" style={{ margin: '0 -1rem .85rem' }}>
+    <div className="adm-panel-hdr" style={{ margin: '0 -1rem .75rem' }}>
       <span style={{ display: 'flex', alignItems: 'center', gap: '.5rem', overflow: 'hidden', flexShrink: 1, minWidth: 0 }}>
         {title}
         {badge}
       </span>
-      {action && <div style={{ flexShrink: 0, display: 'flex', gap: '.35rem', flexWrap: 'wrap' }}>{action}</div>}
+      {action && <div style={{ flexShrink: 0, display: 'flex', gap: '.25rem', flexWrap: 'wrap' }}>{action}</div>}
     </div>
   )
 }
@@ -27,7 +27,7 @@ export function CardHeader({ title, badge, action }: { title: string; badge?: Re
 export function Badge({ n, color = 'var(--red)' }: { n: number; color?: string }) {
   if (!n) return null
   return (
-    <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', background: color + '22', color, border: `1px solid ${color}44`, borderRadius: 100, padding: '.1rem .4rem', flexShrink: 0 }}>{n}</span>
+    <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', background: color + '22', color, border: `1px solid ${color}44`, borderRadius: 100, padding: '.125rem .5rem', flexShrink: 0 }}>{n}</span>
   )
 }
 
@@ -36,11 +36,11 @@ export function BarChart({ items, max, green }: { items: { label: string; value:
     <div>
       {items.map(item => (
         <div key={item.label} className="adm-row">
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)', width: '40%', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', width: '40%', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
           <div className="adm-bar-wrap">
             <div className={green ? 'adm-bar green' : 'adm-bar'} style={{ width: `${max > 0 ? (item.value / max) * 100 : 0}%` }} />
           </div>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', width: 28, textAlign: 'right', flexShrink: 0 }}>{item.value}</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', width: 28, textAlign: 'right', flexShrink: 0 }}>{item.value}</span>
         </div>
       ))}
     </div>

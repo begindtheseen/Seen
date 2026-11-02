@@ -97,18 +97,18 @@ export async function generateMetadata(
 
 const S = {
   wrap: { maxWidth: 760, margin: '0 auto', padding: '3.5rem 1.25rem 5rem', width: '100%', boxSizing: 'border-box' as const },
-  eyebrow: { fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase' as const, letterSpacing: '.2em', color: 'var(--blue)', marginBottom: '.7rem', display: 'flex', alignItems: 'center', gap: 10 },
+  eyebrow: { fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase' as const, letterSpacing: '.2em', color: 'var(--blue)', marginBottom: '.75rem', display: 'flex', alignItems: 'center', gap: 12 },
   h1: { fontFamily: 'var(--display)', fontSize: 'clamp(1.6rem,5vw,2.3rem)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', lineHeight: 1.1, margin: '0 0 1rem' },
   lead: { color: 'var(--sub)', fontSize: 'var(--fs-body)', lineHeight: 1.7, fontWeight: 300, margin: '0 0 2rem' },
-  h2: { fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', margin: '2.2rem 0 .8rem', letterSpacing: '-.01em' },
+  h2: { fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', margin: '2rem 0 .75rem', letterSpacing: '-.01em' },
   p: { color: 'var(--sub)', fontSize: 'var(--fs-ui)', lineHeight: 1.75, margin: '0 0 1rem', fontWeight: 300 },
 }
 
 function MetricCard({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <div style={{ flex: '1 1 120px', minWidth: 0, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '.9rem 1rem' }}>
+    <div style={{ flex: '1 1 120px', minWidth: 0, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '1rem 1rem' }}>
       <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-xl)', fontWeight: 500, color, lineHeight: 1, letterSpacing: '-.02em' }}>{value}</div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', marginTop: '.45rem' }}>{label}</div>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', marginTop: '.5rem' }}>{label}</div>
     </div>
   )
 }
@@ -121,7 +121,7 @@ function DataPanel({ name, s }: { name: string; s: GrowthScore }) {
   const wait = s.avg_wait_days != null ? Math.round(s.avg_wait_days) : null
   const fp = firstPartyReportCount(s)
   return (
-    <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderLeft: `3px solid ${accent}`, borderRadius: 12, padding: '1.2rem 1.25rem', margin: '0 0 1.8rem' }}>
+    <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderLeft: `3px solid ${accent}`, borderRadius: 12, padding: '1.25rem 1.25rem', margin: '0 0 1.75rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: '1rem' }}>
         <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-h2)', fontWeight: 600, color: accent, lineHeight: 1 }}>{grade(s.overall_score)}</div>
         <div>
@@ -129,12 +129,12 @@ function DataPanel({ name, s }: { name: string; s: GrowthScore }) {
           <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', letterSpacing: '.1em', color: accent }}>{riskLabel(s.risk_level)}</div>
         </div>
       </div>
-      <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
         {ghostPct != null && <MetricCard label="Ghost rate" value={`${ghostPct}%`} color="var(--red)" />}
         {respPct != null && <MetricCard label="Response rate" value={`${respPct}%`} color="var(--green)" />}
         {wait != null && <MetricCard label="Avg wait" value={`${wait}d`} color="var(--amber)" />}
       </div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.9rem' }}>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '1rem' }}>
         {`Based on ${fp.toLocaleString()} applicant account${fp === 1 ? '' : 's'}`} · A community signal, not a verified fact
       </div>
     </div>
@@ -143,14 +143,14 @@ function DataPanel({ name, s }: { name: string; s: GrowthScore }) {
 
 function CTAs({ name, cslug }: { name: string; cslug: string }) {
   return (
-    <div style={{ display: 'flex', gap: '.7rem', flexWrap: 'wrap', margin: '2.4rem 0 0' }}>
-      <Link href={`/company/${cslug}`} className="btn" style={{ background: 'var(--cta)', color: '#fff', padding: '.7rem 1.3rem', fontWeight: 700 }}>
+    <div style={{ display: 'flex', gap: '.75rem', flexWrap: 'wrap', margin: '2.5rem 0 0' }}>
+      <Link href={`/company/${cslug}`} className="btn" style={{ background: 'var(--cta)', color: 'var(--text-1)', padding: '.75rem 1.25rem', fontWeight: 700 }}>
         See {name}&apos;s full hiring report →
       </Link>
-      <Link href={`/tracker?add=1&company=${encodeURIComponent(name)}`} className="btn btn-ghost" style={{ padding: '.7rem 1.3rem' }}>
+      <Link href={`/tracker?add=1&company=${encodeURIComponent(name)}`} className="btn btn-ghost" style={{ padding: '.75rem 1.25rem' }}>
         Track your application
       </Link>
-      <Link href="/report" className="btn btn-ghost" style={{ padding: '.7rem 1.3rem' }}>
+      <Link href="/report" className="btn btn-ghost" style={{ padding: '.75rem 1.25rem' }}>
         Report your experience
       </Link>
     </div>
@@ -242,8 +242,8 @@ export default async function FaqSlugPage({ params }: { params: Promise<{ slug: 
         <p style={S.lead}>{shortAnswer}</p>
 
         {graded ? <DataPanel name={name} s={graded} /> : (
-          <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderLeft: '3px solid var(--blue)', borderRadius: 12, padding: '1.2rem 1.25rem', margin: '0 0 1.8rem' }}>
-            <div style={{ fontFamily: 'var(--body)', fontWeight: 600, color: 'var(--white)', marginBottom: '.4rem' }}>{fp > 0 ? `${name} is not graded yet (${Math.min(fp, MIN_REPORTS_FOR_GRADE)} of ${MIN_REPORTS_FOR_GRADE} applicant accounts)` : `No reports yet for ${name}`}</div>
+          <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderLeft: '3px solid var(--blue)', borderRadius: 12, padding: '1.25rem 1.25rem', margin: '0 0 1.75rem' }}>
+            <div style={{ fontFamily: 'var(--body)', fontWeight: 600, color: 'var(--white)', marginBottom: '.5rem' }}>{fp > 0 ? `${name} is not graded yet (${Math.min(fp, MIN_REPORTS_FOR_GRADE)} of ${MIN_REPORTS_FOR_GRADE} applicant accounts)` : `No reports yet for ${name}`}</div>
             <p style={{ ...S.p, margin: 0 }}>{fp > 0 ? `Read the ${fp} applicant account${fp === 1 ? '' : 's'} on ${name}'s page — and add yours so it can be graded fairly.` : `Be the first to report how ${name} treated your application. Your report becomes the data the next applicant searches for tonight.`}</p>
           </div>
         )}

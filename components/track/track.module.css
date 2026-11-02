@@ -26,7 +26,7 @@
   font-size: var(--fs-ui);
   line-height: 1.55;
   color: var(--sub);
-  margin: 0 0 .8rem;
+  margin: 0 0 .75rem;
   overflow-wrap: anywhere;
 }
 .fact {
@@ -41,7 +41,7 @@
   font-size: var(--fs-sm);
   line-height: 1.6;
   color: var(--text-3);
-  margin: .55rem 0 0;
+  margin: .5rem 0 0;
   overflow-wrap: anywhere;
 }
 .err {
@@ -56,14 +56,14 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: .4rem;
+  gap: .5rem;
   min-height: 48px;
   width: 100%;
   padding: 0 var(--sp-5);
   border: none;
   border-radius: var(--r-control);
   background: var(--cta);
-  color: #fff;
+  color: var(--text-1);
   font-family: var(--body);
   font-weight: 600;
   font-size: var(--fs-body);
@@ -83,7 +83,7 @@
   align-items: center;
   justify-content: center;
   min-height: 44px;
-  padding: .55rem .9rem;
+  padding: .5rem 1rem;
   border: 1px solid var(--line2);
   border-radius: 10px;
   background: var(--surface-overlay);
@@ -100,7 +100,7 @@
   display: inline-flex;
   align-items: center;
   min-height: 44px;
-  padding: 0 .1rem;
+  padding: 0 .125rem;
   background: none;
   border: none;
   color: var(--accent);
@@ -118,7 +118,7 @@
   font-size: var(--fs-sm);
   font-weight: 500;
   color: var(--text-2);
-  margin: 0 0 .4rem;
+  margin: 0 0 .5rem;
 }
 .input {
   width: 100%;
@@ -127,25 +127,25 @@
   background: var(--surface);
   border: 1.5px solid var(--line2);
   border-radius: 9px;
-  padding: .6rem .85rem;
+  padding: .5rem .75rem;
   color: var(--white);
   font-family: var(--body);
   font-size: var(--fs-lead); /* 16px: iOS does not zoom into the field */
   caret-color: var(--accent);
 }
 .input:focus { border-color: var(--accent); box-shadow: var(--sh-focus); outline: none; }
-.field { margin: 0 0 .85rem; min-width: 0; }
+.field { margin: 0 0 .75rem; min-width: 0; }
 
 .chips {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: .45rem;
-  margin: 0 0 .85rem;
+  gap: .5rem;
+  margin: 0 0 .75rem;
 }
 .chip {
   min-height: 44px;
   min-width: 0;
-  padding: .5rem .6rem;
+  padding: .5rem .5rem;
   border: 1px solid var(--line2);
   border-radius: 10px;
   background: var(--surface);
@@ -183,7 +183,7 @@
   gap: .25rem 1rem;
   flex-wrap: wrap;
   align-items: center;
-  margin-top: .35rem;
+  margin-top: .25rem;
 }
 
 .ok {
@@ -191,7 +191,7 @@
   font-weight: 600;
   font-size: var(--fs-lead);
   color: var(--good-text);
-  margin: 0 0 .3rem;
+  margin: 0 0 .25rem;
 }
 
 /* Invite banner (components/growth/InviteBanner.tsx): fixed, slim, solid. */
@@ -206,8 +206,8 @@
   display: flex;
   align-items: center;
   gap: .5rem .75rem;
-  padding: .45rem .45rem .45rem .95rem;
-  background: #0e111c;
+  padding: .5rem .5rem .5rem 1rem;
+  background: var(--surface-overlay);
   border: 1px solid var(--border-2);
   border-radius: var(--r-card);
   box-shadow: var(--sh-overlay);
@@ -225,10 +225,10 @@
   display: inline-flex;
   align-items: center;
   min-height: 44px;
-  padding: 0 .85rem;
+  padding: 0 .75rem;
   border-radius: 9px;
   background: var(--cta);
-  color: #fff;
+  color: var(--text-1);
   font-family: var(--body);
   font-weight: 600;
   font-size: var(--fs-sm);
@@ -251,7 +251,7 @@
   :global(html.tabbar.kb) .invite { display: none; }
 }
 @media (max-width: 480px) {
-  .invite { flex-wrap: wrap; gap: .45rem; padding: .6rem 3rem .55rem .8rem; }
+  .invite { flex-wrap: wrap; gap: .5rem; padding: .5rem 3rem .5rem .75rem; }
   .inviteText { flex: 1 1 100%; }
   .inviteCta { flex: 1 1 100%; justify-content: center; }
   .inviteClose { position: absolute; top: 2px; right: 2px; }

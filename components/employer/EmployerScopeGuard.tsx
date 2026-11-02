@@ -62,8 +62,8 @@ export function EmployerScopeGuard({ param, godview = false }: { param: string; 
 
 function chip(border: string, bg: string): React.CSSProperties {
   return {
-    display: 'flex', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap',
+    display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap',
     border: `1px solid ${border}`, background: bg, borderRadius: 10,
-    padding: '.55rem .9rem', marginBottom: '1.4rem',
+    padding: '.5rem 1rem', marginBottom: '1.5rem',
   }
 }

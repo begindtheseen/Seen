@@ -1,36 +1,36 @@
 /* Shared inner-page header: crumbs → eyebrow → title → sub → actions. One rhythm everywhere. */
 
-.head { margin-bottom: 1.6rem; min-width: 0; }
+.head { margin-bottom: 1.5rem; min-width: 0; }
 .head > * { animation: riseIn 0.55s var(--ease-out) backwards; }
 .head > *:nth-child(2) { animation-delay: 0.05s; }
 .head > *:nth-child(3) { animation-delay: 0.12s; }
 
 /* ── Breadcrumb trail ── */
 .crumbs {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 0.1rem 0;
-  list-style: none; margin: 0 0 0.85rem; padding: 0;
+  display: flex; align-items: center; flex-wrap: wrap; gap: .125rem 0;
+  list-style: none; margin: 0 0 .75rem; padding: 0;
   font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.04em; color: var(--dim);
 }
 .crumbLi { display: inline-flex; align-items: center; }
 .crumb {
-  display: inline-flex; align-items: center; gap: 0.38rem;
-  color: var(--dim); text-decoration: none; padding: 0.24rem 0.45rem; border-radius: 6px;
+  display: inline-flex; align-items: center; gap: .5rem;
+  color: var(--dim); text-decoration: none; padding: .25rem .5rem; border-radius: 6px;
   transition: color 0.15s ease, background 0.15s ease, transform 0.25s var(--ease-out);
 }
-.crumbLi:first-child .crumb { margin-left: -0.45rem; }
+.crumbLi:first-child .crumb { margin-left: -.5rem; }
 .crumb:hover { color: var(--white); background: rgba(255, 255, 255, 0.05); }
 .crumb:active { transform: scale(0.97); }
 .crumb svg { width: 12px; height: 12px; opacity: 0.85; }
-.sep { color: var(--muted); margin: 0 0.3rem; }
-.cur { color: var(--sub); padding: 0.24rem 0; }
+.sep { color: var(--muted); margin: 0 .25rem; }
+.cur { color: var(--sub); padding: .25rem 0; }
 
 /* ── Title block ── */
 .row { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem 1.5rem; flex-wrap: wrap; }
 .text { min-width: 0; flex: 1 1 320px; }
 .eyebrow {
-  display: flex; align-items: center; gap: 0.6rem;
+  display: flex; align-items: center; gap: .5rem;
   font-family: var(--mono); font-size: var(--fs-meta); font-weight: 500; letter-spacing: var(--ls-meta); text-transform: uppercase;
-  color: var(--tone, var(--blue)); margin-bottom: 0.6rem;
+  color: var(--tone, var(--blue)); margin-bottom: .5rem;
 }
 .eyebrow::before { content: ''; width: 22px; height: 1px; background: currentColor; opacity: 0.85; flex: none; }
 .title {
@@ -38,13 +38,13 @@
   font-size: var(--fs-h2); color: var(--white); margin: 0; text-wrap: balance;
 }
 .lg .title { font-size: clamp(var(--fs-h2), 5vw, var(--fs-fig-m)); line-height: 1.06; }
-.sub { color: var(--sub); font-size: var(--fs-ui); font-weight: 400; line-height: 1.6; margin: 0.45rem 0 0; max-width: 64ch; }
+.sub { color: var(--sub); font-size: var(--fs-ui); font-weight: 400; line-height: 1.6; margin: .5rem 0 0; max-width: 64ch; }
 .lg .sub { font-size: var(--fs-body); line-height: 1.7; max-width: 70ch; }
 .sub a { color: var(--blue); text-decoration: none; }
-.actions { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; flex-shrink: 0; padding-top: 0.2rem; }
+.actions { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; flex-shrink: 0; padding-top: .25rem; }
 
 @media (max-width: 560px) {
-  .head { margin-bottom: 1.3rem; }
+  .head { margin-bottom: 1.25rem; }
   .actions { width: 100%; padding-top: 0; }
 }
 

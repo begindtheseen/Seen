@@ -53,14 +53,14 @@ export function EmployerPanel({ token }: { token: string }) {
     <Card style={{ marginBottom: '1.25rem', border: '1px solid rgba(247,201,72,.22)' }}>
       <CardHeader
         title="Employer revenue"
-        action={<span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: totalCents > 0 ? '#f7c948' : 'var(--dim)' }}>${(totalCents / 100).toLocaleString(undefined, { minimumFractionDigits: 0 })} total{unfulfilled > 0 ? ` · ${unfulfilled} to fulfill` : ''}</span>}
+        action={<span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: totalCents > 0 ? 'var(--caution-text)' : 'var(--dim)' }}>${(totalCents / 100).toLocaleString(undefined, { minimumFractionDigits: 0 })} total{unfulfilled > 0 ? ` · ${unfulfilled} to fulfill` : ''}</span>}
       />
-      {err && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--red)', marginBottom: '.6rem' }}>{err}</div>}
+      {err && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--red)', marginBottom: '.5rem' }}>{err}</div>}
 
       {loading ? (
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)' }}>Loading…</div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>Loading…</div>
       ) : purchases.length === 0 ? (
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', lineHeight: 1.6 }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', lineHeight: 1.6 }}>
           No employer purchases yet. When a company buys Featured or Transparency Verified on <span style={{ color: 'var(--white)' }}>/employers</span>, it lands here to fulfill.
         </div>
       ) : (
@@ -68,32 +68,32 @@ export function EmployerPanel({ token }: { token: string }) {
           {purchases.map(p => {
             const paid = p.status === 'paid'
             return (
-              <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '.7rem', padding: '.55rem 0', borderTop: '1px solid var(--line2)' }}>
+              <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '.75rem', padding: '.5rem 0', borderTop: '1px solid var(--line2)' }}>
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.64rem', color: 'var(--white)', textTransform: 'capitalize' }}>{p.company || 'Unknown company'}</div>
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', marginTop: '.1rem' }}>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', textTransform: 'capitalize' }}>{p.company || 'Unknown company'}</div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.125rem' }}>
                     {SKU_LABEL[p.employer_sku] || p.employer_sku} · ${(p.amount_cents / 100).toFixed(0)} · {p.email || '—'} · {relTime(p.created_at)}
                   </div>
                 </div>
                 {paid ? (
-                  <button onClick={() => fulfill(p.id)} disabled={busy === p.id} style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', padding: '.32rem .7rem', borderRadius: 6, border: '1px solid rgba(247,201,72,.4)', background: 'rgba(247,201,72,.12)', color: '#f7c948', cursor: 'pointer', flexShrink: 0 }}>{busy === p.id ? '…' : 'Fulfill →'}</button>
+                  <button onClick={() => fulfill(p.id)} disabled={busy === p.id} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .75rem', borderRadius: 6, border: '1px solid var(--caution-line)', background: 'var(--caution-tint)', color: 'var(--caution-text)', cursor: 'pointer', flexShrink: 0 }}>{busy === p.id ? '…' : 'Fulfill →'}</button>
                 ) : (
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--green)', flexShrink: 0 }}>✓ {p.status}</span>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', flexShrink: 0 }}>✓ {p.status}</span>
                 )}
               </div>
             )
           })}
 
           {activePerks.length > 0 && (
-            <div style={{ marginTop: '.9rem', paddingTop: '.7rem', borderTop: '1px solid var(--line2)' }}>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--dim)', marginBottom: '.4rem' }}>Active perks</div>
+            <div style={{ marginTop: '1rem', paddingTop: '.75rem', borderTop: '1px solid var(--line2)' }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--dim)', marginBottom: '.5rem' }}>Active perks</div>
               {activePerks.map(p => {
                 const now = Date.now()
                 const feat = p.featured_until && Date.parse(p.featured_until) > now
                 const ver = p.verified_until && Date.parse(p.verified_until) > now
                 return (
-                  <div key={p.company} style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--sub)', marginBottom: '.2rem', textTransform: 'capitalize' }}>
-                    {p.company} — {feat ? <span style={{ color: '#f7c948' }}>Featured</span> : null}{feat && ver ? ' · ' : ''}{ver ? <span style={{ color: 'var(--blue)' }}>Verified</span> : null}
+                  <div key={p.company} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '.25rem', textTransform: 'capitalize' }}>
+                    {p.company} — {feat ? <span style={{ color: 'var(--caution-text)' }}>Featured</span> : null}{feat && ver ? ' · ' : ''}{ver ? <span style={{ color: 'var(--blue)' }}>Verified</span> : null}
                   </div>
                 )
               })}

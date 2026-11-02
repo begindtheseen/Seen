@@ -9,7 +9,7 @@ import { formatPacific } from '@/lib/time/pacific.js'
 
 export function KpiDetailRows({ metric, rows, token, onDeleteRow }: { metric: string; rows: Record<string, unknown>[]; token: string; onDeleteRow: (id: string) => void }) {
   const cell = (txt: unknown, color?: string) => (
-    <span style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: color || 'var(--sub)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(txt ?? '—')}</span>
+    <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: color || 'var(--sub)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(txt ?? '—')}</span>
   )
   const ts = (iso: unknown) => {
     if (!iso) return '—'
@@ -22,7 +22,7 @@ export function KpiDetailRows({ metric, rows, token, onDeleteRow }: { metric: st
 
   // Users group — with per-row delete (full admins only; server enforces role)
   if (['total_accounts','new_today','new_this_week'].includes(metric)) {
-    return <div style={{ display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
+    return <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
       {rows.map((r, i) => (
         <UserRow key={String(r.id ?? i)} r={r} token={token} onDeleted={onDeleteRow} ts={ts} />
       ))}
@@ -31,9 +31,9 @@ export function KpiDetailRows({ metric, rows, token, onDeleteRow }: { metric: st
 
   // Companies scored
   if (metric === 'companies_scored') {
-    return <div style={{ display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
+    return <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
       {rows.map((r, i) => (
-        <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '.5rem', padding: '.5rem .6rem', background: 'var(--card)', borderRadius: 7, alignItems: 'center' }}>
+        <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '.5rem', padding: '.5rem .5rem', background: 'var(--card)', borderRadius: 7, alignItems: 'center' }}>
           {cell(r.company, 'var(--white)')}
           {cell(`${Math.round(Number(r.score || 0))}`, Number(r.score) > 65 ? 'var(--green)' : Number(r.score) > 40 ? 'var(--amber)' : 'var(--red)')}
           {cell(ts(r.created_at))}
@@ -52,9 +52,9 @@ export function KpiDetailRows({ metric, rows, token, onDeleteRow }: { metric: st
       if (s === 'offer' || s === 'hired') return 'var(--green)'
       return 'var(--dim)'
     }
-    return <div style={{ display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
+    return <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
       {rows.map((r, i) => (
-        <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '.5rem', padding: '.5rem .6rem', background: 'var(--card)', borderRadius: 7, alignItems: 'center' }}>
+        <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '.5rem', padding: '.5rem .5rem', background: 'var(--card)', borderRadius: 7, alignItems: 'center' }}>
           {cell(r.company_name || r.company, 'var(--white)')}
           {cell(r.outcome, outColor(r.outcome))}
           {cell(ts(r.created_at || r.updated_at))}
@@ -72,10 +72,10 @@ export function KpiDetailRows({ metric, rows, token, onDeleteRow }: { metric: st
       if (v === 'rejected') return 'var(--amber)'
       return 'var(--sub)'
     }
-    return <div style={{ display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
+    return <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
       {rows.map((r, i) => (
-        <div key={i} style={{ padding: '.5rem .6rem', background: 'var(--card)', borderRadius: 7 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '.5rem', marginBottom: '.2rem' }}>
+        <div key={i} style={{ padding: '.5rem .5rem', background: 'var(--card)', borderRadius: 7 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '.5rem', marginBottom: '.25rem' }}>
             {cell(r.company_name, 'var(--white)')}
             {cell(r.status, statusColor(r.status))}
           </div>
@@ -90,9 +90,9 @@ export function KpiDetailRows({ metric, rows, token, onDeleteRow }: { metric: st
 
   // Co. lookups
   if (metric === 'co_lookups') {
-    return <div style={{ display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
+    return <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
       {rows.map((r, i) => (
-        <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '.5rem', padding: '.5rem .6rem', background: 'var(--card)', borderRadius: 7, alignItems: 'center' }}>
+        <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '.5rem', padding: '.5rem .5rem', background: 'var(--card)', borderRadius: 7, alignItems: 'center' }}>
           {cell(r.query, 'var(--white)')}
           {cell(ts(r.created_at))}
         </div>
@@ -101,10 +101,10 @@ export function KpiDetailRows({ metric, rows, token, onDeleteRow }: { metric: st
   }
 
   // Jobs group (total/active/today/stale)
-  return <div style={{ display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
+  return <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
     {rows.map((r, i) => (
-      <div key={i} style={{ padding: '.5rem .6rem', background: 'var(--card)', borderRadius: 7 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '.5rem', marginBottom: '.2rem' }}>
+      <div key={i} style={{ padding: '.5rem .5rem', background: 'var(--card)', borderRadius: 7 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '.5rem', marginBottom: '.25rem' }}>
           {cell(r.company, 'var(--white)')}
           {cell(r.availability_status || 'active', r.availability_status === 'stale' ? 'var(--amber)' : r.availability_status === 'expired' ? 'var(--red)' : 'var(--green)')}
         </div>
@@ -140,15 +140,15 @@ export function KpiModal({ metric, title, token, onClose }: { metric: string; ti
       >
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem 1.25rem .75rem', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
-          <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: '.95rem', color: 'var(--white)' }}>{title}</div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: '.9rem', padding: '.2rem .4rem', lineHeight: 1 }}>✕</button>
+          <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 'var(--fs-body)', color: 'var(--white)' }}>{title}</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: 'var(--fs-ui)', padding: '.25rem .5rem', lineHeight: 1 }}>✕</button>
         </div>
         {/* Body */}
         <div style={{ overflow: 'auto', flex: 1, padding: '.75rem 1.25rem 2rem' }}>
           {rows === null ? (
-            <div style={{ textAlign: 'center', padding: '2.5rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)' }}>Loading…</div>
+            <div style={{ textAlign: 'center', padding: '2.5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>Loading…</div>
           ) : !rows.length ? (
-            <div style={{ textAlign: 'center', padding: '2.5rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)' }}>No data yet</div>
+            <div style={{ textAlign: 'center', padding: '2.5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>No data yet</div>
           ) : (
             <KpiDetailRows metric={metric} rows={rows} token={token} onDeleteRow={(id) => setRows(rs => (rs || []).filter(r => String(r.id) !== id))} />
           )}
@@ -192,7 +192,7 @@ export function ManageAccountsModal({ token, initialFilter = 'all', onClose }: {
   )
   const segStyle = (active: boolean): React.CSSProperties => ({
     flex: 1, background: active ? 'rgba(59,130,246,.18)' : 'transparent', border: `1px solid ${active ? 'rgba(59,130,246,.5)' : 'var(--line2)'}`,
-    borderRadius: 6, padding: '.32rem .5rem', fontFamily: 'var(--mono)', fontSize: '.56rem', color: active ? 'var(--blue)' : 'var(--dim)', cursor: 'pointer', whiteSpace: 'nowrap',
+    borderRadius: 6, padding: '.25rem .5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: active ? 'var(--blue)' : 'var(--dim)', cursor: 'pointer', whiteSpace: 'nowrap',
   })
 
   return (
@@ -208,7 +208,7 @@ export function ManageAccountsModal({ token, initialFilter = 'all', onClose }: {
         </div>
         <div className="ac-modal-search">
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="Filter by email…" autoComplete="off" />
-          <div style={{ display: 'flex', gap: '.4rem', marginTop: '.5rem' }}>
+          <div style={{ display: 'flex', gap: '.5rem', marginTop: '.5rem' }}>
             <button type="button" style={segStyle(filter === 'all')} onClick={() => setFilter('all')}>All</button>
             <button type="button" style={segStyle(filter === 'pro')} onClick={() => setFilter('pro')}>Pro</button>
             <button type="button" style={segStyle(filter === 'free')} onClick={() => setFilter('free')}>Free</button>
@@ -216,9 +216,9 @@ export function ManageAccountsModal({ token, initialFilter = 'all', onClose }: {
         </div>
         <div className="ac-modal-body">
           {rows === null ? (
-            <div style={{ textAlign: 'center', padding: '2rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)' }}>Loading accounts…</div>
+            <div style={{ textAlign: 'center', padding: '2rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>Loading accounts…</div>
           ) : !filtered.length ? (
-            <div style={{ textAlign: 'center', padding: '2rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)' }}>{needle ? 'No accounts match that email.' : filter === 'pro' ? 'No Pro accounts yet.' : filter === 'free' ? 'No free accounts.' : 'No accounts yet.'}</div>
+            <div style={{ textAlign: 'center', padding: '2rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>{needle ? 'No accounts match that email.' : filter === 'pro' ? 'No Pro accounts yet.' : filter === 'free' ? 'No free accounts.' : 'No accounts yet.'}</div>
           ) : (
             filtered.map((r, i) => (
               <UserRow key={String(r.id ?? i)} r={r} token={token} ts={ts} onDeleted={id => setRows(rs => (rs || []).filter(x => String(x.id) !== id))} />
@@ -233,7 +233,7 @@ export function ManageAccountsModal({ token, initialFilter = 'all', onClose }: {
 
 const STRIPE_SUBS_URL = 'https://dashboard.stripe.com/subscriptions'
 function stripeLinkStyle(): React.CSSProperties {
-  return { display: 'inline-flex', alignItems: 'center', gap: '.35rem', marginTop: '.9rem', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--blue)', textDecoration: 'none', border: '1px solid rgba(59,130,246,.35)', borderRadius: 7, padding: '.45rem .7rem', background: 'rgba(59,130,246,.08)' }
+  return { display: 'inline-flex', alignItems: 'center', gap: '.25rem', marginTop: '1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none', border: '1px solid rgba(59,130,246,.35)', borderRadius: 7, padding: '.5rem .75rem', background: 'rgba(59,130,246,.08)' }
 }
 
 // MRR tile → revenue breakdown from stats.monetization (NO new fetch) + Stripe deep link.
@@ -243,7 +243,7 @@ export function RevenueDetailModal({ m, onClose }: { m: AdminStats['monetization
   return (
     <DetailModal title="Revenue" sub={stripeOn ? 'Live from Stripe' : 'Stripe not connected'} onClose={onClose}>
       {!stripeOn ? (
-        <div style={{ textAlign: 'center', padding: '2rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)' }}>Stripe not connected — revenue breakdown unavailable.</div>
+        <div style={{ textAlign: 'center', padding: '2rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>Stripe not connected — revenue breakdown unavailable.</div>
       ) : (
         <>
           <DetailStat label="MRR" value={money(m?.mrr)} status="monthly recurring" tone={m?.mrr ? 'green' : 'dim'} />
@@ -281,11 +281,11 @@ export function TrialsDetailModal({ token, onClose }: { token: string; onClose: 
   return (
     <DetailModal title="Trials & subscriptions" sub={data === null ? 'Loading…' : data.stripe_connected ? `${trialCount} trialing · ${subs.length} total` : 'Stripe not connected'} onClose={onClose}>
       {data === null ? (
-        <div style={{ textAlign: 'center', padding: '2rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)' }}>Loading subscriptions…</div>
+        <div style={{ textAlign: 'center', padding: '2rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>Loading subscriptions…</div>
       ) : !data.stripe_connected ? (
-        <div style={{ textAlign: 'center', padding: '2rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)' }}>Stripe not connected — no subscriptions to show.</div>
+        <div style={{ textAlign: 'center', padding: '2rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>Stripe not connected — no subscriptions to show.</div>
       ) : !subs.length ? (
-        <div style={{ textAlign: 'center', padding: '2rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)' }}>{data.error ? `Stripe error: ${data.error}` : 'No subscriptions yet.'}</div>
+        <div style={{ textAlign: 'center', padding: '2rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>{data.error ? `Stripe error: ${data.error}` : 'No subscriptions yet.'}</div>
       ) : (
         subs.map(s => (
           <div key={s.id} className="ac-acct">
@@ -294,10 +294,10 @@ export function TrialsDetailModal({ token, onClose }: { token: string; onClose: 
               <span className="ac-acct-age" style={{ color: `var(--${statusTone(s.status) === 'white' ? 'sub' : statusTone(s.status)})` }}>{s.status}{s.cancel_at_period_end ? ' · canceling' : ''}</span>
             </div>
             <div className="ac-acct-actions" style={{ justifyContent: 'space-between' }}>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>
                 {s.status === 'trialing' ? `trial ends ${fmtDate(s.trial_end)}` : `renews ${fmtDate(s.current_period_end)}`}
               </span>
-              <a href={`${STRIPE_SUBS_URL}/${s.id}`} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--blue)', textDecoration: 'none', border: '1px solid rgba(59,130,246,.3)', borderRadius: 5, padding: '.22rem .45rem' }}>Open in Stripe ↗</a>
+              <a href={`${STRIPE_SUBS_URL}/${s.id}`} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none', border: '1px solid rgba(59,130,246,.3)', borderRadius: 5, padding: '.25rem .5rem' }}>Open in Stripe ↗</a>
             </div>
           </div>
         ))
@@ -313,7 +313,7 @@ export function SharesDetailModal({ m, onClose }: { m: AdminStats['monetization'
   return (
     <DetailModal title="Outcome cards shared" sub={`${total.toLocaleString()} total`} onClose={onClose}>
       {!channels.length ? (
-        <div style={{ textAlign: 'center', padding: '2rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)' }}>No outcome cards shared yet — the virality flywheel has not started.</div>
+        <div style={{ textAlign: 'center', padding: '2rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>No outcome cards shared yet — the virality flywheel has not started.</div>
       ) : (
         channels.map(([ch, n]) => (
           <DetailStat key={ch} label={ch} value={(n as number).toLocaleString()} status="shares" tone={(n as number) > 0 ? 'blue' : 'dim'} />
@@ -330,12 +330,12 @@ export function ErrorsDetailModal({ errors, onClose }: { errors: AdminStats['err
   return (
     <DetailModal title="API errors" sub={`${errors?.today ?? 0} today · ${errors?.this_week ?? 0} this week`} onClose={onClose}>
       {!recent.length && !byRoute.length ? (
-        <div style={{ textAlign: 'center', padding: '2rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--green)' }}>✓ No API errors logged.</div>
+        <div style={{ textAlign: 'center', padding: '2rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)' }}>✓ No API errors logged.</div>
       ) : (
         <>
           {byRoute.length > 0 && (
             <>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--sub)', textTransform: 'uppercase', letterSpacing: '.1em', margin: '.2rem 0 .35rem' }}>By route</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', textTransform: 'uppercase', letterSpacing: '.1em', margin: '.25rem 0 .25rem' }}>By route</div>
               {byRoute.map(([route, n]) => (
                 <DetailStat key={route} label={route} value={(n as number).toLocaleString()} status="errors" tone={(n as number) > 10 ? 'red' : 'amber'} />
               ))}
@@ -343,14 +343,14 @@ export function ErrorsDetailModal({ errors, onClose }: { errors: AdminStats['err
           )}
           {recent.length > 0 && (
             <>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--sub)', textTransform: 'uppercase', letterSpacing: '.1em', margin: '.9rem 0 .35rem' }}>Recent</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', textTransform: 'uppercase', letterSpacing: '.1em', margin: '1rem 0 .25rem' }}>Recent</div>
               {recent.map((e, i) => (
-                <div key={i} style={{ padding: '.5rem .6rem', background: 'var(--card)', borderRadius: 7, marginBottom: '.4rem' }}>
+                <div key={i} style={{ padding: '.5rem .5rem', background: 'var(--card)', borderRadius: 7, marginBottom: '.5rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: '.5rem' }}>
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.endpoint}</span>
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)', flexShrink: 0 }}>{relTime(e.created_at)}</span>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.endpoint}</span>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', flexShrink: 0 }}>{relTime(e.created_at)}</span>
                   </div>
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', color: 'var(--red)', marginTop: '.2rem', lineHeight: 1.4 }}>{e.error_msg}</div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--red)', marginTop: '.25rem', lineHeight: 1.4 }}>{e.error_msg}</div>
                 </div>
               ))}
             </>

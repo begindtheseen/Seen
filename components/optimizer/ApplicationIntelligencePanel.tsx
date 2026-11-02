@@ -130,27 +130,27 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
   return <div className="ai-card" style={{ marginBottom: '1rem', ...style }}>{children}</div>
 }
 function kicker(text: string, color = 'var(--dim)') {
-  return <div style={{ fontFamily: mono, fontSize: '.58rem', textTransform: 'uppercase', letterSpacing: '.08em', color, marginBottom: '.6rem' }}>{text}</div>
+  return <div style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.08em', color, marginBottom: '.5rem' }}>{text}</div>
 }
 function tag(t: MatchType) {
   const c = matchColor(t)
-  return <span style={{ flexShrink: 0, fontFamily: mono, fontSize: '.5rem', textTransform: 'uppercase', letterSpacing: '.06em', color: c, border: `1px solid ${c}`, borderRadius: 4, padding: '.08rem .32rem', opacity: .9 }}>{matchLabel(t)}</span>
+  return <span style={{ flexShrink: 0, fontFamily: mono, fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.06em', color: c, border: `1px solid ${c}`, borderRadius: 4, padding: '.0625rem .25rem', opacity: .9 }}>{matchLabel(t)}</span>
 }
 
 // A single requirement/match row — requirement + match tag + explanation + first evidence line.
 function MatchRow({ m }: { m: AiMatch }) {
   const c = matchColor(m.matchType)
   return (
-    <li style={{ display: 'flex', flexDirection: 'column', gap: '.25rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.6rem .75rem' }}>
+    <li style={{ display: 'flex', flexDirection: 'column', gap: '.25rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.5rem .75rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
-        <span style={{ fontSize: '.76rem', color: 'var(--white)', fontWeight: 600, minWidth: 0, overflowWrap: 'anywhere', flex: 1 }}>{asText(m.requirement)}</span>
+        <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--white)', fontWeight: 600, minWidth: 0, overflowWrap: 'anywhere', flex: 1 }}>{asText(m.requirement)}</span>
         {tag(m.matchType)}
       </div>
-      {m.explanation && <div style={{ fontFamily: mono, fontSize: '.62rem', color: 'var(--sub)', lineHeight: 1.55, overflowWrap: 'anywhere' }}>{asText(m.explanation)}</div>}
+      {m.explanation && <div style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.55, overflowWrap: 'anywhere' }}>{asText(m.explanation)}</div>}
       {Array.isArray(m.evidence) && typeof m.evidence[0] === 'string' && m.evidence[0].length > 0 && (
-        <div style={{ fontFamily: mono, fontSize: '.58rem', color: c, lineHeight: 1.5, overflowWrap: 'anywhere' }}>▸ {m.evidence[0].slice(0, 140)}</div>
+        <div style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: c, lineHeight: 1.5, overflowWrap: 'anywhere' }}>▸ {m.evidence[0].slice(0, 140)}</div>
       )}
-      {plainMeta(m) && <div style={{ fontFamily: mono, fontSize: '.54rem', color: 'var(--muted)', letterSpacing: '.02em' }}>{plainMeta(m)}</div>}
+      {plainMeta(m) && <div style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--muted)', letterSpacing: '.02em' }}>{plainMeta(m)}</div>}
     </li>
   )
 }
@@ -181,21 +181,21 @@ function ImproveSection({ questions, onAnswers, rerunning }: {
   return (
     <Card>
       {kicker('Improve this result', 'var(--accent)')}
-      <div style={{ fontFamily: mono, fontSize: '.58rem', color: 'var(--sub)', marginBottom: '.75rem', lineHeight: 1.55 }}>
+      <div style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '.75rem', lineHeight: 1.55 }}>
         Answer any of these with a real number or detail — we fold your confirmed evidence back in and re-score. Nothing is invented from a blank answer.
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
         {questions.map(q => (
           <div key={q.id}>
-            <label style={{ display: 'block', fontSize: '.72rem', color: 'var(--sub)', lineHeight: 1.5, marginBottom: '.3rem', overflowWrap: 'anywhere' }}>
-              {q.question}{q.unit ? <span style={{ color: 'var(--muted)', fontFamily: mono, fontSize: '.58rem' }}> ({q.unit})</span> : null}
+            <label style={{ display: 'block', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5, marginBottom: '.25rem', overflowWrap: 'anywhere' }}>
+              {q.question}{q.unit ? <span style={{ color: 'var(--muted)', fontFamily: mono, fontSize: 'var(--fs-meta)' }}> ({q.unit})</span> : null}
             </label>
             <input autoComplete="off"
               type="text"
               value={vals[q.id] || ''}
               onChange={e => setVals(v => ({ ...v, [q.id]: e.target.value }))}
               placeholder="Your real answer…"
-              style={{ width: '100%', background: 'var(--surface)', border: '1.5px solid var(--line2)', borderRadius: 8, padding: '.5rem .75rem', color: 'var(--white)', fontFamily: mono, fontSize: '.7rem', outline: 'none', caretColor: 'var(--indigo)', boxSizing: 'border-box' }}
+              style={{ width: '100%', background: 'var(--surface)', border: '1.5px solid var(--line2)', borderRadius: 8, padding: '.5rem .75rem', color: 'var(--white)', fontFamily: mono, fontSize: 'var(--fs-meta)', outline: 'none', caretColor: 'var(--indigo)', boxSizing: 'border-box' }}
             />
           </div>
         ))}
@@ -203,7 +203,7 @@ function ImproveSection({ questions, onAnswers, rerunning }: {
       <button
         onClick={() => onAnswers(answered)}
         disabled={rerunning || answered.length === 0}
-        style={{ marginTop: '.85rem', width: '100%', background: answered.length ? 'var(--cta)' : 'var(--raised)', color: answered.length ? '#fff' : 'var(--muted)', border: 'none', borderRadius: 8, padding: '.65rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.78rem', cursor: (rerunning || !answered.length) ? 'not-allowed' : 'pointer', opacity: rerunning ? 0.6 : 1 }}
+        style={{ marginTop: '.75rem', width: '100%', background: answered.length ? 'var(--cta)' : 'var(--raised)', color: answered.length ? 'var(--text-1)' : 'var(--muted)', border: 'none', borderRadius: 8, padding: '.75rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-meta)', cursor: (rerunning || !answered.length) ? 'not-allowed' : 'pointer', opacity: rerunning ? 0.6 : 1 }}
       >
         {rerunning ? 'Re-scoring…' : answered.length ? `Re-run with ${answered.length} answer${answered.length !== 1 ? 's' : ''} →` : 'Add an answer to re-run'}
       </button>
@@ -239,18 +239,18 @@ export default function ApplicationIntelligencePanel({
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           {!compact && (
             <div style={{ flexShrink: 0, width: 60, height: 60, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `3px solid ${scoreColor(pkg.fit_score)}` }}>
-              <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.3rem', color: scoreColor(pkg.fit_score) }}>{pkg.fit_score}</span>
+              <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-h3)', color: scoreColor(pkg.fit_score) }}>{pkg.fit_score}</span>
             </div>
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '.95rem' }}>Deep match analysis</div>
-            <div style={{ fontFamily: mono, fontSize: '.6rem', color: 'var(--dim)', marginTop: '.2rem', overflowWrap: 'anywhere' }}>
+            <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: 'var(--fs-body)' }}>Deep match analysis</div>
+            <div style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.25rem', overflowWrap: 'anywhere' }}>
               {pkg.role_family_label} · {pkg.confidence_label} confidence ({pct(pkg.confidence)})
             </div>
           </div>
         </div>
         {pkg.summary_recommendation?.text && (
-          <p style={{ fontFamily: mono, fontSize: '.64rem', color: 'var(--sub)', lineHeight: 1.6, marginTop: '.85rem', overflowWrap: 'anywhere' }}>{pkg.summary_recommendation.text}</p>
+          <p style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6, marginTop: '.75rem', overflowWrap: 'anywhere' }}>{pkg.summary_recommendation.text}</p>
         )}
       </Card>
 
@@ -259,28 +259,28 @@ export default function ApplicationIntelligencePanel({
       {ats && !compact && (
         <Card>
           {kicker('ATS simulation')}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', marginBottom: '.7rem' }}>
-            <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.1rem', color: scoreColor(ats.ats_score) }}>{Math.round(ats.ats_score)}<span style={{ fontSize: '.6rem', color: 'var(--muted)' }}>/100</span></span>
-            <span style={{ fontFamily: mono, fontSize: '.6rem', color: 'var(--muted)' }}>keyword-match score (simulated)</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.75rem' }}>
+            <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-lead)', color: scoreColor(ats.ats_score) }}>{Math.round(ats.ats_score)}<span style={{ fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>/100</span></span>
+            <span style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>keyword-match score (simulated)</span>
           </div>
           {ats.missing_exact_keywords?.length > 0 && (
             <>
-              <div style={{ fontFamily: mono, fontSize: '.56rem', color: 'var(--amber)', marginBottom: '.4rem', lineHeight: 1.5 }}>Posting wording your résumé does not use verbatim — it may say the same thing another way; add a word only if it is true for you:</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.35rem', marginBottom: ats.recommendations?.length ? '.7rem' : 0 }}>
+              <div style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--amber)', marginBottom: '.5rem', lineHeight: 1.5 }}>Posting wording your résumé does not use verbatim — it may say the same thing another way; add a word only if it is true for you:</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.25rem', marginBottom: ats.recommendations?.length ? '.7rem' : 0 }}>
                 {ats.missing_exact_keywords.slice(0, 14).map((k, i) => (
-                  <span key={i} style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.25)', color: 'var(--amber)', borderRadius: 5, padding: '.2rem .55rem', fontFamily: mono, fontSize: '.62rem', maxWidth: '100%', overflowWrap: 'anywhere' }}>{k}</span>
+                  <span key={i} style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.25)', color: 'var(--amber)', borderRadius: 5, padding: '.25rem .5rem', fontFamily: mono, fontSize: 'var(--fs-meta)', maxWidth: '100%', overflowWrap: 'anywhere' }}>{k}</span>
                 ))}
               </div>
             </>
           )}
           {ats.recommendations?.length > 0 && (
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.35rem' }}>
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.25rem' }}>
               {ats.recommendations.slice(0, 6).map((r, i) => (
-                <li key={i} style={{ display: 'flex', gap: '.5rem', fontSize: '.72rem', color: 'var(--sub)', lineHeight: 1.5 }}><span style={{ color: 'var(--blue)', flexShrink: 0, marginTop: '.1rem' }}>›</span><span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{r}</span></li>
+                <li key={i} style={{ display: 'flex', gap: '.5rem', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5 }}><span style={{ color: 'var(--blue)', flexShrink: 0, marginTop: '.125rem' }}>›</span><span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{r}</span></li>
               ))}
             </ul>
           )}
-          {ats.disclaimer && <div style={{ fontFamily: mono, fontSize: '.52rem', color: 'var(--muted)', marginTop: '.6rem', lineHeight: 1.5, overflowWrap: 'anywhere' }}>{ats.disclaimer}</div>}
+          {ats.disclaimer && <div style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.5rem', lineHeight: 1.5, overflowWrap: 'anywhere' }}>{ats.disclaimer}</div>}
         </Card>
       )}
 
@@ -298,10 +298,10 @@ export default function ApplicationIntelligencePanel({
           {pkg.skills_recommendation?.length > 0 && (
             <Card>
               {kicker('Skills worth surfacing', 'var(--green)')}
-              <div style={{ fontFamily: mono, fontSize: '.56rem', color: 'var(--muted)', marginBottom: '.6rem', lineHeight: 1.5 }}>Evidenced by your résumé but not in your skills section.</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+              <div style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginBottom: '.5rem', lineHeight: 1.5 }}>Evidenced by your résumé but not in your skills section.</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                 {pkg.skills_recommendation.map((s, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '.5rem', fontSize: '.72rem', color: 'var(--sub)', lineHeight: 1.5 }}>
+                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '.5rem', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5 }}>
                     {tag(s.matchType)}<span style={{ minWidth: 0, overflowWrap: 'anywhere' }}><strong style={{ color: 'var(--white)' }}>{s.skill}</strong>{s.why ? ` — ${s.why}` : ''}</span>
                   </div>
                 ))}
@@ -313,15 +313,15 @@ export default function ApplicationIntelligencePanel({
           {pkg.safe_bullets?.length > 0 && (
             <Card>
               {kicker('Safe to use', 'var(--green)')}
-              <div style={{ fontFamily: mono, fontSize: '.56rem', color: 'var(--green)', marginBottom: '.6rem' }}>✓ Fully backed by your résumé — no invented numbers, tools, or claims.</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
+              <div style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--green)', marginBottom: '.5rem' }}>✓ Fully backed by your résumé — no invented numbers, tools, or claims.</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                 {pkg.safe_bullets.map((b, i) => (
-                  <div key={b.id || i} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.7rem .85rem' }}>
-                    <div style={{ display: 'flex', gap: '.6rem', alignItems: 'flex-start' }}>
-                      <span style={{ fontSize: '.76rem', color: 'var(--sub)', lineHeight: 1.6, flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{b.text}</span>
-                      <button onClick={() => copy(b.text, `sb${i}`)} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 6, padding: '.25rem .5rem', fontFamily: mono, fontSize: '.55rem', color: copied === `sb${i}` ? 'var(--green)' : 'var(--muted)', cursor: 'pointer', flexShrink: 0 }}>{copied === `sb${i}` ? '✓' : 'copy'}</button>
+                  <div key={b.id || i} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.75rem .75rem' }}>
+                    <div style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-start' }}>
+                      <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6, flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{b.text}</span>
+                      <button onClick={() => copy(b.text, `sb${i}`)} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 6, padding: '.25rem .5rem', fontFamily: mono, fontSize: 'var(--fs-meta)', color: copied === `sb${i}` ? 'var(--green)' : 'var(--muted)', cursor: 'pointer', flexShrink: 0 }}>{copied === `sb${i}` ? '✓' : 'copy'}</button>
                     </div>
-                    {b.whySafe && <div style={{ fontFamily: mono, fontSize: '.54rem', color: 'var(--muted)', marginTop: '.4rem', lineHeight: 1.45, overflowWrap: 'anywhere' }}>{b.whySafe}</div>}
+                    {b.whySafe && <div style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.5rem', lineHeight: 1.45, overflowWrap: 'anywhere' }}>{b.whySafe}</div>}
                   </div>
                 ))}
               </div>
@@ -332,16 +332,16 @@ export default function ApplicationIntelligencePanel({
           {pkg.needs_confirmation?.length > 0 && (
             <Card style={{ border: '1px solid rgba(245,158,11,.28)' }}>
               {kicker('Needs a real detail from you', 'var(--amber)')}
-              <div style={{ fontFamily: mono, fontSize: '.56rem', color: 'var(--amber)', marginBottom: '.6rem', lineHeight: 1.5 }}>Not final copy. Fill in the real number or detail first — we will not invent it.</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
+              <div style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--amber)', marginBottom: '.5rem', lineHeight: 1.5 }}>Not final copy. Fill in the real number or detail first — we will not invent it.</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                 {pkg.needs_confirmation.map((b, i) => (
-                  <div key={b.id || i} style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, padding: '.7rem .85rem' }}>
-                    <div style={{ fontSize: '.74rem', color: 'var(--sub)', lineHeight: 1.6, overflowWrap: 'anywhere' }}>{b.text}</div>
+                  <div key={b.id || i} style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, padding: '.75rem .75rem' }}>
+                    <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6, overflowWrap: 'anywhere' }}>{b.text}</div>
                     {(b.confirmBeforeUsing || []).map((c, j) => (
-                      <div key={j} style={{ fontFamily: mono, fontSize: '.56rem', color: 'var(--amber)', marginTop: '.35rem', lineHeight: 1.5, overflowWrap: 'anywhere' }}>→ {asText(c)}</div>
+                      <div key={j} style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--amber)', marginTop: '.25rem', lineHeight: 1.5, overflowWrap: 'anywhere' }}>→ {asText(c)}</div>
                     ))}
                     {(b.warnings || []).map((w, j) => (
-                      <div key={`w${j}`} style={{ fontFamily: mono, fontSize: '.54rem', color: 'var(--muted)', marginTop: '.3rem', lineHeight: 1.45, overflowWrap: 'anywhere' }}>{asText(w)}</div>
+                      <div key={`w${j}`} style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.25rem', lineHeight: 1.45, overflowWrap: 'anywhere' }}>{asText(w)}</div>
                     ))}
                   </div>
                 ))}
@@ -353,10 +353,10 @@ export default function ApplicationIntelligencePanel({
           {pkg.interview_defense?.length > 0 && (
             <Card>
               {kicker('Interview defense', 'var(--amber)')}
-              <div style={{ fontFamily: mono, fontSize: '.56rem', color: 'var(--muted)', marginBottom: '.6rem', lineHeight: 1.5 }}>If you use the flagged phrasing, be ready to back it up in the interview.</div>
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+              <div style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginBottom: '.5rem', lineHeight: 1.5 }}>If you use the flagged phrasing, be ready to back it up in the interview.</div>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                 {pkg.interview_defense.map((n, i) => (
-                  <li key={i} style={{ display: 'flex', gap: '.5rem', fontSize: '.72rem', color: n.severity === 'high' ? 'var(--red)' : n.severity === 'medium' ? 'var(--amber)' : 'var(--muted)', lineHeight: 1.5 }}>
+                  <li key={i} style={{ display: 'flex', gap: '.5rem', fontSize: 'var(--fs-meta)', color: n.severity === 'high' ? 'var(--red)' : n.severity === 'medium' ? 'var(--amber)' : 'var(--muted)', lineHeight: 1.5 }}>
                     <span style={{ flexShrink: 0 }}>{n.severity === 'high' ? '✕' : '⚠'}</span><span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{asText(n.message)}</span>
                   </li>
                 ))}
@@ -368,8 +368,8 @@ export default function ApplicationIntelligencePanel({
           {pkg.application_message && (
             <Card>
               {kicker('Application message')}
-              <p style={{ fontSize: '.76rem', color: 'var(--sub)', lineHeight: 1.7, margin: 0, overflowWrap: 'anywhere' }}>{pkg.application_message}</p>
-              <button onClick={() => copy(pkg.application_message, 'aimsg')} style={{ marginTop: '.75rem', background: 'var(--green)', color: 'var(--ink)', border: 'none', borderRadius: 7, padding: '.45rem .9rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.7rem', cursor: 'pointer' }}>{copied === 'aimsg' ? '✓ Copied' : 'Copy message'}</button>
+              <p style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.7, margin: 0, overflowWrap: 'anywhere' }}>{pkg.application_message}</p>
+              <button onClick={() => copy(pkg.application_message, 'aimsg')} style={{ marginTop: '.75rem', background: 'var(--green)', color: 'var(--ink)', border: 'none', borderRadius: 7, padding: '.5rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-meta)', cursor: 'pointer' }}>{copied === 'aimsg' ? '✓ Copied' : 'Copy message'}</button>
             </Card>
           )}
 

@@ -124,18 +124,18 @@ export default function HumanProofPanel({ job, optimized = false }: { job: Job; 
   if (state === 'idle') {
     return (
       <div style={{ marginTop: '1.5rem' }}>
-        <div style={{ background: 'var(--gdim)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.1rem 1.1rem 1.25rem' }}>
-          <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '.95rem', marginBottom: '.3rem' }}>HumanProof</div>
-          <p style={{ fontFamily: mono, fontSize: '.65rem', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.9rem' }}>
+        <div style={{ background: 'var(--gdim)', border: '1px solid var(--line)', borderRadius: 12, padding: '1rem 1rem 1.25rem' }}>
+          <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: 'var(--fs-body)', marginBottom: '.25rem' }}>HumanProof</div>
+          <p style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '1rem' }}>
             {optimized ? 'Your application is optimized. Now make it sound real — ' : 'Make your application sound real — '}remove generic AI tone and add truthful, specific work context so it&apos;s interview-ready.
           </p>
           <button
             onClick={run}
-            style={{ width: '100%', background: 'var(--cta)', color: '#fff', border: 'none', borderRadius: 10, padding: '.85rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.9rem', cursor: 'pointer' }}
+            style={{ width: '100%', background: 'var(--accent-tint)', color: 'var(--accent)', border: '1px solid var(--accent-line)', borderRadius: 'var(--r-control)', padding: 'var(--sp-3) var(--sp-4)', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-ui)', minHeight: 44, cursor: 'pointer' }}
           >
             Humanize this application
           </button>
-          <div style={{ fontFamily: mono, fontSize: '.55rem', color: 'var(--muted)', textAlign: 'center', marginTop: '.45rem' }}>
+          <div style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--muted)', textAlign: 'center', marginTop: '.5rem' }}>
             Deterministic — keeps every number from your résumé exactly and adds no new claims.
           </div>
         </div>
@@ -145,8 +145,8 @@ export default function HumanProofPanel({ job, optimized = false }: { job: Job; 
 
   if (state === 'loading') {
     return (
-      <div style={{ marginTop: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '.6rem', padding: '1.5rem', background: 'var(--gdim)', border: '1px solid var(--line)', borderRadius: 12 }}>
-        <div className="spinner" /><span style={{ fontFamily: mono, fontSize: '.7rem', color: 'var(--sub)' }}>Making it sound real…</span>
+      <div style={{ marginTop: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '.5rem', padding: '1.5rem', background: 'var(--gdim)', border: '1px solid var(--line)', borderRadius: 12 }}>
+        <div className="spinner" /><span style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--sub)' }}>Making it sound real…</span>
       </div>
     )
   }
@@ -154,16 +154,16 @@ export default function HumanProofPanel({ job, optimized = false }: { job: Job; 
   if (state === 'no_resume') {
     return (
       <div style={{ marginTop: '1.5rem', background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 12, padding: '1.25rem', textAlign: 'center' }}>
-        <div style={{ fontFamily: 'var(--display)', fontWeight: 700, color: 'var(--white)', marginBottom: '.4rem' }}>Add your résumé first</div>
-        <p style={{ fontFamily: mono, fontSize: '.65rem', color: 'var(--sub)', marginBottom: '1rem', lineHeight: 1.6 }}>HumanProof rewrites your real résumé into plainer, more specific language. Add it once to use it on every application.</p>
-        <a href={`/resume?company=${encodeURIComponent(job.company)}&role=${encodeURIComponent(job.title)}`} style={{ display: 'inline-block', background: 'var(--green)', color: 'var(--ink)', borderRadius: 8, padding: '.6rem 1.25rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.82rem', textDecoration: 'none' }}>Add résumé →</a>
+        <div style={{ fontFamily: 'var(--display)', fontWeight: 700, color: 'var(--white)', marginBottom: '.5rem' }}>Add your résumé first</div>
+        <p style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '1rem', lineHeight: 1.6 }}>HumanProof rewrites your real résumé into plainer, more specific language. Add it once to use it on every application.</p>
+        <a href={`/resume?company=${encodeURIComponent(job.company)}&role=${encodeURIComponent(job.title)}`} style={{ display: 'inline-block', background: 'var(--green)', color: 'var(--ink)', borderRadius: 8, padding: '.5rem 1.25rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', textDecoration: 'none' }}>Add résumé →</a>
       </div>
     )
   }
 
   if (state === 'disabled') {
     return (
-      <div style={{ marginTop: '1.5rem', fontFamily: mono, fontSize: '.7rem', color: 'var(--muted)', textAlign: 'center', padding: '1rem' }}>HumanProof is temporarily unavailable.</div>
+      <div style={{ marginTop: '1.5rem', fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--muted)', textAlign: 'center', padding: '1rem' }}>HumanProof is temporarily unavailable.</div>
     )
   }
 
@@ -171,21 +171,21 @@ export default function HumanProofPanel({ job, optimized = false }: { job: Job; 
   if (state === 'locked') {
     return (
       <div style={{ marginTop: '1.5rem' }}>
-        <div style={{ background: 'var(--gdim)', border: '1px solid var(--line2)', borderRadius: 12, padding: '1.4rem', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ fontSize: '1.5rem', marginBottom: '.5rem' }}>🔒</div>
-          <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '1rem', marginBottom: '.5rem' }}>
+        <div style={{ background: 'var(--gdim)', border: '1px solid var(--line2)', borderRadius: 12, padding: '1.5rem', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ fontSize: 'var(--fs-xl)', marginBottom: '.5rem' }}>🔒</div>
+          <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: 'var(--fs-body)', marginBottom: '.5rem' }}>
             {optimized ? 'Your application is optimized. Now make it sound real.' : 'Make your application sound real.'}
           </div>
-          <p style={{ fontFamily: mono, fontSize: '.66rem', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1.1rem', maxWidth: 420, marginLeft: 'auto', marginRight: 'auto' }}>
+          <p style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1rem', maxWidth: 420, marginLeft: 'auto', marginRight: 'auto' }}>
             Unlock HumanProof to remove generic AI tone, add truthful work context, and make your application interview-ready.
           </p>
           <button
             onClick={() => setShowUpgrade(true)}
-            style={{ background: 'var(--cta)', color: '#fff', border: 'none', borderRadius: 10, padding: '.75rem 1.5rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', cursor: 'pointer' }}
+            style={{ background: 'var(--cta)', color: 'var(--text-1)', border: 'none', borderRadius: 10, padding: '.75rem 1.5rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)', cursor: 'pointer' }}
           >
             Unlock HumanProof
           </button>
-          <p style={{ fontFamily: mono, fontSize: '.75rem', color: 'var(--muted)', lineHeight: 1.6, margin: '.65rem 0 0' }}>{LOCK_NOTE}</p>
+          <p style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.6, margin: '.75rem 0 0' }}>{LOCK_NOTE}</p>
         </div>
         {showUpgrade && <UpgradeModal reason="pro" featureName="HumanProof" onClose={() => setShowUpgrade(false)} />}
       </div>
@@ -195,8 +195,8 @@ export default function HumanProofPanel({ job, optimized = false }: { job: Job; 
   if (state === 'error') {
     return (
       <div style={{ marginTop: '1.5rem', textAlign: 'center', padding: '1rem' }}>
-        <div style={{ fontFamily: mono, fontSize: '.7rem', color: 'var(--muted)', marginBottom: '.6rem' }}>Couldn&apos;t humanize this. Try again.</div>
-        <button onClick={run} style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 7, padding: '.5rem 1rem', fontFamily: mono, fontSize: '.65rem', cursor: 'pointer' }}>Retry</button>
+        <div style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginBottom: '.5rem' }}>Couldn&apos;t humanize this. Try again.</div>
+        <button onClick={run} style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 7, padding: '.5rem 1rem', fontFamily: mono, fontSize: 'var(--fs-meta)', cursor: 'pointer' }}>Retry</button>
       </div>
     )
   }
@@ -212,41 +212,41 @@ export default function HumanProofPanel({ job, optimized = false }: { job: Job; 
       <div style={{ background: 'var(--gdim)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.25rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div style={{ position: 'relative', flexShrink: 0, width: 64, height: 64, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `3px solid ${scoreColor(out.humanproof_score)}` }}>
-            <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.35rem', color: scoreColor(out.humanproof_score) }}>{out.humanproof_score}</span>
+            <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-h3)', color: scoreColor(out.humanproof_score) }}>{out.humanproof_score}</span>
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '1rem' }}>HumanProof Score</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginTop: '.3rem', flexWrap: 'wrap' }}>
-              <span style={{ fontFamily: mono, fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.05em', color: riskColor(out.ai_slop_risk), border: `1px solid ${riskColor(out.ai_slop_risk)}`, borderRadius: 5, padding: '.12rem .45rem' }}>
+            <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: 'var(--fs-body)' }}>HumanProof Score</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginTop: '.25rem', flexWrap: 'wrap' }}>
+              <span style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.05em', color: riskColor(out.ai_slop_risk), border: `1px solid ${riskColor(out.ai_slop_risk)}`, borderRadius: 5, padding: '.125rem .5rem' }}>
                 {out.ai_slop_risk} AI-slop risk
               </span>
-              <span style={{ fontFamily: mono, fontSize: '.55rem', color: 'var(--dim)' }}>v{out.engine_version}</span>
+              <span style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>v{out.engine_version}</span>
             </div>
           </div>
         </div>
         {/* Before → After */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', marginTop: '.95rem', fontFamily: mono, fontSize: '.62rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginTop: '1rem', fontFamily: mono, fontSize: 'var(--fs-meta)' }}>
           <span style={{ color: 'var(--muted)' }}>Before <strong style={{ color: scoreColor(out.before_score) }}>{out.before_score}</strong></span>
           <span style={{ color: 'var(--dim)' }}>→</span>
           <span style={{ color: 'var(--muted)' }}>After <strong style={{ color: scoreColor(out.after_score) }}>{out.after_score}</strong></span>
           {delta !== 0 && <span style={{ color: delta > 0 ? 'var(--green)' : 'var(--red)' }}>({delta > 0 ? '+' : ''}{delta})</span>}
         </div>
-        <p style={{ fontFamily: mono, fontSize: '.65rem', color: 'var(--sub)', lineHeight: 1.6, marginTop: '.85rem' }}>{out.explanation.summary}</p>
+        <p style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6, marginTop: '.75rem' }}>{out.explanation.summary}</p>
       </div>
 
       {/* Why your score is this — self-explaining */}
       <Section title="WHY YOUR SCORE IS THIS">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
           {sortedContribs.map((c) => (
             <div key={c.factor}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '.25rem' }}>
-                <span style={{ fontFamily: mono, fontSize: '.62rem', color: 'var(--sub)' }}>{labelOf(c.factor)}</span>
-                <span style={{ fontFamily: mono, fontSize: '.62rem', color: 'var(--white)' }}>+{c.points} pts</span>
+                <span style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--sub)' }}>{labelOf(c.factor)}</span>
+                <span style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--white)' }}>+{c.points} pts</span>
               </div>
               <div style={{ height: 5, background: 'var(--raised)', borderRadius: 3, overflow: 'hidden' }}>
                 <div style={{ width: `${Math.min(100, c.raw * 100)}%`, height: '100%', background: scoreColor(c.raw * 100) }} />
               </div>
-              <div style={{ fontFamily: mono, fontSize: '.55rem', color: 'var(--muted)', marginTop: '.25rem', lineHeight: 1.5 }}>{c.reason}</div>
+              <div style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.25rem', lineHeight: 1.5 }}>{c.reason}</div>
             </div>
           ))}
         </div>
@@ -257,13 +257,13 @@ export default function HumanProofPanel({ job, optimized = false }: { job: Job; 
         <Section title="WHAT CHANGED">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
             {out.changes_made.slice(0, 14).map((c, i) => (
-              <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 7, padding: '.6rem .8rem' }}>
-                <div style={{ fontSize: '.72rem', lineHeight: 1.5 }}>
+              <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 7, padding: '.5rem .75rem' }}>
+                <div style={{ fontSize: 'var(--fs-meta)', lineHeight: 1.5 }}>
                   <span style={{ color: 'var(--red)', textDecoration: 'line-through' }}>{c.from}</span>
                   <span style={{ color: 'var(--dim)' }}> → </span>
                   <span style={{ color: 'var(--green)' }}>{c.to}</span>
                 </div>
-                <div style={{ fontFamily: mono, fontSize: '.55rem', color: 'var(--muted)', marginTop: '.25rem' }}>{c.reason}</div>
+                <div style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.25rem' }}>{c.reason}</div>
               </div>
             ))}
           </div>
@@ -274,13 +274,13 @@ export default function HumanProofPanel({ job, optimized = false }: { job: Job; 
       {out.safe_bullets.length > 0 && (
         <Section title="SAFE HUMANIZED BULLETS">
           {out.integrity?.grounded
-            ? <div style={{ fontFamily: mono, fontSize: '.58rem', color: 'var(--green)', marginBottom: '.6rem' }}>✓ Every number from your résumé kept exactly — no invented numbers, tools, or claims.</div>
-            : out.integrity && <div style={{ fontFamily: mono, fontSize: '.58rem', color: 'var(--amber)', marginBottom: '.6rem', lineHeight: 1.5 }}>⚠ {out.integrity.unsupported_claims > 0 ? `${out.integrity.unsupported_claims} figure${out.integrity.unsupported_claims === 1 ? '' : 's'} or tool${out.integrity.unsupported_claims === 1 ? '' : 's'} here ${out.integrity.unsupported_claims === 1 ? 'is' : 'are'} not in your résumé — see “Confirm before using”.` : 'Check these lines against your résumé before using them.'}</div>}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
+            ? <div style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--green)', marginBottom: '.5rem' }}>✓ Every number from your résumé kept exactly — no invented numbers, tools, or claims.</div>
+            : out.integrity && <div style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--amber)', marginBottom: '.5rem', lineHeight: 1.5 }}>⚠ {out.integrity.unsupported_claims > 0 ? `${out.integrity.unsupported_claims} figure${out.integrity.unsupported_claims === 1 ? '' : 's'} or tool${out.integrity.unsupported_claims === 1 ? '' : 's'} here ${out.integrity.unsupported_claims === 1 ? 'is' : 'are'} not in your résumé — see “Confirm before using”.` : 'Check these lines against your résumé before using them.'}</div>}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
             {out.safe_bullets.map((b, i) => (
-              <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.7rem .85rem', display: 'flex', gap: '.6rem', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: '.78rem', color: 'var(--sub)', lineHeight: 1.6, flex: 1 }}>{b.text}</span>
-                <button onClick={() => copy(b.text, `b${i}`, out.run_id)} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 6, padding: '.25rem .5rem', fontFamily: mono, fontSize: '.55rem', color: copied === `b${i}` ? 'var(--green)' : 'var(--muted)', cursor: 'pointer', flexShrink: 0 }}>{copied === `b${i}` ? '✓' : 'copy'}</button>
+              <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.75rem .75rem', display: 'flex', gap: '.5rem', alignItems: 'flex-start' }}>
+                <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6, flex: 1 }}>{b.text}</span>
+                <button onClick={() => copy(b.text, `b${i}`, out.run_id)} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 6, padding: '.25rem .5rem', fontFamily: mono, fontSize: 'var(--fs-meta)', color: copied === `b${i}` ? 'var(--green)' : 'var(--muted)', cursor: 'pointer', flexShrink: 0 }}>{copied === `b${i}` ? '✓' : 'copy'}</button>
               </div>
             ))}
           </div>
@@ -290,12 +290,12 @@ export default function HumanProofPanel({ job, optimized = false }: { job: Job; 
       {/* Confirm before using */}
       {out.confirm_before_using.length > 0 && (
         <Section title="CONFIRM BEFORE USING">
-          <div style={{ fontFamily: mono, fontSize: '.58rem', color: 'var(--amber)', marginBottom: '.6rem', lineHeight: 1.5 }}>⚠ These numbers/tools aren&apos;t in your résumé. Confirm a real one or leave it out — we won&apos;t invent it.</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
+          <div style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--amber)', marginBottom: '.5rem', lineHeight: 1.5 }}>⚠ These numbers/tools aren&apos;t in your résumé. Confirm a real one or leave it out — we won&apos;t invent it.</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
             {out.confirm_before_using.map((c, i) => (
-              <div key={i} style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, padding: '.7rem .85rem' }}>
-                <div style={{ fontSize: '.76rem', color: 'var(--sub)', lineHeight: 1.6 }}>{c.text}</div>
-                <div style={{ fontFamily: mono, fontSize: '.55rem', color: 'var(--muted)', marginTop: '.35rem' }}>{c.reason}</div>
+              <div key={i} style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, padding: '.75rem .75rem' }}>
+                <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6 }}>{c.text}</div>
+                <div style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.25rem' }}>{c.reason}</div>
               </div>
             ))}
           </div>
@@ -305,10 +305,10 @@ export default function HumanProofPanel({ job, optimized = false }: { job: Job; 
       {/* Interview defensibility warnings */}
       {out.interview_risk_warnings.length > 0 && (
         <Section title="INTERVIEW DEFENSIBILITY">
-          <div style={{ fontFamily: mono, fontSize: '.58rem', color: 'var(--muted)', marginBottom: '.6rem', lineHeight: 1.5 }}>Make sure every line is easy to explain out loud in an interview.</div>
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
+          <div style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginBottom: '.5rem', lineHeight: 1.5 }}>Make sure every line is easy to explain out loud in an interview.</div>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
             {out.interview_risk_warnings.map((w, i) => (
-              <li key={i} style={{ display: 'flex', gap: '.5rem', fontSize: '.72rem', color: 'var(--sub)', lineHeight: 1.5 }}>
+              <li key={i} style={{ display: 'flex', gap: '.5rem', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5 }}>
                 <span style={{ color: 'var(--amber)', flexShrink: 0 }}>⚠</span>{w.warning}
               </li>
             ))}
@@ -318,29 +318,29 @@ export default function HumanProofPanel({ job, optimized = false }: { job: Job; 
 
       {/* Full humanized version */}
       <Section title="HUMANIZED VERSION">
-        <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.85rem' }}>
-          <pre style={{ fontSize: '.78rem', color: 'var(--sub)', lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{out.humanized_text}</pre>
+        <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.75rem' }}>
+          <pre style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{out.humanized_text}</pre>
           <div style={{ display: 'flex', gap: '.5rem', marginTop: '.75rem', flexWrap: 'wrap' }}>
-            <button onClick={() => copy(out.humanized_text, 'bullets', out.run_id, 'copy_bullets')} style={{ background: 'var(--green)', color: 'var(--ink)', border: 'none', borderRadius: 7, padding: '.45rem .9rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.7rem', cursor: 'pointer' }}>{copied === 'bullets' ? '✓ Copied' : 'Copy Humanized Resume Bullets'}</button>
+            <button onClick={() => copy(out.humanized_text, 'bullets', out.run_id, 'copy_bullets')} style={{ background: 'var(--green)', color: 'var(--ink)', border: 'none', borderRadius: 7, padding: '.5rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-meta)', cursor: 'pointer' }}>{copied === 'bullets' ? '✓ Copied' : 'Copy Humanized Resume Bullets'}</button>
           </div>
         </div>
       </Section>
 
       {/* Actions — save + rate */}
-      <div style={{ background: 'var(--gdim)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.1rem' }}>
-        <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <button onClick={() => { sendFeedback('save', out.run_id); setCopied('saved'); setTimeout(() => setCopied(null), 1600) }} style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, padding: '.55rem 1rem', fontFamily: mono, fontSize: '.65rem', cursor: 'pointer' }}>{copied === 'saved' ? '✓ Saved' : 'Save Version'}</button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem', marginLeft: 'auto' }}>
-            <span style={{ fontFamily: mono, fontSize: '.55rem', color: 'var(--muted)' }}>Rate this pass</span>
+      <div style={{ background: 'var(--gdim)', border: '1px solid var(--line)', borderRadius: 12, padding: '1rem' }}>
+        <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <button onClick={() => { sendFeedback('save', out.run_id); setCopied('saved'); setTimeout(() => setCopied(null), 1600) }} style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, padding: '.5rem 1rem', fontFamily: mono, fontSize: 'var(--fs-meta)', cursor: 'pointer' }}>{copied === 'saved' ? '✓ Saved' : 'Save Version'}</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '.25rem', marginLeft: 'auto' }}>
+            <span style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>Rate this pass</span>
             {[1, 2, 3, 4, 5].map((n) => (
-              <button key={n} onClick={() => { setRated(n); sendFeedback('rate', out.run_id, n) }} aria-label={`Rate ${n}`} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '.95rem', color: rated != null && n <= rated ? 'var(--amber)' : 'var(--line2)', padding: 0 }}>★</button>
+              <button key={n} onClick={() => { setRated(n); sendFeedback('rate', out.run_id, n) }} aria-label={`Rate ${n}`} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 'var(--fs-body)', color: rated != null && n <= rated ? 'var(--amber)' : 'var(--line2)', padding: 0 }}>★</button>
             ))}
           </div>
         </div>
         {out.explanation.notes.length > 0 && (
-          <ul style={{ listStyle: 'none', padding: 0, margin: '.85rem 0 0', display: 'flex', flexDirection: 'column', gap: '.35rem' }}>
+          <ul style={{ listStyle: 'none', padding: 0, margin: '.75rem 0 0', display: 'flex', flexDirection: 'column', gap: '.25rem' }}>
             {out.explanation.notes.map((n, i) => (
-              <li key={i} style={{ fontFamily: mono, fontSize: '.58rem', color: 'var(--muted)', lineHeight: 1.5 }}>• {n}</li>
+              <li key={i} style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.5 }}>• {n}</li>
             ))}
           </ul>
         )}
@@ -351,8 +351,8 @@ export default function HumanProofPanel({ job, optimized = false }: { job: Job; 
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={{ background: 'var(--gdim)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.1rem' }}>
-      <div style={{ fontFamily: mono, fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)', marginBottom: '.75rem' }}>{title}</div>
+    <div style={{ background: 'var(--gdim)', border: '1px solid var(--line)', borderRadius: 12, padding: '1rem' }}>
+      <div style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)', marginBottom: '.75rem' }}>{title}</div>
       {children}
     </div>
   )

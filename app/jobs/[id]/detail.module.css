@@ -5,7 +5,7 @@
 .stack { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-3); }
 .skel { display: flex; flex-direction: column; gap: var(--sp-2); }
 .p { margin: 0; font-size: var(--fs-body); color: var(--text-3); line-height: var(--lh-body); }
-.fine { margin: 0; display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-sm); color: var(--text-3); line-height: 1.5; }
+.fine { margin: 0; display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-sm); color: var(--text-3); line-height: 1.5; }
 .link { color: var(--accent); }
 .h2 { margin: 0 0 var(--sp-2); font-family: var(--display); font-weight: 700; font-size: var(--fs-h3); letter-spacing: var(--ls-heading); color: var(--text-1); }
 
@@ -32,11 +32,11 @@
 
 .status { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-2); margin-bottom: var(--sp-6); }
 .notice { margin: 0; display: flex; align-items: flex-start; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); border-radius: var(--r-control); font-size: var(--fs-sm); line-height: 1.5; border: 1px solid var(--border-2); color: var(--text-2); }
-.notice svg { margin-top: 3px; flex-shrink: 0; }
+.notice svg { margin-top: 4px; flex-shrink: 0; }
 .notice[data-tone="caution"] { background: var(--caution-tint); border-color: var(--caution-line); color: var(--caution-text); }
 .notice[data-tone="bad"] { background: var(--bad-tint); border-color: var(--bad-line); color: var(--bad-text); }
 .notice[data-tone="good"] { background: var(--good-tint); border-color: var(--good-line); color: var(--good-text); }
-.textBtn { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0; background: none; border: 0; color: var(--text-3); font: inherit; font-size: var(--fs-sm); cursor: pointer; }
+.textBtn { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0; background: none; border: 0; color: var(--text-3); font: inherit; font-size: var(--fs-sm); cursor: pointer; }
 .textBtn:hover { color: var(--text-1); }
 @media (max-width: 768px) { .textBtn { min-height: 44px; } }
 

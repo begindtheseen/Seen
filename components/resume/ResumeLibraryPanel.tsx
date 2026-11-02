@@ -135,15 +135,15 @@ export default function ResumeLibraryPanel({ isLoggedIn, list, setList, single, 
 
   return (
     <div className="ai-card" style={{ marginBottom: '1rem' }} data-testid="resume-library">
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '.5rem', flexWrap: 'wrap', marginBottom: '.6rem' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '.5rem', flexWrap: 'wrap', marginBottom: '.5rem' }}>
         <div style={kick}>{live && rows.length > 1 ? 'Your résumés' : 'Your résumé on file'}</div>
         {live && <div style={meta} data-testid="resume-cap">{capLine(list)}</div>}
       </div>
 
       {!live && single && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
           <div style={{ flex: '1 1 12rem', minWidth: 0 }}>
-            <div style={{ fontSize: '.88rem', color: 'var(--white)', overflowWrap: 'anywhere' }}>{single.fileName || 'Your résumé'}</div>
+            <div style={{ fontSize: 'var(--fs-ui)', color: 'var(--white)', overflowWrap: 'anywhere' }}>{single.fileName || 'Your résumé'}</div>
             <div style={meta}>{words(single.wordCount)}</div>
           </div>
           <Button size="sm" variant="secondary" icon="eye" onClick={openSingle}>View</Button>
@@ -153,16 +153,16 @@ export default function ResumeLibraryPanel({ isLoggedIn, list, setList, single, 
       {live && rows.length === 0 && <div style={{ ...meta, marginBottom: '.5rem' }}>No résumé saved yet — add one below, or paste it into the box on the left.</div>}
 
       {live && rows.map(r => (
-        <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap', padding: '.55rem 0', borderTop: '1px solid var(--line)' }}>
+        <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap', padding: '.5rem 0', borderTop: '1px solid var(--line)' }}>
           <div style={{ flex: '1 1 12rem', minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '.88rem', color: 'var(--white)', overflowWrap: 'anywhere', minWidth: 0 }}>{r.name}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 'var(--fs-ui)', color: 'var(--white)', overflowWrap: 'anywhere', minWidth: 0 }}>{r.name}</span>
               {r.is_default && <Badge tone="accent">Default</Badge>}
               {!r.usable && <Badge tone="neutral" icon="lock">Pro</Badge>}
             </div>
             <div style={meta}>{[words(r.word_count), updated(r.updated_at)].filter(Boolean).join(' · ')}</div>
           </div>
-          <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
             {rows.length > 1 && (r.id === selectedId
               ? <span style={{ ...meta, color: 'var(--green)', alignSelf: 'center' }}>In use</span>
               : <Button size="sm" variant="ghost" disabled={!r.usable || !!busy} title={r.usable ? 'Use this résumé for this job' : 'Only your default résumé can be used without Pro'}
@@ -173,7 +173,7 @@ export default function ResumeLibraryPanel({ isLoggedIn, list, setList, single, 
       ))}
 
       {live && !adding && (
-        <div style={{ marginTop: '.6rem', display: 'flex', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap' }}>
+        <div style={{ marginTop: '.5rem', display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
           {canAdd
             ? <Button size="sm" variant="secondary" icon="plus" onClick={() => { setAdding(true); setAddErr('') }}>Add a résumé</Button>
             : !isPro
@@ -184,16 +184,16 @@ export default function ResumeLibraryPanel({ isLoggedIn, list, setList, single, 
 
       {live && adding && (
         <div style={{ marginTop: '.75rem', borderTop: '1px solid var(--line)', paddingTop: '.75rem' }}>
-          <label style={{ ...kick, display: 'block', marginBottom: '.3rem' }} htmlFor="resume-add-name">Name (optional)</label>
-          <input id="resume-add-name" className="ui-input" autoComplete="off" maxLength={60} placeholder="e.g. Warehouse roles" value={addName} onChange={e => setAddName(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', marginBottom: '.6rem' }} />
-          <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginBottom: '.6rem' }}>
+          <label style={{ ...kick, display: 'block', marginBottom: '.25rem' }} htmlFor="resume-add-name">Name (optional)</label>
+          <input id="resume-add-name" className="ui-input" autoComplete="off" maxLength={60} placeholder="e.g. Warehouse roles" value={addName} onChange={e => setAddName(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', marginBottom: '.5rem' }} />
+          <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginBottom: '.5rem' }}>
             <Button size="sm" variant="secondary" icon="file-text" loading={busy === 'add'} onClick={() => fileRef.current?.click()}>Upload PDF / Word / text · free</Button>
             <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,.txt,.md,text/plain" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void addFile(f) }} />
           </div>
-          <label style={{ ...kick, display: 'block', marginBottom: '.3rem' }} htmlFor="resume-add-text">…or paste the text</label>
-          <textarea id="resume-add-text" className="ui-input" autoComplete="off" rows={6} value={addText} onChange={e => setAddText(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', fontSize: '.85rem' }} />
+          <label style={{ ...kick, display: 'block', marginBottom: '.25rem' }} htmlFor="resume-add-text">…or paste the text</label>
+          <textarea id="resume-add-text" className="ui-input" autoComplete="off" rows={6} value={addText} onChange={e => setAddText(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', fontSize: 'var(--fs-ui)' }} />
           {addErr && <div role="alert" style={errStyle}>{addErr}</div>}
-          <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginTop: '.6rem' }}>
+          <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginTop: '.5rem' }}>
             <Button size="sm" variant="primary" disabled={addText.trim().length < 50 || !!busy} onClick={() => save(addText.trim(), 'Pasted résumé', countWords(addText))}>Save résumé</Button>
             <Button size="sm" variant="ghost" onClick={() => { setAdding(false); setAddErr('') }}>Cancel</Button>
           </div>
@@ -223,31 +223,31 @@ export default function ResumeLibraryPanel({ isLoggedIn, list, setList, single, 
         {viewing && (
           <div>
             {live && viewing.id && (
-              <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap', marginBottom: '.75rem' }}>
+              <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginBottom: '.75rem' }}>
                 {!viewing.isDefault && <Button size="sm" variant="ghost" loading={busy === 'default'} onClick={makeDefault}>Make default</Button>}
                 <Button size="sm" variant="ghost" icon="pencil" onClick={() => { setRenaming(renaming == null ? viewing.name : null); setConfirmDelete(false) }}>Rename</Button>
                 <Button size="sm" variant="ghost" icon="trash-2" onClick={() => { setConfirmDelete(v => !v); setRenaming(null) }}>Delete</Button>
               </div>
             )}
             {renaming != null && (
-              <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap', marginBottom: '.75rem' }}>
+              <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginBottom: '.75rem' }}>
                 <input aria-label="Résumé name" className="ui-input" autoComplete="off" maxLength={60} value={renaming} onChange={e => setRenaming(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void rename() }} style={{ flex: '1 1 12rem', minWidth: 0 }} />
                 <Button size="sm" variant="secondary" loading={busy === 'rename'} onClick={rename}>Save name</Button>
               </div>
             )}
             {confirmDelete && (
-              <div role="alert" style={{ background: 'var(--rdim)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, padding: '.65rem .8rem', marginBottom: '.75rem' }}>
-                <div style={{ fontSize: '.85rem', color: 'var(--sub)', lineHeight: 1.5, marginBottom: '.5rem' }}>
+              <div role="alert" style={{ background: 'var(--rdim)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, padding: '.75rem .75rem', marginBottom: '.75rem' }}>
+                <div style={{ fontSize: 'var(--fs-ui)', color: 'var(--sub)', lineHeight: 1.5, marginBottom: '.5rem' }}>
                   Delete “{viewing.name}”? This can’t be undone.{viewing.isDefault && rows.length > 1 ? ' Your most recently updated other résumé becomes the default.' : ''}
                 </div>
-                <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
                   <Button size="sm" variant="danger" loading={busy === 'delete'} onClick={remove}>Delete it</Button>
                   <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(false)}>Keep it</Button>
                 </div>
               </div>
             )}
-            {!viewing.isDefault && <div style={{ ...meta, marginBottom: '.6rem' }}>Studio edits your default résumé — make this one the default to edit it there.{!viewing.usable ? ' Without Pro only your default can be used to optimize or apply; this one stays saved.' : ''}</div>}
-            {err && <div role="alert" style={{ ...errStyle, marginTop: 0, marginBottom: '.6rem' }}>{err}</div>}
+            {!viewing.isDefault && <div style={{ ...meta, marginBottom: '.5rem' }}>Studio edits your default résumé — make this one the default to edit it there.{!viewing.usable ? ' Without Pro only your default can be used to optimize or apply; this one stays saved.' : ''}</div>}
+            {err && <div role="alert" style={{ ...errStyle, marginTop: 0, marginBottom: '.5rem' }}>{err}</div>}
             <ResumeView text={viewing.text} fileName={viewing.fileName} />
           </div>
         )}

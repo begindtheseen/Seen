@@ -67,13 +67,13 @@ export default function WelcomeOnboarding({
         background: 'linear-gradient(160deg, var(--accent-tint), transparent 60%)',
         border: '1px solid var(--accent-line)',
         borderRadius: 16,
-        padding: '1.15rem 1.15rem 1.25rem',
+        padding: '1.25rem 1.25rem 1.25rem',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '.75rem', marginBottom: '.35rem' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '.75rem', marginBottom: '.25rem' }}>
         <div style={{ minWidth: 0 }}>
           <div className="deyebrow" style={{ color: 'var(--accent)' }}>✦ Getting started</div>
-          <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: '.35rem 0 .2rem' }}>
+          <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: '.25rem 0 .25rem' }}>
             {/* Sign-up no longer asks a name first (it is asked later, in Settings): no "Welcome to Seen, there". */}
             {name && name !== 'there' ? <>Welcome to Seen, {name} 👋</> : <>Welcome to Seen 👋</>}
           </h2>
@@ -85,12 +85,12 @@ export default function WelcomeOnboarding({
           onClick={onDismiss}
           title="Hide getting started"
           aria-label="Hide getting started"
-          style={{ flexShrink: 0, background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontSize: 'var(--fs-body)', lineHeight: 1, minWidth: 44, minHeight: 44, margin: '-.6rem -.6rem 0 0', borderRadius: 10 }}
+          style={{ flexShrink: 0, background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontSize: 'var(--fs-body)', lineHeight: 1, minWidth: 44, minHeight: 44, margin: '-.5rem -.5rem 0 0', borderRadius: 10 }}
         >✕</button>
       </div>
 
       {/* Progress */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', margin: '.85rem 0 1rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', margin: '.75rem 0 1rem' }}>
         <div style={{ flex: 1, height: 5, background: 'var(--line2)', borderRadius: 4, overflow: 'hidden' }}>
           <div style={{ height: '100%', width: `${(doneCount / steps.length) * 100}%`, background: 'var(--accent-strong)', borderRadius: 4, transition: 'width .4s ease' }} />
         </div>
@@ -105,10 +105,10 @@ export default function WelcomeOnboarding({
             <div
               key={i}
               style={{
-                display: 'flex', alignItems: 'center', gap: '.7rem', flexWrap: 'wrap',
+                display: 'flex', alignItems: 'center', gap: '.75rem', flexWrap: 'wrap',
                 background: s.done ? 'transparent' : 'var(--surface)',
                 border: `1px solid ${isNext ? 'var(--accent-line)' : 'var(--line2)'}`,
-                borderRadius: 11, padding: '.65rem .7rem',
+                borderRadius: 11, padding: '.75rem .75rem',
                 opacity: s.done ? 0.72 : 1,
               }}
             >
@@ -125,16 +125,16 @@ export default function WelcomeOnboarding({
               {/* The text keeps ≥180px; on a phone the CTA wraps under it instead of squeezing the title. */}
               <div style={{ minWidth: 0, flex: '1 1 180px' }}>
                 <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', fontWeight: 600, color: s.done ? 'var(--sub)' : 'var(--white)', textDecoration: s.done ? 'line-through' : 'none' }}>{s.title}</div>
-                {!s.done && <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.15rem', lineHeight: 1.45 }}>{s.sub}</div>}
+                {!s.done && <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.125rem', lineHeight: 1.45 }}>{s.sub}</div>}
                 {!s.done && 'alt' in s && s.alt && (
-                  <a href={s.alt.href} onClick={e => { e.preventDefault(); router.push(s.alt!.href) }} style={{ display: 'inline-flex', alignItems: 'center', minHeight: 40, fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none', marginTop: '-.2rem', marginBottom: '-.5rem' }}>{s.alt.label}</a>
+                  <a href={s.alt.href} onClick={e => { e.preventDefault(); router.push(s.alt!.href) }} style={{ display: 'inline-flex', alignItems: 'center', minHeight: 40, fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none', marginTop: '-.25rem', marginBottom: '-.5rem' }}>{s.alt.label}</a>
                 )}
               </div>
               {!s.done && (
                 <button
                   onClick={s.go}
                   className={isNext ? 'dbtn dbtn-primary' : 'dbtn dbtn-ghost'}
-                  style={{ flex: '0 1 auto', marginLeft: 'auto', minHeight: 44, padding: '.42rem .8rem', fontSize: 'var(--fs-meta)' }}
+                  style={{ flex: '0 1 auto', marginLeft: 'auto', minHeight: 44, padding: '.5rem .75rem', fontSize: 'var(--fs-meta)' }}
                 >{s.cta} →</button>
               )}
             </div>

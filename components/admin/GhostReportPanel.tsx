@@ -54,20 +54,20 @@ export function GhostReportPanel() {
       <CardHeader
         title="Weekly Ghost Report"
         action={
-          <div style={{ display: 'flex', gap: '.4rem' }}>
+          <div style={{ display: 'flex', gap: '.5rem' }}>
             <a href="/ghost-report" target="_blank" rel="noopener noreferrer" style={linkBtn}>View page ↗</a>
             <a href="/ghost-report/opengraph-image" target="_blank" rel="noopener noreferrer" style={linkBtn}>Share image ↗</a>
           </div>
         }
       />
 
-      {err && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--red)', marginBottom: '.6rem' }}>{err}</div>}
+      {err && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--red)', marginBottom: '.5rem' }}>{err}</div>}
 
-      {!rows && !err && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)' }}>Loading this week&apos;s numbers…</div>}
+      {!rows && !err && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>Loading this week&apos;s numbers…</div>}
 
       {report && (
         <>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.8rem' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.75rem' }}>
             {report.hasReported ? (
               <>
                 <span style={{ color: 'var(--white)' }}>{report.headline.reportsTotal.toLocaleString()}</span> reports · {report.headline.companiesTracked} companies
@@ -79,14 +79,14 @@ export function GhostReportPanel() {
             )}
           </div>
 
-          <div style={{ fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 700, color: 'var(--white)', lineHeight: 1.4, marginBottom: '.7rem' }}>
+          <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--white)', lineHeight: 1.4, marginBottom: '.75rem' }}>
             {pickHeadline(report)}
           </div>
 
           {report.worstOffenders.length > 0 && (
-            <div style={{ marginBottom: '.8rem' }}>
+            <div style={{ marginBottom: '.75rem' }}>
               {report.worstOffenders.slice(0, 3).map((r, i) => (
-                <div key={r.name} style={{ display: 'flex', alignItems: 'center', gap: '.5rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', marginBottom: '.2rem' }}>
+                <div key={r.name} style={{ display: 'flex', alignItems: 'center', gap: '.5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginBottom: '.25rem' }}>
                   <span style={{ width: 12 }}>{i + 1}</span>
                   <span style={{ color: 'var(--white)', textTransform: 'capitalize', flex: 1 }}>{r.name}</span>
                   <span style={{ color: 'var(--red)' }}>{r.ghostPct}% ghost</span>
@@ -100,14 +100,14 @@ export function GhostReportPanel() {
             readOnly
             value={caption}
             onFocus={(e) => e.currentTarget.select()}
-            style={{ width: '100%', minHeight: 140, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 7, padding: '.6rem .7rem', fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--sub)', lineHeight: 1.6, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
+            style={{ width: '100%', minHeight: 140, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 7, padding: '.5rem .75rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
           />
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', marginTop: '.6rem', flexWrap: 'wrap' }}>
-            <button onClick={copy} style={{ background: 'rgba(239,68,68,.14)', border: '1px solid rgba(239,68,68,.35)', borderRadius: 7, padding: '.42rem .9rem', fontFamily: 'var(--mono)', fontSize: '.6rem', color: '#fca5a5', cursor: 'pointer' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginTop: '.5rem', flexWrap: 'wrap' }}>
+            <button onClick={copy} style={{ background: 'rgba(239,68,68,.14)', border: '1px solid rgba(239,68,68,.35)', borderRadius: 7, padding: '.5rem 1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--bad-text)', cursor: 'pointer' }}>
               {copied ? '✓ Copied' : 'Copy post caption'}
             </button>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>Post to r/recruitinghell · LinkedIn · X — image first, reply to comments for 2h.</span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>Post to r/recruitinghell · LinkedIn · X — image first, reply to comments for 2h.</span>
           </div>
         </>
       )}
@@ -116,6 +116,6 @@ export function GhostReportPanel() {
 }
 
 const linkBtn: React.CSSProperties = {
-  fontFamily: 'var(--mono)', fontSize: '.52rem', padding: '.25rem .6rem', borderRadius: 5,
+  fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .5rem', borderRadius: 5,
   border: '1px solid var(--line2)', background: 'transparent', color: 'var(--dim)', textDecoration: 'none',
 }

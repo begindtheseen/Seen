@@ -93,10 +93,10 @@ function prep(canvas: HTMLCanvasElement, f: Frame): Ctx {
 
 const white = (a: number) => `rgba(255,255,255,${a})`
 // next/font self-hosts the faces under generated family names ("__Syne_1a2b3c"), exposed as the CSS
-// variables --font-syne / --font-instrument / --font-dm-mono on <html> (app/layout.tsx). A canvas
+// variables --font-syne / --font-instrument on <html> (app/layout.tsx) — the only two families (DESIGN.md). A canvas
 // cannot read a CSS variable, so the shared theme's plain names ("Syne") are swapped for the live
 // family list here; the server OG route keeps the plain names (satori registers its own fonts).
-const FAMILY_VARS: Array<[RegExp, string]> = [[/"Syne"/g, '--font-syne'], [/"Instrument Sans"/g, '--font-instrument'], [/"DM Mono"/g, '--font-dm-mono']]
+const FAMILY_VARS: Array<[RegExp, string]> = [[/"Syne"/g, '--font-syne'], [/"Instrument Sans"/g, '--font-instrument']]
 export function canvasFamily(family: string): string {
   if (typeof document === 'undefined') return family
   const cs = getComputedStyle(document.documentElement)

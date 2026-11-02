@@ -406,10 +406,10 @@ export default function DashboardPage() {
             </div>
             {/* No numbers from a failed load with nothing local: "0 / 0 / 0" under an error reads as a verdict (R-1). */}
             <div className={styles.pills}>
-              <div className={styles.pill}><small>Open</small><b style={{ color: '#93b4ff' }}>{noData ? '—' : <Odometer value={active.length} />}</b></div>
-              <div className={styles.pill}><small>Response</small><b style={{ color: '#a5a2ff' }}>{noData || responseNum == null ? '—' : <Odometer value={responseNum} suffix="%" />}</b></div>
+              <div className={styles.pill}><small>Open</small><b style={{ color: 'var(--info-text)' }}>{noData ? '—' : <Odometer value={active.length} />}</b></div>
+              <div className={styles.pill}><small>Response</small><b style={{ color: 'var(--accent)' }}>{noData || responseNum == null ? '—' : <Odometer value={responseNum} suffix="%" />}</b></div>
               <div className={styles.pill}><small>Hired</small><b style={{ color: 'var(--green)' }}>{noData ? '—' : <Odometer value={hired.length} />}</b></div>
-              <div className={styles.pill}><small>Ghosted</small><b style={{ color: '#f87185' }}>{noData ? '—' : <Odometer value={ghosted.length} />}</b></div>
+              <div className={styles.pill}><small>Ghosted</small><b style={{ color: 'var(--bad-text)' }}>{noData ? '—' : <Odometer value={ghosted.length} />}</b></div>
             </div>
             {ratedCount > 0 && <p className={styles.caption}>Based on {ratedCount} tracked application{ratedCount !== 1 ? 's' : ''}{apps.length > ratedCount ? ` · ${apps.length - ratedCount} withdrawn not counted` : ''}</p>}
           </section>

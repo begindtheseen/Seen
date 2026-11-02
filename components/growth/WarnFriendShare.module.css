@@ -4,10 +4,10 @@
 .wrap { display: flex; flex-direction: column; gap: .5rem; min-width: 0; }
 .page {
   margin-top: 1rem;
-  padding: .85rem 1rem;
+  padding: .75rem 1rem;
   border: 1px solid var(--line2);
   border-radius: 14px;
-  background: #0e111c;
+  background: var(--surface-overlay);
 }
 .modal { margin: 0 0 .75rem; }
 .lead {
@@ -29,7 +29,7 @@
   border-radius: 10px;
   border: 1px solid rgba(59,130,246,.55);
   background: rgba(59,130,246,.14);
-  color: #f9fafb;
+  color: var(--text-1);
   font-family: var(--body);
   font-size: var(--fs-ui);
   font-weight: 600;

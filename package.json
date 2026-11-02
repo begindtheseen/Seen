@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "design:audit": "node scripts/design-audit.mjs",
+    "design:rules": "node --test lib/ui/designRules.test.mjs",
     "dev": "next dev",
     "build": "next build --experimental-build-mode=compile && next build --experimental-build-mode=generate",
     "build:default": "next build",

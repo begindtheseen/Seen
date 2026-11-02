@@ -63,7 +63,7 @@ export function CompanyResultCard({ items, searched }: { items: CompanyCandidate
   const c = items.find((x) => queryNamesCompany(x.name, searched))
   if (!c) return null
   return (
-    <Link href={`/company/${slugOf(c.name)}`} style={{ display: 'flex', alignItems: 'center', gap: '.75rem', padding: '.7rem .9rem', margin: '.75rem 0', background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 12, textDecoration: 'none' }}>
+    <Link href={`/company/${slugOf(c.name)}`} style={{ display: 'flex', alignItems: 'center', gap: '.75rem', padding: '.75rem 1rem', margin: '.75rem 0', background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 12, textDecoration: 'none' }}>
       <span aria-hidden style={{ width: 34, height: 34, borderRadius: 9, background: 'var(--raised)', border: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--body)', fontWeight: 600, color: 'var(--sub)', flexShrink: 0 }}>{c.name.charAt(0).toUpperCase()}</span>
       <span style={{ flex: 1, minWidth: 0 }}>
         <span style={{ display: 'block', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-body)', color: 'var(--white)' }}>{titleCase(c.name)}</span>

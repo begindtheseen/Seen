@@ -106,7 +106,7 @@ export function EmployerNav() {
         <Link href="/" className="logo" title="Back to Seen home">
           <span className="logo-pulse" />
           Seen
-          <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.12em', marginLeft: '.15rem', fontWeight: 500 }}>for employers</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.12em', marginLeft: '.125rem', fontWeight: 500 }}>for employers</span>
         </Link>
 
         {/* Primary employer destinations (hidden on mobile via .primary — the drawer takes over). */}
@@ -157,7 +157,7 @@ export function EmployerNav() {
           ) : (
             <>
               <Link href="/login?type=employer" className="btn btn-ghost">Sign in</Link>
-              <Link href="/employers#claim" className="btn btn-solid">Claim your company</Link>
+              <Link href="/employers#claim" className="btn btn-nav-cta">Claim your company</Link>
             </>
           )}
           </div>
@@ -181,7 +181,7 @@ export function EmployerNav() {
           <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-h3)', color: 'var(--white)', letterSpacing: '-.02em' }}>Seen</span>
           <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.12em' }}>employers</span>
           {/* 44×44 hit area by box size (the glyph stays 1rem); negative block margins keep the row height. */}
-          <button ref={drawerCloseRef} type="button" onClick={() => setMenuOpen(false)} style={{ marginLeft: 'auto', width: 44, height: 44, marginTop: -10, marginBottom: -10, marginRight: '-.5rem', display: 'grid', placeItems: 'center', background: 'none', border: 'none', borderRadius: 10, color: 'var(--muted)', cursor: 'pointer', fontSize: 'var(--fs-lead)' }} aria-label="Close menu">✕</button>
+          <button ref={drawerCloseRef} type="button" onClick={() => setMenuOpen(false)} style={{ marginLeft: 'auto', width: 44, height: 44, marginTop: -12, marginBottom: -12, marginRight: '-.5rem', display: 'grid', placeItems: 'center', background: 'none', border: 'none', borderRadius: 10, color: 'var(--muted)', cursor: 'pointer', fontSize: 'var(--fs-lead)' }} aria-label="Close menu">✕</button>
         </div>
 
         <div className="side-menu-label">For employers</div>
@@ -202,7 +202,7 @@ export function EmployerNav() {
           ) : (
             <>
               <Link href="/login?type=employer" className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setMenuOpen(false)}>Sign in</Link>
-              <Link href="/employers#claim" className="btn btn-solid" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setMenuOpen(false)}>Claim your company</Link>
+              <Link href="/employers#claim" className="btn btn-nav-cta" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setMenuOpen(false)}>Claim your company</Link>
             </>
           )}
         </div>
@@ -215,10 +215,10 @@ export function EmployerNav() {
 // and a clear route back to the job-seeker side.
 export function EmployerFooter() {
   return (
-    <footer style={{ borderTop: '1px solid var(--line)', padding: '1.4rem 1.5rem' }}>
-      <div style={{ maxWidth: 960, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.6rem', width: '100%', boxSizing: 'border-box' }}>
+    <footer style={{ borderTop: '1px solid var(--line)', padding: '1.5rem 1.5rem' }}>
+      <div style={{ maxWidth: 960, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.5rem', width: '100%', boxSizing: 'border-box' }}>
         <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>© 2026 Seen · for employers</span>
-        <div style={{ display: 'flex', gap: '1.1rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
           <Link href="/employers#promote" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', textDecoration: 'none' }}>Pricing</Link>
           <Link href="/employers/verified" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', textDecoration: 'none' }}>Get Verified</Link>
           <Link href="/legal" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', textDecoration: 'none' }}>Legal</Link>

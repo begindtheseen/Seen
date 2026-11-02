@@ -23,7 +23,7 @@ export default function ResumePicker({ list, selectedId, onPick, disabled, note 
   if (mode === 'hidden' || !list) return null
   const rows = list.resumes
   if (mode === 'name') {
-    return <div style={wrap} data-testid="resume-picker-name"><span style={lab}>Résumé:</span><span style={{ fontSize: '.85rem', color: 'var(--white)', overflowWrap: 'anywhere', minWidth: 0 }}>{rows[0].name}</span></div>
+    return <div style={wrap} data-testid="resume-picker-name"><span style={lab}>Résumé:</span><span style={{ fontSize: 'var(--fs-ui)', color: 'var(--white)', overflowWrap: 'anywhere', minWidth: 0 }}>{rows[0].name}</span></div>
   }
   const locked = rows.some(r => !r.usable)
   return (
@@ -37,13 +37,13 @@ export default function ResumePicker({ list, selectedId, onPick, disabled, note 
           value={selectedId || ''}
           disabled={disabled}
           onChange={e => { const r = rows.find(x => x.id === e.target.value); if (r && r.usable) onPick(r) }}
-          style={{ flex: '1 1 12rem', minWidth: 0, minHeight: 44, fontSize: '.85rem' }}
+          style={{ flex: '1 1 12rem', minWidth: 0, minHeight: 44, fontSize: 'var(--fs-ui)' }}
         >
           {rows.map(r => <option key={r.id} value={r.id} disabled={!r.usable}>{optionLabel(r)}</option>)}
         </select>
       </div>
       {(note || locked) && (
-        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', color: 'var(--muted)', marginTop: '.3rem', lineHeight: 1.5 }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', color: 'var(--muted)', marginTop: '.25rem', lineHeight: 1.5 }}>
           {[note, locked ? 'Résumés marked Pro stay saved — only your default can be used without Pro.' : ''].filter(Boolean).join(' ')}
         </div>
       )}

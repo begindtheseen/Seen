@@ -16,7 +16,8 @@ import './globals.css'
 import '@/components/ui/ui.css'
 import './motion.css'
 
-// Exactly the faces the type scale uses (app/globals.css tokens), shipped WITH the site from app/fonts
+// Exactly TWO families (DESIGN.md: max two fonts) — Syne for the one headline, Instrument Sans for everything
+// else, figures included (it has tabular numerals; app/globals.css turns them on). Exactly the faces the type scale uses (app/globals.css tokens), shipped WITH the site from app/fonts
 // (latin subset, one woff2 per weight; SIL Open Font License — app/fonts/OFL.txt). They used to be
 // downloaded from Google at build time (next/font/google), which failed the Vercel build on Next 15.5.28
 // when Google answered with a font link the loader could not read (2026-11-01) — a build must not depend
@@ -33,10 +34,6 @@ const instrument = localFont({
     { path: './fonts/instrument-sans-600.woff2', weight: '600' },
   ],
   display: 'swap', variable: '--font-instrument', adjustFontFallback: false,
-})
-const dmMono = localFont({
-  src: [{ path: './fonts/dm-mono-400.woff2', weight: '400' }, { path: './fonts/dm-mono-500.woff2', weight: '500' }],
-  display: 'swap', variable: '--font-dm-mono', adjustFontFallback: false,
 })
 
 export const metadata: Metadata = {
@@ -89,7 +86,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${syne.variable} ${instrument.variable} ${dmMono.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${syne.variable} ${instrument.variable}`} suppressHydrationWarning>
       <head>
         {/* The opening: on the FIRST load of a session the nav wordmark rises letter by letter and the
             nav hairline draws (app/motion.css `html.seen-first`). Marked before first paint so the pure-CSS

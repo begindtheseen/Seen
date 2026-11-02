@@ -38,11 +38,11 @@ export default async function ComparePage() {
   return (
     <div className="page-full">
       <div style={wrap}>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.2em', color: 'var(--blue)', marginBottom: '.7rem', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.2em', color: 'var(--blue)', marginBottom: '.75rem', display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ width: 20, height: 1, background: 'var(--blue)', display: 'inline-block' }} />
           Compare
         </div>
-        <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.6rem,5vw,2.3rem)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', lineHeight: 1.1, margin: '0 0 .7rem' }}>
+        <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.6rem,5vw,2.3rem)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', lineHeight: 1.1, margin: '0 0 .75rem' }}>
           Compare hiring, side by side
         </h1>
         <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-body)', lineHeight: 1.7, fontWeight: 400, margin: '0 0 2rem' }}>
@@ -58,9 +58,9 @@ export default async function ComparePage() {
           <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--blue)', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--line)' }}>
             Popular matchups
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.6rem' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.5rem' }}>
             {matchups.map(([x, y]) => (
-              <Link key={`${x}-${y}`} href={`/compare/${slugify(x)}-vs-${slugify(y)}`} className="btn btn-ghost" style={{ fontSize: 'var(--fs-meta)', padding: '.55rem .9rem' }}>
+              <Link key={`${x}-${y}`} href={`/compare/${slugify(x)}-vs-${slugify(y)}`} className="btn btn-ghost" style={{ fontSize: 'var(--fs-meta)', padding: '.5rem 1rem' }}>
                 {x} vs {y}
               </Link>
             ))}

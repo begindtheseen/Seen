@@ -53,7 +53,7 @@ function Finding({ f, doc, onJump, onApplyRewrite, onApplyVerb }: { f: HealthFin
             {(fix.options || fix.verbs || []).slice(0, 5).map((v) => <button key={v} type="button" className={`${s.chip} ${s.chipGreen} ${s.chipBtn}`} onClick={() => onApplyVerb(f.anchor.bulletId!, v)}>{v}</button>)}
           </div>
         )}
-        {fix && fix.kind === 'prompt' && fix.text && <div className={s.muted} style={{ marginTop: '.3rem' }}>{fix.text}</div>}
+        {fix && fix.kind === 'prompt' && fix.text && <div className={s.muted} style={{ marginTop: '.25rem' }}>{fix.text}</div>}
       </div>
     </div>
   )
@@ -70,12 +70,12 @@ export default function HealthPanel({ health, doc, onJump, onApplyRewrite, onApp
           <div className={s.ring} style={{ borderColor: color }}><span className={s.ringNum} style={{ color }}>{health.score}</span></div>
           <div style={{ minWidth: 0, flex: 1 }}>
             <div className={s.grade}>Résumé health · {health.grade}</div>
-            <div className={s.dim} style={{ marginTop: '.15rem' }}>{health.band} · {health.words} words{health.years != null ? ` · ${health.years} yrs experience` : ''}</div>
+            <div className={s.dim} style={{ marginTop: '.125rem' }}>{health.band} · {health.words} words{health.years != null ? ` · ${health.years} yrs experience` : ''}</div>
           </div>
         </div>
-        <p className={s.dim} style={{ marginTop: '.75rem', color: 'var(--sub)', fontSize: '.7rem' }}>{health.summary}</p>
+        <p className={s.dim} style={{ marginTop: '.75rem', color: 'var(--sub)', fontSize: 'var(--fs-meta)' }}>{health.summary}</p>
         {fixAllCount > 0 && (
-          <div className={s.findingActions} style={{ marginTop: '.6rem' }}>
+          <div className={s.findingActions} style={{ marginTop: '.5rem' }}>
             <button type="button" className={s.btnGreen} data-testid="fix-all" onClick={onFixAll}>✦ Review {fixAllCount} bullet fix{fixAllCount === 1 ? '' : 'es'}</button>
             <span className={s.muted} style={{ alignSelf: 'center' }}>Verbs, tense, passive voice, filler — shown as before → after first; never a new fact.</span>
           </div>
@@ -102,7 +102,7 @@ export default function HealthPanel({ health, doc, onJump, onApplyRewrite, onApp
             <span className={s.muted}>{(open[k] ?? d.findings.some((f) => f.severity !== 'info')) ? '▾' : '▸'}</span>
           </button>
           {(open[k] ?? d.findings.some((f) => f.severity !== 'info')) && (
-            <div style={{ marginTop: '.6rem' }}>
+            <div style={{ marginTop: '.5rem' }}>
               {d.findings.map((f, i) => <Finding key={`${f.code}${f.anchor.bulletId || f.anchor.itemId || i}`} f={f} doc={doc} onJump={onJump} onApplyRewrite={onApplyRewrite} onApplyVerb={onApplyVerb} />)}
             </div>
           )}

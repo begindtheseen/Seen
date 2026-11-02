@@ -25,8 +25,8 @@ import RefreshButton from '@/components/RefreshButton'
 const card: React.CSSProperties = { background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 18, padding: '2rem', marginBottom: '2.5rem' }
 const kicker: React.CSSProperties = { fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.16em', color: 'var(--blue)', marginBottom: '.5rem' }
 const h2: React.CSSProperties = { fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--white)', margin: '0 0 .5rem', letterSpacing: '-.02em' }
-const body: React.CSSProperties = { color: 'var(--sub)', fontSize: 'var(--fs-ui)', lineHeight: 1.7, margin: '0 0 1.4rem', maxWidth: 560 }
-const primaryBtn: React.CSSProperties = { background: 'var(--cta)', border: 'none', borderRadius: 9, padding: '.7rem 1.4rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)', color: '#fff', cursor: 'pointer' }
+const body: React.CSSProperties = { color: 'var(--sub)', fontSize: 'var(--fs-ui)', lineHeight: 1.7, margin: '0 0 1.5rem', maxWidth: 560 }
+const primaryBtn: React.CSSProperties = { background: 'var(--cta)', border: 'none', borderRadius: 9, padding: '.75rem 1.5rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)', color: 'var(--text-1)', cursor: 'pointer' }
 const mono = (size: string, color: string): React.CSSProperties => ({ fontFamily: 'var(--mono)', fontSize: size, color })
 
 export function EmployerClaimPanel() {
@@ -58,15 +58,15 @@ export function EmployerClaimPanel() {
           dashboard, analytics and notifications scoped to your company; nobody sees a company they
           don&apos;t represent.
         </p>
-        <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
           <Link href="/login?type=employer" style={{ ...primaryBtn, display: 'inline-block', textDecoration: 'none' }}>
             Create an employer account →
           </Link>
-          <Link href="/login?type=employer&return=%2Femployers%23claim" style={{ ...mono('.7rem', 'var(--sub)'), textDecoration: 'none', border: '1px solid var(--line2)', borderRadius: 9, padding: '.7rem 1.1rem' }}>
+          <Link href="/login?type=employer&return=%2Femployers%23claim" style={{ ...mono('var(--fs-meta)', 'var(--sub)'), textDecoration: 'none', border: '1px solid var(--line2)', borderRadius: 9, padding: '.75rem 1rem' }}>
             I have one — sign in
           </Link>
         </div>
-        <p style={{ ...mono('.58rem', 'var(--muted)'), lineHeight: 1.6, margin: '1rem 0 0' }}>
+        <p style={{ ...mono('var(--fs-meta)', 'var(--muted)'), lineHeight: 1.6, margin: '1rem 0 0' }}>
           Questions before you claim? <a href="/contact" style={{ color: 'var(--sub)' }}>Contact us</a> — a person answers within two business days.
         </p>
       </div>
@@ -78,7 +78,7 @@ export function EmployerClaimPanel() {
     return (
       <div style={{ ...card, marginBottom: '2.5rem' }}>
         <div style={kicker}>Manage your company</div>
-        <div style={mono('.7rem', 'var(--dim)')}>Checking your company claim…</div>
+        <div style={mono('var(--fs-meta)', 'var(--dim)')}>Checking your company claim…</div>
       </div>
     )
   }
@@ -121,10 +121,10 @@ export function EmployerClaimPanel() {
           Your claim is approved. Your dashboard, analytics, and posting updates below now open
           scoped to your company automatically — the company lookup is set to you.
         </p>
-        <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
           <Link href="/employers/dashboard" style={{ ...primaryBtn, display: 'inline-block', textDecoration: 'none' }}>Open your dashboard →</Link>
-          <Link href="/employers/dashboard?tab=analytics" style={{ display: 'inline-block', border: '1px solid var(--line2)', borderRadius: 9, padding: '.7rem 1.2rem', ...mono('.7rem', 'var(--white)'), textDecoration: 'none' }}>Analytics</Link>
-          <Link href="/employers/dashboard?tab=updates" style={{ display: 'inline-block', border: '1px solid var(--line2)', borderRadius: 9, padding: '.7rem 1.2rem', ...mono('.7rem', 'var(--white)'), textDecoration: 'none' }}>Updates</Link>
+          <Link href="/employers/dashboard?tab=analytics" style={{ display: 'inline-block', border: '1px solid var(--line2)', borderRadius: 9, padding: '.75rem 1.25rem', ...mono('var(--fs-meta)', 'var(--white)'), textDecoration: 'none' }}>Analytics</Link>
+          <Link href="/employers/dashboard?tab=updates" style={{ display: 'inline-block', border: '1px solid var(--line2)', borderRadius: 9, padding: '.75rem 1.25rem', ...mono('var(--fs-meta)', 'var(--white)'), textDecoration: 'none' }}>Updates</Link>
         </div>
       </div>
     )
@@ -143,7 +143,7 @@ export function EmployerClaimPanel() {
           data from ever showing to another. We&apos;ll open your scoped dashboard here the moment it&apos;s
           approved. You can still look up any company&apos;s public reputation below in the meantime.
         </p>
-        <RefreshButton onRefresh={reloadClaims} label="Check status" busyLabel="Checking…" doneLabel="Checked — still pending" style={{ ...mono('.62rem', 'var(--sub)'), background: 'transparent', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem 1rem' }} />
+        <RefreshButton onRefresh={reloadClaims} label="Check status" busyLabel="Checking…" doneLabel="Checked — still pending" style={{ ...mono('var(--fs-meta)', 'var(--sub)'), background: 'transparent', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem 1rem' }} />
       </div>
     )
   }
@@ -162,15 +162,15 @@ export function EmployerClaimPanel() {
         automatically.
       </p>
       {rejected && (
-        <div style={{ marginBottom: '1.2rem', padding: '.8rem 1rem', border: '1px solid rgba(239,68,68,.3)', background: 'rgba(239,68,68,.05)', borderRadius: 10 }}>
-          <div style={mono('.66rem', 'var(--red)')}>
+        <div style={{ marginBottom: '1.25rem', padding: '.75rem 1rem', border: '1px solid rgba(239,68,68,.3)', background: 'rgba(239,68,68,.05)', borderRadius: 10 }}>
+          <div style={mono('var(--fs-meta)', 'var(--red)')}>
             Your earlier claim for &ldquo;{claimCompany}&rdquo; wasn&apos;t approved.
             {employerClaim?.note ? <> {employerClaim.note}</> : null}
           </div>
-          <div style={{ ...mono('.6rem', 'var(--dim)'), marginTop: '.3rem' }}>You can request again below.</div>
+          <div style={{ ...mono('var(--fs-meta)', 'var(--dim)'), marginTop: '.25rem' }}>You can request again below.</div>
         </div>
       )}
-      <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
         <input
           value={name}
           onChange={e => setName(e.target.value)}
@@ -178,14 +178,14 @@ export function EmployerClaimPanel() {
           placeholder="Your company name"
           aria-label="Your company name"
           autoComplete="off"
-          style={{ flex: 1, minWidth: 220, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.7rem .9rem', ...mono('.75rem', 'var(--white)'), outline: 'none' }}
+          style={{ flex: 1, minWidth: 220, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.75rem 1rem', ...mono('var(--fs-meta)', 'var(--white)'), outline: 'none' }}
         />
         <button onClick={submit} disabled={busy || !name.trim()} style={{ ...primaryBtn, opacity: busy || !name.trim() ? .6 : 1 }}>
           {busy ? 'Submitting…' : 'Request claim →'}
         </button>
       </div>
-      {err && <div style={{ ...mono('.62rem', 'var(--red)'), marginTop: '.7rem' }}>{err}</div>}
-      <p style={{ ...mono('.55rem', 'var(--muted)'), lineHeight: 1.6, margin: '1rem 0 0' }}>
+      {err && <div style={{ ...mono('var(--fs-meta)', 'var(--red)'), marginTop: '.75rem' }}>{err}</div>}
+      <p style={{ ...mono('var(--fs-meta)', 'var(--muted)'), lineHeight: 1.6, margin: '1rem 0 0' }}>
         Signed up with your work email? If its domain matches the company, your claim is approved
         instantly. Otherwise it goes to an admin for a quick review — you&apos;ll see the status here.
       </p>

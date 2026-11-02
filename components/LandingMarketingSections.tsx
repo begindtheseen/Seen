@@ -101,10 +101,10 @@ export default function LandingMarketingSections() {
                 <h2 className="lp2-h2" style={{ maxWidth: '18ch', margin: '0 auto' }}>
                   Check your next company before you apply.
                 </h2>
-                <p className="lp2-section-sub" style={{ marginTop: '.9rem' }}>
+                <p className="lp2-section-sub" style={{ marginTop: '1rem' }}>
                   It takes five seconds. Free, no account needed.
                 </p>
-                <div className="lp2-cta-row" style={{ marginTop: '1.8rem' }}>
+                <div className="lp2-cta-row" style={{ marginTop: '1.75rem' }}>
                   <button className="lp2-btn lp2-btn-primary" onClick={() => router.push('/companies')}>
                     Check a company
                   </button>

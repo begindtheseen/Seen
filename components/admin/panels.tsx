@@ -62,7 +62,7 @@ export function JobCrisisBanner({
         border: '1px solid rgba(239,68,68,.5)',
         borderLeft: '4px solid var(--red)',
         borderRadius: 12,
-        padding: '1rem 1.15rem',
+        padding: '1rem 1.25rem',
         marginBottom: '1.25rem',
         display: 'flex',
         alignItems: 'center',
@@ -72,14 +72,14 @@ export function JobCrisisBanner({
       }}
     >
       <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.95rem', color: 'var(--red)', letterSpacing: '-.01em', marginBottom: '.25rem' }}>
+        <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-body)', color: 'var(--red)', letterSpacing: '-.01em', marginBottom: '.25rem' }}>
           ⚠️ JOB CRISIS — only {health.active.toLocaleString()} active listings
         </div>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', lineHeight: 1.5 }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5 }}>
           {health.stale.toLocaleString()} stale, {stalePct}% of corpus unavailable. Auto-refresh recommended.
         </div>
         {result && (
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', marginTop: '.4rem', color: result.ok ? 'var(--green)' : 'var(--red)' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', marginTop: '.5rem', color: result.ok ? 'var(--green)' : 'var(--red)' }}>
             {result.ok ? '✓ ' : '✗ '}{result.msg}
           </div>
         )}
@@ -91,10 +91,10 @@ export function JobCrisisBanner({
           background: 'var(--red)',
           border: 'none',
           borderRadius: 8,
-          padding: '.6rem 1rem',
-          color: '#fff',
+          padding: '.5rem 1rem',
+          color: 'var(--text-1)',
           fontFamily: 'var(--mono)',
-          fontSize: '.65rem',
+          fontSize: 'var(--fs-meta)',
           fontWeight: 700,
           cursor: running ? 'wait' : 'pointer',
           whiteSpace: 'nowrap',
@@ -123,8 +123,8 @@ export function JobRefreshButton({ token, onDone, stale, idle }: { token: string
     setBusy(false)
   }
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem' }}>
-      {msg && <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: msg.startsWith('✓') ? 'var(--green)' : msg.startsWith('✗') ? 'var(--red)' : 'var(--amber)' }}>{msg}</span>}
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.5rem' }}>
+      {msg && <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: msg.startsWith('✓') ? 'var(--green)' : msg.startsWith('✗') ? 'var(--red)' : 'var(--amber)' }}>{msg}</span>}
       {(stale > 0 || busy) && <button className="ac-attn-act" onClick={run} disabled={busy}>{busy ? '…' : 'Clear stale'}</button>}
       {stale === 0 && !busy && !msg && idle}
     </span>
@@ -172,22 +172,22 @@ export function JobRunner({ token }: { token: string }) {
       <CardHeader title="Background jobs" />
       <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
         {JOB_DEFS.map(j => (
-          <div key={j.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.5rem', padding: '.6rem .75rem', background: 'var(--surface)', borderRadius: 8 }}>
+          <div key={j.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.5rem', padding: '.5rem .75rem', background: 'var(--surface)', borderRadius: 8 }}>
             <div style={{ minWidth: 0, overflow: 'hidden' }}>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{j.name}</div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{j.desc}</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{j.name}</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{j.desc}</div>
             </div>
             <button
               onClick={() => run(j.key)}
               disabled={running === j.key}
-              style={{ background: 'none', border: `1px solid ${j.green ? 'var(--green)' : 'var(--line2)'}`, borderRadius: 7, padding: '.35rem .8rem', fontFamily: 'var(--mono)', fontSize: '.6rem', color: j.green ? 'var(--green)' : 'var(--sub)', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+              style={{ background: 'none', border: `1px solid ${j.green ? 'var(--green)' : 'var(--line2)'}`, borderRadius: 7, padding: '.25rem .75rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: j.green ? 'var(--green)' : 'var(--sub)', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
             >
               {label[j.key] || '▶ Run'}
             </button>
           </div>
         ))}
       </div>
-      {result && <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', marginTop: '.6rem' }}>{result}</div>}
+      {result && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginTop: '.5rem' }}>{result}</div>}
     </Card>
   )
 }
@@ -230,16 +230,16 @@ export function ReportRow({ report: r, token, onRefresh }: { report: RecentRepor
 
   const chip = STATE_CHIP[state] || STATE_CHIP.live
   const oc = outcomeColor(r.outcome)
-  const btn = (bg: string, on: boolean) => ({ background: bg, border: 'none', borderRadius: 5, minWidth: 26, height: 26, padding: '0 .4rem', color: '#fff', fontSize: '.7rem', cursor: on ? 'pointer' : 'not-allowed', opacity: on ? 1 : 0.35 })
-  const tag = (text: string, color: string, title?: string) => <span title={title} style={{ marginLeft: '.4rem', color, border: `1px solid ${color}55`, borderRadius: 4, padding: '0 .3rem' }}>{text}</span>
+  const btn = (bg: string, on: boolean) => ({ background: bg, border: 'none', borderRadius: 5, minWidth: 26, height: 26, padding: '0 .5rem', color: 'var(--text-1)', fontSize: 'var(--fs-meta)', cursor: on ? 'pointer' : 'not-allowed', opacity: on ? 1 : 0.35 })
+  const tag = (text: string, color: string, title?: string) => <span title={title} style={{ marginLeft: '.5rem', color, border: `1px solid ${color}55`, borderRadius: 4, padding: '0 .25rem' }}>{text}</span>
   return (
-    <div style={{ padding: '.6rem 1rem', borderBottom: '1px solid var(--line2)', borderLeft: `3px solid ${oc}`, margin: '0 -1rem', opacity: state === 'rejected' || state === 'duplicate' ? 0.55 : 1 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.6rem', flexWrap: 'wrap' }}>
-        <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: oc, background: oc + '18', border: `1px solid ${oc}30`, borderRadius: 4, padding: '.1rem .4rem', flexShrink: 0, marginTop: 1 }}>{r.outcome}</span>
+    <div style={{ padding: '.5rem 1rem', borderBottom: '1px solid var(--line2)', borderLeft: `3px solid ${oc}`, margin: '0 -1rem', opacity: state === 'rejected' || state === 'duplicate' ? 0.55 : 1 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.5rem', flexWrap: 'wrap' }}>
+        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: oc, background: oc + '18', border: `1px solid ${oc}30`, borderRadius: 4, padding: '.125rem .5rem', flexShrink: 0, marginTop: 1 }}>{r.outcome}</span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.company_name}{r.role ? ` · ${r.role}` : ''}</div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', marginTop: '.15rem', overflowWrap: 'anywhere' }}>{r.report_text?.slice(0, 140)}{r.report_text?.length > 140 ? '…' : ''}</div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', marginTop: '.2rem', display: 'flex', flexWrap: 'wrap', gap: '.2rem 0', alignItems: 'center' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.company_name}{r.role ? ` · ${r.role}` : ''}</div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginTop: '.125rem', overflowWrap: 'anywhere' }}>{r.report_text?.slice(0, 140)}{r.report_text?.length > 140 ? '…' : ''}</div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.25rem', display: 'flex', flexWrap: 'wrap', gap: '.25rem 0', alignItems: 'center' }}>
             <span>{relTime(r.created_at)} · {r.platform}{r.trust_reason ? ` · ${r.trust_reason}` : ''}</span>
             {tag(chip.label, chip.color)}
             {counted === true && tag('counts in grade', 'var(--sub)', 'This report is part of the company’s grade right now')}
@@ -247,9 +247,9 @@ export function ReportRow({ report: r, token, onRefresh }: { report: RecentRepor
             {r.rules === 'fails' && tag('⚠ fails new rules', 'var(--amber)', 'Seen’s strict first-hand rules would not accept this as an applicant account — read it and reject it if it is not one')}
             {r.rules === 'passes' && tag('✓ passes rules', 'var(--green)')}
           </div>
-          {msg && <div role="status" style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', marginTop: '.3rem', color: msg.ok ? 'var(--green)' : 'var(--red)' }}>{msg.text}</div>}
+          {msg && <div role="status" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', marginTop: '.25rem', color: msg.ok ? 'var(--green)' : 'var(--red)' }}>{msg.text}</div>}
         </div>
-        <div style={{ display: 'flex', gap: '.3rem', flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: '.25rem', flexShrink: 0 }}>
           {state === 'rejected'
             ? <button onClick={() => act('restore')} disabled={acting} title="Restore — put it back the way it was before it was rejected" style={btn('var(--green)', !acting)}>↺</button>
             : <button onClick={() => act('approve')} disabled={acting || state !== 'held'} title={state === 'held' ? 'Approve — make it public' : 'Already live — nothing to approve'} style={btn('var(--green)', !acting && state === 'held')}>✓</button>}
@@ -285,29 +285,29 @@ export function IssueRow({ issue, token, onRefresh, onOpenMerge }: { issue: Issu
   }
 
   if (done) return (
-    <div style={{ padding: '.65rem 0', borderBottom: '1px solid rgba(255,255,255,.04)', opacity: 0.4, fontFamily: 'var(--mono)', fontSize: '.6rem', color: done === 'resolve' ? 'var(--green)' : 'var(--dim)' }}>
+    <div style={{ padding: '.75rem 0', borderBottom: '1px solid rgba(255,255,255,.04)', opacity: 0.4, fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: done === 'resolve' ? 'var(--green)' : 'var(--dim)' }}>
       {done === 'resolve' ? '✓ Resolved' : '✓ Dismissed'} — {issue.target_name || ISSUE_TYPE_LABEL[issue.type] || issue.type}
     </div>
   )
 
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.65rem', padding: '.65rem 0', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.75rem', padding: '.75rem 0', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', flexWrap: 'wrap', marginBottom: '.2rem' }}>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', textTransform: 'uppercase', letterSpacing: '.1em', padding: '.18rem .5rem', borderRadius: 4, flexShrink: 0, color, background: color + '1f' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap', marginBottom: '.25rem' }}>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', padding: '.25rem .5rem', borderRadius: 4, flexShrink: 0, color, background: color + '1f' }}>
             {ISSUE_TYPE_LABEL[issue.type] || issue.type}
           </span>
-          {issue.target_name && <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--white)', fontWeight: 600 }}>{issue.target_name}</span>}
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', marginLeft: 'auto', flexShrink: 0 }}>{relTime(issue.created_at)}</span>
+          {issue.target_name && <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', fontWeight: 600 }}>{issue.target_name}</span>}
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginLeft: 'auto', flexShrink: 0 }}>{relTime(issue.created_at)}</span>
         </div>
-        {issue.notes && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)', lineHeight: 1.5, marginTop: '.18rem' }}>{issue.notes}</div>}
+        {issue.notes && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5, marginTop: '.25rem' }}>{issue.notes}</div>}
         {issue.type === 'duplicate' && issue.target_name && (
-          <button onClick={() => onOpenMerge(issue.target_name)} style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', marginTop: '.3rem', padding: '.18rem .5rem', borderRadius: 4, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer' }}>Open in merge tool ↓</button>
+          <button onClick={() => onOpenMerge(issue.target_name)} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', marginTop: '.25rem', padding: '.25rem .5rem', borderRadius: 4, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer' }}>Open in merge tool ↓</button>
         )}
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '.3rem', flexShrink: 0 }}>
-        <button onClick={() => act('resolve_issue')} disabled={acting} style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', padding: '.22rem .6rem', borderRadius: 5, border: '1px solid rgba(16,185,129,.3)', background: 'rgba(16,185,129,.08)', color: 'var(--green)', cursor: 'pointer' }}>Resolve</button>
-        <button onClick={() => act('dismiss_issue')} disabled={acting} style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', padding: '.22rem .6rem', borderRadius: 5, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--dim)', cursor: 'pointer' }}>Dismiss</button>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '.25rem', flexShrink: 0 }}>
+        <button onClick={() => act('resolve_issue')} disabled={acting} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .5rem', borderRadius: 5, border: '1px solid rgba(16,185,129,.3)', background: 'rgba(16,185,129,.08)', color: 'var(--green)', cursor: 'pointer' }}>Resolve</button>
+        <button onClick={() => act('dismiss_issue')} disabled={acting} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .5rem', borderRadius: 5, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--dim)', cursor: 'pointer' }}>Dismiss</button>
       </div>
     </div>
   )
@@ -397,63 +397,63 @@ export function RedditDisputesPanel({ token }: { token: string }) {
   const emptyMsg = filter === 'open' ? 'No open disputes.' : `No ${activeLabel} disputes.`
 
   return (
-    <Card style={{ marginTop: '.65rem', border: '1px solid rgba(245,158,11,.22)' }}>
+    <Card style={{ marginTop: '.75rem', border: '1px solid rgba(245,158,11,.22)' }}>
       <CardHeader
         title="Reddit disputes"
         badge={counts.open > 0 ? <Badge n={counts.open} color="var(--amber)" /> : undefined}
-        action={<span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>Corrections submitted on company pages about the surfaced public-Reddit discussion</span>}
+        action={<span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>Corrections submitted on company pages about the surfaced public-Reddit discussion</span>}
       />
 
       {/* Status filter — the actionable Open queue first; the rest is review history */}
-      <div style={{ display: 'flex', gap: '.35rem', flexWrap: 'wrap', padding: '.2rem 0 .7rem', borderBottom: '1px solid var(--line2)', marginBottom: '.7rem' }}>
+      <div style={{ display: 'flex', gap: '.25rem', flexWrap: 'wrap', padding: '.25rem 0 .75rem', borderBottom: '1px solid var(--line2)', marginBottom: '.75rem' }}>
         {DISPUTE_FILTERS.map(f => {
           const n = f.key === 'all' ? counts.total : counts[f.key]
           const active = filter === f.key
           return (
-            <button key={f.key} onClick={() => setFilter(f.key)} style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.24rem .55rem', borderRadius: 6, border: `1px solid ${active ? 'var(--white)' : 'var(--line2)'}`, background: active ? 'rgba(255,255,255,.06)' : 'transparent', color: active ? 'var(--white)' : 'var(--sub)', cursor: 'pointer' }}>
+            <button key={f.key} onClick={() => setFilter(f.key)} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .5rem', borderRadius: 6, border: `1px solid ${active ? 'var(--white)' : 'var(--line2)'}`, background: active ? 'rgba(255,255,255,.06)' : 'transparent', color: active ? 'var(--white)' : 'var(--sub)', cursor: 'pointer' }}>
               {f.label}{n > 0 ? ` ${n}` : ''}
             </button>
           )
         })}
       </div>
 
-      {err && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--red)', marginBottom: '.6rem' }}>{err}</div>}
+      {err && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--red)', marginBottom: '.5rem' }}>{err}</div>}
 
       {loading ? (
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)' }}>Loading…</div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>Loading…</div>
       ) : disputes.length === 0 ? (
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: filter === 'open' ? 'var(--green)' : 'var(--dim)' }}>{filter === 'open' ? '✓ ' : ''}{emptyMsg}</div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: filter === 'open' ? 'var(--green)' : 'var(--dim)' }}>{filter === 'open' ? '✓ ' : ''}{emptyMsg}</div>
       ) : (
         disputes.map(d => {
           const reasonColor = disputeReasonColor(d.reason)
           return (
-            <div key={d.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '.65rem', padding: '.7rem 0', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
+            <div key={d.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '.75rem', padding: '.75rem 0', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', flexWrap: 'wrap', marginBottom: '.25rem' }}>
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', textTransform: 'uppercase', letterSpacing: '.1em', padding: '.18rem .5rem', borderRadius: 4, flexShrink: 0, color: reasonColor, background: reasonColor + '1f' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap', marginBottom: '.25rem' }}>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', padding: '.25rem .5rem', borderRadius: 4, flexShrink: 0, color: reasonColor, background: reasonColor + '1f' }}>
                     {DISPUTE_REASON_LABEL[d.reason] || d.reason}
                   </span>
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--white)', fontWeight: 600 }}>{d.company_name}</span>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', fontWeight: 600 }}>{d.company_name}</span>
                   {d.status !== 'open' && (
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: '.46rem', textTransform: 'uppercase', letterSpacing: '.08em', color: disputeStatusColor(d.status), border: `1px solid ${disputeStatusColor(d.status)}`, borderRadius: 4, padding: '.1rem .35rem', flexShrink: 0 }}>{d.status}</span>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.08em', color: disputeStatusColor(d.status), border: `1px solid ${disputeStatusColor(d.status)}`, borderRadius: 4, padding: '.125rem .25rem', flexShrink: 0 }}>{d.status}</span>
                   )}
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', marginLeft: 'auto', flexShrink: 0 }}>{relTime(d.created_at)}</span>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginLeft: 'auto', flexShrink: 0 }}>{relTime(d.created_at)}</span>
                 </div>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', lineHeight: 1.5, marginTop: '.1rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{d.detail}</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap', marginTop: '.3rem' }}>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5, marginTop: '.125rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{d.detail}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap', marginTop: '.25rem' }}>
                   {d.permalink && (
-                    <a href={d.permalink} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--blue)', textDecoration: 'none', fontWeight: 700 }}>↗ Disputed thread</a>
+                    <a href={d.permalink} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none', fontWeight: 700 }}>↗ Disputed thread</a>
                   )}
                   {d.contact && (
-                    <a href={`mailto:${d.contact}`} style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--sub)', textDecoration: 'none' }}>✉ {d.contact}</a>
+                    <a href={`mailto:${d.contact}`} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', textDecoration: 'none' }}>✉ {d.contact}</a>
                   )}
                 </div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '.3rem', flexShrink: 0 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '.25rem', flexShrink: 0 }}>
                 {DISPUTE_ACTIONS.filter(a => a.status !== d.status).map(a => {
                   const c = disputeStatusColor(a.status)
                   return (
-                    <button key={a.status} onClick={() => act(d.id, a.status)} disabled={busy === d.id} style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', padding: '.22rem .6rem', borderRadius: 5, border: `1px solid ${c}4d`, background: c + '14', color: c, cursor: busy === d.id ? 'default' : 'pointer', opacity: busy === d.id ? 0.5 : 1, whiteSpace: 'nowrap' }}>
+                    <button key={a.status} onClick={() => act(d.id, a.status)} disabled={busy === d.id} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .5rem', borderRadius: 5, border: `1px solid ${c}4d`, background: c + '14', color: c, cursor: busy === d.id ? 'default' : 'pointer', opacity: busy === d.id ? 0.5 : 1, whiteSpace: 'nowrap' }}>
                       {busy === d.id ? '…' : a.label}
                     </button>
                   )
@@ -554,33 +554,33 @@ export function ListingDisputesPanel({ token }: { token: string }) {
   const total = counts.open + counts.approved + counts.denied
 
   return (
-    <Card style={{ marginTop: '.65rem', border: '1px solid rgba(59,130,246,.22)' }}>
+    <Card style={{ marginTop: '.75rem', border: '1px solid rgba(59,130,246,.22)' }}>
       <CardHeader
         title="Listing disputes"
         badge={counts.open > 0 ? <Badge n={counts.open} color="var(--amber)" /> : undefined}
-        action={<span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>Employers contesting a listing on their company — approve applies a takedown/edit</span>}
+        action={<span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>Employers contesting a listing on their company — approve applies a takedown/edit</span>}
       />
 
       {/* Status filter — the actionable Open queue first; the rest is decision history */}
-      <div style={{ display: 'flex', gap: '.35rem', flexWrap: 'wrap', padding: '.2rem 0 .7rem', borderBottom: '1px solid var(--line2)', marginBottom: '.7rem' }}>
+      <div style={{ display: 'flex', gap: '.25rem', flexWrap: 'wrap', padding: '.25rem 0 .75rem', borderBottom: '1px solid var(--line2)', marginBottom: '.75rem' }}>
         {LISTING_DISPUTE_FILTERS.map(f => {
           const n = f.key === 'all' ? total : counts[f.key]
           const active = filter === f.key
           return (
-            <button key={f.key} onClick={() => setFilter(f.key)} style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.24rem .55rem', borderRadius: 6, border: `1px solid ${active ? 'var(--white)' : 'var(--line2)'}`, background: active ? 'rgba(255,255,255,.06)' : 'transparent', color: active ? 'var(--white)' : 'var(--sub)', cursor: 'pointer' }}>
+            <button key={f.key} onClick={() => setFilter(f.key)} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .5rem', borderRadius: 6, border: `1px solid ${active ? 'var(--white)' : 'var(--line2)'}`, background: active ? 'rgba(255,255,255,.06)' : 'transparent', color: active ? 'var(--white)' : 'var(--sub)', cursor: 'pointer' }}>
               {f.label}{n > 0 ? ` ${n}` : ''}
             </button>
           )
         })}
       </div>
 
-      {msg && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--green)', marginBottom: '.6rem' }}>{msg}</div>}
-      {err && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--red)', marginBottom: '.6rem' }}>{err}</div>}
+      {msg && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', marginBottom: '.5rem' }}>{msg}</div>}
+      {err && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--red)', marginBottom: '.5rem' }}>{err}</div>}
 
       {loading ? (
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)' }}>Loading…</div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>Loading…</div>
       ) : disputes.length === 0 ? (
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: filter === 'open' ? 'var(--green)' : 'var(--dim)' }}>{filter === 'open' ? '✓ ' : ''}{emptyMsg}</div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: filter === 'open' ? 'var(--green)' : 'var(--dim)' }}>{filter === 'open' ? '✓ ' : ''}{emptyMsg}</div>
       ) : (
         disputes.map(d => {
           const kindColor = listingKindColor(d.kind)
@@ -588,26 +588,26 @@ export function ListingDisputesPanel({ token }: { token: string }) {
           const pcEntries = pc ? Object.entries(pc).filter(([, v]) => v != null && String(v).trim() !== '') : []
           const open = d.status === 'open'
           return (
-            <div key={d.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '.65rem', padding: '.7rem 0', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
+            <div key={d.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '.75rem', padding: '.75rem 0', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', flexWrap: 'wrap', marginBottom: '.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap', marginBottom: '.25rem' }}>
                   {/* The dispute number — the shared reference across the employer's portal, their
                       notifications, and the seeker-report queue's "disputed" badge. */}
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--blue)', fontWeight: 700, flexShrink: 0 }}>#{d.id}</span>
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', textTransform: 'uppercase', letterSpacing: '.1em', padding: '.18rem .5rem', borderRadius: 4, flexShrink: 0, color: kindColor, background: kindColor + '1f' }}>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', fontWeight: 700, flexShrink: 0 }}>#{d.id}</span>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', padding: '.25rem .5rem', borderRadius: 4, flexShrink: 0, color: kindColor, background: kindColor + '1f' }}>
                     {LISTING_KIND_LABEL[d.kind] || d.kind}
                   </span>
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--white)', fontWeight: 600 }}>{d.company_name}</span>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', fontWeight: 600 }}>{d.company_name}</span>
                   {d.status !== 'open' && (
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: '.46rem', textTransform: 'uppercase', letterSpacing: '.08em', color: listingDisputeStatusColor(d.status), border: `1px solid ${listingDisputeStatusColor(d.status)}`, borderRadius: 4, padding: '.1rem .35rem', flexShrink: 0 }}>{d.status}</span>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.08em', color: listingDisputeStatusColor(d.status), border: `1px solid ${listingDisputeStatusColor(d.status)}`, borderRadius: 4, padding: '.125rem .25rem', flexShrink: 0 }}>{d.status}</span>
                   )}
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', marginLeft: 'auto', flexShrink: 0 }}>{relTime(d.created_at)}</span>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginLeft: 'auto', flexShrink: 0 }}>{relTime(d.created_at)}</span>
                 </div>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', lineHeight: 1.5, marginTop: '.1rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{d.detail}</div>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5, marginTop: '.125rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{d.detail}</div>
                 {/* BOTH SIDES: the seeker's reports on this same listing, so the ruling weighs the
                     employer's dispute against the candidate signal — never one side blind. */}
                 {d.seeker_reports && d.seeker_reports.count > 0 && (
-                  <div style={{ marginTop: '.35rem', padding: '.35rem .6rem', border: '1px solid rgba(245,158,11,.3)', borderRadius: 6, background: 'rgba(245,158,11,.06)', fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--amber)' }}>
+                  <div style={{ marginTop: '.25rem', padding: '.25rem .5rem', border: '1px solid rgba(245,158,11,.3)', borderRadius: 6, background: 'rgba(245,158,11,.06)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--amber)' }}>
                     👤 Seeker side: {d.seeker_reports.count} report{d.seeker_reports.count === 1 ? '' : 's'} on this listing
                     {d.seeker_reports.expired > 0 ? ` · ${d.seeker_reports.expired} say inactive` : ''}
                     {d.seeker_reports.unknown > 0 ? ` · ${d.seeker_reports.unknown} unsure` : ''}
@@ -615,30 +615,30 @@ export function ListingDisputesPanel({ token }: { token: string }) {
                   </div>
                 )}
                 {pcEntries.length > 0 && (
-                  <div style={{ marginTop: '.35rem', padding: '.4rem .6rem', border: '1px solid var(--line2)', borderRadius: 6, background: 'rgba(59,130,246,.05)' }}>
-                    <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--blue)', marginBottom: '.25rem' }}>Proposed changes</div>
+                  <div style={{ marginTop: '.25rem', padding: '.5rem .5rem', border: '1px solid var(--line2)', borderRadius: 6, background: 'rgba(59,130,246,.05)' }}>
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--blue)', marginBottom: '.25rem' }}>Proposed changes</div>
                     {pcEntries.map(([k, v]) => (
-                      <div key={k} style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--sub)', lineHeight: 1.5, wordBreak: 'break-word' }}>
+                      <div key={k} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5, wordBreak: 'break-word' }}>
                         <span style={{ color: 'var(--dim)' }}>{k}:</span> {String(v)}
                       </div>
                     ))}
                   </div>
                 )}
-                {d.admin_note && <div style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', color: 'var(--muted)', marginTop: '.25rem' }}>Admin note: {d.admin_note}</div>}
+                {d.admin_note && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.25rem' }}>Admin note: {d.admin_note}</div>}
                 {open && (
                   <input autoComplete="off"
                     value={notes[d.id] || ''}
                     onChange={e => setNotes(n => ({ ...n, [d.id]: e.target.value }))}
                     placeholder="Optional note to the employer"
                     aria-label="Optional note to the employer"
-                    style={{ marginTop: '.4rem', width: '100%', maxWidth: 320, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 6, padding: '.3rem .5rem', fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--white)', outline: 'none', boxSizing: 'border-box' }}
+                    style={{ marginTop: '.5rem', width: '100%', maxWidth: 320, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 6, padding: '.25rem .5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', outline: 'none', boxSizing: 'border-box' }}
                   />
                 )}
               </div>
               {open && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '.3rem', flexShrink: 0 }}>
-                  <button onClick={() => resolve(d.id, 'approved')} disabled={busy === d.id} style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', padding: '.22rem .6rem', borderRadius: 5, border: '1px solid rgba(16,185,129,.4)', background: 'rgba(16,185,129,.12)', color: 'var(--green)', cursor: busy === d.id ? 'default' : 'pointer', opacity: busy === d.id ? 0.5 : 1, whiteSpace: 'nowrap' }}>{busy === d.id ? '…' : 'Approve'}</button>
-                  <button onClick={() => resolve(d.id, 'denied')} disabled={busy === d.id} style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', padding: '.22rem .6rem', borderRadius: 5, border: '1px solid rgba(239,68,68,.4)', background: 'rgba(239,68,68,.1)', color: 'var(--red)', cursor: busy === d.id ? 'default' : 'pointer', opacity: busy === d.id ? 0.5 : 1, whiteSpace: 'nowrap' }}>Deny</button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '.25rem', flexShrink: 0 }}>
+                  <button onClick={() => resolve(d.id, 'approved')} disabled={busy === d.id} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .5rem', borderRadius: 5, border: '1px solid rgba(16,185,129,.4)', background: 'rgba(16,185,129,.12)', color: 'var(--green)', cursor: busy === d.id ? 'default' : 'pointer', opacity: busy === d.id ? 0.5 : 1, whiteSpace: 'nowrap' }}>{busy === d.id ? '…' : 'Approve'}</button>
+                  <button onClick={() => resolve(d.id, 'denied')} disabled={busy === d.id} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .5rem', borderRadius: 5, border: '1px solid rgba(239,68,68,.4)', background: 'rgba(239,68,68,.1)', color: 'var(--red)', cursor: busy === d.id ? 'default' : 'pointer', opacity: busy === d.id ? 0.5 : 1, whiteSpace: 'nowrap' }}>Deny</button>
                 </div>
               )}
             </div>
@@ -694,24 +694,24 @@ export function ListingTicketsPanel({ token }: { token: string }) {
   const total = counts.open + counts.resolved
 
   return (
-    <Card style={{ marginTop: '.65rem', border: '1px solid rgba(245,158,11,.22)' }}>
+    <Card style={{ marginTop: '.75rem', border: '1px solid rgba(245,158,11,.22)' }}>
       <CardHeader
         title="Listing tickets"
         badge={counts.open > 0 ? <Badge n={counts.open} color="var(--amber)" /> : undefined}
-        action={<span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)' }}>One ticket per listing — the seeker&apos;s report and the employer&apos;s dispute, reviewed together</span>}
+        action={<span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>One ticket per listing — the seeker&apos;s report and the employer&apos;s dispute, reviewed together</span>}
       />
-      <div style={{ display: 'flex', gap: '.35rem', flexWrap: 'wrap', padding: '.2rem 0 .7rem', borderBottom: '1px solid var(--line2)', marginBottom: '.7rem' }}>
+      <div style={{ display: 'flex', gap: '.25rem', flexWrap: 'wrap', padding: '.25rem 0 .75rem', borderBottom: '1px solid var(--line2)', marginBottom: '.75rem' }}>
         {([['open', 'Open', counts.open], ['resolved', 'Resolved', counts.resolved], ['all', 'All', total]] as [TicketFilter, string, number][]).map(([k, label, n]) => (
-          <button key={k} onClick={() => setFilter(k)} style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.24rem .55rem', borderRadius: 6, border: `1px solid ${filter === k ? 'var(--white)' : 'var(--line2)'}`, background: filter === k ? 'rgba(255,255,255,.06)' : 'transparent', color: filter === k ? 'var(--white)' : 'var(--sub)', cursor: 'pointer' }}>{label}{n > 0 ? ` ${n}` : ''}</button>
+          <button key={k} onClick={() => setFilter(k)} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .5rem', borderRadius: 6, border: `1px solid ${filter === k ? 'var(--white)' : 'var(--line2)'}`, background: filter === k ? 'rgba(255,255,255,.06)' : 'transparent', color: filter === k ? 'var(--white)' : 'var(--sub)', cursor: 'pointer' }}>{label}{n > 0 ? ` ${n}` : ''}</button>
         ))}
       </div>
-      {msg && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--green)', marginBottom: '.6rem' }}>{msg}</div>}
-      {err && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--red)', marginBottom: '.6rem' }}>{err}</div>}
+      {msg && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', marginBottom: '.5rem' }}>{msg}</div>}
+      {err && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--red)', marginBottom: '.5rem' }}>{err}</div>}
 
       {loading ? (
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)' }}>Loading…</div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>Loading…</div>
       ) : shown.length === 0 ? (
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: filter === 'open' ? 'var(--green)' : 'var(--dim)' }}>{filter === 'open' ? '✓ No open tickets.' : 'No tickets.'}</div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: filter === 'open' ? 'var(--green)' : 'var(--dim)' }}>{filter === 'open' ? '✓ No open tickets.' : 'No tickets.'}</div>
       ) : shown.map(t => {
         const d = t.dispute
         const openDispute = d && d.status === 'open'
@@ -722,51 +722,51 @@ export function ListingTicketsPanel({ token }: { token: string }) {
         return (
           <div key={t.job_id} style={{ padding: '.75rem 0', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
             {/* Ticket header: the listing + its state */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', flexWrap: 'wrap', marginBottom: '.3rem' }}>
-              {d && <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--blue)', fontWeight: 700 }}>#{d.id}</span>}
-              <span style={{ fontFamily: 'var(--mono)', fontSize: '.66rem', color: 'var(--white)', fontWeight: 600 }}>{t.title || t.job_id}</span>
-              {t.company && <span style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--sub)' }}>· {t.company}</span>}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap', marginBottom: '.25rem' }}>
+              {d && <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', fontWeight: 700 }}>#{d.id}</span>}
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', fontWeight: 600 }}>{t.title || t.job_id}</span>
+              {t.company && <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)' }}>· {t.company}</span>}
               {t.removed
-                ? <span style={{ fontFamily: 'var(--mono)', fontSize: '.46rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--red)', border: '1px solid rgba(239,68,68,.4)', borderRadius: 4, padding: '.1rem .35rem' }}>{TICKET_REASON_LABEL[t.removed.reason] || 'Removed'}</span>
-                : t.availability_status && <span style={{ fontFamily: 'var(--mono)', fontSize: '.46rem', textTransform: 'uppercase', letterSpacing: '.08em', color: availColor(t.availability_status || ''), border: `1px solid ${availColor(t.availability_status || '')}`, borderRadius: 4, padding: '.1rem .35rem' }}>{t.availability_status}</span>}
-              <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', marginLeft: 'auto' }}>{t.latest_activity ? relTime(t.latest_activity) : ''}</span>
+                ? <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--red)', border: '1px solid rgba(239,68,68,.4)', borderRadius: 4, padding: '.125rem .25rem' }}>{TICKET_REASON_LABEL[t.removed.reason] || 'Removed'}</span>
+                : t.availability_status && <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.08em', color: availColor(t.availability_status || ''), border: `1px solid ${availColor(t.availability_status || '')}`, borderRadius: 4, padding: '.125rem .25rem' }}>{t.availability_status}</span>}
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginLeft: 'auto' }}>{t.latest_activity ? relTime(t.latest_activity) : ''}</span>
             </div>
 
             {/* Seeker side */}
             {rep && rep.count > 0 && (
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--amber)', marginBottom: '.25rem' }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--amber)', marginBottom: '.25rem' }}>
                 👤 Seeker: {rep.count} report{rep.count === 1 ? '' : 's'}{rep.expired > 0 ? ` · ${rep.expired} say inactive` : ''}{rep.unknown > 0 ? ` · ${rep.unknown} unsure` : ''}
               </div>
             )}
             {/* Employer side */}
             {d ? (
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--sub)', marginBottom: '.25rem' }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '.25rem' }}>
                 🏢 Employer: <span style={{ color: listingKindColor(d.kind) }}>{LISTING_KIND_LABEL[d.kind] || d.kind}</span>{d.status !== 'open' ? ` · ${d.status}` : ''} — {d.detail}
                 {pcEntries.length > 0 && <span style={{ color: 'var(--blue)' }}> · proposes: {pcEntries.map(([k, v]) => `${k}=${String(v)}`).join(', ')}</span>}
                 {d.admin_note && <span style={{ color: 'var(--muted)' }}> · note: {d.admin_note}</span>}
               </div>
             ) : (
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', color: 'var(--muted)', marginBottom: '.25rem' }}>🏢 No employer dispute filed.</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginBottom: '.25rem' }}>🏢 No employer dispute filed.</div>
             )}
 
-            {isUuid && <a href={`/jobs/${encodeURIComponent(t.job_id)}`} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', color: 'var(--blue)', textDecoration: 'none' }}>↗ View listing</a>}
+            {isUuid && <a href={`/jobs/${encodeURIComponent(t.job_id)}`} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none' }}>↗ View listing</a>}
 
             {/* One action bar for the whole ticket */}
             {t.status === 'open' && (
-              <div style={{ marginTop: '.45rem' }}>
+              <div style={{ marginTop: '.5rem' }}>
                 {(openDispute || (rep && rep.count > 0)) && (
-                  <input autoComplete="off" value={notes[t.job_id] || ''} onChange={e => setNotes(n => ({ ...n, [t.job_id]: e.target.value }))} placeholder="Note to the employer (optional)" style={{ width: '100%', boxSizing: 'border-box', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 6, padding: '.35rem .5rem', fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--white)', outline: 'none', marginBottom: '.35rem' }} />
+                  <input autoComplete="off" value={notes[t.job_id] || ''} onChange={e => setNotes(n => ({ ...n, [t.job_id]: e.target.value }))} placeholder="Note to the employer (optional)" style={{ width: '100%', boxSizing: 'border-box', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 6, padding: '.25rem .5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', outline: 'none', marginBottom: '.25rem' }} />
                 )}
-                <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
                   {openDispute ? (
                     <>
-                      <button disabled={isBusy} onClick={() => act(t, { action: 'resolve_listing_dispute', id: d!.id, decision: 'approved', note: notes[t.job_id] || undefined }, `Dispute #${d!.id} approved`)} style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.6rem', padding: '.35rem .8rem', borderRadius: 6, border: '1px solid var(--green)', background: 'rgba(16,185,129,.12)', color: 'var(--green)', cursor: 'pointer', opacity: isBusy ? .6 : 1 }}>{isBusy ? '…' : 'Approve dispute'}</button>
-                      <button disabled={isBusy} onClick={() => act(t, { action: 'resolve_listing_dispute', id: d!.id, decision: 'denied', note: notes[t.job_id] || undefined }, `Dispute #${d!.id} denied`)} style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.6rem', padding: '.35rem .8rem', borderRadius: 6, border: '1px solid var(--red)', background: 'rgba(239,68,68,.1)', color: 'var(--red)', cursor: 'pointer', opacity: isBusy ? .6 : 1 }}>{isBusy ? '…' : 'Deny dispute'}</button>
+                      <button disabled={isBusy} onClick={() => act(t, { action: 'resolve_listing_dispute', id: d!.id, decision: 'approved', note: notes[t.job_id] || undefined }, `Dispute #${d!.id} approved`)} style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-meta)', padding: '.25rem .75rem', borderRadius: 6, border: '1px solid var(--green)', background: 'rgba(16,185,129,.12)', color: 'var(--green)', cursor: 'pointer', opacity: isBusy ? .6 : 1 }}>{isBusy ? '…' : 'Approve dispute'}</button>
+                      <button disabled={isBusy} onClick={() => act(t, { action: 'resolve_listing_dispute', id: d!.id, decision: 'denied', note: notes[t.job_id] || undefined }, `Dispute #${d!.id} denied`)} style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-meta)', padding: '.25rem .75rem', borderRadius: 6, border: '1px solid var(--red)', background: 'rgba(239,68,68,.1)', color: 'var(--red)', cursor: 'pointer', opacity: isBusy ? .6 : 1 }}>{isBusy ? '…' : 'Deny dispute'}</button>
                     </>
                   ) : rep && rep.count > 0 ? (
                     <>
-                      <button disabled={isBusy} onClick={() => { if (confirm('Delete this listing? It leaves search + is suppressed from re-aggregation, and the reports clear.')) act(t, { action: 'delete_listing', job_id: t.job_id }, 'Listing deleted') }} style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.6rem', padding: '.35rem .8rem', borderRadius: 6, border: '1px solid var(--red)', background: 'rgba(239,68,68,.1)', color: 'var(--red)', cursor: 'pointer', opacity: isBusy ? .6 : 1 }}>{isBusy ? '…' : 'Delete listing'}</button>
-                      <button disabled={isBusy} onClick={() => act(t, { action: 'dismiss_inactive_report', job_id: t.job_id }, 'Reports dismissed — listing kept')} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.35rem .8rem', borderRadius: 6, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer', opacity: isBusy ? .6 : 1 }}>{isBusy ? '…' : 'Keep — dismiss reports'}</button>
+                      <button disabled={isBusy} onClick={() => { if (confirm('Delete this listing? It leaves search + is suppressed from re-aggregation, and the reports clear.')) act(t, { action: 'delete_listing', job_id: t.job_id }, 'Listing deleted') }} style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-meta)', padding: '.25rem .75rem', borderRadius: 6, border: '1px solid var(--red)', background: 'rgba(239,68,68,.1)', color: 'var(--red)', cursor: 'pointer', opacity: isBusy ? .6 : 1 }}>{isBusy ? '…' : 'Delete listing'}</button>
+                      <button disabled={isBusy} onClick={() => act(t, { action: 'dismiss_inactive_report', job_id: t.job_id }, 'Reports dismissed — listing kept')} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .75rem', borderRadius: 6, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer', opacity: isBusy ? .6 : 1 }}>{isBusy ? '…' : 'Keep — dismiss reports'}</button>
                     </>
                   ) : null}
                 </div>
@@ -823,18 +823,18 @@ export function InactiveRow({ report: r, token, onRefresh }: { report: InactiveR
   }
 
   if (done) return (
-    <div style={{ padding: '.5rem 0', borderBottom: '1px solid var(--line2)', fontFamily: 'var(--mono)', fontSize: '.58rem', color: done === 'deleted' ? 'var(--green)' : 'var(--dim)' }}>
+    <div style={{ padding: '.5rem 0', borderBottom: '1px solid var(--line2)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: done === 'deleted' ? 'var(--green)' : 'var(--dim)' }}>
       {done === 'deleted' ? '✓ Listing deleted' : '✓ Listing kept — report cleared'}
     </div>
   )
 
   return (
-    <div style={{ padding: '.7rem 0', borderBottom: '1px solid var(--line2)' }}>
+    <div style={{ padding: '.75rem 0', borderBottom: '1px solid var(--line2)' }}>
       {/* BOTH SIDES: the employer filed a dispute on this reported listing — same dispute
           number as the Community tab's queue. Rule there (with both sides in view) before
           deleting here, or the rebuttal is silently orphaned. */}
       {r.dispute && (
-        <div style={{ marginBottom: '.45rem', padding: '.35rem .6rem', border: '1px solid rgba(59,130,246,.35)', borderRadius: 6, background: 'rgba(59,130,246,.07)', fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--blue)' }}>
+        <div style={{ marginBottom: '.5rem', padding: '.25rem .5rem', border: '1px solid rgba(59,130,246,.35)', borderRadius: 6, background: 'rgba(59,130,246,.07)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)' }}>
           ⚖ Employer dispute <span style={{ fontWeight: 700 }}>#{r.dispute.id}</span> open on this listing ({LISTING_KIND_LABEL[r.dispute.kind] || r.dispute.kind}) — resolve it in Community Data → Listing disputes before acting here.
         </div>
       )}
@@ -842,42 +842,42 @@ export function InactiveRow({ report: r, token, onRefresh }: { report: InactiveR
         <div style={{ flex: 1, minWidth: 0 }}>
           {orphan ? (
             <>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {snap && (snap.title || snap.company)
                   ? <>{snap.title || 'Untitled role'} · <span style={{ color: 'var(--sub)' }}>{snap.company || 'Unknown company'}</span></>
                   : <span style={{ color: 'var(--sub)' }}>{r.job_id}</span>}
               </div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', marginTop: '.15rem' }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.125rem' }}>
                 {snap?.city ? `${snap.city} · ` : ''}live listing (not saved to the board) · {reasonStr} · latest {relTime(r.latest_reported_at)}
               </div>
               {snap?.apply_url ? (
-                <div style={{ marginTop: '.3rem' }}>
-                  <a href={snap.apply_url} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--blue)', textDecoration: 'none', fontWeight: 700 }}>↗ Open the live posting to investigate</a>
+                <div style={{ marginTop: '.25rem' }}>
+                  <a href={snap.apply_url} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none', fontWeight: 700 }}>↗ Open the live posting to investigate</a>
                 </div>
               ) : (
-                <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)', marginTop: '.3rem' }}>No apply URL captured (reported before snapshotting shipped) — dismiss to clear.</div>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.25rem' }}>No apply URL captured (reported before snapshotting shipped) — dismiss to clear.</div>
               )}
             </>
           ) : (
             <>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {j.title || 'Unknown title'} · <span style={{ color: 'var(--sub)' }}>{j.company || 'Unknown company'}</span>
               </div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', marginTop: '.15rem' }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.125rem' }}>
                 {j.city || 'Unknown location'} · {reasonStr} · latest {relTime(r.latest_reported_at)}
               </div>
               <div style={{ display: 'flex', gap: '.75rem', marginTop: '.25rem', flexWrap: 'wrap' }}>
-                <a href={`/jobs/${encodeURIComponent(r.job_id)}`} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--blue)', textDecoration: 'none' }}>↗ View listing page</a>
-                {applyUrl && <a href={applyUrl} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--blue)', textDecoration: 'none' }}>↗ Open apply URL</a>}
+                <a href={`/jobs/${encodeURIComponent(r.job_id)}`} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none' }}>↗ View listing page</a>
+                {applyUrl && <a href={applyUrl} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none' }}>↗ Open apply URL</a>}
               </div>
             </>
           )}
         </div>
-        <div style={{ display: 'flex', gap: '.45rem', flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: '.5rem', flexShrink: 0 }}>
           {/* Orphan (ephemeral) delete suppresses the listing from future searches; a real board
               row is soft-deleted. Both are offered so the admin can always keep or delete. */}
-          <button onClick={() => act('delete_listing')} disabled={acting} style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', padding: '.3rem .65rem', borderRadius: 6, border: '1px solid rgba(239,68,68,.4)', background: 'rgba(239,68,68,.08)', color: 'var(--red)', cursor: 'pointer' }}>Delete listing</button>
-          <button onClick={() => act('dismiss_inactive_report')} disabled={acting} style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', padding: '.3rem .65rem', borderRadius: 6, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer' }}>Keep listing</button>
+          <button onClick={() => act('delete_listing')} disabled={acting} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .75rem', borderRadius: 6, border: '1px solid rgba(239,68,68,.4)', background: 'rgba(239,68,68,.08)', color: 'var(--red)', cursor: 'pointer' }}>Delete listing</button>
+          <button onClick={() => act('dismiss_inactive_report')} disabled={acting} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .75rem', borderRadius: 6, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer' }}>Keep listing</button>
         </div>
       </div>
     </div>
@@ -1047,18 +1047,18 @@ export function MergePanel({ token, prefill }: { token: string; prefill: MergePr
     return `${Math.floor(h / 24)}d ago`
   }
 
-  const inputStyle: React.CSSProperties = { width: '100%', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 7, padding: '.42rem .65rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', outline: 'none', boxSizing: 'border-box' }
+  const inputStyle: React.CSSProperties = { width: '100%', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 7, padding: '.5rem .75rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', outline: 'none', boxSizing: 'border-box' }
 
   return (
     <Card style={{ marginBottom: '1.25rem' }}>
       <CardHeader
         title="Company deduplication"
         action={
-          <div style={{ display: 'flex', gap: '.45rem' }}>
-            <button onClick={scan} disabled={scanning} style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.3rem .75rem', borderRadius: 6, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer' }}>
+          <div style={{ display: 'flex', gap: '.5rem' }}>
+            <button onClick={scan} disabled={scanning} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .75rem', borderRadius: 6, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer' }}>
               {scanning ? 'Scanning…' : 'Scan for dupes'}
             </button>
-            <button onClick={autoMerge} disabled={autoMerging} style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.3rem .75rem', borderRadius: 6, border: '1px solid rgba(16,185,129,.3)', background: 'rgba(16,185,129,.08)', color: 'var(--green)', cursor: 'pointer' }}>
+            <button onClick={autoMerge} disabled={autoMerging} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .75rem', borderRadius: 6, border: '1px solid rgba(16,185,129,.3)', background: 'rgba(16,185,129,.08)', color: 'var(--green)', cursor: 'pointer' }}>
               {autoMerging ? 'Running…' : 'Auto-merge'}
             </button>
           </div>
@@ -1066,50 +1066,50 @@ export function MergePanel({ token, prefill }: { token: string; prefill: MergePr
       />
       {/* Manual merge form */}
       <div style={{ paddingBottom: '.75rem', borderBottom: '1px solid var(--line2)', marginBottom: '.75rem' }}>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--dim)', marginBottom: '.5rem' }}>Manual merge</div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--dim)', marginBottom: '.5rem' }}>Manual merge</div>
         <div style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: 110 }}>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--muted)', marginBottom: '.22rem' }}>Keep (primary)</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginBottom: '.25rem' }}>Keep (primary)</div>
             <input autoComplete="off" value={primary} onChange={e => setPrimary(e.target.value)} placeholder="e.g. Amazon" style={inputStyle} />
           </div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.8rem', color: 'var(--dim)', flexShrink: 0, paddingBottom: '.45rem' }}>←</div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-sm)', color: 'var(--dim)', flexShrink: 0, paddingBottom: '.5rem' }}>←</div>
           <div style={{ flex: 1, minWidth: 110 }}>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--muted)', marginBottom: '.22rem' }}>Absorb (secondary)</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginBottom: '.25rem' }}>Absorb (secondary)</div>
             <input autoComplete="off" value={secondary} onChange={e => setSecondary(e.target.value)} placeholder="e.g. amazon.com" style={inputStyle} />
           </div>
-          <button onClick={manualMerge} disabled={merging} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.42rem .9rem', borderRadius: 7, border: '1px solid rgba(239,68,68,.3)', background: 'rgba(239,68,68,.08)', color: 'var(--red)', cursor: 'pointer', flexShrink: 0 }}>Merge →</button>
+          <button onClick={manualMerge} disabled={merging} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.5rem 1rem', borderRadius: 7, border: '1px solid rgba(239,68,68,.3)', background: 'rgba(239,68,68,.08)', color: 'var(--red)', cursor: 'pointer', flexShrink: 0 }}>Merge →</button>
         </div>
-        {status && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', marginTop: '.45rem', color: status.color }}>{status.text}</div>}
+        {status && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', marginTop: '.5rem', color: status.color }}>{status.text}</div>}
       </div>
       {/* Separate a company back out (recovery) — reverses a bad merge by NAME */}
       <div style={{ paddingBottom: '.75rem', borderBottom: '1px solid var(--line2)', marginBottom: '.75rem' }}>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--dim)', marginBottom: '.25rem' }}>Separate a company (undo a bad merge)</div>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--muted)', marginBottom: '.5rem', lineHeight: 1.5 }}>Got absorbed into another company (e.g. &quot;Towne Park&quot; saved as &quot;Towne&quot;)? Type it here to split it back out — reverses the most recent merge where it was absorbed, moves its reports back, and clears the stale score.</div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--dim)', marginBottom: '.25rem' }}>Separate a company (undo a bad merge)</div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginBottom: '.5rem', lineHeight: 1.5 }}>Got absorbed into another company (e.g. &quot;Towne Park&quot; saved as &quot;Towne&quot;)? Type it here to split it back out — reverses the most recent merge where it was absorbed, moves its reports back, and clears the stale score.</div>
         <div style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: 140 }}>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--muted)', marginBottom: '.22rem' }}>Absorbed company name</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginBottom: '.25rem' }}>Absorbed company name</div>
             <input autoComplete="off" value={resplitName} onChange={e => setResplitName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') resplitCompany() }} placeholder="e.g. Towne Park" style={inputStyle} />
           </div>
-          <button onClick={resplitCompany} disabled={resplitting} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.42rem .9rem', borderRadius: 7, border: '1px solid rgba(59,130,246,.35)', background: 'rgba(59,130,246,.1)', color: 'var(--blue)', cursor: 'pointer', flexShrink: 0 }}>{resplitting ? 'Separating…' : 'Separate ←'}</button>
+          <button onClick={resplitCompany} disabled={resplitting} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.5rem 1rem', borderRadius: 7, border: '1px solid rgba(59,130,246,.35)', background: 'rgba(59,130,246,.1)', color: 'var(--blue)', cursor: 'pointer', flexShrink: 0 }}>{resplitting ? 'Separating…' : 'Separate ←'}</button>
         </div>
       </div>
       {/* Detected duplicates list */}
       {dupes === null
-        ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>Click &quot;Scan for dupes&quot; to detect company name duplicates.</div>
+        ? <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>Click &quot;Scan for dupes&quot; to detect company name duplicates.</div>
         : dupes.length === 0
-          ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--green)' }}>✓ No duplicates detected</div>
+          ? <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)' }}>✓ No duplicates detected</div>
           : dupes.map(({ key, companies, auto }) => {
             const prim = companies[0]
             const rest = companies.slice(1)
             return (
-              <div key={key} style={{ padding: '.65rem 0', borderBottom: '1px solid var(--line2)' }}>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--amber)', marginBottom: '.3rem' }}>{companies.length} entries match &quot;{key}&quot; · {auto ? 'same name (Auto-merge handles it)' : 'look-alike — your call'}</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem', flexWrap: 'wrap' }}>
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.18rem .55rem', borderRadius: 4, background: 'rgba(16,185,129,.12)', color: 'var(--green)', border: '1px solid rgba(16,185,129,.2)' }}>{prim.name} <span style={{ opacity: .6 }}>({prim.report_count || 0})</span></span>
+              <div key={key} style={{ padding: '.75rem 0', borderBottom: '1px solid var(--line2)' }}>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--amber)', marginBottom: '.25rem' }}>{companies.length} entries match &quot;{key}&quot; · {auto ? 'same name (Auto-merge handles it)' : 'look-alike — your call'}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '.25rem', flexWrap: 'wrap' }}>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .5rem', borderRadius: 4, background: 'rgba(16,185,129,.12)', color: 'var(--green)', border: '1px solid rgba(16,185,129,.2)' }}>{prim.name} <span style={{ opacity: .6 }}>({prim.report_count || 0})</span></span>
                   {rest.map(c => (
-                    <span key={c.id} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.18rem .55rem', borderRadius: 4, background: 'rgba(239,68,68,.08)', color: 'var(--red)', border: '1px solid rgba(239,68,68,.15)' }}>{c.name} <span style={{ opacity: .6 }}>({c.report_count || 0})</span></span>
+                    <span key={c.id} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .5rem', borderRadius: 4, background: 'rgba(239,68,68,.08)', color: 'var(--red)', border: '1px solid rgba(239,68,68,.15)' }}>{c.name} <span style={{ opacity: .6 }}>({c.report_count || 0})</span></span>
                   ))}
-                  <button onClick={() => setMerge(prim.name, rest[0].name)} style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', padding: '.18rem .55rem', borderRadius: 5, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer', marginLeft: 'auto' }}>Set to merge</button>
+                  <button onClick={() => setMerge(prim.name, rest[0].name)} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .5rem', borderRadius: 5, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer', marginLeft: 'auto' }}>Set to merge</button>
                 </div>
               </div>
             )
@@ -1117,32 +1117,32 @@ export function MergePanel({ token, prefill }: { token: string; prefill: MergePr
       }
 
       {/* ── Merge history (undo) ── */}
-      <div style={{ marginTop: '1rem', paddingTop: '.85rem', borderTop: '1px solid var(--line2)' }}>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--dim)', marginBottom: '.5rem' }}>Merge history</div>
+      <div style={{ marginTop: '1rem', paddingTop: '.75rem', borderTop: '1px solid var(--line2)' }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--dim)', marginBottom: '.5rem' }}>Merge history</div>
         {merges === null
-          ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)' }}>Loading…</div>
+          ? <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>Loading…</div>
           : merges.length === 0
-            ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)' }}>No merges recorded yet — history starts with the next merge.</div>
+            ? <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>No merges recorded yet — history starts with the next merge.</div>
             : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '.3rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '.25rem' }}>
                 {merges.map(m => (
-                  <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap', padding: '.4rem 0', borderBottom: '1px solid var(--line2)' }}>
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--white)', minWidth: 0, flex: 1, wordBreak: 'break-word' }}>
+                  <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap', padding: '.5rem 0', borderBottom: '1px solid var(--line2)' }}>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', minWidth: 0, flex: 1, wordBreak: 'break-word' }}>
                       <span style={{ color: 'var(--red)' }}>{m.secondary_name}</span>
                       <span style={{ color: 'var(--dim)' }}> → </span>
                       <span style={{ color: 'var(--green)' }}>{m.primary_name}</span>
                       <span style={{ color: 'var(--dim)' }}> · {ts(m.created_at)}{m.moved_reports ? ` · ${m.moved_reports} report${m.moved_reports === 1 ? '' : 's'}` : ''}</span>
                     </span>
                     {m.undone_at
-                      ? <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', flexShrink: 0 }}>undone {ts(m.undone_at)}</span>
+                      ? <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', flexShrink: 0 }}>undone {ts(m.undone_at)}</span>
                       : confirmUndo === m.id
                         ? (
-                          <span style={{ display: 'flex', gap: '.3rem', flexShrink: 0 }}>
-                            <button onClick={() => undoMerge(m.id)} disabled={undoing === m.id} style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', padding: '.18rem .5rem', borderRadius: 5, border: '1px solid rgba(239,68,68,.4)', background: 'rgba(239,68,68,.12)', color: 'var(--red)', cursor: 'pointer' }}>{undoing === m.id ? '…' : 'Confirm undo'}</button>
-                            <button onClick={() => setConfirmUndo(null)} disabled={undoing === m.id} style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', padding: '.18rem .5rem', borderRadius: 5, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer' }}>Cancel</button>
+                          <span style={{ display: 'flex', gap: '.25rem', flexShrink: 0 }}>
+                            <button onClick={() => undoMerge(m.id)} disabled={undoing === m.id} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .5rem', borderRadius: 5, border: '1px solid rgba(239,68,68,.4)', background: 'rgba(239,68,68,.12)', color: 'var(--red)', cursor: 'pointer' }}>{undoing === m.id ? '…' : 'Confirm undo'}</button>
+                            <button onClick={() => setConfirmUndo(null)} disabled={undoing === m.id} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .5rem', borderRadius: 5, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer' }}>Cancel</button>
                           </span>
                         )
-                        : <button onClick={() => setConfirmUndo(m.id)} style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', padding: '.18rem .5rem', borderRadius: 5, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer', flexShrink: 0 }}>Undo</button>
+                        : <button onClick={() => setConfirmUndo(m.id)} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .5rem', borderRadius: 5, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer', flexShrink: 0 }}>Undo</button>
                     }
                   </div>
                 ))}
@@ -1165,7 +1165,7 @@ export function CompanyExportPanel({ token }: { token: string }) {
   // holds whichever artifact was last prepared (JSON bundle or the legal PDF blob).
   const [ready, setReady] = useState<{ filename: string; mime: string; content: string | Blob; label: string } | null>(null)
 
-  const inputStyle: React.CSSProperties = { width: '100%', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 7, padding: '.42rem .65rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', outline: 'none', boxSizing: 'border-box' }
+  const inputStyle: React.CSSProperties = { width: '100%', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 7, padding: '.5rem .75rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', outline: 'none', boxSizing: 'border-box' }
   const slugDate = (name: string) => ({ slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'company', date: pacificDate() })
 
   // Raw JSON audit bundle (unchanged contract).
@@ -1254,33 +1254,33 @@ export function CompanyExportPanel({ token }: { token: string }) {
   return (
     <Card style={{ marginBottom: '1.25rem' }}>
       <CardHeader title="Company score audit" />
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', marginBottom: '.6rem', lineHeight: 1.5 }}>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginBottom: '.5rem', lineHeight: 1.5 }}>
         Full evidentiary record for one company — every contributing &amp; held-out report with its source and trust weight, the per-source aggregation, the live-recomputed grade with all inputs, and the scoring methodology. Submitters are pseudonymized. Export the raw <strong>JSON</strong> bundle, the professional <strong>Legal Audit PDF</strong> (methodology + evidence packet, source JSON SHA-256 embedded), or the <strong>Legal Audit Package</strong> — a ZIP of the PDF + the exact source JSON + a manifest whose hashes all match (the strongest option for a company, its counsel, an authorized legal representative, or a regulator).
       </div>
       <div style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 140 }}>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--muted)', marginBottom: '.22rem' }}>Company name</div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginBottom: '.25rem' }}>Company name</div>
           <input autoComplete="off" value={company} onChange={e => { setCompany(e.target.value); setReady(null) }} onKeyDown={e => { if (e.key === 'Enter') prepareJson() }} placeholder="e.g. FedEx" style={inputStyle} />
         </div>
         {ready ? (
-          <button onClick={download} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.42rem .9rem', borderRadius: 7, border: '1px solid rgba(16,185,129,.5)', background: 'rgba(16,185,129,.12)', color: 'var(--green)', cursor: 'pointer', flexShrink: 0 }}>
+          <button onClick={download} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.5rem 1rem', borderRadius: 7, border: '1px solid rgba(16,185,129,.5)', background: 'rgba(16,185,129,.12)', color: 'var(--green)', cursor: 'pointer', flexShrink: 0 }}>
             ⬇ Download {ready.label}
           </button>
         ) : (
           <>
-            <button onClick={prepareJson} disabled={!!busy} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.42rem .9rem', borderRadius: 7, border: '1px solid rgba(59,130,246,.3)', background: 'rgba(59,130,246,.08)', color: 'var(--blue)', cursor: 'pointer', flexShrink: 0 }}>
+            <button onClick={prepareJson} disabled={!!busy} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.5rem 1rem', borderRadius: 7, border: '1px solid rgba(59,130,246,.3)', background: 'rgba(59,130,246,.08)', color: 'var(--blue)', cursor: 'pointer', flexShrink: 0 }}>
               {busy === 'json' ? 'Assembling…' : 'Export JSON'}
             </button>
-            <button onClick={preparePdf} disabled={!!busy} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.42rem .9rem', borderRadius: 7, border: '1px solid var(--accent-line)', background: 'var(--accent-tint)', color: 'var(--accent)', cursor: 'pointer', flexShrink: 0 }}>
+            <button onClick={preparePdf} disabled={!!busy} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.5rem 1rem', borderRadius: 7, border: '1px solid var(--accent-line)', background: 'var(--accent-tint)', color: 'var(--accent)', cursor: 'pointer', flexShrink: 0 }}>
               {busy === 'pdf' ? 'Generating…' : 'Generate Legal Audit PDF'}
             </button>
-            <button onClick={preparePackage} disabled={!!busy} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.42rem .9rem', borderRadius: 7, border: '1px solid rgba(16,185,129,.45)', background: 'rgba(16,185,129,.1)', color: 'var(--green)', cursor: 'pointer', flexShrink: 0 }}>
+            <button onClick={preparePackage} disabled={!!busy} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.5rem 1rem', borderRadius: 7, border: '1px solid rgba(16,185,129,.45)', background: 'rgba(16,185,129,.1)', color: 'var(--green)', cursor: 'pointer', flexShrink: 0 }}>
               {busy === 'package' ? 'Packaging…' : 'Generate Legal Audit Package'}
             </button>
           </>
         )}
       </div>
-      {status && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', marginTop: '.5rem', color: status.color, lineHeight: 1.5 }}>{status.text}</div>}
+      {status && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', marginTop: '.5rem', color: status.color, lineHeight: 1.5 }}>{status.text}</div>}
     </Card>
   )
 }
@@ -1337,9 +1337,9 @@ export function CreditsPanel({ credits, flags, token, onRefresh }: { credits: { 
     setSaving(false)
   }
   const Stat = ({ l, n, c }: { l: string; n: number | string; c?: string }) => (
-    <div style={{ flex: '1 1 30%', minWidth: 92, padding: '.55rem .6rem', border: '1px solid var(--line2)', borderRadius: 8 }}>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.04em' }}>{l}</div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '1.05rem', color: c || 'var(--white)', marginTop: '.15rem' }}>{typeof n === 'number' ? n.toLocaleString() : n}</div>
+    <div style={{ flex: '1 1 30%', minWidth: 92, padding: '.5rem .5rem', border: '1px solid var(--line2)', borderRadius: 8 }}>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.04em' }}>{l}</div>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-lead)', color: c || 'var(--white)', marginTop: '.125rem' }}>{typeof n === 'number' ? n.toLocaleString() : n}</div>
     </div>
   )
   return (
@@ -1347,7 +1347,7 @@ export function CreditsPanel({ credits, flags, token, onRefresh }: { credits: { 
       <CardHeader
         title="Credits"
         action={
-          <button onClick={toggle} disabled={saving} style={{ background: on ? 'rgba(239,68,68,.1)' : 'rgba(34,197,94,.1)', border: `1px solid ${on ? 'rgba(239,68,68,.4)' : 'rgba(34,197,94,.4)'}`, borderRadius: 6, padding: '.3rem .7rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: on ? 'var(--red)' : 'var(--green)', cursor: 'pointer' }}>
+          <button onClick={toggle} disabled={saving} style={{ background: on ? 'rgba(239,68,68,.1)' : 'rgba(34,197,94,.1)', border: `1px solid ${on ? 'rgba(239,68,68,.4)' : 'rgba(34,197,94,.4)'}`, borderRadius: 6, padding: '.25rem .75rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: on ? 'var(--red)' : 'var(--green)', cursor: 'pointer' }}>
             {saving ? '…' : on ? 'Disable credit system' : 'Enable credit system'}
           </button>
         }
@@ -1411,20 +1411,20 @@ export function FlagsPanel({ flags, token, onRefresh }: { flags: FeatureFlag[]; 
   function row(f: FeatureFlag) {
     const status = effectiveStatus(f)
     return (
-      <div key={f.flag_name} style={{ display: 'flex', alignItems: 'center', gap: '.5rem', padding: '.55rem 0', borderBottom: '1px solid var(--line2)', flexWrap: 'wrap' }}>
-        <div style={{ flex: 1, minWidth: 0, fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--white)', overflow: 'hidden' }}>
+      <div key={f.flag_name} style={{ display: 'flex', alignItems: 'center', gap: '.5rem', padding: '.5rem 0', borderBottom: '1px solid var(--line2)', flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 0, fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', overflow: 'hidden' }}>
           <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{FLAG_FRIENDLY[f.flag_name] || f.flag_name}</div>
-          {f.description && <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--dim)', marginTop: '.1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.description}</div>}
+          {f.description && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.125rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.description}</div>}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem', flexShrink: 0 }}>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: FLAG_STATUS_COLORS[status] || 'var(--muted)', whiteSpace: 'nowrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.25rem', flexShrink: 0 }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: FLAG_STATUS_COLORS[status] || 'var(--muted)', whiteSpace: 'nowrap' }}>
             {saving === f.flag_name ? 'Saving…' : (FLAG_STATUS_LABELS[status] || status)}
           </div>
           <select
             value={status}
             disabled={saving === f.flag_name}
             onChange={e => setFlag(f.flag_name, e.target.value)}
-            style={{ background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 5, padding: '.18rem .4rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)', cursor: 'pointer' }}
+            style={{ background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 5, padding: '.25rem .5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', cursor: 'pointer' }}
           >
             {FLAG_STATUSES.map(s => <option key={s} value={s}>{FLAG_STATUS_LABELS[s]}</option>)}
           </select>
@@ -1441,7 +1441,7 @@ export function FlagsPanel({ flags, token, onRefresh }: { flags: FeatureFlag[]; 
       <CardHeader
         title="Feature flags"
         action={
-          <button onClick={seed} disabled={seeding} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 6, padding: '.3rem .7rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)', cursor: 'pointer' }}>
+          <button onClick={seed} disabled={seeding} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 6, padding: '.25rem .75rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', cursor: 'pointer' }}>
             {seeding ? 'Creating…' : '+ Seed defaults'}
           </button>
         }
@@ -1449,8 +1449,8 @@ export function FlagsPanel({ flags, token, onRefresh }: { flags: FeatureFlag[]; 
       {flags.length === 0
         ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.75rem' }}>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>No flags in database</div>
-            <button onClick={seed} disabled={seeding} style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', padding: '.3rem .75rem', borderRadius: 6, border: '1px solid rgba(59,130,246,.4)', background: 'rgba(59,130,246,.1)', color: 'var(--blue)', cursor: 'pointer' }}>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>No flags in database</div>
+            <button onClick={seed} disabled={seeding} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .75rem', borderRadius: 6, border: '1px solid rgba(59,130,246,.4)', background: 'rgba(59,130,246,.1)', color: 'var(--blue)', cursor: 'pointer' }}>
               {seeding ? 'Creating…' : 'Initialize default flags →'}
             </button>
           </div>
@@ -1461,15 +1461,15 @@ export function FlagsPanel({ flags, token, onRefresh }: { flags: FeatureFlag[]; 
               const rows = grp.flags.map(name => flags.find(f => f.flag_name === name)).filter(Boolean) as FeatureFlag[]
               if (!rows.length) return null
               return (
-                <div key={grp.group} style={{ marginBottom: '.4rem' }}>
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.06em', margin: '.5rem 0 .15rem' }}>{grp.group}</div>
+                <div key={grp.group} style={{ marginBottom: '.5rem' }}>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.06em', margin: '.5rem 0 .125rem' }}>{grp.group}</div>
                   {rows.map(row)}
                 </div>
               )
             })}
             {others.length > 0 && (
-              <div style={{ marginBottom: '.4rem' }}>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.06em', margin: '.5rem 0 .15rem' }}>Other</div>
+              <div style={{ marginBottom: '.5rem' }}>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.06em', margin: '.5rem 0 .125rem' }}>Other</div>
                 {others.map(row)}
               </div>
             )}
@@ -1532,30 +1532,30 @@ export function ClustersPanel({ clusters, suspected, token, onRefresh }: { clust
       <CardHeader
         title="Duplicate account clusters"
         action={
-          <button onClick={scan} disabled={scanning} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 6, padding: '.3rem .7rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)', cursor: 'pointer' }}>
+          <button onClick={scan} disabled={scanning} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 6, padding: '.25rem .75rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', cursor: 'pointer' }}>
             Scan signals
           </button>
         }
       />
-      {scanMsg && <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: scanMsg.startsWith('✓') ? 'var(--green)' : scanMsg.startsWith('Error') ? 'var(--red)' : 'var(--dim)', marginBottom: '.6rem' }}>{scanMsg}</div>}
+      {scanMsg && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: scanMsg.startsWith('✓') ? 'var(--green)' : scanMsg.startsWith('Error') ? 'var(--red)' : 'var(--dim)', marginBottom: '.5rem' }}>{scanMsg}</div>}
       {suspected > 0 && (
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--amber)', marginBottom: '.6rem' }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--amber)', marginBottom: '.5rem' }}>
           {suspected} suspected cluster{suspected === 1 ? '' : 's'}
         </div>
       )}
       {clusters.length === 0
-        ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>No suspected clusters — click &quot;Scan signals&quot; to detect</div>
+        ? <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>No suspected clusters — click &quot;Scan signals&quot; to detect</div>
         : clusters.map(c => {
           const status = localStatus[c.id] || c.status
           return (
-            <div key={c.id} style={{ padding: '.6rem 0', borderBottom: '1px solid var(--line2)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '.65rem', flexWrap: 'wrap' }}>
-                <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', fontWeight: 700, color: CLUSTER_COLORS[status] || 'var(--sub)', flexShrink: 0 }}>Risk {c.risk_score}/100</span>
-                <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.user_ids?.length || 0} accounts · {(c.signals || []).join(', ')}</span>
+            <div key={c.id} style={{ padding: '.5rem 0', borderBottom: '1px solid var(--line2)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', flexWrap: 'wrap' }}>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 700, color: CLUSTER_COLORS[status] || 'var(--sub)', flexShrink: 0 }}>Risk {c.risk_score}/100</span>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.user_ids?.length || 0} accounts · {(c.signals || []).join(', ')}</span>
                 <select
                   value={status}
                   onChange={e => updateCluster(c.id, e.target.value)}
-                  style={{ background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 5, padding: '.18rem .4rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)', cursor: 'pointer', marginLeft: 'auto' }}
+                  style={{ background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 5, padding: '.25rem .5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', cursor: 'pointer', marginLeft: 'auto' }}
                 >
                   {CLUSTER_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
@@ -1630,13 +1630,13 @@ export function JobDedupePanel({ token }: { token: string }) {
     setDeduping(false)
   }
 
-  const btnBase: React.CSSProperties = { background: 'none', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, padding: '.4rem .9rem', fontFamily: 'var(--mono)', fontSize: '.6rem', cursor: 'pointer', transition: 'all .15s', whiteSpace: 'nowrap' }
+  const btnBase: React.CSSProperties = { background: 'none', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', cursor: 'pointer', transition: 'all .15s', whiteSpace: 'nowrap' }
 
   return (
     <Card style={{ marginBottom: '1.25rem' }}>
       <CardHeader
         title="Job deduplication"
-        action={<span style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--dim)' }}>Same listing: title + company + location, or same link + title</span>}
+        action={<span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>Same listing: title + company + location, or same link + title</span>}
       />
       <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginBottom: msg ? '.65rem' : 0 }}>
         <button onClick={scan} disabled={scanning || deduping} style={{ ...btnBase, borderColor: 'var(--blue)', color: 'var(--blue)' }}>
@@ -1648,12 +1648,12 @@ export function JobDedupePanel({ token }: { token: string }) {
           </button>
         )}
       </div>
-      {msg && <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: msg.startsWith('✗') ? 'var(--red)' : msg.startsWith('✓') ? 'var(--green)' : 'var(--amber)' }}>{msg}</div>}
+      {msg && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: msg.startsWith('✗') ? 'var(--red)' : msg.startsWith('✓') ? 'var(--green)' : 'var(--amber)' }}>{msg}</div>}
       {sample.length > 0 && (
-        <div style={{ marginTop: '.6rem', display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--dim)' }}>Examples — check before removing</div>
+        <div style={{ marginTop: '.5rem', display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--dim)' }}>Examples — check before removing</div>
           {sample.map((g) => (
-            <div key={g.keep.id} style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', lineHeight: 1.5, padding: '.4rem .55rem', border: '1px solid var(--line2)', borderRadius: 6 }}>
+            <div key={g.keep.id} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', lineHeight: 1.5, padding: '.5rem .5rem', border: '1px solid var(--line2)', borderRadius: 6 }}>
               <div style={{ color: 'var(--green)' }}>keep · {g.keep.title} · {g.keep.company || '—'} · {g.keep.location || 'no location'} · {g.keep.source || '?'} · {g.keep.status || '?'}</div>
               {g.remove.map((r) => <div key={r.id} style={{ color: 'var(--red)' }}>remove · {r.title} · {r.company || '—'} · {r.location || 'no location'} · {r.source || '?'} · {r.status || '?'}</div>)}
               {g.kept.map((r) => <div key={r.id} style={{ color: 'var(--sub)' }}>kept (protected) · {r.title} · {r.company || '—'} · {r.location || 'no location'}</div>)}
@@ -1663,21 +1663,21 @@ export function JobDedupePanel({ token }: { token: string }) {
       )}
 
       {/* Aggregation target */}
-      <div style={{ marginTop: '.85rem', paddingTop: '.75rem', borderTop: '1px solid var(--line2)' }}>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--dim)', marginBottom: '.4rem' }}>Aggregation target</div>
+      <div style={{ marginTop: '.75rem', paddingTop: '.75rem', borderTop: '1px solid var(--line2)' }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--dim)', marginBottom: '.5rem' }}>Aggregation target</div>
         <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)' }}>Min listings per search</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)' }}>Min listings per search</span>
           <input type="number" min={5} max={60} value={target} onChange={e => setTarget(e.target.value)}
-            style={{ width: 64, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 6, padding: '.3rem .5rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', outline: 'none' }} />
+            style={{ width: 64, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 6, padding: '.25rem .5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', outline: 'none' }} />
           <button onClick={saveTarget} disabled={targetSaving} style={{ ...btnBase, borderColor: 'var(--green)', color: 'var(--green)' }}>{targetSaving ? '⏳ Saving…' : 'Save'}</button>
         </div>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', marginTop: '.4rem' }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.5rem' }}>
           If a search has fewer related listings than this, Seen pulls more from online and stores them. Higher = aggregate harder; lower = calm it down. (5–60)
         </div>
-        {targetMsg && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', marginTop: '.35rem', color: targetMsg.startsWith('✗') ? 'var(--red)' : 'var(--green)' }}>{targetMsg}</div>}
+        {targetMsg && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', marginTop: '.25rem', color: targetMsg.startsWith('✗') ? 'var(--red)' : 'var(--green)' }}>{targetMsg}</div>}
       </div>
 
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', marginTop: '.5rem' }}>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.5rem' }}>
         Scan first to preview. The scan reads every listing; one press removes every duplicate (it keeps going until done). New copies are already blocked when they arrive — the database merges a re-imported listing into the existing row.
       </div>
     </Card>
@@ -1756,17 +1756,17 @@ export function AllJobsBrowser({ token, onUnauthorized }: { token: string; onUna
           onChange={e => setSearch(e.target.value)}
           style={{
             width: '100%', boxSizing: 'border-box',
-            fontFamily: 'var(--mono)', fontSize: '.62rem',
-            padding: '.35rem .6rem', borderRadius: 6,
+            fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)',
+            padding: '.25rem .5rem', borderRadius: 6,
             border: '1px solid var(--line2)', background: 'var(--bg2)',
             color: 'var(--white)', outline: 'none',
           }}
         />
       </div>
-      {loading && <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>Loading…</div>}
-      {!loading && error && <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--red)' }}>✗ {error}</div>}
+      {loading && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>Loading…</div>}
+      {!loading && error && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--red)' }}>✗ {error}</div>}
       {!loading && !error && filtered.length === 0 && (
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>No companies match.</div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>No companies match.</div>
       )}
       {!loading && !error && visible.map(g => {
         const isOpen = expanded === g.company
@@ -1776,34 +1776,34 @@ export function AllJobsBrowser({ token, onUnauthorized }: { token: string; onUna
           <div key={g.company} style={{ borderBottom: '1px solid var(--line2)' }}>
             <div
               onClick={() => toggleCompany(g.company)}
-              style={{ display: 'flex', alignItems: 'center', gap: '.6rem', padding: '.45rem 0', cursor: 'pointer' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '.5rem', padding: '.5rem 0', cursor: 'pointer' }}
             >
-              <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)', width: '.8rem', flexShrink: 0 }}>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', width: '.8rem', flexShrink: 0 }}>
                 {isOpen ? '▾' : '▸'}
               </span>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', flex: 1 }}>{g.company}</span>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', flexShrink: 0 }}>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', flex: 1 }}>{g.company}</span>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', flexShrink: 0 }}>
                 {g.total} total · <span style={{ color: g.active > 0 ? 'var(--green)' : 'var(--dim)' }}>{g.active} active</span>
               </span>
             </div>
             {isOpen && (
-              <div style={{ paddingLeft: '1.4rem', paddingBottom: '.5rem' }}>
-                {isLoadingJobs && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)' }}>Loading…</div>}
-                {!isLoadingJobs && jobs.length === 0 && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)' }}>No listings found.</div>}
+              <div style={{ paddingLeft: '1.5rem', paddingBottom: '.5rem' }}>
+                {isLoadingJobs && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>Loading…</div>}
+                {!isLoadingJobs && jobs.length === 0 && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>No listings found.</div>}
                 {!isLoadingJobs && jobs.map(j => {
                   const avail = j.availability_status || 'active'
                   return (
-                    <div key={j.id} style={{ display: 'flex', alignItems: 'center', gap: '.6rem', padding: '.3rem 0', borderBottom: '1px solid var(--line2)' }}>
+                    <div key={j.id} style={{ display: 'flex', alignItems: 'center', gap: '.5rem', padding: '.25rem 0', borderBottom: '1px solid var(--line2)' }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {j.title || '—'}
                         </div>
-                        <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)', marginTop: '.08rem' }}>
+                        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.0625rem' }}>
                           {j.city || '—'} · <span style={{ color: availColor(avail) }}>{avail}</span> · {relTime(j.created_at)}
                         </div>
                       </div>
                       {j.apply_url && (
-                        <a href={j.apply_url} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--blue)', textDecoration: 'none', flexShrink: 0 }}>↗</a>
+                        <a href={j.apply_url} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none', flexShrink: 0 }}>↗</a>
                       )}
                     </div>
                   )
@@ -1816,7 +1816,7 @@ export function AllJobsBrowser({ token, onUnauthorized }: { token: string; onUna
       {!loading && !error && !search.trim() && filtered.length > COLLAPSED_COUNT && (
         <button
           onClick={() => setShowAll(v => !v)}
-          style={{ marginTop: '.6rem', fontFamily: 'var(--mono)', fontSize: '.58rem', padding: '.4rem .8rem', borderRadius: 6, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer', width: '100%' }}
+          style={{ marginTop: '.5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.5rem .75rem', borderRadius: 6, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer', width: '100%' }}
         >
           {showAll ? `▴ Show less` : `▾ Show all ${filtered.length} companies`}
         </button>
@@ -1876,7 +1876,7 @@ export function DeployPanel() {
           saved ? (
             <button
               onClick={() => { setShowInput(s => !s); setStatus(null) }}
-              style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', padding: '.25rem .6rem', borderRadius: 5, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--dim)', cursor: 'pointer' }}
+              style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .5rem', borderRadius: 5, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--dim)', cursor: 'pointer' }}
             >
               {showInput ? 'Cancel' : 'Change hook'}
             </button>
@@ -1886,7 +1886,7 @@ export function DeployPanel() {
 
       {(!saved || showInput) && (
         <div style={{ marginBottom: '1rem' }}>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '.65rem' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '.75rem' }}>
             In Vercel → Seen project → Settings → find <span style={{ color: 'var(--white)' }}>Deploy Hooks</span> → create one for branch <span style={{ color: 'var(--blue)' }}>next-migration</span> → paste the URL below.
           </div>
           <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
@@ -1895,12 +1895,12 @@ export function DeployPanel() {
               value={input}
               onChange={e => setInput(e.target.value)}
               placeholder="https://api.vercel.com/v1/integrations/deploy/…"
-              style={{ flex: 1, minWidth: 200, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 7, padding: '.42rem .65rem', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--white)', outline: 'none' }}
+              style={{ flex: 1, minWidth: 200, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 7, padding: '.5rem .75rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', outline: 'none' }}
             />
             <button
               onClick={saveHook}
               disabled={!input.trim()}
-              style={{ background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 7, padding: '.42rem .9rem', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--accent)', cursor: 'pointer', flexShrink: 0 }}
+              style={{ background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 7, padding: '.5rem 1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--accent)', cursor: 'pointer', flexShrink: 0 }}
             >
               Save →
             </button>
@@ -1909,7 +1909,7 @@ export function DeployPanel() {
       )}
 
       {saved && !showInput && (
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)', marginBottom: '.85rem' }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginBottom: '.75rem' }}>
           Hook: {masked}
         </div>
       )}
@@ -1921,8 +1921,8 @@ export function DeployPanel() {
           width: '100%',
           background: saved ? 'var(--accent-tint)' : 'var(--raised)',
           border: `1px solid ${saved ? 'var(--accent-line)' : 'var(--line2)'}`,
-          borderRadius: 9, padding: '.85rem 1.25rem',
-          fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.95rem',
+          borderRadius: 9, padding: '.75rem 1.25rem',
+          fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-body)',
           color: saved ? 'var(--accent)' : 'var(--sub)',
           cursor: deploying ? 'not-allowed' : 'pointer', opacity: deploying ? 0.7 : 1,
           letterSpacing: '-.01em', textAlign: 'left' as const,
@@ -1930,14 +1930,14 @@ export function DeployPanel() {
       >
         {deploying ? '⏳ Deploying…' : saved ? '🚀 Deploy latest Claude changes →' : '⚙ Paste deploy hook URL above to enable'}
         {saved && !deploying && (
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', fontWeight: 400, color: 'var(--sub)', marginTop: '.2rem' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 400, color: 'var(--sub)', marginTop: '.25rem' }}>
             Pushes all Claude commits live in ~1 min
           </div>
         )}
       </button>
 
       {status && (
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: status.color, marginTop: '.65rem' }}>{status.text}</div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: status.color, marginTop: '.75rem' }}>{status.text}</div>
       )}
     </Card>
   )

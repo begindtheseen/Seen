@@ -415,7 +415,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
                   <span className={s.why}>{sample.why}</span>
                 </div>
               )}
-              <div className={s.label} style={{ marginTop: '.2rem' }}>The full prep</div>
+              <div className={s.label} style={{ marginTop: '.25rem' }}>The full prep</div>
               <ul className={s.list}>
                 {guide ? <li>{guide.questions} questions {guide.company} is known for{guide.framework ? `, each tied to ${guide.framework.name}` : ''}, plus the ones for {role ? `${article(role)} ${role}` : 'this role'}</li> : <li>Likely questions for {role ? `${article(role)} ${role}` : 'this role'}, and what each one checks</li>}
                 <li>Answers built from <b>your</b> résumé — no invented jobs or numbers. You finish each one in your own words on the card, and it stays yours</li>
@@ -536,7 +536,7 @@ function AnswerEditor({ a, company, values, notes, onSave, defaultOpen, title, t
       {!!notes?.length && (
         <div className={s.notes}>
           <div className={s.label}>Your words from before the rebuild</div>
-          <p className={s.dim} style={{ margin: '0 0 .3rem' }}>This answer changed when the posting changed, so what you typed is kept here for you to reuse — not shown as finished.</p>
+          <p className={s.dim} style={{ margin: '0 0 .25rem' }}>This answer changed when the posting changed, so what you typed is kept here for you to reuse — not shown as finished.</p>
           {notes.map((t, i) => <p key={i} className={s.prose}>{t}</p>)}
           <CopyBtn text={notes.join('\n')} />
         </div>
@@ -602,7 +602,7 @@ function PackView({ pack, company, fu, onFill, onRebuild, building }: { pack: Pa
       )}
       <div className={s.block}>
         <div className={s.label}>Your answers · {done}/{pack.answers.filter(a => !a.exercise).length} finished</div>
-        <p className={s.dim} style={{ margin: '0 0 .45rem' }}>Every answer starts from your résumé or the posting. Type the part only you know into each blank, and the finished answer is yours — saved here, on every device.</p>
+        <p className={s.dim} style={{ margin: '0 0 .5rem' }}>Every answer starts from your résumé or the posting. Type the part only you know into each blank, and the finished answer is yours — saved here, on every device.</p>
         {pack.answers.map((a, i) => (
           <AnswerEditor key={a.q} a={a} company={company} values={fills[a.q] || []} notes={notes[a.q]} onSave={(vals, urgent) => onFill(a.q, vals, urgent)} defaultOpen={i === 0} />
         ))}
@@ -610,7 +610,7 @@ function PackView({ pack, company, fu, onFill, onRebuild, building }: { pack: Pa
           <div className={s.notes}>
             <div className={s.label}>Your words for questions no longer on the card</div>
             {orphanNotes.map(([q, vals]) => (
-              <div key={q} style={{ marginBottom: '.4rem' }}><b className={s.prose}>{q}</b>{vals.map((t, i) => <p key={i} className={s.prose}>{t}</p>)}<CopyBtn text={vals.join('\n')} /></div>
+              <div key={q} style={{ marginBottom: '.5rem' }}><b className={s.prose}>{q}</b>{vals.map((t, i) => <p key={i} className={s.prose}>{t}</p>)}<CopyBtn text={vals.join('\n')} /></div>
             ))}
           </div>
         )}

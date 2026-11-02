@@ -49,7 +49,7 @@ export default function LegalPage() {
   return (
     <div className="rise-in" style={{ minHeight: '100vh' }}>
       <div style={{ maxWidth: 760, margin: '0 auto', padding: '4rem 2rem', width: '100%', boxSizing: 'border-box' }}>
-        <h1 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-h2)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', marginBottom: '.35rem' }}>
+        <h1 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-h2)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', marginBottom: '.25rem' }}>
           Legal
         </h1>
         <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.7, marginBottom: '2rem' }}>
@@ -60,22 +60,22 @@ export default function LegalPage() {
 
         <div style={{ display: 'grid', gap: '.75rem', marginBottom: '2.5rem' }}>
           {DOCS.map(d => (
-            <Link key={d.href} href={d.href} style={{ display: 'block', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1rem 1.2rem', textDecoration: 'none' }}>
+            <Link key={d.href} href={d.href} style={{ display: 'block', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1rem 1.25rem', textDecoration: 'none' }}>
               <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', marginBottom: '.25rem' }}>{d.title} →</div>
               <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.6 }}>{d.body}</div>
             </Link>
           ))}
         </div>
 
-        <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', marginBottom: '.65rem' }}>
+        <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', marginBottom: '.75rem' }}>
           The plain facts
         </h2>
-        <p style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.7, margin: '0 0 .9rem' }}>
+        <p style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.7, margin: '0 0 1rem' }}>
           Each line below is what the product does today and is stated in the documents above
           (<Link href="/terms#one-time" style={{ color: 'var(--sub)' }}>Terms §9–10</Link>,{' '}
           <Link href="/privacy" style={{ color: 'var(--sub)' }}>Privacy §2–7</Link>).
         </p>
-        <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
+        <ul style={{ margin: 0, paddingLeft: '1rem' }}>
           {facts.map(f => (
             <li key={f} style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.8, marginBottom: '.5rem' }}>{f}</li>
           ))}

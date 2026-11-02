@@ -125,7 +125,7 @@ const sheet: React.CSSProperties = {
 }
 
 const sheetHdr: React.CSSProperties = {
-  padding: '.85rem 1.1rem',
+  padding: '.75rem 1rem',
   borderBottom: '1px solid var(--line)',
   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
   position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 1,
@@ -133,35 +133,35 @@ const sheetHdr: React.CSSProperties = {
 
 const btnClose: React.CSSProperties = {
   background: 'none', border: 'none', color: 'var(--dim)',
-  cursor: 'pointer', fontSize: '1rem', padding: '.2rem .3rem', lineHeight: 1,
+  cursor: 'pointer', fontSize: 'var(--fs-body)', padding: '.25rem .25rem', lineHeight: 1,
 }
 
 const btnPrimary: React.CSSProperties = {
-  width: '100%', padding: '.8rem 1rem',
+  width: '100%', padding: '.75rem 1rem',
   background: 'var(--cta)',
-  color: '#fff', border: 'none', borderRadius: 10,
-  fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.88rem',
+  color: 'var(--text-1)', border: 'none', borderRadius: 10,
+  fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)',
   cursor: 'pointer', boxShadow: 'var(--sh-control)',
 }
 
 const btnGhost: React.CSSProperties = {
-  width: '100%', padding: '.65rem 1rem',
+  width: '100%', padding: '.75rem 1rem',
   background: 'none', border: '1px solid var(--line2)', color: 'var(--muted)',
-  borderRadius: 10, fontFamily: 'var(--mono)', fontSize: '.7rem',
+  borderRadius: 10, fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)',
   cursor: 'pointer',
 }
 
 const btnGreen: React.CSSProperties = {
-  width: '100%', padding: '.8rem 1rem',
+  width: '100%', padding: '.75rem 1rem',
   background: 'var(--good-tint)',
   color: 'var(--green)', border: '1.5px solid rgba(16,185,129,.45)',
-  borderRadius: 10, fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.88rem',
+  borderRadius: 10, fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)',
   cursor: 'pointer',
 }
 
 const kicker: React.CSSProperties = {
-  fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase',
-  letterSpacing: '.08em', color: 'var(--dim)', marginBottom: '.45rem',
+  fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase',
+  letterSpacing: '.08em', color: 'var(--dim)', marginBottom: '.5rem',
 }
 
 // Fit score colour: green / amber / NEUTRAL. A low score means the résumé lacks the listing's
@@ -172,7 +172,7 @@ function scoreColor(s: number): string {
 
 function LoadingDots() {
   return (
-    <div style={{ display: 'flex', gap: 5, justifyContent: 'center', alignItems: 'center', padding: '2.5rem 0' }}>
+    <div style={{ display: 'flex', gap: 4, justifyContent: 'center', alignItems: 'center', padding: '2.5rem 0' }}>
       {[0, 1, 2].map(i => (
         <div
           key={i}
@@ -664,16 +664,16 @@ export default function ApplyOptimizeModal({
         {/* Header — the job posting link lives here so it is visible above the fold on every step. */}
         <div style={sheetHdr}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontFamily: 'var(--display)', fontSize: '.88rem', fontWeight: 700, color: 'var(--white)' }}>
+            <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-ui)', fontWeight: 700, color: 'var(--white)' }}>
               {title}
             </div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--muted)', marginTop: '.1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.125rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {job.title} · {job.company}
             </div>
             {job.apply_url && (
               <a href={job.apply_url} target="_blank" rel="noopener noreferrer" data-testid="modal-posting-link"
                 onClick={() => trackApplyClick(job)}
-                style={{ display: 'inline-block', marginTop: '.3rem', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--green)', textDecoration: 'none' }}>
+                style={{ display: 'inline-block', marginTop: '.25rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', textDecoration: 'none' }}>
                 Open the job posting ↗
               </a>
             )}
@@ -681,10 +681,10 @@ export default function ApplyOptimizeModal({
           <button style={btnClose} onClick={onClose} aria-label="Close">✕</button>
         </div>
 
-        <div className="ai-safe-bottom" style={{ paddingTop: '1.1rem', paddingLeft: '1.1rem', paddingRight: '1.1rem', minHeight: 240 }}>
+        <div className="ai-safe-bottom" style={{ paddingTop: '1rem', paddingLeft: '1rem', paddingRight: '1rem', minHeight: 240 }}>
 
           {showPicker && <ResumePicker list={resumeList} selectedId={resumeId} onPick={r => { void pickResume(r) }} note="Switching re-checks your fit · free" />}
-          {showPicker && pickErr && <div role="alert" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-65)', color: 'var(--red)', marginBottom: '.6rem' }}>{pickErr}</div>}
+          {showPicker && pickErr && <div role="alert" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-65)', color: 'var(--red)', marginBottom: '.5rem' }}>{pickErr}</div>}
 
           {/* ── loading-resume / checking (free) / confirm (the dialog sits above) ── */}
           {(step === 'loading-resume' || step === 'checking' || step === 'confirm') && <LoadingDots />}
@@ -692,15 +692,15 @@ export default function ApplyOptimizeModal({
           {/* ── needs-posting: the listing is only a teaser — nothing was charged (D2) ── */}
           {step === 'needs-posting' && (
             <div className="ai-stack">
-              <div style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.22)', borderRadius: 10, padding: '.8rem .95rem' }}>
-                <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '.88rem', marginBottom: '.3rem' }}>Seen could not read the full posting</div>
+              <div style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.22)', borderRadius: 10, padding: '.75rem 1rem' }}>
+                <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: 'var(--fs-ui)', marginBottom: '.25rem' }}>Seen could not read the full posting</div>
                 <div style={{ fontSize: 'var(--fs-72)', color: 'var(--sub)', lineHeight: 1.6 }}>
                   This source gives Seen only a short preview, and the listing&apos;s own page would not hand over the rest just now. No credit was used. Open the listing, select all of its text, and paste it here — the check is free.
                 </div>
                 {job.apply_url && (
                   <a href={job.apply_url} target="_blank" rel="noopener noreferrer" data-testid="needs-posting-link"
                     onClick={() => trackApplyClick(job)}
-                    style={{ display: 'inline-block', marginTop: '.55rem', fontSize: 'var(--fs-72)', fontWeight: 700, color: 'var(--accent)', textDecoration: 'none' }}>
+                    style={{ display: 'inline-block', marginTop: '.5rem', fontSize: 'var(--fs-72)', fontWeight: 700, color: 'var(--accent)', textDecoration: 'none' }}>
                     Open the listing ↗
                   </a>
                 )}
@@ -708,7 +708,7 @@ export default function ApplyOptimizeModal({
               <label style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.08em' }}>
                 Full job posting
                 <textarea autoComplete="off" data-testid="posting-paste" value={pasteDraft} onChange={e => setPasteDraft(e.target.value)} rows={7} placeholder="Paste the whole posting: duties, requirements, schedule…"
-                  style={{ display: 'block', width: '100%', marginTop: '.35rem', background: 'var(--surface)', border: '1.5px solid var(--line2)', borderRadius: 8, padding: '.65rem .8rem', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: '.8rem', lineHeight: 1.55, boxSizing: 'border-box', textTransform: 'none', letterSpacing: 0 }} />
+                  style={{ display: 'block', width: '100%', marginTop: '.25rem', background: 'var(--surface)', border: '1.5px solid var(--line2)', borderRadius: 8, padding: '.75rem .75rem', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-sm)', lineHeight: 1.55, boxSizing: 'border-box', textTransform: 'none', letterSpacing: 0 }} />
               </label>
               <button style={{ ...btnPrimary, opacity: pasteDraft.trim().length < 200 ? 0.55 : 1 }} disabled={pasteDraft.trim().length < 200}
                 onClick={() => { const t = pasteDraft.trim(); setPosting(t); prepare(resumeText, t) }}>
@@ -721,14 +721,14 @@ export default function ApplyOptimizeModal({
           {/* ── no-requirements: the posting states too few requirements — refused free, no credit ── */}
           {step === 'no-requirements' && (
             <div className="ai-stack" data-testid="no-requirements">
-              <div style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.22)', borderRadius: 10, padding: '.8rem .95rem' }}>
-                <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '.88rem', marginBottom: '.3rem' }}>Nothing to optimize against</div>
+              <div style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.22)', borderRadius: 10, padding: '.75rem 1rem' }}>
+                <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: 'var(--fs-ui)', marginBottom: '.25rem' }}>Nothing to optimize against</div>
                 <div style={{ fontSize: 'var(--fs-72)', color: 'var(--sub)', lineHeight: 1.6 }}>{noReqNote || NO_REQUIREMENTS_NOTE}</div>
               </div>
               <label style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.08em' }}>
                 Have the full posting with its requirements? Paste it
                 <textarea autoComplete="off" value={pasteDraft} onChange={e => setPasteDraft(e.target.value)} rows={6} placeholder="Paste the whole posting: duties, requirements, schedule…"
-                  style={{ display: 'block', width: '100%', marginTop: '.35rem', background: 'var(--surface)', border: '1.5px solid var(--line2)', borderRadius: 8, padding: '.65rem .8rem', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: '.8rem', lineHeight: 1.55, boxSizing: 'border-box', textTransform: 'none', letterSpacing: 0 }} />
+                  style={{ display: 'block', width: '100%', marginTop: '.25rem', background: 'var(--surface)', border: '1.5px solid var(--line2)', borderRadius: 8, padding: '.75rem .75rem', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-sm)', lineHeight: 1.55, boxSizing: 'border-box', textTransform: 'none', letterSpacing: 0 }} />
               </label>
               <button style={{ ...btnPrimary, opacity: pasteDraft.trim().length < 200 ? 0.55 : 1 }} disabled={pasteDraft.trim().length < 200}
                 onClick={() => { const t = pasteDraft.trim(); setPosting(t); prepare(resumeText, t) }}>
@@ -742,9 +742,9 @@ export default function ApplyOptimizeModal({
           {step === 'not-logged-in' && (
             <>
               <div style={{ textAlign: 'center', padding: '.5rem 0 1.25rem' }}>
-                <div style={{ fontSize: '2rem', marginBottom: '.75rem' }}>👋</div>
-                <div style={{ fontFamily: 'var(--display)', fontSize: '1rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.35rem' }}>Sign in to apply &amp; track</div>
-                <div style={{ fontSize: '.82rem', color: 'var(--sub)', lineHeight: 1.7, marginBottom: '1.25rem' }}>
+                <div style={{ fontSize: 'var(--fs-h2)', marginBottom: '.75rem' }}>👋</div>
+                <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', marginBottom: '.25rem' }}>Sign in to apply &amp; track</div>
+                <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.7, marginBottom: '1.25rem' }}>
                   Track responses, get ghost-risk warnings, and receive day-7/14/30 check-ins.
                 </div>
               </div>
@@ -774,9 +774,9 @@ export default function ApplyOptimizeModal({
           {step === 'no-resume' && (
             <>
               <div style={{ textAlign: 'center', padding: '.5rem 0 1rem' }}>
-                <div style={{ fontSize: '2rem', marginBottom: '.75rem' }}>📄</div>
-                <div style={{ fontFamily: 'var(--display)', fontSize: '.95rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.35rem' }}>Upload your resume first</div>
-                <div style={{ fontSize: '.8rem', color: 'var(--sub)', lineHeight: 1.7, marginBottom: '1.25rem' }}>
+                <div style={{ fontSize: 'var(--fs-h2)', marginBottom: '.75rem' }}>📄</div>
+                <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', marginBottom: '.25rem' }}>Upload your resume first</div>
+                <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.7, marginBottom: '1.25rem' }}>
                   Seen needs your resume to rewrite bullets for this specific role.
                   Takes 30 seconds — upload once, optimized for every job.
                 </div>
@@ -800,9 +800,9 @@ export default function ApplyOptimizeModal({
           {step === 'resume-corrupted' && (
             <>
               <div style={{ textAlign: 'center', padding: '.5rem 0 1rem' }}>
-                <div style={{ fontSize: '2rem', marginBottom: '.75rem' }}>📄</div>
-                <div style={{ fontFamily: 'var(--display)', fontSize: '.95rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.35rem' }}>We couldn&apos;t read your saved resume</div>
-                <div style={{ fontSize: '.8rem', color: 'var(--sub)', lineHeight: 1.7, marginBottom: '1.25rem' }}>
+                <div style={{ fontSize: 'var(--fs-h2)', marginBottom: '.75rem' }}>📄</div>
+                <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', marginBottom: '.25rem' }}>We couldn&apos;t read your saved resume</div>
+                <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.7, marginBottom: '1.25rem' }}>
                   It didn&apos;t convert to clean text — this is common with resumes exported or scanned on a phone.
                   Re-upload it (or paste the text) and you&apos;re good to go. Takes 30 seconds.
                 </div>
@@ -833,8 +833,8 @@ export default function ApplyOptimizeModal({
                   <MissingList missing={diag.unsupported_requirements} limit={6} />
                 </div>
               )}
-              <div style={{ background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 10, padding: '.8rem .95rem', marginBottom: '1rem' }}>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-52)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--accent)', fontWeight: 700, marginBottom: '.45rem' }}>What {pro === true ? 'the optimize' : OPTIMIZE_PRICE} adds — kept for 7 days</div>
+              <div style={{ background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 10, padding: '.75rem 1rem', marginBottom: '1rem' }}>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-52)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--accent)', fontWeight: 700, marginBottom: '.5rem' }}>What {pro === true ? 'the optimize' : OPTIMIZE_PRICE} adds — kept for 7 days</div>
                 {[
                   'Which of your bullets should lead each job for this posting',
                   'Number questions — your answer writes the bullet',
@@ -842,12 +842,12 @@ export default function ApplyOptimizeModal({
                   'A summary for this job, built only from your own facts',
                   'Wording proposals you accept one by one, and HumanProof',
                 ].map(t => (
-                  <div key={t} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--text)', marginBottom: '.22rem' }}>• {t}</div>
+                  <div key={t} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--text)', marginBottom: '.25rem' }}>• {t}</div>
                 ))}
               </div>
 
               {error && (
-                <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, padding: '.6rem .85rem', marginBottom: '.75rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--red)' }}>
+                <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, padding: '.5rem .75rem', marginBottom: '.75rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--red)' }}>
                   {error}
                 </div>
               )}
@@ -867,10 +867,10 @@ export default function ApplyOptimizeModal({
           {step === 'optimizing' && (
             <div style={{ textAlign: 'center', paddingBottom: '1rem' }}>
               <LoadingDots />
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.7rem', color: 'var(--sub)', marginBottom: '.75rem' }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '.75rem' }}>
                 Scoring your fit and rewriting bullets for this role…
               </div>
-              <button style={{ background: 'none', border: 'none', color: 'var(--dim)', fontFamily: 'var(--mono)', fontSize: '.62rem', cursor: 'pointer', textDecoration: 'underline' }} onClick={applyWithoutOptimize}>
+              <button style={{ background: 'none', border: 'none', color: 'var(--dim)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', cursor: 'pointer', textDecoration: 'underline' }} onClick={applyWithoutOptimize}>
                 Skip — just apply ↗
               </button>
             </div>
@@ -880,7 +880,7 @@ export default function ApplyOptimizeModal({
           {step === 'review' && result && (
             <div className="ai-stack">
               {error && (
-                <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, padding: '.6rem .85rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--red)' }}>
+                <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, padding: '.5rem .75rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--red)' }}>
                   {error}
                 </div>
               )}
@@ -904,9 +904,9 @@ export default function ApplyOptimizeModal({
               {wordingNotes.length > 0 && (
                 <div>
                   <div style={kicker}>Same thing, different word</div>
-                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.3rem' }}>
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.25rem' }}>
                     {wordingNotes.map((n, i) => (
-                      <li key={i} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', lineHeight: 1.55, overflowWrap: 'anywhere' }}>{n}</li>
+                      <li key={i} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.55, overflowWrap: 'anywhere' }}>{n}</li>
                     ))}
                   </ul>
                 </div>
@@ -916,16 +916,16 @@ export default function ApplyOptimizeModal({
               {realBullets.length > 0 && (
                 <div>
                   <div style={kicker}>Safe improvements — {realBullets.length} of your own bullet{realBullets.length !== 1 ? 's' : ''}, nothing invented</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                     {realBullets.map((b, i) => (
                       <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 10, overflow: 'hidden' }}>
-                        <div style={{ padding: '.55rem .75rem', borderBottom: '1px solid var(--line)' }}>
-                          <div style={{ fontFamily: 'var(--mono)', fontSize: '.46rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)', marginBottom: '.28rem' }}>Before</div>
-                          <div style={{ fontSize: '.72rem', color: 'var(--muted)', lineHeight: 1.55, overflowWrap: 'anywhere' }}>{b.original}</div>
+                        <div style={{ padding: '.5rem .75rem', borderBottom: '1px solid var(--line)' }}>
+                          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)', marginBottom: '.25rem' }}>Before</div>
+                          <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.55, overflowWrap: 'anywhere' }}>{b.original}</div>
                         </div>
-                        <div style={{ padding: '.55rem .75rem' }}>
-                          <div style={{ fontFamily: 'var(--mono)', fontSize: '.46rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--green)', marginBottom: '.28rem' }}>After · {b.addresses}</div>
-                          <div style={{ fontSize: '.72rem', color: 'var(--white)', lineHeight: 1.55, fontWeight: 500, overflowWrap: 'anywhere' }}>{b.optimized}</div>
+                        <div style={{ padding: '.5rem .75rem' }}>
+                          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--green)', marginBottom: '.25rem' }}>After · {b.addresses}</div>
+                          <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--white)', lineHeight: 1.55, fontWeight: 500, overflowWrap: 'anywhere' }}>{b.optimized}</div>
                         </div>
                       </div>
                     ))}
@@ -937,9 +937,9 @@ export default function ApplyOptimizeModal({
               {guidanceItems.length > 0 && (
                 <div>
                   <div style={{ ...kicker, color: 'var(--amber)' }}>Needs a real detail from you — add only if true</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                     {guidanceItems.map((g, i) => (
-                      <div key={i} style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, padding: '.55rem .75rem', fontSize: '.72rem', color: 'var(--sub)', lineHeight: 1.5, overflowWrap: 'anywhere' }}>
+                      <div key={i} style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, padding: '.5rem .75rem', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5, overflowWrap: 'anywhere' }}>
                         Write a bullet for <strong style={{ color: 'var(--white)' }}>{g.addresses}</strong> — only include it if it reflects real work, and attach a real number.
                       </div>
                     ))}
@@ -949,11 +949,11 @@ export default function ApplyOptimizeModal({
 
               {/* ── HumanProof step ── */}
               {realBullets.length > 0 && (
-              <div style={{ borderTop: '1px solid var(--line)', paddingTop: '.9rem' }}>
+              <div style={{ borderTop: '1px solid var(--line)', paddingTop: '1rem' }}>
                 {hpState === 'idle' && (
-                  <div style={{ background: 'var(--gdim)', border: '1px solid var(--line)', borderRadius: 12, padding: '.95rem 1rem' }}>
-                    <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '.85rem', marginBottom: '.25rem' }}>Make it sound human</div>
-                    <p style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', lineHeight: 1.55, marginBottom: '.75rem' }}>
+                  <div style={{ background: 'var(--gdim)', border: '1px solid var(--line)', borderRadius: 12, padding: '1rem 1rem' }}>
+                    <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: 'var(--fs-ui)', marginBottom: '.25rem' }}>Make it sound human</div>
+                    <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.55, marginBottom: '.75rem' }}>
                       HumanProof removes generic AI tone and keeps your bullets specific, natural, and interview-defensible — no unsupported claims.
                     </p>
                     <button style={btnGreen} onClick={runHumanProof}>Run HumanProof →</button>
@@ -961,62 +961,62 @@ export default function ApplyOptimizeModal({
                 )}
 
                 {hpState === 'loading' && (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '.6rem', padding: '1rem', background: 'var(--gdim)', border: '1px solid var(--line)', borderRadius: 12 }}>
-                    <div className="spinner" /><span style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--sub)' }}>Making it sound real…</span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '.5rem', padding: '1rem', background: 'var(--gdim)', border: '1px solid var(--line)', borderRadius: 12 }}>
+                    <div className="spinner" /><span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)' }}>Making it sound real…</span>
                   </div>
                 )}
 
                 {hpState === 'error' && (
                   <div style={{ textAlign: 'center', padding: '.5rem 0' }}>
-                    <div style={{ fontFamily: 'var(--mono)', fontSize: '.66rem', color: 'var(--muted)', marginBottom: '.5rem' }}>Couldn&apos;t run HumanProof. Your optimized bullets above are ready to use.</div>
-                    <button onClick={runHumanProof} style={{ ...btnGhost, width: 'auto', padding: '.4rem 1rem' }}>Retry</button>
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginBottom: '.5rem' }}>Couldn&apos;t run HumanProof. Your optimized bullets above are ready to use.</div>
+                    <button onClick={runHumanProof} style={{ ...btnGhost, width: 'auto', padding: '.5rem 1rem' }}>Retry</button>
                   </div>
                 )}
 
                 {hpState === 'locked' && (
-                  <div style={{ background: 'var(--gdim)', border: '1px solid var(--line2)', borderRadius: 12, padding: '1.1rem', textAlign: 'center' }}>
-                    <div style={{ fontSize: '1.3rem', marginBottom: '.4rem' }}>🔒</div>
-                    <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '.9rem', marginBottom: '.4rem' }}>
+                  <div style={{ background: 'var(--gdim)', border: '1px solid var(--line2)', borderRadius: 12, padding: '1rem', textAlign: 'center' }}>
+                    <div style={{ fontSize: 'var(--fs-h3)', marginBottom: '.5rem' }}>🔒</div>
+                    <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: 'var(--fs-ui)', marginBottom: '.5rem' }}>
                       Your application is optimized. Now make it sound real.
                     </div>
-                    <p style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.9rem' }}>
+                    <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '1rem' }}>
                       Unlock HumanProof so it sounds specific &amp; natural, stays interview-defensible, and carries no unsupported claims.
                     </p>
                     <button
                       onClick={() => { setUpgradeReason('pro'); setUpgradeFeature('HumanProof'); setShowUpgrade(true) }}
-                      style={{ ...btnGreen, width: 'auto', padding: '.65rem 1.4rem' }}
+                      style={{ ...btnGreen, width: 'auto', padding: '.75rem 1.5rem' }}
                     >
                       Unlock HumanProof
                     </button>
-                    <p style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--muted)', lineHeight: 1.6, margin: '.6rem 0 0' }}>{LOCK_NOTE}</p>
+                    <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.6, margin: '.5rem 0 0' }}>{LOCK_NOTE}</p>
                   </div>
                 )}
 
                 {hpState === 'done' && hp && (
                   <div className="ai-stack">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
                       <div style={{ flexShrink: 0, width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `3px solid ${scoreColor(hp.humanproof_score)}` }}>
-                        <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', color: scoreColor(hp.humanproof_score) }}>{hp.humanproof_score}</span>
+                        <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)', color: scoreColor(hp.humanproof_score) }}>{hp.humanproof_score}</span>
                       </div>
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '.82rem' }}>HumanProof score</div>
-                        <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>{hp.ai_slop_risk} AI-slop risk · specific, natural, interview-defensible</div>
+                        <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: 'var(--fs-sm)' }}>HumanProof score</div>
+                        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>{hp.ai_slop_risk} AI-slop risk · specific, natural, interview-defensible</div>
                       </div>
                     </div>
                     <div>
                       <div style={kicker}>Humanized bullets</div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                         {hp.package.bullets.map((b, i) => (
-                          <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.6rem .75rem', fontSize: '.72rem', color: 'var(--sub)', lineHeight: 1.55, overflowWrap: 'anywhere' }}>{b.humanized_text}</div>
+                          <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.5rem .75rem', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.55, overflowWrap: 'anywhere' }}>{b.humanized_text}</div>
                         ))}
                       </div>
                     </div>
                     {confirmItems().length > 0 && (
                       <div>
                         <div style={{ ...kicker, color: 'var(--amber)' }}>⚠ Confirm before using</div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '.35rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '.25rem' }}>
                           {confirmItems().map((c, i) => (
-                            <div key={i} style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, padding: '.5rem .7rem', fontSize: '.7rem', color: 'var(--sub)', lineHeight: 1.5, overflowWrap: 'anywhere' }}>{c}</div>
+                            <div key={i} style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, padding: '.5rem .75rem', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5, overflowWrap: 'anywhere' }}>{c}</div>
                           ))}
                         </div>
                       </div>
@@ -1034,17 +1034,17 @@ export default function ApplyOptimizeModal({
                 </div>
               )}
               {pro === false && !upsellDismissed && result.charged && (
-                <div data-testid="credit-ledger" style={{ display: 'flex', alignItems: 'center', gap: '.6rem', background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 8, padding: '.5rem .6rem .5rem .85rem' }}>
+                <div data-testid="credit-ledger" style={{ display: 'flex', alignItems: 'center', gap: '.5rem', background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 8, padding: '.5rem .5rem .5rem .75rem' }}>
                   <button
                     onClick={() => { setUpgradeReason('generic'); setUpgradeFeature(undefined); setShowUpgrade(true) }}
-                    style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--body)', fontSize: '.66rem', color: 'var(--sub)', lineHeight: 1.5 }}
+                    style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5 }}
                   >
                     {OPTIMIZE_PRICE} used{balance != null ? ` · ${balance} left` : ''} · {dailyResetLabel()} · <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{PASS_AFTER_WIN}</span>
                   </button>
                   <button
                     onClick={() => setUpsellDismissed(true)}
                     aria-label="Dismiss"
-                    style={{ background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontSize: '.8rem', lineHeight: 1, padding: '.1rem .2rem', flexShrink: 0 }}
+                    style={{ background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontSize: 'var(--fs-sm)', lineHeight: 1, padding: '.125rem .25rem', flexShrink: 0 }}
                   >✕</button>
                 </div>
               )}
@@ -1065,21 +1065,21 @@ export default function ApplyOptimizeModal({
                       : (job.apply_url ? 'Apply online →' : 'I applied — start tracking')}
                 </button>
                 {pdfFailed && (
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', textAlign: 'center' }}>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', textAlign: 'center' }}>
                     Couldn&apos;t build the PDF — Apply still works, or retry / email below.
                   </div>
                 )}
                 <div className="ai-btn-row" style={{ display: 'flex', gap: '.5rem' }}>
                   <button
                     onClick={() => copyText(buildPackageText(), 'pkg')}
-                    style={{ flex: 1, padding: '.65rem .5rem', background: 'var(--raised)', border: '1px solid var(--line2)', color: copied === 'pkg' ? 'var(--green)' : 'var(--sub)', borderRadius: 9, fontFamily: 'var(--mono)', fontSize: '.66rem', cursor: 'pointer' }}
+                    style={{ flex: 1, padding: '.75rem .5rem', background: 'var(--raised)', border: '1px solid var(--line2)', color: copied === 'pkg' ? 'var(--green)' : 'var(--sub)', borderRadius: 9, fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', cursor: 'pointer' }}
                   >
                     {copied === 'pkg' ? '✓ Copied' : 'Copy package'}
                   </button>
                   {pdfBlob ? (
                     <button
                       onClick={saveBlob}
-                      style={{ flex: 1, padding: '.65rem .5rem', background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 9, fontFamily: 'var(--mono)', fontSize: '.66rem', cursor: 'pointer' }}
+                      style={{ flex: 1, padding: '.75rem .5rem', background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 9, fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', cursor: 'pointer' }}
                     >
                       ⬇ Save PDF
                     </button>
@@ -1087,14 +1087,14 @@ export default function ApplyOptimizeModal({
                     <button
                       onClick={() => { setPdfFailed(false); preparePdf() }}
                       disabled={prepping}
-                      style={{ flex: 1, padding: '.65rem .5rem', background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 9, fontFamily: 'var(--mono)', fontSize: '.66rem', cursor: prepping ? 'not-allowed' : 'pointer', opacity: prepping ? 0.6 : 1 }}
+                      style={{ flex: 1, padding: '.75rem .5rem', background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 9, fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', cursor: prepping ? 'not-allowed' : 'pointer', opacity: prepping ? 0.6 : 1 }}
                     >
                       {prepping ? 'Building…' : '⬇ Save PDF'}
                     </button>
                   )}
                   <button
                     onClick={approveAndSend}
-                    style={{ flex: 1, padding: '.65rem .5rem', background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 9, fontFamily: 'var(--mono)', fontSize: '.66rem', cursor: 'pointer' }}
+                    style={{ flex: 1, padding: '.75rem .5rem', background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 9, fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', cursor: 'pointer' }}
                   >
                     ✉ Email it
                   </button>
@@ -1107,7 +1107,7 @@ export default function ApplyOptimizeModal({
           {step === 'sending' && (
             <div style={{ textAlign: 'center', paddingBottom: '1rem' }}>
               <LoadingDots />
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.7rem', color: 'var(--sub)' }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)' }}>
                 Sending your optimized resume to {user?.email || profile?.email || 'your email'}…
               </div>
             </div>
@@ -1117,18 +1117,18 @@ export default function ApplyOptimizeModal({
           {step === 'done' && (
             <>
               <div style={{ textAlign: 'center', padding: '.5rem 0 1.25rem' }}>
-                <div style={{ fontSize: '2.5rem', marginBottom: '.75rem' }}>✉️</div>
-                <div style={{ fontFamily: 'var(--display)', fontSize: '1rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.4rem' }}>
+                <div style={{ fontSize: 'var(--fs-fig-m)', marginBottom: '.75rem' }}>✉️</div>
+                <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', marginBottom: '.5rem' }}>
                   Check your email
                 </div>
-                <div style={{ fontSize: '.78rem', color: 'var(--sub)', lineHeight: 1.7 }}>
+                <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.7 }}>
                   Your optimized resume is on its way to{' '}
                   <span style={{ color: 'var(--white)', fontWeight: 600 }}>{user?.email || profile?.email || 'your inbox'}</span>.
                   Open it, then apply with your new bullets.
                 </div>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                 {job.apply_url ? (
                   <a
                     href={job.apply_url}

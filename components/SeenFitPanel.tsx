@@ -104,13 +104,14 @@ export default function SeenFitPanel({ job }: { job: Job }) {
   if (state === 'idle') {
     return (
       <div style={{ marginTop: '1.5rem' }}>
+        {/* Secondary on purpose: Apply is the page's one filled button (DESIGN.md §5). */}
         <button
           onClick={run}
-          style={{ width: '100%', background: 'var(--cta)', color: '#fff', border: 'none', borderRadius: 10, padding: '.85rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.9rem', cursor: 'pointer' }}
+          style={{ width: '100%', background: 'var(--accent-tint)', color: 'var(--accent)', border: '1px solid var(--accent-line)', borderRadius: 'var(--r-control)', padding: 'var(--sp-3) var(--sp-4)', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-ui)', minHeight: 44, cursor: 'pointer' }}
         >
-          ✨ Check my fit for this job · free
+          Check my fit for this job · free
         </button>
-        <div style={{ fontFamily: mono, fontSize: '.55rem', color: 'var(--muted)', textAlign: 'center', marginTop: '.45rem' }}>
+        <div style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--text-4)', textAlign: 'center', marginTop: 'var(--sp-2)' }}>
           Deterministic SeenFit Engine — no AI guesswork, your data stays grounded.
         </div>
       </div>
@@ -119,8 +120,8 @@ export default function SeenFitPanel({ job }: { job: Job }) {
 
   if (state === 'loading') {
     return (
-      <div style={{ marginTop: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '.6rem', padding: '1.5rem', background: 'var(--gdim)', border: '1px solid var(--line)', borderRadius: 12 }}>
-        <div className="spinner" /><span style={{ fontFamily: mono, fontSize: '.7rem', color: 'var(--sub)' }}>Scoring your fit…</span>
+      <div style={{ marginTop: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '.5rem', padding: '1.5rem', background: 'var(--gdim)', border: '1px solid var(--line)', borderRadius: 12 }}>
+        <div className="spinner" /><span style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--sub)' }}>Scoring your fit…</span>
       </div>
     )
   }
@@ -128,9 +129,9 @@ export default function SeenFitPanel({ job }: { job: Job }) {
   if (state === 'no_resume') {
     return (
       <div style={{ marginTop: '1.5rem', background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 12, padding: '1.25rem', textAlign: 'center' }}>
-        <div style={{ fontFamily: 'var(--display)', fontWeight: 700, color: 'var(--white)', marginBottom: '.4rem' }}>Add your résumé first</div>
-        <p style={{ fontFamily: mono, fontSize: '.65rem', color: 'var(--sub)', marginBottom: '1rem', lineHeight: 1.6 }}>SeenFit scores your résumé against this exact role. Upload it once and we&apos;ll optimize every application.</p>
-        <a href={`/resume?company=${encodeURIComponent(job.company)}&role=${encodeURIComponent(job.title)}`} style={{ display: 'inline-block', background: 'var(--green)', color: 'var(--ink)', borderRadius: 8, padding: '.6rem 1.25rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.82rem', textDecoration: 'none' }}>Add résumé →</a>
+        <div style={{ fontFamily: 'var(--display)', fontWeight: 700, color: 'var(--white)', marginBottom: '.5rem' }}>Add your résumé first</div>
+        <p style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '1rem', lineHeight: 1.6 }}>SeenFit scores your résumé against this exact role. Upload it once and we&apos;ll optimize every application.</p>
+        <a href={`/resume?company=${encodeURIComponent(job.company)}&role=${encodeURIComponent(job.title)}`} style={{ display: 'inline-block', background: 'var(--green)', color: 'var(--ink)', borderRadius: 8, padding: '.5rem 1.25rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', textDecoration: 'none' }}>Add résumé →</a>
       </div>
     )
   }
@@ -143,15 +144,15 @@ export default function SeenFitPanel({ job }: { job: Job }) {
 
   if (state === 'disabled') {
     return (
-      <div style={{ marginTop: '1.5rem', fontFamily: mono, fontSize: '.7rem', color: 'var(--muted)', textAlign: 'center', padding: '1rem' }}>SeenFit optimization is temporarily unavailable.</div>
+      <div style={{ marginTop: '1.5rem', fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--muted)', textAlign: 'center', padding: '1rem' }}>SeenFit optimization is temporarily unavailable.</div>
     )
   }
 
   if (state === 'error') {
     return (
       <div style={{ marginTop: '1.5rem', textAlign: 'center', padding: '1rem' }}>
-        <div style={{ fontFamily: mono, fontSize: '.7rem', color: 'var(--muted)', marginBottom: '.6rem' }}>Couldn&apos;t run the optimization. Try again.</div>
-        <button onClick={run} style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 7, padding: '.5rem 1rem', fontFamily: mono, fontSize: '.65rem', cursor: 'pointer' }}>Retry</button>
+        <div style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginBottom: '.5rem' }}>Couldn&apos;t run the optimization. Try again.</div>
+        <button onClick={run} style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 7, padding: '.5rem 1rem', fontFamily: mono, fontSize: 'var(--fs-meta)', cursor: 'pointer' }}>Retry</button>
       </div>
     )
   }
@@ -166,7 +167,7 @@ export default function SeenFitPanel({ job }: { job: Job }) {
 
       {out.verdict.score != null && (
         <Section title="WHAT THE SCORE IS MADE OF">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
             {sortedContribs.map((c) => (
               <div key={c.factor}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '.25rem' }}>
@@ -192,33 +193,33 @@ export default function SeenFitPanel({ job }: { job: Job }) {
 
       {/* Company hiring / process risk */}
       <Section title="COMPANY HIRING RISK">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', marginBottom: out.risk_flags.length ? '.7rem' : 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: out.risk_flags.length ? '.7rem' : 0 }}>
           {out.company_process_known === false ? (
-            <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', color: 'var(--muted)' }}>Not graded yet</span>
+            <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)', color: 'var(--muted)' }}>Not graded yet</span>
           ) : (
-            <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.1rem', color: scoreColor(out.company_process_score) }}>{Math.round(out.company_process_score)}<span style={{ fontSize: '.6rem', color: 'var(--muted)' }}>/100</span></span>
+            <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-lead)', color: scoreColor(out.company_process_score) }}>{Math.round(out.company_process_score)}<span style={{ fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>/100</span></span>
           )}
-          <span style={{ fontFamily: mono, fontSize: '.6rem', color: 'var(--muted)' }}>{out.company_process_known === false ? `Fewer than ${MIN_REPORTS_FOR_GRADE} applicant reports — no grade yet` : 'hiring-process score (real applicant outcomes)'}</span>
+          <span style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>{out.company_process_known === false ? `Fewer than ${MIN_REPORTS_FOR_GRADE} applicant reports — no grade yet` : 'hiring-process score (real applicant outcomes)'}</span>
         </div>
         {out.risk_flags.length > 0 ? (
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
             {out.risk_flags.map((f, i) => (
-              <li key={i} style={{ display: 'flex', gap: '.5rem', fontSize: '.72rem', color: f.severity === 'high' ? 'var(--red)' : f.severity === 'medium' ? 'var(--amber)' : 'var(--muted)', lineHeight: 1.5 }}>
+              <li key={i} style={{ display: 'flex', gap: '.5rem', fontSize: 'var(--fs-meta)', color: f.severity === 'high' ? 'var(--red)' : f.severity === 'medium' ? 'var(--amber)' : 'var(--muted)', lineHeight: 1.5 }}>
                 <span style={{ flexShrink: 0 }}>{f.severity === 'high' ? '✕' : '⚠'}</span>{f.message}
               </li>
             ))}
           </ul>
         ) : (
-          <div style={{ fontFamily: mono, fontSize: '.62rem', color: 'var(--green)' }}>No risk flags — clean signals for this role.</div>
+          <div style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--green)' }}>No risk flags — clean signals for this role.</div>
         )}
       </Section>
 
       {/* Actions */}
-      <div style={{ display: 'flex', gap: '.6rem' }}>
+      <div style={{ display: 'flex', gap: '.5rem' }}>
         {job.apply_url && (
-          <a href={job.apply_url} target="_blank" rel="noopener noreferrer" onClick={() => sendFeedback('apply', out.run_id)} style={{ flex: 1, textAlign: 'center', background: 'var(--green)', color: 'var(--ink)', borderRadius: 8, padding: '.65rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.8rem', textDecoration: 'none' }}>Apply now →</a>
+          <a href={job.apply_url} target="_blank" rel="noopener noreferrer" onClick={() => sendFeedback('apply', out.run_id)} style={{ flex: 1, textAlign: 'center', background: 'var(--green)', color: 'var(--ink)', borderRadius: 8, padding: '.75rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)', textDecoration: 'none' }}>Apply now →</a>
         )}
-        <button onClick={() => sendFeedback('save', out.run_id)} style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, padding: '.65rem 1rem', fontFamily: mono, fontSize: '.65rem', cursor: 'pointer' }}>Saved ✓</button>
+        <button onClick={() => sendFeedback('save', out.run_id)} style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, padding: '.75rem 1rem', fontFamily: mono, fontSize: 'var(--fs-meta)', cursor: 'pointer' }}>Saved ✓</button>
       </div>
     </div>
   )
@@ -226,8 +227,8 @@ export default function SeenFitPanel({ job }: { job: Job }) {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={{ background: 'var(--gdim)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.1rem' }}>
-      <div style={{ fontFamily: mono, fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)', marginBottom: '.75rem' }}>{title}</div>
+    <div style={{ background: 'var(--gdim)', border: '1px solid var(--line)', borderRadius: 12, padding: '1rem' }}>
+      <div style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)', marginBottom: '.75rem' }}>{title}</div>
       {children}
     </div>
   )

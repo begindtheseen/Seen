@@ -34,15 +34,28 @@ When the owner needs to run SQL (migrations, fixes, queries), NEVER send a .sql 
 path. Put the SQL in the chat as a plain fenced code block he can copy straight into the Supabase SQL
 Editor — comments stripped, one block per migration, and say which to run first.
 
-## OWNER DECISION 2026-11-02: no purple, no gradient fills, no glow — ONE flat blue accent
-"Seenjobs needs to ditch the purple gradient as a whole — it's the tell-tale sign of vibecode slop." The whole
-indigo/violet family is retired, with the gradient CTA, the gradient headline text, the purple glow shadows and the
-animated aurora orbs. The look is now: dark surfaces, one flat accent (`--accent:#60a5fa` text/icons,
-`--accent-strong:#2563eb` fills, `--cta:#2563eb` / `--cta-hover:#1d4ed8` for THE primary button), the semantic
-good/caution/bad/info set, and plain shadows (`--sh-*`). `lib/ui/designRules.test.mjs` fails the suite on any
-indigo/violet/purple/fuchsia hex or rgb, any retired token (`--cta-gradient`, `--g-*`, `--violet`, `--purple`…), any
-gradient that mixes two colours, and any `background-clip:text`. Do not add a second hue "for pop"; do not bring
-back a gradient button; a new colour is a token in app/globals.css or it does not ship.
+## DESIGN SYSTEM — locked 2026-11-02 (owner: "ditch the purple gradient… without sacrificing how good it looks")
+**Read `DESIGN.md` before touching any CSS, page or component.** It is the whole system; the short form:
+- **Personality: Candid. Calm. Exact.** Reference: an air-traffic control room at night — dark, every reading real, one
+  thing lit at a time. Not another SaaS template.
+- **Colour 60/30/10, every value a token in `app/globals.css`:** 60 dark field (`--bg`, `--surface-*`), 30 neutral ink
+  (`--text-1..4`, `--border-1..3`), 10 signal = ONE flat blue on actions and the current place (`--cta`/`--cta-hover`
+  for THE primary button, `--accent` text/icons, `--accent-strong` fills) + semantic good/caution/bad/info WITH a word
+  and an icon. Eyebrows/labels/meta are ink (`--text-3`), never the accent. No raw hex/rgb in `*.module.css` or `.tsx`
+  (only globals.css, OG/canvas renderers and SVGs may hold literals).
+- **Retired for good:** indigo/violet/purple/fuchsia, any gradient mixing two colours, glow shadows, gradient text,
+  glass over content, backdrop-filter on full-screen overlays, aurora orbs, a gradient primary button.
+- **Type: exactly TWO fonts** — Syne 700/800 (`--display`, H1–H3 only) and Instrument Sans 400/500/600 (`--body`;
+  `--mono` now aliases it; DM Mono is gone). Tabular figures are on page-wide. The `--fs-*` scale only; 12px floor.
+  **One `<h1>` per screen.**
+- **Spacing: 8px grid** for layout (`--sp-2/4/6/8/12/16/24`), 4px steps only inside a component, 1–2px for hairlines;
+  the whole codebase was snapped to it (1,140 values). Radii `--r-*`, shadows `--sh-*` (four), widths `--w-*`.
+- **Layout: one scroll per page, one filled button per screen**, less density; phone first at 390.
+- **Guardrails:** `lib/ui/designRules.test.mjs` (purple, retired tokens, multi-hue gradients, gradient text, font
+  count, grid, raw hex) fails the suite; `node scripts/design-audit.mjs` (h1 count, font families, filled CTAs per
+  viewport, 60/30/10 pixel share) runs against `next start`; `scripts/overlap-sweep.mjs` for phone overlap.
+- **Skill:** `.claude/skills/ui-ux-pro-max/` (UX rules, patterns, charts, WCAG — Python search over local CSVs) is for
+  decisions INSIDE this system; never use its `--design-system` output to pick a palette or font.
 
 ## North Star
 Read SEEN_STRATEGY.md at the start of every session. That document is the product strategy.

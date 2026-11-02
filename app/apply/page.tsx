@@ -163,7 +163,7 @@ function ApplyContent() {
       </div>
 
       {/* Company header */}
-      <h1 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-fig)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', lineHeight: 1.2, marginBottom: '.35rem' }}>
+      <h1 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-fig)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', lineHeight: 1.2, marginBottom: '.25rem' }}>
         {phase === 'ask' ? <>Did you apply to <span style={{ color: riskColor }}>{co}</span>?</> :
          phase === 'not_yet_reason' ? 'What\'s holding you back?' :
          phase === 'changed_reason' ? 'What changed your mind?' :
@@ -177,13 +177,13 @@ function ApplyContent() {
       {/* Journey progress — endowed progress effect */}
       {(phase === 'ask' || phase === 'done_yes') && (
         <div style={{ marginBottom: '1.5rem', background: 'var(--raised)', border: '1px solid var(--line)', borderRadius: 10, padding: '.75rem 1rem' }}>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', marginBottom: '.6rem' }}>Application journey</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '.35rem' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', marginBottom: '.5rem' }}>Application journey</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '.25rem' }}>
             {JOURNEY_STEPS.map((step, i) => {
               const isCompleted = phase === 'done_yes' ? i <= 2 : step.done
               const isCurrent = phase === 'ask' ? i === 1 : (phase === 'done_yes' ? i === 3 : false)
               return (
-                <div key={step.label} style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
+                <div key={step.label} style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
                   <div style={{
                     width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
                     background: isCompleted ? 'var(--green)' : isCurrent ? 'rgba(59,130,246,0.3)' : 'var(--line)',
@@ -191,11 +191,11 @@ function ApplyContent() {
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: 'var(--fs-meta)',
                   }}>
-                    {isCompleted && <span style={{ color: '#fff' }}>✓</span>}
+                    {isCompleted && <span style={{ color: 'var(--text-1)' }}>✓</span>}
                   </div>
                   <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: isCompleted ? 'var(--green)' : isCurrent ? 'var(--white)' : 'var(--dim)', fontWeight: isCurrent ? 600 : 400 }}>
                     {step.label}
-                    {isCurrent && <span style={{ color: 'var(--blue)', marginLeft: '.4rem' }}>← you are here</span>}
+                    {isCurrent && <span style={{ color: 'var(--blue)', marginLeft: '.5rem' }}>← you are here</span>}
                   </div>
                 </div>
               )
@@ -208,7 +208,7 @@ function ApplyContent() {
       {score && phase === 'ask' && (
         <div style={{
           background: 'var(--raised)', border: `1px solid ${riskColor}22`, borderRadius: 12,
-          padding: '.85rem 1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem',
+          padding: '.75rem 1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem',
         }}>
           <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-h2)', fontWeight: 600, color: riskColor, lineHeight: 1, flexShrink: 0 }}>
             {grade(score.overall_score)}
@@ -217,12 +217,12 @@ function ApplyContent() {
             <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginBottom: '.25rem' }}>{co} hiring grade</div>
             <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
               {score.ghost_rate > 0 && (
-                <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', background: score.ghost_rate > 0.5 ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)', color: score.ghost_rate > 0.5 ? 'var(--red)' : 'var(--amber)', border: `1px solid ${score.ghost_rate > 0.5 ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.2)'}`, borderRadius: 4, padding: '.1rem .35rem' }}>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', background: score.ghost_rate > 0.5 ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)', color: score.ghost_rate > 0.5 ? 'var(--red)' : 'var(--amber)', border: `1px solid ${score.ghost_rate > 0.5 ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.2)'}`, borderRadius: 4, padding: '.125rem .25rem' }}>
                   {Math.round(score.ghost_rate * 100)}% ghost rate
                 </span>
               )}
               {score.avg_wait_days > 0 && (
-                <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', background: 'var(--accent-tint)', color: 'var(--accent)', border: '1px solid var(--accent-line)', borderRadius: 4, padding: '.1rem .35rem' }}>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', background: 'var(--accent-tint)', color: 'var(--accent)', border: '1px solid var(--accent-line)', borderRadius: 4, padding: '.125rem .25rem' }}>
                   avg {score.avg_wait_days}d wait
                 </span>
               )}
@@ -235,18 +235,18 @@ function ApplyContent() {
       {phase === 'ask' && (
         <>
           {/* Incentive strip */}
-          <div style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.18)', borderRadius: 12, padding: '.9rem 1rem', marginBottom: '1.25rem' }}>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--green)', fontWeight: 500, marginBottom: '.65rem' }}>
+          <div style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.18)', borderRadius: 12, padding: '1rem 1rem', marginBottom: '1.25rem' }}>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--green)', fontWeight: 500, marginBottom: '.75rem' }}>
               Track this application and unlock
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
               {[
                 ['📊', 'Expected response window for ' + (co || 'this company')],
                 ['👻', 'Ghost-risk warning if they go silent'],
                 ['📅', 'Day 7 / 14 / 30 check-in reminders'],
                 ['🎉', 'Outcome card + share image when it closes'],
               ].map(([icon, text]) => (
-                <div key={text} style={{ display: 'flex', alignItems: 'center', gap: '.55rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'rgba(52,211,153,0.85)' }}>
+                <div key={text} style={{ display: 'flex', alignItems: 'center', gap: '.5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'rgba(52,211,153,0.85)' }}>
                   <span style={{ flexShrink: 0 }}>{icon}</span><span>{text}</span>
                 </div>
               ))}
@@ -254,7 +254,7 @@ function ApplyContent() {
           </div>
 
           {!isLoggedIn && (
-            <div style={{ background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 9, padding: '.65rem .9rem', marginBottom: '1rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--amber)', lineHeight: 1.65 }}>
+            <div style={{ background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 9, padding: '.75rem 1rem', marginBottom: '1rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--amber)', lineHeight: 1.65 }}>
               <strong>Sign in</strong> to sync reminders across all devices.{' '}
               <a href={`/login?return=${encodeURIComponent(`/apply?co=${encodeURIComponent(co)}&role=${encodeURIComponent(role)}&jid=${encodeURIComponent(jid)}&jobUrl=${encodeURIComponent(jobUrl)}${city ? `&city=${encodeURIComponent(city)}` : ''}`)}`} style={{ color: 'var(--blue)', textDecoration: 'none' }}>Sign in →</a>
             </div>
@@ -265,7 +265,7 @@ function ApplyContent() {
             <button
               onClick={handleYes}
               disabled={saving}
-              style={{ width: '100%', background: 'var(--good-tint)', border: '1.5px solid rgba(16,185,129,0.5)', color: 'var(--green)', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-body)', borderRadius: 12, padding: '.95rem 1.25rem', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1, letterSpacing: '-.01em', textAlign: 'left', boxShadow: '0 0 24px rgba(16,185,129,0.1)' }}
+              style={{ width: '100%', background: 'var(--good-tint)', border: '1.5px solid rgba(16,185,129,0.5)', color: 'var(--green)', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-body)', borderRadius: 12, padding: '1rem 1.25rem', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1, letterSpacing: '-.01em', textAlign: 'left', boxShadow: '0 0 24px rgba(16,185,129,0.1)' }}
             >
               ✅ Yes, I applied
               <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 400, color: 'rgba(52,211,153,0.65)', marginTop: '.25rem' }}>Start tracking your timeline</div>
@@ -273,22 +273,22 @@ function ApplyContent() {
 
             <button
               onClick={handleNotYet}
-              style={{ width: '100%', background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--white)', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-ui)', borderRadius: 12, padding: '.85rem 1.25rem', cursor: 'pointer', textAlign: 'left' }}
+              style={{ width: '100%', background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--white)', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-ui)', borderRadius: 12, padding: '.75rem 1.25rem', cursor: 'pointer', textAlign: 'left' }}
             >
               ⏳ Not yet
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 400, color: 'var(--sub)', marginTop: '.2rem' }}>Save it and come back</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 400, color: 'var(--sub)', marginTop: '.25rem' }}>Save it and come back</div>
             </button>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.5rem' }}>
               <button
                 onClick={handleChanged}
-                style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', borderRadius: 10, padding: '.75rem .9rem', cursor: 'pointer', textAlign: 'left' }}
+                style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', borderRadius: 10, padding: '.75rem 1rem', cursor: 'pointer', textAlign: 'left' }}
               >
                 ❌ Changed my mind
               </button>
               <button
                 onClick={handleRemind}
-                style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', borderRadius: 10, padding: '.75rem .9rem', cursor: 'pointer', textAlign: 'left' }}
+                style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', borderRadius: 10, padding: '.75rem 1rem', cursor: 'pointer', textAlign: 'left' }}
               >
                 🔔 Remind me later
               </button>
@@ -299,12 +299,12 @@ function ApplyContent() {
 
       {/* === PHASE: not_yet_reason === */}
       {phase === 'not_yet_reason' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
           {NOT_YET_REASONS.map(r => (
             <button
               key={r.id}
               onClick={() => handleNotYetReason(r.id)}
-              style={{ width: '100%', background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', borderRadius: 10, padding: '.8rem 1rem', cursor: 'pointer', textAlign: 'left' }}
+              style={{ width: '100%', background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', borderRadius: 10, padding: '.75rem 1rem', cursor: 'pointer', textAlign: 'left' }}
             >
               {r.label}
             </button>
@@ -314,7 +314,7 @@ function ApplyContent() {
               href={jobUrl}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ display: 'block', marginTop: '.5rem', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.25)', color: 'var(--blue)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', borderRadius: 10, padding: '.8rem 1rem', textDecoration: 'none', textAlign: 'center' }}
+              style={{ display: 'block', marginTop: '.5rem', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.25)', color: 'var(--blue)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', borderRadius: 10, padding: '.75rem 1rem', textDecoration: 'none', textAlign: 'center' }}
             >
               ↗ Open job listing — decide now
             </a>
@@ -328,12 +328,12 @@ function ApplyContent() {
           <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '1rem', lineHeight: 1.65 }}>
             Your feedback helps Seen flag risky companies for other applicants.
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
             {CHANGED_REASONS.map(r => (
               <button
                 key={r.id}
                 onClick={() => handleChangedReason(r.id)}
-                style={{ width: '100%', background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', borderRadius: 10, padding: '.8rem 1rem', cursor: 'pointer', textAlign: 'left' }}
+                style={{ width: '100%', background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', borderRadius: 10, padding: '.75rem 1rem', cursor: 'pointer', textAlign: 'left' }}
               >
                 {r.label}
               </button>
@@ -346,14 +346,14 @@ function ApplyContent() {
       {phase === 'done_yes' && (
         <>
           {insight && (
-            <div style={{ background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 12, padding: '1rem 1.1rem', marginBottom: '1.25rem' }}>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--green)', fontWeight: 500, marginBottom: '.4rem' }}>Unlocked insight</div>
+            <div style={{ background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 12, padding: '1rem 1rem', marginBottom: '1.25rem' }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--green)', fontWeight: 500, marginBottom: '.5rem' }}>Unlocked insight</div>
               <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'rgba(255,255,255,0.85)', lineHeight: 1.7 }}>{insight}</div>
             </div>
           )}
           <button
             onClick={() => router.push('/tracker?new=1')}
-            style={{ width: '100%', background: 'var(--good-tint)', border: '1.5px solid rgba(16,185,129,0.4)', color: 'var(--green)', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-body)', borderRadius: 12, padding: '.95rem 1.25rem', cursor: 'pointer', marginBottom: '.65rem', letterSpacing: '-.01em' }}
+            style={{ width: '100%', background: 'var(--good-tint)', border: '1.5px solid rgba(16,185,129,0.4)', color: 'var(--green)', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-body)', borderRadius: 12, padding: '1rem 1.25rem', cursor: 'pointer', marginBottom: '.75rem', letterSpacing: '-.01em' }}
           >
             View my tracker →
           </button>
@@ -369,7 +369,7 @@ function ApplyContent() {
       {/* === PHASE: done_other === */}
       {phase === 'done_other' && (
         <>
-          <div style={{ background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 12, padding: '1rem 1.1rem', marginBottom: '1.25rem' }}>
+          <div style={{ background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 12, padding: '1rem 1rem', marginBottom: '1.25rem' }}>
             <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.7 }}>
               {answer === 'not_yet' && (
                 <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.7 }}>
@@ -397,14 +397,14 @@ function ApplyContent() {
                 href={jobUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ display: 'block', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', color: 'var(--blue)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', borderRadius: 10, padding: '.8rem 1rem', textDecoration: 'none', textAlign: 'center' }}
+                style={{ display: 'block', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', color: 'var(--blue)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', borderRadius: 10, padding: '.75rem 1rem', textDecoration: 'none', textAlign: 'center' }}
               >
                 ↗ Open job listing
               </a>
             )}
             <a
               href="/jobs"
-              style={{ display: 'block', background: 'none', border: '1px solid var(--line)', color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', borderRadius: 10, padding: '.8rem 1rem', textDecoration: 'none', textAlign: 'center' }}
+              style={{ display: 'block', background: 'none', border: '1px solid var(--line)', color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', borderRadius: 10, padding: '.75rem 1rem', textDecoration: 'none', textAlign: 'center' }}
             >
               Browse more jobs →
             </a>

@@ -1,37 +1,37 @@
 /* Listing signals — a quiet card under the Seen Grade. Tokens from app/globals.css; every grid track is
    minmax(0, …) so a long factor line can never widen the column past a phone screen. */
 .card {
-  margin-top: 0.9rem;
+  margin-top: 1rem;
   background: var(--raised, rgba(255, 255, 255, 0.03));
   border: 1px solid var(--line);
   border-left: 3px solid var(--sub);
   border-radius: 12px;
-  padding: 0.85rem 1rem;
+  padding: .75rem 1rem;
   min-width: 0;
 }
-.clear { border-left-color: var(--green, #34d399); }
-.mixed { border-left-color: var(--amber, #fbbf24); }
-.thin { border-left-color: var(--red, #f87171); }
+.clear { border-left-color: var(--green); }
+.mixed { border-left-color: var(--amber); }
+.thin { border-left-color: var(--red); }
 .head { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .kicker { font-family: var(--mono); font-size: var(--fs-meta); text-transform: uppercase; letter-spacing: 0.16em; color: var(--dim); }
-.scope { font-family: var(--body); font-size: var(--fs-meta); color: var(--text-3); border: 1px solid var(--line); border-radius: 999px; padding: 0.1rem 0.5rem; }
-.top { display: flex; align-items: baseline; gap: 0.6rem; margin: 0.45rem 0 0.55rem; flex-wrap: wrap; }
+.scope { font-family: var(--body); font-size: var(--fs-meta); color: var(--text-3); border: 1px solid var(--line); border-radius: 999px; padding: .125rem 0.5rem; }
+.top { display: flex; align-items: baseline; gap: .5rem; margin: .5rem 0 .5rem; flex-wrap: wrap; }
 .score { font-family: var(--mono); font-size: var(--fs-h3); font-weight: 500; }
 .score small { font-size: var(--fs-meta); color: var(--dim); font-weight: 400; }
 .label { font-size: var(--fs-ui); color: var(--sub); }
-.factors { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.45rem; }
-.factor { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto; grid-template-areas: 'l b v' 'd d d'; gap: 0.15rem 0.6rem; align-items: center; min-width: 0; }
+.factors { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
+.factor { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto; grid-template-areas: 'l b v' 'd d d'; gap: .125rem .5rem; align-items: center; min-width: 0; }
 .fLabel { grid-area: l; font-size: var(--fs-meta); min-width: 0; overflow-wrap: anywhere; }
 .fLabel em { font-style: normal; color: var(--dim); font-family: var(--mono); font-size: var(--fs-meta); }
 .bar { grid-area: b; height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; min-width: 0; }
 .bar span { display: block; height: 100%; background: var(--sub); border-radius: 999px; }
-.clear .bar span { background: var(--green, #34d399); }
-.mixed .bar span { background: var(--amber, #fbbf24); }
-.thin .bar span { background: var(--red, #f87171); }
+.clear .bar span { background: var(--green); }
+.mixed .bar span { background: var(--amber); }
+.thin .bar span { background: var(--red); }
 .fVal { grid-area: v; font-family: var(--mono); font-size: var(--fs-meta); }
 .fDetail { grid-area: d; font-size: var(--fs-meta); color: var(--dim); min-width: 0; overflow-wrap: anywhere; }
-.basis { margin: 0.6rem 0 0; font-size: var(--fs-meta); color: var(--dim); }
-.thinLine { margin: 0.6rem 0 0; font-family: var(--mono); font-size: var(--fs-meta); color: var(--dim); }
+.basis { margin: .5rem 0 0; font-size: var(--fs-meta); color: var(--dim); }
+.thinLine { margin: .5rem 0 0; font-family: var(--mono); font-size: var(--fs-meta); color: var(--dim); }
 
 /* Phone floor (audit 2026-10-23): every label and value reads at 12px. */
 @media (max-width: 768px) {

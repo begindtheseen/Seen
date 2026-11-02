@@ -136,32 +136,32 @@ interface ResumeNavSnap {
 
 const areaStyle: React.CSSProperties = {
   width: '100%', background: 'var(--surface)', border: '1.5px solid var(--line2)', borderRadius: 8,
-  padding: '.72rem 1rem', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-72)',
+  padding: '.75rem 1rem', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-72)',
   outline: 'none', resize: 'vertical', lineHeight: 1.6, caretColor: 'var(--blue)',
 }
 const inputStyle: React.CSSProperties = {
   width: '100%', background: 'var(--surface)', border: '1.5px solid var(--line2)', borderRadius: 8,
-  padding: '.62rem .9rem', color: 'var(--white)', fontFamily: 'var(--body)', fontSize: '.875rem',
+  padding: '.5rem 1rem', color: 'var(--white)', fontFamily: 'var(--body)', fontSize: 'var(--fs-ui)',
   outline: 'none', caretColor: 'var(--blue)', marginBottom: '.75rem', boxSizing: 'border-box',
 }
 const btnPrimary: React.CSSProperties = {
-  background: 'var(--cta)', color: '#fff', border: 'none', borderRadius: 8,
-  padding: '.75rem 1.25rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem',
+  background: 'var(--cta)', color: 'var(--text-1)', border: 'none', borderRadius: 8,
+  padding: '.75rem 1.25rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)',
   cursor: 'pointer', boxShadow: 'var(--sh-control)', width: '100%',
 }
 
 const label = (text: string) => (
-  <label style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', textTransform: 'uppercase' as const, letterSpacing: '.08em', color: 'var(--dim)', display: 'block', marginBottom: '.3rem' }}>
+  <label style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', textTransform: 'uppercase' as const, letterSpacing: '.08em', color: 'var(--dim)', display: 'block', marginBottom: '.25rem' }}>
     {text}
   </label>
 )
 
 const kicker = (text: string, color = 'var(--dim)') => (
-  <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', textTransform: 'uppercase', letterSpacing: '.08em', color, marginBottom: '.6rem' }}>{text}</div>
+  <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', textTransform: 'uppercase', letterSpacing: '.08em', color, marginBottom: '.5rem' }}>{text}</div>
 )
 
 function chip(text: string, color: string, bg: string, border: string) {
-  return <span style={{ background: bg, border: `1px solid ${border}`, color, borderRadius: 5, padding: '.2rem .6rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-65)', maxWidth: '100%', overflowWrap: 'anywhere' }}>{text}</span>
+  return <span style={{ background: bg, border: `1px solid ${border}`, color, borderRadius: 5, padding: '.25rem .5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-65)', maxWidth: '100%', overflowWrap: 'anywhere' }}>{text}</span>
 }
 
 function scoreColor(s: number): string {
@@ -186,7 +186,7 @@ function FitView({ out, intel, jobCompany, insights }: { out: OptimizerOutput; i
       {out.verdict.score != null && metrics.length > 0 && (
         <Card>
           {kicker('What the score is made of')}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '.65rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
             {metrics.map((m) => (
               <div key={m.factor} title={m.reason}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '.25rem', gap: '.5rem' }}>
@@ -208,16 +208,16 @@ function FitView({ out, intel, jobCompany, insights }: { out: OptimizerOutput; i
 
       <Card>
         {kicker('Company hiring risk')}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', marginBottom: out.risk_flags.length ? '.7rem' : 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: out.risk_flags.length ? '.7rem' : 0 }}>
           {out.company_process_known === false ? (
-            <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', color: 'var(--muted)' }}>Not graded yet</span>
+            <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)', color: 'var(--muted)' }}>Not graded yet</span>
           ) : (
-            <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.1rem', color: scoreColor(out.company_process_score) }}>{Math.round(out.company_process_score)}<span style={{ fontSize: 'var(--fs-60)', color: 'var(--muted)' }}>/100</span></span>
+            <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-lead)', color: scoreColor(out.company_process_score) }}>{Math.round(out.company_process_score)}<span style={{ fontSize: 'var(--fs-60)', color: 'var(--muted)' }}>/100</span></span>
           )}
           <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', color: 'var(--muted)' }}>{out.company_process_known === false ? `Fewer than ${MIN_REPORTS_FOR_GRADE} applicant reports — no grade yet` : 'Seen hiring-process grade (applicant reports + public hiring data)'}</span>
         </div>
         {out.risk_flags.length > 0 ? (
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
             {out.risk_flags.map((f, i) => (
               <li key={i} style={{ display: 'flex', gap: '.5rem', fontSize: 'var(--fs-72)', color: f.severity === 'high' ? 'var(--red)' : f.severity === 'medium' ? 'var(--amber)' : 'var(--muted)', lineHeight: 1.5 }}>
                 <span style={{ flexShrink: 0 }}>{f.severity === 'high' ? '✕' : '⚠'}</span>{f.message}
@@ -225,7 +225,7 @@ function FitView({ out, intel, jobCompany, insights }: { out: OptimizerOutput; i
             ))}
           </ul>
         ) : intel && intel.report_count ? (
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: '#7cb3ff', lineHeight: 1.6 }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--accent)', lineHeight: 1.6 }}>
             📊 Seen data on {jobCompany}: {Math.round((intel.ghost_rate || 0) * 100)}% ghost · {Math.round((intel.response_rate || 0) * 100)}% respond{intel.overall_score != null ? ` · grade ${Math.round(intel.overall_score)}/100` : ''}.
           </div>
         ) : (
@@ -238,8 +238,8 @@ function FitView({ out, intel, jobCompany, insights }: { out: OptimizerOutput; i
           {kicker(`What ${jobCompany || 'they'} really wants`)}
           <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
             {insights.what_they_want.slice(0, 6).map((it, i) => (
-              <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '.5rem', fontSize: '.78rem', color: 'var(--sub)', lineHeight: 1.5 }}>
-                <span style={{ color: 'var(--green)', fontSize: 'var(--fs-55)', marginTop: '.22rem', flexShrink: 0 }}>▶</span><span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{it}</span>
+              <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '.5rem', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5 }}>
+                <span style={{ color: 'var(--green)', fontSize: 'var(--fs-55)', marginTop: '.25rem', flexShrink: 0 }}>▶</span><span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{it}</span>
               </li>
             ))}
           </ul>
@@ -261,10 +261,10 @@ function RewriteView({ out, copy, copied, onRerun, pro }: { out: PaidOptimize; c
       {real.length > 0 && (
         <Card>
           {kicker('Safe improvements to your own bullets', 'var(--green)')}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
             {real.map((b, i) => (
-              <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.7rem .85rem', display: 'flex', gap: '.6rem', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: '.78rem', color: 'var(--sub)', lineHeight: 1.6, flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{b.optimized}</span>
+              <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.75rem .75rem', display: 'flex', gap: '.5rem', alignItems: 'flex-start' }}>
+                <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6, flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{b.optimized}</span>
                 <button onClick={() => copy(b.optimized, `sb${i}`)} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 6, padding: '.25rem .5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', color: copied === `sb${i}` ? 'var(--green)' : 'var(--muted)', cursor: 'pointer', flexShrink: 0 }}>{copied === `sb${i}` ? '✓' : 'copy'}</button>
               </div>
             ))}
@@ -275,8 +275,8 @@ function RewriteView({ out, copy, copied, onRerun, pro }: { out: PaidOptimize; c
       {guidance.length > 0 && (
         <Card>
           {kicker('⚠ Needs a real detail from you — add only if true', 'var(--amber)')}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
-            {guidance.map((g, i) => <div key={i} style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, padding: '.6rem .8rem', fontSize: '.76rem', color: 'var(--sub)', lineHeight: 1.6, overflowWrap: 'anywhere' }}>Write a bullet for <strong style={{ color: 'var(--white)' }}>{g.addresses}</strong> — only if it reflects real work, with a real number.</div>)}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+            {guidance.map((g, i) => <div key={i} style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, padding: '.5rem .75rem', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6, overflowWrap: 'anywhere' }}>Write a bullet for <strong style={{ color: 'var(--white)' }}>{g.addresses}</strong> — only if it reflects real work, with a real number.</div>)}
           </div>
         </Card>
       )}
@@ -284,15 +284,15 @@ function RewriteView({ out, copy, copied, onRerun, pro }: { out: PaidOptimize; c
       {(out.wording_notes || []).length > 0 && (
         <Card>
           {kicker('Same thing, different word')}
-          {(out.wording_notes || []).slice(0, 3).map((n, i) => <div key={i} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.3rem', overflowWrap: 'anywhere' }}>{n}</div>)}
+          {(out.wording_notes || []).slice(0, 3).map((n, i) => <div key={i} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.25rem', overflowWrap: 'anywhere' }}>{n}</div>)}
         </Card>
       )}
 
       {out.application_message && (
         <Card>
           {kicker('Application message')}
-          <p style={{ fontSize: '.78rem', color: 'var(--sub)', lineHeight: 1.7, margin: 0, overflowWrap: 'anywhere' }}>{out.application_message}</p>
-          <button onClick={() => copy(out.application_message || '', 'msg')} style={{ marginTop: '.75rem', background: 'var(--green)', color: 'var(--ink)', border: 'none', borderRadius: 7, padding: '.45rem .9rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-70)', cursor: 'pointer' }}>{copied === 'msg' ? '✓ Copied' : 'Copy message'}</button>
+          <p style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.7, margin: 0, overflowWrap: 'anywhere' }}>{out.application_message}</p>
+          <button onClick={() => copy(out.application_message || '', 'msg')} style={{ marginTop: '.75rem', background: 'var(--green)', color: 'var(--ink)', border: 'none', borderRadius: 7, padding: '.5rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-70)', cursor: 'pointer' }}>{copied === 'msg' ? '✓ Copied' : 'Copy message'}</button>
         </Card>
       )}
     </div>
@@ -312,14 +312,14 @@ function CoachResultView({ d }: { d: CoachResult }) {
     <div style={{ animation: 'fadeUp .3s ease both' }}>
       {steps.filter(s => s.content).map(s => (
         <Card key={s.title}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '.65rem', marginBottom: '.65rem' }}>
-            <div style={{ width: 28, height: 28, borderRadius: 7, background: 'var(--gdim)', border: '1px solid var(--gmid)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.85rem', flexShrink: 0 }}>{s.icon}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', marginBottom: '.75rem' }}>
+            <div style={{ width: 28, height: 28, borderRadius: 7, background: 'var(--gdim)', border: '1px solid var(--gmid)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--fs-ui)', flexShrink: 0 }}>{s.icon}</div>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 700, color: 'var(--white)' }}>{s.title}</div>
+              <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--white)' }}>{s.title}</div>
               <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--muted)' }}>{s.label}</div>
             </div>
           </div>
-          <div style={{ fontSize: '.8rem', color: 'var(--sub)', lineHeight: 1.75, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{s.content}</div>
+          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.75, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{s.content}</div>
         </Card>
       ))}
     </div>
@@ -337,7 +337,7 @@ function ProposalResultView({ d }: { d: ProposalResult }) {
       {phases.filter(p => p.content).map(p => (
         <Card key={p.label}>
           {kicker(p.label, p.color)}
-          <div style={{ fontSize: '.82rem', color: 'var(--sub)', lineHeight: 1.75, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{p.content}</div>
+          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.75, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{p.content}</div>
         </Card>
       ))}
     </div>
@@ -347,7 +347,7 @@ function ProposalResultView({ d }: { d: ProposalResult }) {
 function ResultEmpty({ icon, text, link }: { icon: string; text: string; link?: { href: string; label: string } }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 220, color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-72)', textAlign: 'center', gap: '.75rem', whiteSpace: 'pre-line' }}>
-      <div style={{ fontSize: '2.5rem' }}>{icon}</div>
+      <div style={{ fontSize: 'var(--fs-fig-m)' }}>{icon}</div>
       <div>{text}</div>
       {link && <a href={link.href} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--blue)', fontWeight: 600, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}>{link.label}</a>}
     </div>
@@ -368,16 +368,16 @@ function ResumeInput({ resumeText, setResumeText, resumeMeta, onUpload, onClear,
   const [isDragging, setIsDragging] = useState(false)
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.4rem', flexWrap: 'wrap', gap: '.4rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.5rem', flexWrap: 'wrap', gap: '.5rem' }}>
         {label('Your resume')}
         {!managed && <div style={{ display: 'flex', gap: '.5rem' }}>
-          <button onClick={() => fileRef.current?.click()} title="Upload is free — no AI credit used" style={{ background: 'none', border: '1px solid var(--line2)', color: 'var(--dim)', borderRadius: 6, padding: '.25rem .65rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', cursor: 'pointer' }}>Upload PDF/Word/txt · free</button>
+          <button onClick={() => fileRef.current?.click()} title="Upload is free — no AI credit used" style={{ background: 'none', border: '1px solid var(--line2)', color: 'var(--dim)', borderRadius: 6, padding: '.25rem .75rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', cursor: 'pointer' }}>Upload PDF/Word/txt · free</button>
           {resumeText && <button onClick={onClear} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', cursor: 'pointer' }}>Clear</button>}
         </div>}
         <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,.txt,.md,text/plain" onChange={onUpload} style={{ display: 'none' }} />
       </div>
       {resumeMeta ? (
-        <div style={{ background: 'var(--gdim)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 8, padding: '.72rem 1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-68)', color: 'var(--green)', marginBottom: '.75rem', overflowWrap: 'anywhere' }}>
+        <div style={{ background: 'var(--gdim)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 8, padding: '.75rem 1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-68)', color: 'var(--green)', marginBottom: '.75rem', overflowWrap: 'anywhere' }}>
           ✓ résumé on file — {resumeMeta.fileName} · {resumeMeta.wordCount} words
         </div>
       ) : (
@@ -929,7 +929,7 @@ function ResumePageInner() {
           title="Win this application"
           crumbLabel="Résumé AI"
           sub={<>One résumé, one job — your fit score, safe rewrites, a human-sounding pass, and the strategy to get through, sharpened with Seen&apos;s data on how this company actually treats applicants.</>}
-          actions={<Link href="/resume/studio" className="tap" style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem', background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', color: 'var(--accent)', borderRadius: 999, padding: '.4rem .85rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', textDecoration: 'none', whiteSpace: 'nowrap' }}>✦ Résumé Studio →</Link>}
+          actions={<Link href="/resume/studio" className="tap" style={{ display: 'inline-flex', alignItems: 'center', gap: '.5rem', background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', color: 'var(--accent)', borderRadius: 999, padding: '.5rem .75rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', textDecoration: 'none', whiteSpace: 'nowrap' }}>✦ Résumé Studio →</Link>}
         />
 
         {params?.get('back') === 'tracker' && (
@@ -939,21 +939,21 @@ function ResumePageInner() {
         )}
 
         {guestGate && !isLoggedIn && (
-          <div role="status" style={{ background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 10, padding: '.9rem 1rem', marginBottom: '1rem' }}>
-            <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.95rem', color: 'var(--white)', marginBottom: '.25rem' }}>Make a free account to build {guestGate}</div>
-            <div style={{ fontSize: '.85rem', color: 'var(--sub)', lineHeight: 1.55, marginBottom: '.6rem' }}>You start with {WELCOME_CREDITS} free AI credits, and this uses one. It takes about 30 seconds.</div>
-            <Link href={signupHref({ next: '/resume' })} className="tap" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 1rem', borderRadius: 9, background: 'var(--indigo)', color: '#fff', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', textDecoration: 'none' }}>Create free account →</Link>
+          <div role="status" style={{ background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 10, padding: '1rem 1rem', marginBottom: '1rem' }}>
+            <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-body)', color: 'var(--white)', marginBottom: '.25rem' }}>Make a free account to build {guestGate}</div>
+            <div style={{ fontSize: 'var(--fs-ui)', color: 'var(--sub)', lineHeight: 1.55, marginBottom: '.5rem' }}>You start with {WELCOME_CREDITS} free AI credits, and this uses one. It takes about 30 seconds.</div>
+            <Link href={signupHref({ next: '/resume' })} className="tap" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 1rem', borderRadius: 9, background: 'var(--indigo)', color: 'var(--text-1)', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-ui)', textDecoration: 'none' }}>Create free account →</Link>
           </div>
         )}
 
         {error && (
-          <div style={{ background: 'var(--rdim)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '.72rem 1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-72)', color: 'var(--red)', marginBottom: '1rem', overflowWrap: 'anywhere' }}>{error}</div>
+          <div style={{ background: 'var(--rdim)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '.75rem 1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-72)', color: 'var(--red)', marginBottom: '1rem', overflowWrap: 'anywhere' }}>{error}</div>
         )}
 
         {isLoggedIn && resumeText && (
-          <div onClick={() => setShowSurvey(true)} style={{ background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 10, padding: '.65rem 1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.75rem', cursor: 'pointer' }}>
+          <div onClick={() => setShowSurvey(true)} style={{ background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 10, padding: '.75rem 1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.75rem', cursor: 'pointer' }}>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', color: 'var(--accent)', fontWeight: 600, marginBottom: '.12rem', display: 'flex', alignItems: 'center', gap: '.35rem' }}><span style={{ fontSize: 'var(--fs-70)' }}>✦</span>Earn AI credits — 60-second résumé survey</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', color: 'var(--accent)', fontWeight: 600, marginBottom: '.125rem', display: 'flex', alignItems: 'center', gap: '.25rem' }}><span style={{ fontSize: 'var(--fs-70)' }}>✦</span>Earn AI credits — 60-second résumé survey</div>
               <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--sub)', overflowWrap: 'anywhere' }}>Share what it was like applying to a company from your résumé — +2 credits</div>
             </div>
             <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-65)', color: 'var(--accent)', flexShrink: 0 }}>Start →</span>
@@ -986,23 +986,23 @@ function ResumePageInner() {
                   {savedJobs.map(s => <option key={String(s.job_id)} value={String(s.job_id)}>{(s.role || 'Role')}{s.company ? ' — ' + s.company : ''}</option>)}
                 </select>
               ) : (
-                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--muted)', marginBottom: '.6rem', lineHeight: 1.6 }}>No saved jobs yet — save jobs from search, or enter the details below.</div>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--muted)', marginBottom: '.5rem', lineHeight: 1.6 }}>No saved jobs yet — save jobs from search, or enter the details below.</div>
               )}
 
               {savedId && !showManual && (
-                <div style={{ background: 'var(--gdim)', border: '1px solid var(--gmid)', borderRadius: 8, padding: '.6rem .85rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-66)', color: 'var(--green)', marginBottom: '.6rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.5rem' }}>
+                <div style={{ background: 'var(--gdim)', border: '1px solid var(--gmid)', borderRadius: 8, padding: '.5rem .75rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-66)', color: 'var(--green)', marginBottom: '.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.5rem' }}>
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>✓ {jobTitle}{jobCompany ? ' · ' + jobCompany : ''}</span>
                   <button onClick={() => setShowManual(true)} style={{ background: 'none', border: 'none', color: 'var(--green)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', cursor: 'pointer', textDecoration: 'underline', flexShrink: 0 }}>edit</button>
                 </div>
               )}
 
               {companyIntel && (
-                <div style={{ background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 8, padding: '.55rem .8rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', color: '#7cb3ff', marginBottom: '.6rem', lineHeight: 1.6, overflowWrap: 'anywhere' }}>
+                <div style={{ background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 8, padding: '.5rem .75rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', color: 'var(--accent)', marginBottom: '.5rem', lineHeight: 1.6, overflowWrap: 'anywhere' }}>
                   📊 Seen data on {jobCompany}: {Math.round((companyIntel.ghost_rate || 0) * 100)}% ghost · {Math.round((companyIntel.response_rate || 0) * 100)}% respond{companyIntel.overall_score != null ? ` · grade ${Math.round(companyIntel.overall_score)}/100` : ''}.
                 </div>
               )}
 
-              <button onClick={() => setShowManual(v => !v)} style={{ background: 'none', border: '1px solid var(--line2)', color: 'var(--dim)', borderRadius: 6, padding: '.4rem .8rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', cursor: 'pointer', marginBottom: (showManual || savedJobs.length === 0) ? '.75rem' : '1rem' }}>
+              <button onClick={() => setShowManual(v => !v)} style={{ background: 'none', border: '1px solid var(--line2)', color: 'var(--dim)', borderRadius: 6, padding: '.5rem .75rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', cursor: 'pointer', marginBottom: (showManual || savedJobs.length === 0) ? '.75rem' : '1rem' }}>
                 {showManual ? '▲ Hide manual entry' : '✎ Enter job info manually'}
               </button>
 
@@ -1034,8 +1034,8 @@ function ResumePageInner() {
               <>
                 <Card>
                   {kicker('Before the job: fix the résumé itself', 'var(--accent)')}
-                  <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '.95rem', marginBottom: '.3rem' }}>Résumé Studio</div>
-                  <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-65)', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.8rem' }}>
+                  <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: 'var(--fs-body)', marginBottom: '.25rem' }}>Résumé Studio</div>
+                  <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-65)', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.75rem' }}>
                     A health score with every weak bullet pinpointed and fixed without inventing a word · a tailored version built only from your own facts · PDF, Word, text, Markdown and JSON Resume exports in three templates, each checked the way a parser reads it.
                   </p>
                   <Link href="/resume/studio" style={{ ...btnPrimary, display: 'block', textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box' } as React.CSSProperties}>Open Résumé Studio →<span style={{ marginLeft: '.5rem', fontSize: 'var(--fs-55)', opacity: .65, fontFamily: 'var(--mono)', fontWeight: 400 }}>· free</span></Link>
@@ -1054,7 +1054,7 @@ function ResumePageInner() {
                 {tab === 'fit' && (
                   fitState === 'loading' ? <ResultEmpty icon="⏳" text={'Scoring your fit…'} />
                   : fitState === 'disabled' ? <ResultEmpty icon="🚧" text={'SeenFit is temporarily unavailable.'} />
-                  : fitState === 'error' ? <div><ResultEmpty icon="⚠️" text={'Could not score your fit. Try again.'} />{fitErrRef && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', color: 'var(--dim)', marginTop: '.35rem' }}>Error ref: {fitErrRef} — share this if it keeps happening.</div>}<button onClick={() => runFit()} style={{ ...btnPrimary, marginTop: '.5rem' }}>Retry</button></div>
+                  : fitState === 'error' ? <div><ResultEmpty icon="⚠️" text={'Could not score your fit. Try again.'} />{fitErrRef && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', color: 'var(--dim)', marginTop: '.25rem' }}>Error ref: {fitErrRef} — share this if it keeps happening.</div>}<button onClick={() => runFit()} style={{ ...btnPrimary, marginTop: '.5rem' }}>Retry</button></div>
                   : fitState === 'preview' ? <ResultEmpty icon="📄" text={previewLink ? 'Seen could only read a summary of this listing, and its page would not open from here. Open the listing, copy the posting, and paste it into the job description box.' : 'This listing only has a summary. Paste the full posting into the job description box to optimize for it.'} link={previewLink ? { href: previewLink, label: 'Open the listing ↗' } : undefined} />
                   : fitOut ? <FitView out={fitOut} intel={companyIntel} jobCompany={jobCompany} insights={insights} /> : null
                 )}
@@ -1068,11 +1068,11 @@ function ResumePageInner() {
                   : paidState === 'done' && paid ? <RewriteView out={paid} copy={copy} copied={copied} pro={pro} onRerun={() => { void runPaid(true) }} />
                   : fitOut ? (
                     <Card>
-                      <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '.95rem', marginBottom: '.3rem' }}>Your rewrite plan for this job</div>
-                      <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-65)', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.9rem' }}>
+                      <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: 'var(--fs-body)', marginBottom: '.25rem' }}>Your rewrite plan for this job</div>
+                      <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-65)', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '1rem' }}>
                         Which bullet should lead each job, number questions that write a bullet from your answer, an availability line from this posting&apos;s schedule, a summary built only from your own facts, and wording proposals you accept one by one. Kept for 7 days — reopening it is free.
                       </p>
-                      {paidState === 'error' && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--red)', marginBottom: '.6rem' }}>Could not build the plan — no credit was used if it failed. Try again.</div>}
+                      {paidState === 'error' && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--red)', marginBottom: '.5rem' }}>Could not build the plan — no credit was used if it failed. Try again.</div>}
                       <button style={btnPrimary} data-testid="resume-paid-btn" onClick={pressPaid}>Build my rewrite plan →<span style={{ marginLeft: '.5rem', fontSize: 'var(--fs-55)', opacity: .65, fontFamily: 'var(--mono)', fontWeight: 400 }}>· {priceLabel(RESUME_OPTIMIZE_COST, pro)}</span></button>
                     </Card>
                   ) : <ResultEmpty icon="✍️" text={'Run the analysis first — then build the rewrite plan for this job.'} />
@@ -1083,8 +1083,8 @@ function ResumePageInner() {
                   <div style={{ animation: 'fadeUp .3s ease both' }}>
                     {hpState === 'idle' && (
                       <Card>
-                        <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '.95rem', marginBottom: '.3rem' }}>HumanProof</div>
-                        <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-65)', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.9rem' }}>
+                        <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: 'var(--fs-body)', marginBottom: '.25rem' }}>HumanProof</div>
+                        <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-65)', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '1rem' }}>
                           Make your rewritten bullets read real — remove generic AI tone and keep them specific, natural, and interview-defensible. Every number stays exactly as you wrote it.
                         </p>
                         {!paid ? (
@@ -1103,33 +1103,33 @@ function ResumePageInner() {
                     {hpState === 'error' && <div><ResultEmpty icon="⚠️" text={'Could not run HumanProof.'} /><button onClick={runHumanProof} style={{ ...btnPrimary, marginTop: '.5rem' }}>Retry</button></div>}
                     {hpState === 'locked' && (
                       <Card style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '1.5rem', marginBottom: '.5rem' }}>🔒</div>
-                        <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '1rem', marginBottom: '.5rem' }}>Your application is optimized. Now make it sound real.</div>
-                        <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-66)', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1.1rem' }}>Unlock HumanProof so it sounds specific &amp; natural, stays interview-defensible, and carries no unsupported claims.</p>
-                        <button onClick={() => { setUpgradeReason('pro'); setUpgradeFeature('HumanProof'); setShowUpgrade(true) }} style={{ background: 'var(--cta)', color: '#fff', border: 'none', borderRadius: 10, padding: '.75rem 1.5rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', cursor: 'pointer' }}>Unlock HumanProof</button>
-                        <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--muted)', lineHeight: 1.6, margin: '.65rem 0 0' }}>{LOCK_NOTE}</p>
+                        <div style={{ fontSize: 'var(--fs-xl)', marginBottom: '.5rem' }}>🔒</div>
+                        <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: 'var(--fs-body)', marginBottom: '.5rem' }}>Your application is optimized. Now make it sound real.</div>
+                        <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-66)', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1rem' }}>Unlock HumanProof so it sounds specific &amp; natural, stays interview-defensible, and carries no unsupported claims.</p>
+                        <button onClick={() => { setUpgradeReason('pro'); setUpgradeFeature('HumanProof'); setShowUpgrade(true) }} style={{ background: 'var(--cta)', color: 'var(--text-1)', border: 'none', borderRadius: 10, padding: '.75rem 1.5rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)', cursor: 'pointer' }}>Unlock HumanProof</button>
+                        <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--muted)', lineHeight: 1.6, margin: '.75rem 0 0' }}>{LOCK_NOTE}</p>
                       </Card>
                     )}
                     {hpState === 'done' && hp && (
                       <>
                         <Card>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '.85rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem' }}>
                             <div style={{ flexShrink: 0, width: 56, height: 56, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `3px solid ${scoreColor(hp.humanproof_score)}` }}>
-                              <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.2rem', color: scoreColor(hp.humanproof_score) }}>{hp.humanproof_score}</span>
+                              <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-h3)', color: scoreColor(hp.humanproof_score) }}>{hp.humanproof_score}</span>
                             </div>
                             <div style={{ minWidth: 0 }}>
-                              <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '.9rem' }}>HumanProof score</div>
+                              <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: 'var(--fs-ui)' }}>HumanProof score</div>
                               <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--dim)' }}>{hp.ai_slop_risk} AI-slop risk · Before {hp.before_score} → After {hp.after_score}</div>
                             </div>
                           </div>
                         </Card>
                         <Card>
                           {kicker('Humanized bullets', 'var(--green)')}
-                          {hp.integrity?.grounded && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--green)', marginBottom: '.55rem' }}>✓ Every number kept exactly as you wrote it — nothing added.</div>}
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
+                          {hp.integrity?.grounded && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--green)', marginBottom: '.5rem' }}>✓ Every number kept exactly as you wrote it — nothing added.</div>}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                             {hp.package.bullets.map((b, i) => (
-                              <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.7rem .85rem', display: 'flex', gap: '.6rem', alignItems: 'flex-start' }}>
-                                <span style={{ fontSize: '.78rem', color: 'var(--sub)', lineHeight: 1.6, flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{b.humanized_text}</span>
+                              <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.75rem .75rem', display: 'flex', gap: '.5rem', alignItems: 'flex-start' }}>
+                                <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6, flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{b.humanized_text}</span>
                                 <button onClick={() => copy(b.humanized_text, `hb${i}`)} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 6, padding: '.25rem .5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', color: copied === `hb${i}` ? 'var(--green)' : 'var(--muted)', cursor: 'pointer', flexShrink: 0 }}>{copied === `hb${i}` ? '✓' : 'copy'}</button>
                               </div>
                             ))}
@@ -1138,15 +1138,15 @@ function ResumePageInner() {
                         {hp.package.application_message && (
                           <Card>
                             {kicker('Humanized application message')}
-                            <p style={{ fontSize: '.78rem', color: 'var(--sub)', lineHeight: 1.7, margin: 0, overflowWrap: 'anywhere' }}>{hp.package.application_message.humanized_text}</p>
-                            <button onClick={() => copy(hp.package.application_message!.humanized_text, 'hmsg')} style={{ marginTop: '.75rem', background: 'var(--green)', color: 'var(--ink)', border: 'none', borderRadius: 7, padding: '.45rem .9rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-70)', cursor: 'pointer' }}>{copied === 'hmsg' ? '✓ Copied' : 'Copy message'}</button>
+                            <p style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.7, margin: 0, overflowWrap: 'anywhere' }}>{hp.package.application_message.humanized_text}</p>
+                            <button onClick={() => copy(hp.package.application_message!.humanized_text, 'hmsg')} style={{ marginTop: '.75rem', background: 'var(--green)', color: 'var(--ink)', border: 'none', borderRadius: 7, padding: '.5rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-70)', cursor: 'pointer' }}>{copied === 'hmsg' ? '✓ Copied' : 'Copy message'}</button>
                           </Card>
                         )}
                         {confirmList().length > 0 && (
                           <Card>
                             {kicker('⚠ Confirm before using', 'var(--amber)')}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
-                              {confirmList().map((c, i) => <div key={i} style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, padding: '.55rem .75rem', fontSize: 'var(--fs-72)', color: 'var(--sub)', lineHeight: 1.5, overflowWrap: 'anywhere' }}>{c}</div>)}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+                              {confirmList().map((c, i) => <div key={i} style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, padding: '.5rem .75rem', fontSize: 'var(--fs-72)', color: 'var(--sub)', lineHeight: 1.5, overflowWrap: 'anywhere' }}>{c}</div>)}
                             </div>
                           </Card>
                         )}
@@ -1162,26 +1162,26 @@ function ResumePageInner() {
                       <Card>
                         {kicker(`What ${jobCompany || 'this company'} is hiring for`)}
                         {insights.what_they_want.length > 0 && (
-                          <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 .75rem', display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
-                            {insights.what_they_want.map((it, i) => <li key={i} style={{ display: 'flex', gap: '.5rem', fontSize: '.78rem', color: 'var(--sub)', lineHeight: 1.5 }}><span style={{ color: 'var(--green)', fontSize: 'var(--fs-55)', marginTop: '.22rem', flexShrink: 0 }}>▶</span><span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{it}</span></li>)}
+                          <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 .75rem', display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+                            {insights.what_they_want.map((it, i) => <li key={i} style={{ display: 'flex', gap: '.5rem', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5 }}><span style={{ color: 'var(--green)', fontSize: 'var(--fs-55)', marginTop: '.25rem', flexShrink: 0 }}>▶</span><span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{it}</span></li>)}
                           </ul>
                         )}
                         {insights.hidden_requirements.length > 0 && (
                           <>
                             {kicker('Unstated expectations', 'var(--red)')}
-                            <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 .75rem', display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
-                              {insights.hidden_requirements.map((r, i) => <li key={i} style={{ display: 'flex', gap: '.5rem', fontSize: 'var(--fs-74)', color: 'var(--muted)', lineHeight: 1.5 }}><span style={{ color: 'var(--red)', fontSize: 'var(--fs-50)', marginTop: '.22rem', flexShrink: 0 }}>◆</span><span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{r}</span></li>)}
+                            <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 .75rem', display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+                              {insights.hidden_requirements.map((r, i) => <li key={i} style={{ display: 'flex', gap: '.5rem', fontSize: 'var(--fs-74)', color: 'var(--muted)', lineHeight: 1.5 }}><span style={{ color: 'var(--red)', fontSize: 'var(--fs-50)', marginTop: '.25rem', flexShrink: 0 }}>◆</span><span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{r}</span></li>)}
                             </ul>
                           </>
                         )}
-                        {insights.insider_tip && <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 7, padding: '.65rem .9rem', fontSize: '.75rem', color: 'var(--sub)', lineHeight: 1.6, overflowWrap: 'anywhere' }}><span style={{ color: 'var(--green)', fontWeight: 700 }}>Tip: </span>{insights.insider_tip}</div>}
+                        {insights.insider_tip && <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 7, padding: '.75rem 1rem', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6, overflowWrap: 'anywhere' }}><span style={{ color: 'var(--green)', fontWeight: 700 }}>Tip: </span>{insights.insider_tip}</div>}
                       </Card>
                     )}
 
                     {advState === 'idle' && (
                       <Card>
-                        <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '.95rem', marginBottom: '.3rem' }}>Advantage playbook + 30/60/90 plan</div>
-                        <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-65)', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.9rem' }}>Hiring-manager outreach, timing, referral tactics and a 30/60/90-day plan, tuned with Seen&apos;s company data.</p>
+                        <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: 'var(--fs-body)', marginBottom: '.25rem' }}>Advantage playbook + 30/60/90 plan</div>
+                        <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-65)', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '1rem' }}>Hiring-manager outreach, timing, referral tactics and a 30/60/90-day plan, tuned with Seen&apos;s company data.</p>
                         <button style={btnPrimary} onClick={runAdvantage}>Build my advantage →<span style={{ marginLeft: '.5rem', fontSize: 'var(--fs-55)', opacity: .65, fontFamily: 'var(--mono)', fontWeight: 400 }}>· {priceLabel(RESUME_OPTIMIZE_COST, pro)}</span></button>
                       </Card>
                     )}
@@ -1196,28 +1196,28 @@ function ResumePageInner() {
                   <div style={{ animation: 'fadeUp .3s ease both' }}>
                     <Card>
                       {kicker('Your final package')}
-                      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.85rem' }}>
+                      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.75rem' }}>
                         {finalBullets().length} bullet{finalBullets().length !== 1 ? 's' : ''}{hp ? ' (HumanProof)' : ''}{fitOut && fitOut.fit_score != null ? ` · SeenFit ${fitOut.fit_score}/100` : ''}{confirmList().length ? ` · ${confirmList().length} to confirm` : ''}
                       </div>
-                      <div className="ai-btn-row" style={{ marginBottom: '.6rem' }}>
-                        <button onClick={() => copy(packageText(), 'pkg')} style={{ padding: '.65rem', background: 'var(--raised)', border: '1px solid var(--line2)', color: copied === 'pkg' ? 'var(--green)' : 'var(--sub)', borderRadius: 9, fontFamily: 'var(--mono)', fontSize: 'var(--fs-68)', cursor: 'pointer' }}>{copied === 'pkg' ? '✓ Copied' : 'Copy final package'}</button>
-                        <button onClick={downloadResume} disabled={downloading} style={{ padding: '.65rem', background: 'var(--surface)', border: '1.5px solid var(--blue)', color: 'var(--blue)', borderRadius: 9, fontFamily: 'var(--mono)', fontSize: 'var(--fs-68)', fontWeight: 700, cursor: downloading ? 'not-allowed' : 'pointer', opacity: downloading ? 0.6 : 1 }}>{downloading ? 'Building…' : '⬇ Download résumé PDF'}</button>
+                      <div className="ai-btn-row" style={{ marginBottom: '.5rem' }}>
+                        <button onClick={() => copy(packageText(), 'pkg')} style={{ padding: '.75rem', background: 'var(--raised)', border: '1px solid var(--line2)', color: copied === 'pkg' ? 'var(--green)' : 'var(--sub)', borderRadius: 9, fontFamily: 'var(--mono)', fontSize: 'var(--fs-68)', cursor: 'pointer' }}>{copied === 'pkg' ? '✓ Copied' : 'Copy final package'}</button>
+                        <button onClick={downloadResume} disabled={downloading} style={{ padding: '.75rem', background: 'var(--surface)', border: '1.5px solid var(--blue)', color: 'var(--blue)', borderRadius: 9, fontFamily: 'var(--mono)', fontSize: 'var(--fs-68)', fontWeight: 700, cursor: downloading ? 'not-allowed' : 'pointer', opacity: downloading ? 0.6 : 1 }}>{downloading ? 'Building…' : '⬇ Download résumé PDF'}</button>
                       </div>
-                      <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '.6rem' }}>
+                      <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '.5rem' }}>
                         {label('PDF template')}
                         {(['classic', 'engineering', 'modern'] as const).map(t => (
-                          <button key={t} type="button" onClick={() => setPdfTemplate(t)} style={{ background: pdfTemplate === t ? 'var(--gdim)' : 'none', border: `1px solid ${pdfTemplate === t ? 'var(--gmid)' : 'var(--line2)'}`, color: pdfTemplate === t ? 'var(--green)' : 'var(--dim)', borderRadius: 6, padding: '.25rem .6rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', cursor: 'pointer', textTransform: 'capitalize' }}>{t}</button>
+                          <button key={t} type="button" onClick={() => setPdfTemplate(t)} style={{ background: pdfTemplate === t ? 'var(--gdim)' : 'none', border: `1px solid ${pdfTemplate === t ? 'var(--gmid)' : 'var(--line2)'}`, color: pdfTemplate === t ? 'var(--green)' : 'var(--dim)', borderRadius: 6, padding: '.25rem .5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', cursor: 'pointer', textTransform: 'capitalize' }}>{t}</button>
                         ))}
                       </div>
                       <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', color: 'var(--muted)', lineHeight: 1.5 }}>The PDF is a complete, ATS-ready résumé built from your own text — only the résumé, none of Seen's notes · free.</div>
-                      <button type="button" onClick={openStudioForJob} style={{ marginTop: '.7rem', background: 'none', border: '1px solid var(--accent-line)', color: 'var(--accent)', borderRadius: 8, padding: '.5rem .85rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-64)', cursor: 'pointer', width: '100%' }}>✦ Tailor the whole résumé to this job in Résumé Studio →</button>
+                      <button type="button" onClick={openStudioForJob} style={{ marginTop: '.75rem', background: 'none', border: '1px solid var(--accent-line)', color: 'var(--accent)', borderRadius: 8, padding: '.5rem .75rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-64)', cursor: 'pointer', width: '100%' }}>✦ Tailor the whole résumé to this job in Résumé Studio →</button>
                     </Card>
 
                     <Card>
                       {kicker('Email me this package')}
                       <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
                         <input autoComplete="off" type="email" value={emailAddr} onChange={e => setEmailAddr(e.target.value)} placeholder="your@email.com" style={{ flex: 1, minWidth: 160, background: 'var(--surface)', border: '1.5px solid rgba(16,185,129,0.3)', borderRadius: 8, padding: '.5rem .75rem', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-72)', outline: 'none', boxSizing: 'border-box' }} />
-                        <button onClick={emailPackage} disabled={emailState === 'sending' || emailState === 'sent' || !emailAddr.trim()} style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', color: 'var(--green)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-72)', fontWeight: 600, padding: '.5rem .9rem', borderRadius: 8, cursor: 'pointer', opacity: (emailState === 'sending' || !emailAddr.trim()) ? 0.7 : 1 }}>{emailState === 'sent' ? '✓ Sent' : emailState === 'sending' ? 'Sending…' : 'Send →'}</button>
+                        <button onClick={emailPackage} disabled={emailState === 'sending' || emailState === 'sent' || !emailAddr.trim()} style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', color: 'var(--green)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-72)', fontWeight: 600, padding: '.5rem 1rem', borderRadius: 8, cursor: 'pointer', opacity: (emailState === 'sending' || !emailAddr.trim()) ? 0.7 : 1 }}>{emailState === 'sent' ? '✓ Sent' : emailState === 'sending' ? 'Sending…' : 'Send →'}</button>
                       </div>
                       {emailState === 'sent' && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--green)', marginTop: '.5rem' }}>✓ Check your email — the apply-tracking link is inside.</div>}
                     </Card>
@@ -1226,8 +1226,8 @@ function ResumePageInner() {
                       {kicker('Now apply — and get Seen')}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                         {httpHref(jobUrl) && <a href={httpHref(jobUrl) ?? '#'} target="_blank" rel="noopener noreferrer" style={{ display: 'block', textAlign: 'center', ...btnPrimary, textDecoration: 'none', boxSizing: 'border-box' } as React.CSSProperties}>Continue to apply →</a>}
-                        <a href={trackHref} style={{ display: 'block', textAlign: 'center', background: 'var(--green)', color: 'var(--ink)', borderRadius: 8, padding: '.7rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.8rem', textDecoration: 'none' }}>📌 Track this application</a>
-                        <a href={reportHref} style={{ display: 'block', textAlign: 'center', background: 'none', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, padding: '.6rem 1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-68)', textDecoration: 'none' }}>Report what happened →</a>
+                        <a href={trackHref} style={{ display: 'block', textAlign: 'center', background: 'var(--green)', color: 'var(--ink)', borderRadius: 8, padding: '.75rem 1rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', textDecoration: 'none' }}>📌 Track this application</a>
+                        <a href={reportHref} style={{ display: 'block', textAlign: 'center', background: 'none', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-68)', textDecoration: 'none' }}>Report what happened →</a>
                       </div>
                     </Card>
                   </div>
@@ -1235,11 +1235,11 @@ function ResumePageInner() {
 
                 {/* Post-win upsell */}
                 {pro === false && !upsellDismissed && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 8, padding: '.5rem .6rem .5rem .85rem', marginTop: '.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 8, padding: '.5rem .5rem .5rem .75rem', marginTop: '.5rem' }}>
                     <button onClick={() => { setUpgradeReason('generic'); setUpgradeFeature(undefined); setShowUpgrade(true) }} style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--body)', fontSize: 'var(--fs-68)', color: 'var(--sub)', lineHeight: 1.5 }}>
                       <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{PASS_AFTER_WIN}</span>
                     </button>
-                    <button onClick={() => setUpsellDismissed(true)} aria-label="Dismiss" style={{ background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontSize: '.85rem', lineHeight: 1, padding: '.1rem .2rem', flexShrink: 0 }}>✕</button>
+                    <button onClick={() => setUpsellDismissed(true)} aria-label="Dismiss" style={{ background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontSize: 'var(--fs-ui)', lineHeight: 1, padding: '.125rem .25rem', flexShrink: 0 }}>✕</button>
                   </div>
                 )}
               </>

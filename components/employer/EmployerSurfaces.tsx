@@ -37,28 +37,28 @@ export function EmployerSurfaces() {
 
   return (
     <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 18, padding: '2rem', marginBottom: '2.5rem' }}>
-      <div style={{ ...mono('.55rem', 'var(--blue)'), textTransform: 'uppercase', letterSpacing: '.16em', marginBottom: '.5rem' }}>Your tools</div>
+      <div style={{ ...mono('var(--fs-meta)', 'var(--blue)'), textTransform: 'uppercase', letterSpacing: '.16em', marginBottom: '.5rem' }}>Your tools</div>
       <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--white)', margin: '0 0 .5rem', letterSpacing: '-.02em' }}>Your dashboard, analytics &amp; notifications.</h2>
-      <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-ui)', lineHeight: 1.7, margin: '0 0 1.4rem', maxWidth: 560 }}>
+      <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-ui)', lineHeight: 1.7, margin: '0 0 1.5rem', maxWidth: 560 }}>
         Go beyond the headline grade: track every posting and applicant outcome, see how your listings actually perform, and stay ahead of new applicants and expiring posts. Enter your company once and we&apos;ll carry it through to each.
       </p>
 
-      <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', marginBottom: '1.6rem' }}>
+      <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
         <input
           value={company}
           onChange={e => setCompany(e.target.value)}
           placeholder="Your company name"
           aria-label="Your company name"
           autoComplete="off"
-          style={{ flex: 1, minWidth: 220, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.7rem .9rem', ...mono('.75rem', 'var(--white)'), outline: 'none' }}
+          style={{ flex: 1, minWidth: 220, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.75rem 1rem', ...mono('var(--fs-meta)', 'var(--white)'), outline: 'none' }}
         />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: '1rem' }}>
         {SURFACES.map(s => (
-          <Link key={s.title} href={hrefFor(s.tab)} style={{ display: 'block', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 14, padding: '1.3rem', textDecoration: 'none' }}>
+          <Link key={s.title} href={hrefFor(s.tab)} style={{ display: 'block', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 14, padding: '1.25rem', textDecoration: 'none' }}>
             <div style={{ fontSize: 'var(--fs-h3)', marginBottom: '.5rem' }} aria-hidden>{s.emoji}</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', marginBottom: '.3rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.25rem' }}>
               <span style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)' }}>{s.title}</span>
               <span style={{ color: 'var(--blue)' }} aria-hidden>→</span>
             </div>
@@ -67,7 +67,7 @@ export function EmployerSurfaces() {
         ))}
       </div>
 
-      <p style={{ ...mono('.55rem', 'var(--muted)'), lineHeight: 1.6, margin: '1.1rem 0 0' }}>
+      <p style={{ ...mono('var(--fs-meta)', 'var(--muted)'), lineHeight: 1.6, margin: '1rem 0 0' }}>
         {q
           ? <>Carrying <span style={{ color: 'var(--sub)' }}>{q}</span> through to your dashboard. The reputation view is public; posting, disputes, and applicant updates unlock once your company claim is approved.</>
           : <>Enter your company above, or open the dashboard and set it there. The reputation view is public; managing listings and updates needs an approved company claim.</>}

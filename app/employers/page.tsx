@@ -37,8 +37,8 @@ export default function EmployersPage() {
       <div style={{ ...wrap, padding: '3.5rem 1.5rem 5rem' }}>
         {/* Hero */}
         <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--blue)', marginBottom: '.7rem' }}>For employers</div>
-          <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.9rem,6vw,2.8rem)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', lineHeight: 1.05, margin: '0 auto .9rem', maxWidth: 640 }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--blue)', marginBottom: '.75rem' }}>For employers</div>
+          <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.9rem,6vw,2.8rem)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', lineHeight: 1.05, margin: '0 auto 1rem', maxWidth: 640 }}>
             Hire the people who actually show up.
           </h1>
           <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-body)', lineHeight: 1.75, maxWidth: 580, margin: '0 auto 2rem' }}>
@@ -46,7 +46,7 @@ export default function EmployersPage() {
           </p>
           <div style={{ display: 'flex', gap: '.75rem', justifyContent: 'center', flexWrap: 'wrap' }}>
             {['📊 Your reputation, candidate-side', '★ Featured placement', '✓ Transparency Verified'].map(b => (
-              <span key={b} className="vibe v-b" style={{ padding: '.4rem .9rem' }}>{b}</span>
+              <span key={b} className="vibe v-b" style={{ padding: '.5rem 1rem' }}>{b}</span>
             ))}
           </div>
         </div>
@@ -85,8 +85,8 @@ export default function EmployersPage() {
             { t: 'Featured = more of the right applicants', d: 'Featured placement puts your listings above standard results for matching searches, in front of candidates already looking for what you offer.' },
             { t: 'Verified = trust that converts', d: 'The Transparency Verified badge is a public commitment to respond — reviewed against real outcome data. It tells strong candidates you’re worth their time.' },
           ].map(c => (
-            <div key={c.t} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 14, padding: '1.4rem' }}>
-              <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', marginBottom: '.4rem' }}>{c.t}</div>
+            <div key={c.t} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 14, padding: '1.5rem' }}>
+              <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', marginBottom: '.5rem' }}>{c.t}</div>
               <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-meta)', lineHeight: 1.65, margin: 0 }}>{c.d}</p>
             </div>
           ))}
@@ -95,8 +95,8 @@ export default function EmployersPage() {
 
         {/* Promote — real, no-login checkout */}
         <div id="promote" style={{ scrollMarginTop: 80 }}>
-          <div style={{ textAlign: 'center', marginBottom: '1.4rem' }}>
-            <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: '0 0 .4rem' }}>Get in front of candidates</h2>
+          <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+            <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: '0 0 .5rem' }}>Get in front of candidates</h2>
             <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.14em' }}>One-time · no account needed</p>
           </div>
           <EmployerCheckout />
@@ -110,7 +110,7 @@ export default function EmployersPage() {
         <div style={{ textAlign: 'center', padding: '2rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16 }}>
           <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', marginBottom: '.5rem' }}>Hiring across many roles or locations?</div>
           <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '1rem' }}>We&apos;ll set up multi-location placement, verified badges, and applicant reporting for your team.</p>
-          <a href="mailto:hello@seenjobs.io?subject=Seen for Employers — Enterprise" style={{ display: 'inline-block', background: 'var(--cta)', border: 'none', borderRadius: 8, padding: '.7rem 1.8rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)', color: '#fff', textDecoration: 'none' }}>Talk to us →</a>
+          <a href="mailto:hello@seenjobs.io?subject=Seen for Employers — Enterprise" style={{ display: 'inline-block', background: 'var(--cta)', border: 'none', borderRadius: 8, padding: '.75rem 1.75rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', color: 'var(--text-1)', textDecoration: 'none' }}>Talk to us →</a>
         </div>
         </Reveal>
       </div>

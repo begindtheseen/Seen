@@ -71,11 +71,11 @@ export default async function CompareSlugsPage({ params }: { params: Promise<{ s
     <div className="page-full">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }} />
       <div style={wrap}>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.2em', color: 'var(--blue)', marginBottom: '.7rem', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.2em', color: 'var(--blue)', marginBottom: '.75rem', display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ width: 20, height: 1, background: 'var(--blue)', display: 'inline-block' }} />
           Compare
         </div>
-        <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.5rem,5vw,2.2rem)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', lineHeight: 1.1, margin: '0 0 .7rem' }}>
+        <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.5rem,5vw,2.2rem)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', lineHeight: 1.1, margin: '0 0 .75rem' }}>
           {aName} vs {bName}: hiring transparency
         </h1>
         <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-body)', lineHeight: 1.7, fontWeight: 400, margin: '0 0 2rem' }}>

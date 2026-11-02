@@ -11,7 +11,7 @@ const inp: React.CSSProperties = {
   background: 'var(--surface)',
   border: '1.5px solid var(--line2)',
   borderRadius: 8,
-  padding: '.72rem 1rem',
+  padding: '.75rem 1rem',
   color: 'var(--white)',
   fontFamily: 'var(--body)',
   fontSize: 'var(--fs-ui)',
@@ -19,13 +19,13 @@ const inp: React.CSSProperties = {
   caretColor: 'var(--blue)',
   boxSizing: 'border-box',
 }
-const label: React.CSSProperties = { fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)', display: 'block', marginBottom: '.35rem' }
-const h1: React.CSSProperties = { fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', margin: '0 0 .2rem' }
+const label: React.CSSProperties = { fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)', display: 'block', marginBottom: '.25rem' }
+const h1: React.CSSProperties = { fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', margin: '0 0 .25rem' }
 const sub: React.CSSProperties = { fontSize: 'var(--fs-sm)', color: 'var(--sub)', fontWeight: 300, marginBottom: '.5rem' }
 const fine: React.CSSProperties = { fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.55, marginBottom: '1.5rem' }
 const focusOn = (e: React.FocusEvent<HTMLInputElement>) => { e.target.style.borderColor = 'var(--blue)' }
 const focusOff = (e: React.FocusEvent<HTMLInputElement>) => { e.target.style.borderColor = 'var(--line2)' }
-const cta = (busy: boolean): React.CSSProperties => ({ width: '100%', padding: '.85rem', background: 'var(--cta)', color: '#fff', border: 'none', borderRadius: 8, fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)', cursor: busy ? 'not-allowed' : 'pointer', marginBottom: '.75rem', boxShadow: '0 0 20px rgba(59,130,246,0.3)', opacity: busy ? 0.7 : 1 })
+const cta = (busy: boolean): React.CSSProperties => ({ width: '100%', padding: '.75rem', background: 'var(--cta)', color: 'var(--text-1)', border: 'none', borderRadius: 8, fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)', cursor: busy ? 'not-allowed' : 'pointer', marginBottom: '.75rem', boxShadow: '0 0 20px rgba(59,130,246,0.3)', opacity: busy ? 0.7 : 1 })
 
 /** The neutral answer to "send me a code" — the same words whether or not the address has an account
  *  (the raw Supabase error, "Signups not allowed for otp", told anyone which emails are registered;
@@ -173,7 +173,7 @@ export default function ResetPage() {
 
   const passwordFields = (onEnter: () => void) => (
     <>
-      <div style={{ marginBottom: '.85rem' }}>
+      <div style={{ marginBottom: '.75rem' }}>
         <label style={label} htmlFor="rs-new">New password</label>
         <input id="rs-new" type="password" autoComplete="new-password" value={newPass} onChange={e => setNewPass(e.target.value)} onFocus={focusOn} onBlur={focusOff} placeholder="Min 8 characters" style={inp} />
       </div>
@@ -183,7 +183,7 @@ export default function ResetPage() {
       </div>
     </>
   )
-  const message = msg && <div role="status" style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: ok ? 'var(--green)' : 'var(--red)', marginBottom: '.85rem', lineHeight: 1.6 }}>{msg}</div>
+  const message = msg && <div role="status" style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: ok ? 'var(--green)' : 'var(--red)', marginBottom: '.75rem', lineHeight: 1.6 }}>{msg}</div>
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 1.5rem 1.5rem' }}>
@@ -258,9 +258,9 @@ export default function ResetPage() {
         {mode === 'code' && step === 2 && (
           <div data-testid="reset-code">
             <h1 style={h1}>Enter your code</h1>
-            <div style={{ ...sub, marginBottom: '.35rem' }}>{CODE_SENT_COPY(email.trim())}</div>
+            <div style={{ ...sub, marginBottom: '.25rem' }}>{CODE_SENT_COPY(email.trim())}</div>
             <div style={fine}>An 8-digit code, not a link. It expires in 10 minutes. Nothing arrived? Check spam, or make sure this is the address you signed up with.</div>
-            <div style={{ marginBottom: '.85rem' }}>
+            <div style={{ marginBottom: '.75rem' }}>
               <label style={label} htmlFor="rs-code">8-digit code</label>
               <input
                 id="rs-code"

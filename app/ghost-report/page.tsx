@@ -58,12 +58,12 @@ function Stat({ value, label, color }: { value: string; label: string; color: st
 function OffenderRow({ r, rank }: { r: Ranked; rank: number }) {
   const accent = toneText(gradeTone(r.overallScore))
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '.85rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '.8rem 1rem', marginBottom: '.5rem' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '.75rem 1rem', marginBottom: '.5rem' }}>
       <div style={{ ...mono('var(--fs-meta)', 'var(--muted)'), minWidth: 40, textAlign: 'right', flexShrink: 0 }}>{rank}</div>
       <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-xl)', fontWeight: 600, color: accent, minWidth: 36, textAlign: 'center', flexShrink: 0 }}>{grade(r.overallScore)}</div>
       <div style={{ minWidth: 0, flex: 1 }}>
-        <Link href={`/company/${slugify(r.name)}`} style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', textDecoration: 'none', textTransform: 'capitalize' }}>{r.name}</Link>
-        <div style={{ ...mono('var(--fs-meta)', 'var(--dim)'), marginTop: '.15rem' }}>
+        <Link href={`/company/${slugify(r.name)}`} style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', textDecoration: 'none', textTransform: 'capitalize' }}>{r.name}</Link>
+        <div style={{ ...mono('var(--fs-meta)', 'var(--dim)'), marginTop: '.125rem' }}>
           {r.reportCount.toLocaleString()} report{r.reportCount !== 1 ? 's' : ''}
           {r.isAgency ? ' · staffing agency' : ''}
           {r.thin ? ' · early signal — low confidence' : ''}
@@ -88,17 +88,17 @@ export default async function GhostReportPage() {
   return (
     <div className="page-full">
       <div style={wrap}>
-        <div style={{ ...mono('var(--fs-meta)', 'var(--blue)'), textTransform: 'uppercase', letterSpacing: '.2em', marginBottom: '.7rem', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ ...mono('var(--fs-meta)', 'var(--blue)'), textTransform: 'uppercase', letterSpacing: '.2em', marginBottom: '.75rem', display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ width: 20, height: 1, background: 'var(--blue)', display: 'inline-block' }} />
           Weekly Ghost Report · {weekLabel} · updates hourly
         </div>
-        <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.7rem,5.5vw,2.5rem)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', lineHeight: 1.08, margin: '0 0 .9rem' }}>
+        <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.7rem,5.5vw,2.5rem)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', lineHeight: 1.08, margin: '0 0 1rem' }}>
           {headline}
         </h1>
 
         {report.hasReported ? (
           <>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.6rem 2.2rem', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.2rem 1.4rem', margin: '1.2rem 0 2.4rem' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem 2rem', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.25rem 1.5rem', margin: '1.25rem 0 2.5rem' }}>
               <Stat value={h.reportsTotal.toLocaleString()} label="applicant accounts" color="var(--white)" />
               <Stat value={String(h.companiesTracked)} label="companies with reports" color="var(--white)" />
               {h.avgGhostRatePct != null && <Stat value={`${h.avgGhostRatePct}%`} label="avg reported ghost rate" color="var(--red)" />}
@@ -107,18 +107,18 @@ export default async function GhostReportPage() {
             </div>
 
             {report.agencySpotlight && (
-              <div style={{ background: 'var(--bad-tint)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 12, padding: '1.1rem 1.3rem', marginBottom: '2.2rem' }}>
-                <div style={{ ...mono('var(--fs-meta)', 'var(--red)'), textTransform: 'uppercase', letterSpacing: '.15em', marginBottom: '.4rem' }}>Agency spotlight</div>
+              <div style={{ background: 'var(--bad-tint)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 12, padding: '1rem 1.25rem', marginBottom: '2rem' }}>
+                <div style={{ ...mono('var(--fs-meta)', 'var(--red)'), textTransform: 'uppercase', letterSpacing: '.15em', marginBottom: '.5rem' }}>Agency spotlight</div>
                 <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', lineHeight: 1.5 }}>
                   <span style={{ textTransform: 'capitalize' }}>{report.agencySpotlight.name}</span> is the most-reported ghosting staffing agency this week — {report.agencySpotlight.ghostPct}% of {report.agencySpotlight.reportCount.toLocaleString()} reported applications got no response at all.
                 </div>
-                <Link href="/agencies" style={{ ...mono('var(--fs-meta)', 'var(--blue)'), textDecoration: 'none', display: 'inline-block', marginTop: '.6rem' }}>See the full staffing-agency ghost index →</Link>
+                <Link href="/agencies" style={{ ...mono('var(--fs-meta)', 'var(--blue)'), textDecoration: 'none', display: 'inline-block', marginTop: '.5rem' }}>See the full staffing-agency ghost index →</Link>
               </div>
             )}
 
             {report.worstOffenders.length > 0 && (
-              <section style={{ marginBottom: '2.4rem' }}>
-                <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Most-reported ghosters</h2>
+              <section style={{ marginBottom: '2.5rem' }}>
+                <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', margin: '0 0 .25rem' }}>Most-reported ghosters</h2>
                 <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 400 }}>Ranked by reported ghost rate among companies with real applicant accounts. No reports, no number.</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                 {report.worstOffenders.map((r, i) => (
@@ -129,8 +129,8 @@ export default async function GhostReportPage() {
                 )}
 
                 {report.responseLeaders.length > 0 && (
-                <section style={{ marginBottom: '2.4rem' }}>
-                <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Actually replies</h2>
+                <section style={{ marginBottom: '2.5rem' }}>
+                <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', margin: '0 0 .25rem' }}>Actually replies</h2>
                 <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 400 }}>The companies applicants reported hearing back from most — proof that responding is a choice.</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                 {report.responseLeaders.map((r, i) => (
@@ -141,16 +141,16 @@ export default async function GhostReportPage() {
                 )}
           </>
         ) : (
-          <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.6rem', margin: '1.4rem 0 2.4rem' }}>
+          <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.5rem', margin: '1.5rem 0 2.5rem' }}>
             <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-ui)', lineHeight: 1.7, fontWeight: 400, margin: 0 }}>
               The report is waiting on its first substantial batch of applicant outcomes. The framework is live — every report you submit becomes a data point in next week&apos;s edition. We&apos;ll never print a number we don&apos;t have.
             </p>
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', margin: '0 0 2.4rem' }}>
-          <Link href="/report?outcome=ghosted" className="btn" style={{ background: 'var(--cta)', color: '#fff', padding: '.7rem 1.3rem', fontWeight: 800 }}>Been ghosted? Add it — 2 min →</Link>
-          <Link href="/agencies" className="btn btn-ghost" style={{ padding: '.7rem 1.3rem' }}>The full ghost index</Link>
+        <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', margin: '0 0 2.5rem' }}>
+          <Link href="/report?outcome=ghosted" className="btn" style={{ background: 'var(--cta)', color: 'var(--text-1)', padding: '.75rem 1.25rem', fontWeight: 800 }}>Been ghosted? Add it — 2 min →</Link>
+          <Link href="/agencies" className="btn btn-ghost" style={{ padding: '.75rem 1.25rem' }}>The full ghost index</Link>
         </div>
 
         <p style={{ ...mono('var(--fs-meta)', 'var(--dim)'), lineHeight: 1.7 }}>

@@ -128,7 +128,7 @@ export default function CompanyScoreModal({ companyName, onClose }: { companyNam
           <div className={styles.skeleton}>
             <div className={styles.skRow}>
               <div className="sk" style={{ width: 92, height: 92, borderRadius: '50%', flexShrink: 0 }} />
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                 <div className="sk" style={{ width: '60%', height: 12 }} />
                 <div className="sk" style={{ width: '40%', height: 10 }} />
               </div>

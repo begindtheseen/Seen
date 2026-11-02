@@ -83,9 +83,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <div style={{ display: 'flex', width: 15, height: 15, borderRadius: 999, background: accent }} />
-            <div style={{ display: 'flex', fontFamily: DISPLAY, fontSize: 34, fontWeight: 800, marginLeft: 12, marginTop: -4 }}>Seen</div>
+            <div style={{ display: 'flex', fontFamily: DISPLAY, fontSize: 'var(--fs-h2)', fontWeight: 800, marginLeft: 12, marginTop: -4 }}>Seen</div>
           </div>
-          <div style={{ display: 'flex', fontSize: 18, fontWeight: 500, letterSpacing: 2.6, color: white(TEXT.meta) }}>
+          <div style={{ display: 'flex', fontSize: 'var(--fs-lead)', fontWeight: 500, letterSpacing: 2.6, color: white(TEXT.meta) }}>
             {hasData ? 'SEEN GRADE' : 'NO GRADE YET'}
           </div>
         </div>
@@ -93,27 +93,27 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
         {hasData ? (
           <div style={{ display: 'flex', flex: 1, position: 'relative' }}>
             {/* the grade letter as a watermark, the score solid beneath it */}
-            <div style={{ display: 'flex', position: 'absolute', right: -12, top: -36, fontFamily: DISPLAY, fontSize: 440, fontWeight: 800, lineHeight: 1, color: rgba(accent, 0.22) }}>
+            <div style={{ display: 'flex', position: 'absolute', right: -12, top: -40, fontFamily: DISPLAY, fontSize: 'var(--fs-fig-l)', fontWeight: 800, lineHeight: 1, color: rgba(accent, 0.22) }}>
               {letter}
             </div>
-            <div style={{ display: 'flex', position: 'absolute', right: 0, top: 322, alignItems: 'baseline' }}>
-              <div style={{ display: 'flex', fontFamily: DISPLAY, fontSize: 56, fontWeight: 800, color: accent }}>{score}</div>
-              <div style={{ display: 'flex', fontSize: 24, fontWeight: 500, color: white(TEXT.faint), marginLeft: 6 }}>/100</div>
+            <div style={{ display: 'flex', position: 'absolute', right: 0, top: 320, alignItems: 'baseline' }}>
+              <div style={{ display: 'flex', fontFamily: DISPLAY, fontSize: 'var(--fs-fig-l)', fontWeight: 800, color: accent }}>{score}</div>
+              <div style={{ display: 'flex', fontSize: 'var(--fs-xl)', fontWeight: 500, color: white(TEXT.faint), marginLeft: 8 }}>/100</div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', width: 1000, marginTop: 52 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', width: 1000, marginTop: 56 }}>
               <div style={{ display: 'flex', fontFamily: DISPLAY, fontSize: nameSize, fontWeight: 800, lineHeight: 1, letterSpacing: -1, whiteSpace: 'nowrap' }}>{name}</div>
-              <div style={{ display: 'flex', fontSize: 27, lineHeight: 1.3, color: white(TEXT.strong), marginTop: 22, maxWidth: 620 }}>{verdict}</div>
+              <div style={{ display: 'flex', fontSize: 'var(--fs-fig)', lineHeight: 1.3, color: white(TEXT.strong), marginTop: 24, maxWidth: 620 }}>{verdict}</div>
 
-              <div style={{ display: 'flex', marginTop: 46 }}>
+              <div style={{ display: 'flex', marginTop: 48 }}>
                 {pairs.map((p) => (
                   <div key={p.label} style={{ display: 'flex', flexDirection: 'column', marginRight: 56 }}>
-                    <div style={{ display: 'flex', fontFamily: DISPLAY, fontSize: 60, fontWeight: 800, lineHeight: 1 }}>{p.value}</div>
-                    <div style={{ display: 'flex', fontSize: 20, color: white(TEXT.meta), marginTop: 8 }}>{p.label}</div>
+                    <div style={{ display: 'flex', fontFamily: DISPLAY, fontSize: 'var(--fs-fig-l)', fontWeight: 800, lineHeight: 1 }}>{p.value}</div>
+                    <div style={{ display: 'flex', fontSize: 'var(--fs-h3)', color: white(TEXT.meta), marginTop: 8 }}>{p.label}</div>
                   </div>
                 ))}
               </div>
-              <div style={{ display: 'flex', fontSize: 19, color: white(TEXT.meta), marginTop: 26 }}>{conf}</div>
+              <div style={{ display: 'flex', fontSize: 'var(--fs-h3)', color: white(TEXT.meta), marginTop: 28 }}>{conf}</div>
             </div>
           </div>
         ) : (
@@ -121,14 +121,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
             <div style={{ display: 'flex', fontFamily: DISPLAY, fontSize: name.length > 18 ? 54 : 64, fontWeight: 800, lineHeight: 1.06, letterSpacing: -1, maxWidth: 1000 }}>
               {noDataHead}
             </div>
-            <div style={{ display: 'flex', fontSize: 28, lineHeight: 1.35, color: white(TEXT.body), marginTop: 24, maxWidth: 900 }}>{noDataSub}</div>
+            <div style={{ display: 'flex', fontSize: 'var(--fs-fig)', lineHeight: 1.35, color: white(TEXT.body), marginTop: 24, maxWidth: 900 }}>{noDataSub}</div>
           </div>
         )}
 
         {/* footer */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: `1px solid ${white(0.06)}`, paddingTop: 22, marginTop: 6 }}>
-          <div style={{ display: 'flex', fontSize: 22, fontWeight: 600, color: white(TEXT.strong) }}>{url}</div>
-          <div style={{ display: 'flex', fontSize: 19, color: white(TEXT.faint) }}>{hasData ? 'Check any company free at seenjobs.io' : 'Track an application free at seenjobs.io'}</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: `1px solid ${white(0.06)}`, paddingTop: 24, marginTop: 8 }}>
+          <div style={{ display: 'flex', fontSize: 'var(--fs-h3)', fontWeight: 600, color: white(TEXT.strong) }}>{url}</div>
+          <div style={{ display: 'flex', fontSize: 'var(--fs-h3)', color: white(TEXT.faint) }}>{hasData ? 'Check any company free at seenjobs.io' : 'Track an application free at seenjobs.io'}</div>
         </div>
       </div>
     ),

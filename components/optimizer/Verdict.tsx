@@ -43,9 +43,9 @@ export interface PaidPlan {
   summary?: { text: string; replaces: string; why: string } | null
 }
 
-const kicker: React.CSSProperties = { fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)', marginBottom: '.45rem' }
-const card: React.CSSProperties = { background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 10, padding: '.6rem .75rem' }
-const amberCard: React.CSSProperties = { background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.22)', borderRadius: 8, padding: '.55rem .75rem' }
+const kicker: React.CSSProperties = { fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)', marginBottom: '.5rem' }
+const card: React.CSSProperties = { background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 10, padding: '.5rem .75rem' }
+const amberCard: React.CSSProperties = { background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.22)', borderRadius: 8, padding: '.5rem .75rem' }
 const show = (s: string): string => displaySkill(s)
 
 function bandColor(score: number | null): string {
@@ -59,22 +59,22 @@ export function VerdictCard({ verdict, title = 'SeenFit match', note, cached }: 
   // the sentence starts with the number; show it once, in the circle
   const why = verdict.sentence.replace(/^\d+ — /, '')
   return (
-    <div data-testid="verdict" style={{ background: 'var(--gdim)', border: '1px solid var(--line)', borderRadius: 12, padding: '.9rem 1rem' }}>
+    <div data-testid="verdict" style={{ background: 'var(--gdim)', border: '1px solid var(--line)', borderRadius: 12, padding: '1rem 1rem' }}>
       {verdict.gate && (
-        <div data-testid="verdict-gate" style={{ display: 'flex', gap: '.45rem', alignItems: 'flex-start', marginBottom: '.65rem', color: 'var(--amber)', fontSize: 'var(--fs-72)', lineHeight: 1.5, fontWeight: 600 }}>
+        <div data-testid="verdict-gate" style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-start', marginBottom: '.75rem', color: 'var(--amber)', fontSize: 'var(--fs-72)', lineHeight: 1.5, fontWeight: 600 }}>
           <span aria-hidden style={{ flexShrink: 0 }}>⚠</span><span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{verdict.gate}</span>
         </div>
       )}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '.85rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem' }}>
         <div aria-label={s == null ? 'No score' : `Score ${s} of 100`} style={{ flexShrink: 0, width: 52, height: 52, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `3px solid ${bandColor(s)}` }}>
-          <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.15rem', color: bandColor(s) }}>{s == null ? '–' : s}</span>
+          <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-lead)', color: bandColor(s) }}>{s == null ? '–' : s}</span>
         </div>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '.9rem' }}>{verdict.band || 'No score'}{cached ? <span style={{ marginLeft: '.45rem', fontFamily: 'var(--mono)', fontWeight: 400, fontSize: 'var(--fs-55)', color: 'var(--green)' }}>· cached, no credit used</span> : null}</div>
+          <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: 'var(--fs-ui)' }}>{verdict.band || 'No score'}{cached ? <span style={{ marginLeft: '.5rem', fontFamily: 'var(--mono)', fontWeight: 400, fontSize: 'var(--fs-55)', color: 'var(--green)' }}>· cached, no credit used</span> : null}</div>
           <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--dim)', lineHeight: 1.5 }}>{title}{note ? ` · ${note}` : ''}</div>
         </div>
       </div>
-      <p style={{ margin: '.7rem 0 0', fontSize: 'var(--fs-72)', color: 'var(--sub)', lineHeight: 1.6, overflowWrap: 'anywhere' }}>{verdict.withheld ? verdict.sentence : why}</p>
+      <p style={{ margin: '.75rem 0 0', fontSize: 'var(--fs-72)', color: 'var(--sub)', lineHeight: 1.6, overflowWrap: 'anywhere' }}>{verdict.withheld ? verdict.sentence : why}</p>
     </div>
   )
 }
@@ -87,7 +87,7 @@ export function WhyYouMatch({ matched, limit = 6 }: { matched: RequirementRow[];
   return (
     <div>
       <div style={{ ...kicker, color: 'var(--green)' }}>Why you match</div>
-      <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+      <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
         {rows.map((m, i) => (
           <li key={i} style={{ display: 'flex', gap: '.5rem', fontSize: 'var(--fs-72)', color: 'var(--sub)', lineHeight: 1.5 }}>
             <span style={{ color: 'var(--green)', flexShrink: 0 }}>✓</span>
@@ -109,9 +109,9 @@ export function MissingList({ missing, limit = 8 }: { missing: RequirementRow[];
   return (
     <div>
       <div style={{ ...kicker, color: 'var(--amber)' }}>The posting asks for — add only if true</div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.3rem' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.25rem' }}>
         {rows.map((m, i) => (
-          <span key={i} style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.28)', color: 'var(--amber)', borderRadius: 5, padding: '.18rem .55rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', maxWidth: '100%', overflowWrap: 'anywhere' }}>{show(m.surface)}{m.importance === 'preferred' ? ' · preferred' : ''}</span>
+          <span key={i} style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.28)', color: 'var(--amber)', borderRadius: 5, padding: '.25rem .5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', maxWidth: '100%', overflowWrap: 'anywhere' }}>{show(m.surface)}{m.importance === 'preferred' ? ' · preferred' : ''}</span>
         ))}
       </div>
     </div>
@@ -125,9 +125,9 @@ export function Checklist({ constraints }: { constraints: ConstraintRow[] }) {
   return (
     <div>
       <div style={kicker}>This job also screens on</div>
-      <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.3rem' }}>
+      <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.25rem' }}>
         {rows.slice(0, 6).map((c, i) => (
-          <li key={i} style={{ display: 'flex', gap: '.45rem', fontSize: 'var(--fs-70)', color: c.conflict ? 'var(--amber)' : 'var(--sub)', lineHeight: 1.5 }}>
+          <li key={i} style={{ display: 'flex', gap: '.5rem', fontSize: 'var(--fs-70)', color: c.conflict ? 'var(--amber)' : 'var(--sub)', lineHeight: 1.5 }}>
             <span style={{ flexShrink: 0 }}>{c.conflict ? '⚠' : '☐'}</span><span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{c.message}</span>
           </li>
         ))}
@@ -140,7 +140,7 @@ function CopyBtn({ text, label = 'copy' }: { text: string; label?: string }) {
   const [done, setDone] = useState(false)
   return (
     <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(text); setDone(true); setTimeout(() => setDone(false), 1500) } catch { /* ignore */ } }}
-      style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 6, padding: '.3rem .55rem', minHeight: 32, fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', color: done ? 'var(--green)' : 'var(--muted)', cursor: 'pointer', flexShrink: 0 }}>
+      style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 6, padding: '.25rem .5rem', minHeight: 32, fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', color: done ? 'var(--green)' : 'var(--muted)', cursor: 'pointer', flexShrink: 0 }}>
       {done ? '✓' : label}
     </button>
   )
@@ -152,10 +152,10 @@ function QuestionRow({ q }: { q: NumberQuestion }) {
   const bullet = answer.trim() ? bulletFromAnswer({ unit: q.unit } as Parameters<typeof bulletFromAnswer>[0], answer) : ''
   return (
     <div style={card}>
-      <label style={{ display: 'block', fontSize: 'var(--fs-72)', color: 'var(--white)', lineHeight: 1.5, marginBottom: '.4rem' }}>
+      <label style={{ display: 'block', fontSize: 'var(--fs-72)', color: 'var(--white)', lineHeight: 1.5, marginBottom: '.5rem' }}>
         {q.question}
         <input autoComplete="off" value={answer} onChange={(e) => setAnswer(e.target.value)} inputMode="text" placeholder="e.g. 200" maxLength={60}
-          style={{ display: 'block', width: '100%', marginTop: '.35rem', background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 7, padding: '.5rem .65rem', color: 'var(--white)', fontSize: '.85rem', boxSizing: 'border-box' }} />
+          style={{ display: 'block', width: '100%', marginTop: '.25rem', background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 7, padding: '.5rem .75rem', color: 'var(--white)', fontSize: 'var(--fs-ui)', boxSizing: 'border-box' }} />
       </label>
       {bullet ? (
         <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
@@ -180,19 +180,19 @@ export function PaidPlanView({ plan }: { plan: PaidPlan }) {
         <div>
           <div style={{ ...kicker, color: 'var(--amber)' }}>Availability line — add only if true</div>
           <div style={amberCard}>
-            {plan.availability.conflict && <div style={{ fontSize: 'var(--fs-70)', color: 'var(--amber)', lineHeight: 1.5, marginBottom: '.4rem' }}>⚠ {plan.availability.conflict}</div>}
+            {plan.availability.conflict && <div style={{ fontSize: 'var(--fs-70)', color: 'var(--amber)', lineHeight: 1.5, marginBottom: '.5rem' }}>⚠ {plan.availability.conflict}</div>}
             <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
               <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--fs-72)', color: 'var(--white)', overflowWrap: 'anywhere' }}>{plan.availability.text}</span>
               <CopyBtn text={plan.availability.text} />
             </div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--muted)', marginTop: '.35rem', lineHeight: 1.5 }}>{plan.availability.why}</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--muted)', marginTop: '.25rem', lineHeight: 1.5 }}>{plan.availability.why}</div>
           </div>
         </div>
       )}
       {reorder.length > 0 && (
         <div>
           <div style={kicker}>Move to the top — no words change</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
             {reorder.map((r, i) => (
               <div key={i} style={card}>
                 <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--dim)', marginBottom: '.25rem' }}>{r.role}{r.company ? ` · ${r.company}` : ''} · line {r.from} → 1</div>
@@ -205,7 +205,7 @@ export function PaidPlanView({ plan }: { plan: PaidPlan }) {
       {questions.length > 0 && (
         <div>
           <div style={{ ...kicker, color: 'var(--amber)' }}>Add a number — your answer writes the bullet</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
             {questions.map((q) => <QuestionRow key={q.id} q={q} />)}
           </div>
         </div>
@@ -218,14 +218,14 @@ export function PaidPlanView({ plan }: { plan: PaidPlan }) {
               <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--fs-72)', color: 'var(--white)', lineHeight: 1.6, overflowWrap: 'anywhere' }}>{plan.summary.text}</span>
               <CopyBtn text={plan.summary.text} />
             </div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--muted)', marginTop: '.35rem' }}>{plan.summary.why}</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--muted)', marginTop: '.25rem' }}>{plan.summary.why}</div>
           </div>
         </div>
       )}
       {rewrites.length > 0 && (
         <div>
           <div style={kicker}>Wording proposals — use only the ones that read right to you</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
             {rewrites.map((r, i) => (
               <div key={i} style={{ ...card, padding: 0, overflow: 'hidden' }}>
                 <div style={{ padding: '.5rem .75rem', borderBottom: '1px solid var(--line)', fontSize: 'var(--fs-70)', color: 'var(--muted)', overflowWrap: 'anywhere' }}>{r.from}</div>

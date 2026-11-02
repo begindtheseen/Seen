@@ -42,13 +42,13 @@ export function EmployerPerkBanner() {
   if (!messages.length) return null
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '.8rem', flexWrap: 'wrap', marginBottom: '1.4rem', padding: '.8rem 1rem', background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.3)', borderRadius: 10 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', flexWrap: 'wrap', marginBottom: '1.5rem', padding: '.75rem 1rem', background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.3)', borderRadius: 10 }}>
       <span aria-hidden style={{ fontSize: 'var(--fs-lead)', flexShrink: 0 }}>⏳</span>
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--white)' }}>{messages.join(' · ')}</div>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.1rem' }}>Renew to keep your reach and badge live — one-time, no auto-charge.</div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.125rem' }}>Renew to keep your reach and badge live — one-time, no auto-charge.</div>
       </div>
-      <Link href="/employers#promote" style={{ flexShrink: 0, background: 'var(--cta)', border: 'none', borderRadius: 8, padding: '.5rem 1.1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-meta)', color: '#fff', textDecoration: 'none' }}>Renew →</Link>
+      <Link href="/employers#promote" style={{ flexShrink: 0, background: 'var(--cta)', border: 'none', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-meta)', color: 'var(--text-1)', textDecoration: 'none' }}>Renew →</Link>
     </div>
   )
 }

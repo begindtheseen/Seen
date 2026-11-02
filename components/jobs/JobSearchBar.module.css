@@ -45,11 +45,11 @@
   caret-color: var(--accent);
 }
 .input:focus { border-color: var(--accent); box-shadow: var(--sh-focus); }
-.locInput { padding-right: 2.4rem; }
+.locInput { padding-right: 2.5rem; }
 
 .pin {
   position: absolute;
-  right: 0.15rem;
+  right: .125rem;
   top: 50%;
   transform: translateY(-50%);
   width: 2.5rem;
@@ -92,7 +92,7 @@
   flex: none;
   min-height: 44px;
   background: var(--cta);
-  color: #fff;
+  color: var(--text-1);
   border: none;
   border-radius: var(--r-control);
   padding: 0 var(--sp-6);
@@ -125,7 +125,7 @@
 
 /* One line for a signed-in account with a résumé but no city on the profile. */
 .cityLine {
-  margin: 0.2rem 0 1.1rem;
+  margin: .25rem 0 1rem;
   font-family: var(--body);
   font-size: var(--fs-sm);
   color: var(--text-3);
@@ -134,7 +134,7 @@
 
 @media (max-width: 560px) {
   /* Three rows: title · city (full width, so "Phoenix, AZ" never clips) · [radius · Search]. */
-  .wrap { gap: 0.45rem; }
+  .wrap { gap: .5rem; }
   .query, .row { flex: 1 1 100%; }
   .row { flex-wrap: wrap; }
   .loc { flex: 1 1 100%; }
@@ -146,9 +146,9 @@
 .divider {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
-  margin: 0.6rem 0 0.2rem;
-  padding: 0.75rem 0 0.35rem;
+  gap: .25rem;
+  margin: .5rem 0 .25rem;
+  padding: 0.75rem 0 .25rem;
   border-top: 1px solid var(--line2);
 }
 .dividerTitle {
@@ -171,7 +171,7 @@
   display: block;
   width: 100%;
   min-height: 44px;
-  margin: 0.4rem 0 2.5rem;
+  margin: .5rem 0 2.5rem;
   background: var(--card);
   border: 1px solid var(--line2);
   border-radius: 10px;
@@ -205,7 +205,7 @@
    surface, never glass. ── */
 @media (max-width: 768px) {
   .compact {
-    position: sticky; top: 58px; z-index: 30;
+    position: sticky; top: 56px; z-index: 30;
     margin: 0 calc(-1 * var(--sp-4)); padding: var(--sp-2) var(--sp-4);
     background: var(--surface-overlay); border-bottom: 1px solid var(--border-1);
   }
@@ -213,7 +213,7 @@
   .compact .goIcon {
     display: inline-flex; align-items: center; justify-content: center; flex: none;
     width: 44px; height: 44px; border: 0; border-radius: var(--r-control);
-    background: var(--cta); color: #fff; cursor: pointer;
+    background: var(--cta); color: var(--text-1); cursor: pointer;
   }
   .compact .row { display: none; }
   .compact.whereOpen .row { display: flex; }
@@ -224,5 +224,5 @@
     color: var(--sub); font: inherit; font-size: var(--fs-meta); text-align: left; cursor: pointer;
   }
   .whereText { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .whereEdit { flex: none; color: var(--accent, #7c9cff); font-weight: 600; }
+  .whereEdit { flex: none; color: var(--accent); font-weight: 600; }
 }

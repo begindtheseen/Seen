@@ -58,7 +58,7 @@ export default function JobAlertsCard({ id = 'alerts', onReady }: { id?: string;
         <div className={p.eyebrow}>Job alerts</div>
         <h2 className={p.cardT}>Job match emails</h2>
         <div className={`${p.msg} ${p.err}`} role="alert">Couldn’t load your job alert settings.</div>
-        <div className={p.btnRow} style={{ marginTop: '0.7rem' }}>
+        <div className={p.btnRow} style={{ marginTop: '.75rem' }}>
           <button type="button" className={`${p.ghost} ${s.tap}`} onClick={() => void load()}>Try again</button>
         </div>
       </section>
@@ -173,7 +173,7 @@ export default function JobAlertsCard({ id = 'alerts', onReady }: { id?: string;
                   </div>
                 )}
                 <p className={s.preview}>{preview}</p>
-                {err && <div className={`${p.msg} ${p.err}`} role="alert" style={{ marginTop: '0.3rem' }}>{err.error}</div>}
+                {err && <div className={`${p.msg} ${p.err}`} role="alert" style={{ marginTop: '.25rem' }}>{err.error}</div>}
                 <button type="button" className={`${p.ghost} ${p.danger} ${s.tap} ${s.remove}`} onClick={() => remove(i)} aria-label={`Remove alert ${i + 1}`}>Remove</button>
               </div>
             )
@@ -185,7 +185,7 @@ export default function JobAlertsCard({ id = 'alerts', onReady }: { id?: string;
       )}
 
       {mode === 'resume' && drafts.length === 0 && (
-        <div className={p.btnRow} style={{ marginTop: '0.9rem' }}>
+        <div className={p.btnRow} style={{ marginTop: '1rem' }}>
           <button type="button" className={`${p.ghost} ${s.tap}`} onClick={() => pickMode('alerts')}>Set up job alerts instead</button>
         </div>
       )}

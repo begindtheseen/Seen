@@ -33,7 +33,7 @@ export function EmployerPurchaseConfirm() {
       : "We've got your payment and emailed a receipt. Transparency Verified is reviewed by our team against your real outcome data — we'll set it up and follow up at the email you used, usually within one business day."
   return (
     <div style={{ background: 'var(--good-tint)', border: '1px solid rgba(16,185,129,.35)', borderRadius: 14, padding: '1.25rem 1.5rem', marginBottom: '2rem', textAlign: 'center' }}>
-      <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', marginBottom: '.3rem' }}>
+      <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', marginBottom: '.25rem' }}>
         {state === 'pending' ? 'Confirming your purchase…' : `🎉 You're in — ${name} is booked.`}
       </div>
       <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6 }}>
@@ -122,7 +122,7 @@ export function EmployerCheckout() {
                 <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.6, textAlign: 'center' }}>
                   One-time payment via Stripe, no account. By continuing you agree to the <Link href="/terms#employer" style={{ color: 'var(--sub)' }}>employer terms</Link>; payments never change a score.
                 </div>
-                <button type="button" onClick={() => { setOpen(null); setErr('') }} style={{ background: 'none', border: 'none', color: 'var(--dim)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', cursor: 'pointer', padding: '.2rem' }}>Cancel</button>
+                <button type="button" onClick={() => { setOpen(null); setErr('') }} style={{ background: 'none', border: 'none', color: 'var(--dim)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', cursor: 'pointer', padding: '.25rem' }}>Cancel</button>
               </form>
             ) : (
               <button onClick={() => { setOpen(sku); setErr('') }} style={btn}>Get started →</button>
@@ -135,11 +135,11 @@ export function EmployerCheckout() {
 }
 
 const inp: React.CSSProperties = {
-  background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 8, padding: '.55rem .7rem',
+  background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem .75rem',
   fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', outline: 'none', width: '100%', boxSizing: 'border-box',
 }
 const btn: React.CSSProperties = {
   display: 'block', width: '100%', textAlign: 'center', background: 'var(--cta)',
-  border: 'none', borderRadius: 8, padding: '.7rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)',
-  color: '#fff', cursor: 'pointer',
+  border: 'none', borderRadius: 8, padding: '.75rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)',
+  color: 'var(--text-1)', cursor: 'pointer',
 }

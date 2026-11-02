@@ -287,14 +287,14 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
             {/* Reported listings now live in the unified LISTING TICKETS queue (Community tab),
                 where each listing's seeker report and employer dispute are reviewed together. */}
             <div id="reported-listings-section" style={{ scrollMarginTop: '1.25rem' }}>
-            <Card style={{ marginTop: '.65rem' }}>
+            <Card style={{ marginTop: '.75rem' }}>
               <CardHeader
                 title="Reported listings"
                 badge={inactiveCount > 0 ? <Badge n={inactiveCount} color="var(--amber)" /> : undefined}
               />
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', lineHeight: 1.6 }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6 }}>
                 {inactiveCount > 0 ? `${inactiveCount} listing${inactiveCount === 1 ? '' : 's'} reported this week. ` : 'No reported listings this week. '}
-                Reports and employer disputes are now handled together as <button onClick={() => setTab('community')} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--blue)', cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: '.62rem', textDecoration: 'underline' }}>Listing tickets → Community</button>.
+                Reports and employer disputes are now handled together as <button onClick={() => setTab('community')} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--blue)', cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textDecoration: 'underline' }}>Listing tickets → Community</button>.
               </div>
             </Card>
             </div>
@@ -325,10 +325,10 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
 
             {/* Company lookups setup note */}
             {stats.company_lookups && !stats.company_lookups.ready && (
-              <div id="admSetupNote" style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 10, padding: '1rem 1.1rem', marginBottom: '1rem' }}>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--amber)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '.5rem' }}>Enable company lookup tracking</div>
-                <p style={{ fontSize: '.78rem', color: 'var(--sub)', marginBottom: '.75rem', lineHeight: 1.6 }}>Run this SQL in your Supabase SQL editor once to track which companies users are researching:</p>
-                <pre style={{ background: 'rgba(0,0,0,.35)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 6, padding: '.75rem 1rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', overflowX: 'auto', lineHeight: 1.7, margin: 0 }}>
+              <div id="admSetupNote" style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 10, padding: '1rem 1rem', marginBottom: '1rem' }}>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--amber)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '.5rem' }}>Enable company lookup tracking</div>
+                <p style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '.75rem', lineHeight: 1.6 }}>Run this SQL in your Supabase SQL editor once to track which companies users are researching:</p>
+                <pre style={{ background: 'rgba(0,0,0,.35)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 6, padding: '.75rem 1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', overflowX: 'auto', lineHeight: 1.7, margin: 0 }}>
                   {`CREATE TABLE IF NOT EXISTS search_logs (
   id bigserial PRIMARY KEY,
   query text NOT NULL,
@@ -339,19 +339,19 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
             )}
 
             {/* Reports chart */}
-            <div className="adm-panel" style={{ marginBottom: '.65rem' }}>
+            <div className="adm-panel" style={{ marginBottom: '.75rem' }}>
               <div className="adm-panel-hdr">
                 Reports submitted — last 30 days
-                <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)' }}>one bar = one day</span>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>one bar = one day</span>
               </div>
-              <div style={{ padding: '.85rem 1rem .6rem' }}>
+              <div style={{ padding: '.75rem 1rem .5rem' }}>
                 <div className="adm-chart-row">
                   {(stats.reports.chart || []).map(d => (
                     <div key={d.date} className="adm-chart-bar" style={{ height: `${chartMax > 0 ? (d.count / chartMax) * 100 : 0}%` }} title={`${d.date}: ${d.count}`} />
                   ))}
                 </div>
                 {stats.reports.chart && stats.reports.chart.length > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '.3rem 0 0', fontFamily: 'var(--mono)', fontSize: '.44rem', color: 'var(--dim)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '.25rem 0 0', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>
                     {[0, 7, 14, 21, 29].map(i => (
                       <span key={i}>{stats.reports.chart[i]?.date?.slice(5) || ''}</span>
                     ))}
@@ -370,7 +370,7 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
                 <div className="adm-panel-hdr">Most researched companies <span style={{ color: 'var(--dim)', fontWeight: 400 }}>(7d)</span></div>
                 {stats.company_lookups?.ready
                   ? <BarChart items={(stats.company_lookups.top || []).slice(0, 8).map(c => ({ label: c.company, value: c.count }))} max={topLookupMax} green />
-                  : <div style={{ padding: '.85rem 1rem', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>search_logs not set up</div>
+                  : <div style={{ padding: '.75rem 1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>search_logs not set up</div>
                 }
               </div>
             </div>
@@ -381,10 +381,10 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
             {/* Self-filling company pages — the enrichment queue (api/enrich-companies cron, every 15 min).
                 Companies land here when a visitor looks them up with zero first-party reports. */}
             {stats.enrichment?.ready && (
-              <div className="adm-panel" style={{ marginBottom: '.65rem' }}>
+              <div className="adm-panel" style={{ marginBottom: '.75rem' }}>
                 <div className="adm-panel-hdr">
                   Self-filling company pages
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)' }}>public Reddit discussion · every 15 min</span>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>public Reddit discussion · every 15 min</span>
                 </div>
                 <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', padding: '.75rem 1rem' }}>
                   {([
@@ -392,7 +392,7 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
                     ['empty', stats.enrichment.empty], ['error', stats.enrichment.error],
                     ['reports added 24h', stats.enrichment.reports_added_24h],
                   ] as [string, number | undefined][]).map(([label, n]) => (
-                    <div key={label} style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', padding: '.35rem .75rem', borderRadius: 6, background: 'var(--raised, #111)', color: label === 'error' && (n ?? 0) > 0 ? 'var(--red)' : 'var(--sub)', border: '1px solid var(--line)' }}>
+                    <div key={label} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .75rem', borderRadius: 6, background: 'var(--raised)', color: label === 'error' && (n ?? 0) > 0 ? 'var(--red)' : 'var(--sub)', border: '1px solid var(--line)' }}>
                       {label}: {n ?? 0}
                     </div>
                   ))}
@@ -401,11 +401,11 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
             )}
 
             {/* Outcome breakdown */}
-            <div className="adm-panel" style={{ marginBottom: '.65rem' }}>
+            <div className="adm-panel" style={{ marginBottom: '.75rem' }}>
               <div className="adm-panel-hdr">Report outcome breakdown <span style={{ color: 'var(--dim)', fontWeight: 400 }}>(30d)</span></div>
               <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', padding: '.75rem 1rem' }}>
                 {Object.entries(stats.reports.outcome_breakdown ?? {}).filter(([, v]) => (v as number) > 0).map(([outcome, count]) => (
-                  <div key={outcome} style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', padding: '.35rem .75rem', borderRadius: 6, background: outcomeColor(outcome) + '18', color: outcomeColor(outcome), border: `1px solid ${outcomeColor(outcome)}30` }}>
+                  <div key={outcome} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .75rem', borderRadius: 6, background: outcomeColor(outcome) + '18', color: outcomeColor(outcome), border: `1px solid ${outcomeColor(outcome)}30` }}>
                     {outcome}: {count as number}
                   </div>
                 ))}
@@ -417,38 +417,38 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
             <ReportDupesCard token={token} onChanged={reload} />
 
             {/* Recent hiring reports (moderation) */}
-            <Card style={{ marginTop: '.65rem' }}>
+            <Card style={{ marginTop: '.75rem' }}>
               <CardHeader title="Recent hiring reports (last 25)" badge={needsReviewCount > 0 ? <Badge n={needsReviewCount} /> : undefined} />
               {(stats.reports.recent || []).length === 0
-                ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>No reports yet</div>
+                ? <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>No reports yet</div>
                 : (stats.reports.recent || []).map(r => (<ReportRow key={r.id} report={r} token={token} onRefresh={reload} />))
               }
             </Card>
 
             {/* Recent tracker applications */}
-            <Card style={{ marginTop: '.65rem' }}>
+            <Card style={{ marginTop: '.75rem' }}>
               <CardHeader title="Recent tracker applications (last 25)" />
               {(stats.applications.recent || []).length === 0
-                ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)' }}>No applications tracked yet</div>
+                ? <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>No applications tracked yet</div>
                 : (stats.applications.recent || []).map(a => (
-                  <div key={a.id} className="adm-row" style={{ margin: '0 -1rem', borderLeft: `3px solid ${stageColor(a.stage)}`, gap: '.6rem' }}>
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: stageColor(a.stage), background: stageColor(a.stage) + '18', border: `1px solid ${stageColor(a.stage)}30`, borderRadius: 4, padding: '.1rem .4rem', flexShrink: 0 }}>{a.stage}</span>
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--white)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.company_name} · {a.role}</span>
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', flexShrink: 0 }}>{relTime(a.created_at)}</span>
+                  <div key={a.id} className="adm-row" style={{ margin: '0 -1rem', borderLeft: `3px solid ${stageColor(a.stage)}`, gap: '.5rem' }}>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: stageColor(a.stage), background: stageColor(a.stage) + '18', border: `1px solid ${stageColor(a.stage)}30`, borderRadius: 4, padding: '.125rem .5rem', flexShrink: 0 }}>{a.stage}</span>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.company_name} · {a.role}</span>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', flexShrink: 0 }}>{relTime(a.created_at)}</span>
                   </div>
                 ))
               }
             </Card>
 
             {/* Data quality issues queue */}
-            <Card style={{ marginTop: '.65rem' }}>
+            <Card style={{ marginTop: '.75rem' }}>
               <CardHeader
                 title="Data quality issues"
                 badge={stats.issues?.open > 0 ? <Badge n={stats.issues.open} /> : undefined}
-                action={<RefreshButton onRefresh={reload} style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.3rem .75rem', borderRadius: 6, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)' }} />}
+                action={<RefreshButton onRefresh={reload} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .75rem', borderRadius: 6, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)' }} />}
               />
               {(stats.issues?.items || []).length === 0
-                ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--green)' }}>✓ No open issues</div>
+                ? <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)' }}>✓ No open issues</div>
                 : (stats.issues.items || []).map(issue => (
                   <IssueRow key={issue.id} issue={issue} token={token} onRefresh={reload} onOpenMerge={name => setMergePrefill({ primary: name, secondary: '', nonce: Date.now() })} />
                 ))
@@ -493,9 +493,9 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
           <MetricRow label="Job refresh" value={jh?.crisis ? 'Behind' : 'Healthy'} status={jh ? `${jh.active_pct}% corpus live` : ''} tone={jh?.crisis ? 'red' : 'green'} />
           {stats.errors?.recent && stats.errors.recent.length > 0 ? (
             <div className="ac-panel-foot">
-              <div style={{ marginBottom: '.35rem', color: 'var(--sub)' }}>Recent errors by route</div>
+              <div style={{ marginBottom: '.25rem', color: 'var(--sub)' }}>Recent errors by route</div>
               {stats.errors.recent.slice(0, 4).map((e, i) => (
-                <div key={i} style={{ padding: '.15rem 0', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div key={i} style={{ padding: '.125rem 0', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   <span style={{ color: 'var(--dim)' }}>{relTime(e.created_at)}</span> · <span style={{ color: 'var(--sub)' }}>{e.endpoint}</span> · {e.error_msg?.slice(0, 50)}
                 </div>
               ))}

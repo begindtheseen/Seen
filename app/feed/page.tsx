@@ -205,7 +205,7 @@ export default function FeedPage() {
         {/* CTA strip — old HTML order: report CTA comes first */}
         <Link href="/report" style={{ background: 'rgba(16,185,129,.06)', border: '1px solid rgba(16,185,129,.18)', borderRadius: 10, padding: '.75rem 1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.75rem', flexWrap: 'wrap', cursor: 'pointer', transition: 'background .15s', textDecoration: 'none' }}>
           <div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', fontWeight: 500, marginBottom: '.1rem' }}>Your experience matters</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', fontWeight: 500, marginBottom: '.125rem' }}>Your experience matters</div>
             <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', fontWeight: 400 }}>Had an interview? Got ghosted? Add your report — it shapes scores for every future applicant.</div>
           </div>
           <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', flexShrink: 0, whiteSpace: 'nowrap' }}>Add yours →</div>
@@ -244,7 +244,7 @@ export default function FeedPage() {
               const src = reportSourceLink(r.platform, r.report_text)
               const body = src ? src.body : r.report_text
               return (
-                <div key={r.id} className={`rcard ${oc.cls}`} style={{ marginBottom: '.65rem' }}>
+                <div key={r.id} className={`rcard ${oc.cls}`} style={{ marginBottom: '.75rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '.5rem' }}>
                     <div>
                       <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, color: 'var(--white)' }}>{oc.label}</span>
@@ -254,7 +254,7 @@ export default function FeedPage() {
                         </Link>
                       )}
                       {r.company_name && appliedCos.has(r.company_name.toLowerCase().trim()) && (
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 4, padding: '.1rem .35rem', color: 'var(--accent)', marginLeft: '.3rem', verticalAlign: 'middle' }}>
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 4, padding: '.125rem .25rem', color: 'var(--accent)', marginLeft: '.25rem', verticalAlign: 'middle' }}>
                           You applied
                         </span>
                       )}
@@ -265,7 +265,7 @@ export default function FeedPage() {
                   </div>
 
                   {r.role && (
-                    <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginBottom: '.4rem' }}>
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginBottom: '.5rem' }}>
                       {r.role}{r.experience_level ? ` · ${r.experience_level}` : ''}
                     </div>
                   )}
@@ -291,7 +291,7 @@ export default function FeedPage() {
                     </p>
                   )}
                   {src && (
-                    <div style={{ marginTop: '.45rem' }}>
+                    <div style={{ marginTop: '.5rem' }}>
                       <ReportSourceLink url={src.url} host={src.host} posted={src.posted} />
                     </div>
                   )}
@@ -309,7 +309,7 @@ export default function FeedPage() {
                 <button
                   onClick={loadMore}
                   disabled={loadingMore}
-                  style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.65rem 1.5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', cursor: loadingMore ? 'not-allowed' : 'pointer', opacity: loadingMore ? 0.6 : 1 }}
+                  style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.75rem 1.5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', cursor: loadingMore ? 'not-allowed' : 'pointer', opacity: loadingMore ? 0.6 : 1 }}
                 >
                   {loadingMore ? 'Loading...' : `Load more${total > offset ? ` (${(total - offset).toLocaleString()} to read)` : ''}`}
                 </button>
@@ -320,13 +320,13 @@ export default function FeedPage() {
 
         {/* CTA */}
         <div style={{ marginTop: '2.5rem', textAlign: 'center', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.5rem' }}>
-          <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', marginBottom: '.4rem' }}>
+          <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', marginBottom: '.5rem' }}>
             Had a notable experience?
           </div>
           <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '1rem' }}>
             Takes 60 seconds. Helps the next applicant who checks this company.
           </p>
-          <Link href="/report" style={{ display: 'inline-block', background: 'var(--cta)', border: 'none', borderRadius: 8, padding: '.65rem 1.5rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', color: '#fff', textDecoration: 'none', boxShadow: '0 0 20px rgba(59,130,246,0.3)' }}>
+          <Link href="/report" style={{ display: 'inline-block', background: 'var(--cta)', border: 'none', borderRadius: 8, padding: '.75rem 1.5rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', color: 'var(--text-1)', textDecoration: 'none', boxShadow: '0 0 20px rgba(59,130,246,0.3)' }}>
             Submit your report →
           </Link>
         </div>

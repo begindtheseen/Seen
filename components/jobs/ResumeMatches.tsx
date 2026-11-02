@@ -22,8 +22,8 @@ export default function ResumeMatches({ jobs, loading, skills, city, citySource,
 }) {
   const rows = jobs.slice(0, 5)
   return (
-    <section aria-label="Matched to your résumé" style={{ marginBottom: '1.35rem', paddingBottom: '1.1rem', borderBottom: '1px solid var(--line)' }}>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--green)', marginBottom: '.6rem', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+    <section aria-label="Matched to your résumé" style={{ marginBottom: '1.25rem', paddingBottom: '1rem', borderBottom: '1px solid var(--line)' }}>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--green)', marginBottom: '.5rem', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <span style={{ width: 20, height: 1.5, background: 'var(--green)', display: 'inline-block', flexShrink: 0 }} />
         Matched to your résumé
         {city && (
@@ -31,18 +31,18 @@ export default function ResumeMatches({ jobs, loading, skills, city, citySource,
         )}
       </div>
       {loading ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
           {[0, 1].map(i => <div key={i} style={{ height: 46, background: 'var(--raised)', borderRadius: 10, animation: `pulse 1.4s ${i * 0.15}s ease infinite` }} />)}
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
           {rows.map(job => {
             return (
               <button
                 key={job.id}
                 type="button"
                 onClick={() => onOpen(job)}
-                style={{ display: 'flex', alignItems: 'center', gap: '.7rem', width: '100%', minWidth: 0, textAlign: 'left', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '.55rem .75rem', cursor: 'pointer', color: 'inherit' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '.75rem', width: '100%', minWidth: 0, textAlign: 'left', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '.5rem .75rem', cursor: 'pointer', color: 'inherit' }}
               >
                 <ListingScoreRing score={job.score} size={34} caption={false} />
                 <div style={{ flex: 1, minWidth: 0 }}>

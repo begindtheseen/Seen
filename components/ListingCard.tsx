@@ -69,7 +69,7 @@ async function drawCard(d: ListingCardData): Promise<HTMLCanvasElement> {
   c.strokeStyle = 'rgba(255,255,255,0.06)'; c.lineWidth = 1.5; c.stroke()
 
   // Eyebrow
-  c.font = `500 13px ${canvasFamily('"DM Mono"')},monospace`; c.fillStyle = 'rgba(255,255,255,0.20)'
+  c.font = `500 13px ${canvasFamily('"Instrument Sans"')},sans-serif`; c.fillStyle = 'rgba(255,255,255,0.20)'
   c.textAlign = 'left'; c.textBaseline = 'top'
   c.fillText('SEEN  ·  JOB LISTING', PAD, PAD)
   c.textAlign = 'right'; c.fillText('seenjobs.io', W - PAD, PAD)
@@ -88,7 +88,7 @@ async function drawCard(d: ListingCardData): Promise<HTMLCanvasElement> {
 
   // Company · location subline
   const subY = titleY + tFs + 10
-  c.font = `400 21px ${canvasFamily('"DM Mono"')},monospace`; c.fillStyle = 'rgba(255,255,255,0.42)'
+  c.font = `400 21px ${canvasFamily('"Instrument Sans"')},sans-serif`; c.fillStyle = 'rgba(255,255,255,0.42)'
   let sub = `${d.company}${d.location ? '  ·  ' + d.location : ''}`
   while (c.measureText(sub).width > W - PAD * 2 && sub.length > 4) sub = sub.slice(0, -1)
   c.fillText(sub, PAD, subY)
@@ -124,9 +124,9 @@ async function drawCard(d: ListingCardData): Promise<HTMLCanvasElement> {
     c.fillText(f.e, PAD, fy)
     const textX = PAD + eFs + 18
     let fFs = 30
-    c.font = `500 ${fFs}px ${canvasFamily('"DM Mono"')},monospace`; c.fillStyle = 'rgba(255,255,255,0.90)'
+    c.font = `500 ${fFs}px ${canvasFamily('"Instrument Sans"')},sans-serif`; c.fillStyle = 'rgba(255,255,255,0.90)'
     while (c.measureText(f.t).width > W - textX - PAD && fFs > 16) {
-      fFs--; c.font = `500 ${fFs}px ${canvasFamily('"DM Mono"')},monospace`
+      fFs--; c.font = `500 ${fFs}px ${canvasFamily('"Instrument Sans"')},sans-serif`
     }
     let ft = f.t
     while (c.measureText(ft).width > W - textX - PAD && ft.length > 4) ft = ft.slice(0, -1)
@@ -138,7 +138,7 @@ async function drawCard(d: ListingCardData): Promise<HTMLCanvasElement> {
   // Footer
   c.strokeStyle = 'rgba(255,255,255,0.08)'; c.lineWidth = 1
   c.beginPath(); c.moveTo(PAD, footerDivY); c.lineTo(W - PAD, footerDivY); c.stroke()
-  c.font = `400 16px ${canvasFamily('"DM Mono"')},monospace`; c.fillStyle = 'rgba(255,255,255,0.30)'
+  c.font = `400 16px ${canvasFamily('"Instrument Sans"')},sans-serif`; c.fillStyle = 'rgba(255,255,255,0.30)'
   c.textAlign = 'center'; c.textBaseline = 'middle'
   c.fillText('Job intel from Seen  ·  seenjobs.io', W / 2, footerDivY + 28)
 

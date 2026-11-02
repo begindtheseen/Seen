@@ -11,7 +11,7 @@
   z-index: 9000;
   width: min(340px, calc(100vw - 32px));
   box-sizing: border-box;
-  padding: 15px 18px 13px;
+  padding: 16px 20px 12px;
   border-radius: 16px;
   background: linear-gradient(180deg, rgba(20, 24, 36, 0.96), rgba(12, 15, 26, 0.97));
   border: 1px solid var(--line2);
@@ -27,8 +27,8 @@
 
 .dismiss {
   position: absolute;
-  top: 7px;
-  right: 9px;
+  top: 8px;
+  right: 8px;
   background: none;
   border: none;
   color: var(--muted);
@@ -49,7 +49,7 @@
   text-transform: uppercase;
   color: var(--accent);
   margin-bottom: 8px;
-  padding-right: 22px;
+  padding-right: 24px;
 }
 
 .question {
@@ -64,13 +64,13 @@
 .choices {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
+  gap: 8px;
 }
 
 .choice {
   flex: 1 1 auto;
   min-width: calc(50% - 4px);
-  padding: 9px 12px;
+  padding: 8px 12px;
   border-radius: 9px;
   background: var(--raised);
   border: 1px solid var(--line);
@@ -95,7 +95,7 @@
   font-family: var(--mono);
   font-size: var(--fs-meta);
   color: var(--muted);
-  margin-top: 11px;
+  margin-top: 12px;
   line-height: 1.4;
 }
 

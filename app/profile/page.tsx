@@ -482,7 +482,7 @@ export default function ProfilePage() {
                     </div>
                   </div>
                   {passMsg && <div className={`${styles.msg} ${passMsgOk ? styles.ok : styles.err}`}>{passMsg}</div>}
-                  <div className={styles.btnRow} style={{ marginTop: '0.9rem' }}>
+                  <div className={styles.btnRow} style={{ marginTop: '1rem' }}>
                     <button type="button" className={styles.primary} onClick={updatePassword} disabled={updatingPass}>{updatingPass ? 'Updating…' : 'Update password →'}</button>
                     <button type="button" className={styles.ghost} onClick={() => { setShowPassForm(false); setPassMsg('') }}>Cancel</button>
                   </div>
@@ -601,7 +601,7 @@ export default function ProfilePage() {
             <section id="danger" className={`${styles.card} ${styles.dangerCard}`}>
               <div className={styles.cardHead}>
                 <div>
-                  <div className={styles.eyebrow} style={{ color: '#f87185' }}>Danger zone</div>
+                  <div className={styles.eyebrow} style={{ color: 'var(--bad-text)' }}>Danger zone</div>
                   <h2 className={styles.cardT}>Delete your account</h2>
                   <p className={styles.cardS}>Permanently removes your profile, résumé, applications, saved jobs and credits (including purchased ones — not refunded). Reports you submitted stay published with no link to you. There is no undo.</p>
                 </div>

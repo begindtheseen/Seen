@@ -4,8 +4,8 @@
 
 .field { position: relative; flex: 1 1 16rem; min-width: 0; }
 .search { display: flex; gap: var(--sp-2); align-items: stretch; }
-.searchIcon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-4); pointer-events: none; }
-.searchInput { min-height: 48px; padding-left: 42px; font-size: var(--fs-body); }
+.searchIcon { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--text-4); pointer-events: none; }
+.searchInput { min-height: 48px; padding-left: 40px; font-size: var(--fs-body); }
 .searchBtn { min-height: 48px; flex-shrink: 0; }
 .hint { margin: var(--sp-2) 0 0; font-size: var(--fs-sm); color: var(--text-3); line-height: 1.5; }
 
@@ -25,7 +25,7 @@
 .name { font-size: var(--fs-lead); font-weight: 600; color: var(--text-1); line-height: 1.25; overflow-wrap: anywhere; }
 .industry { font-size: var(--fs-sm); color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rank { flex-shrink: 0; font-size: var(--fs-meta); font-weight: 500; color: var(--text-4); font-variant-numeric: tabular-nums; }
-.badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.badges { display: flex; flex-wrap: wrap; gap: 8px; }
 .foot { margin-top: auto; display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3); flex-wrap: wrap; }
 .score { font-size: var(--fs-sm); color: var(--text-3); }
 .score b { font-size: var(--fs-lead); font-weight: 600; color: var(--text-1); }

@@ -146,7 +146,7 @@ export default function GuestTracker({ still = false }: { still?: boolean } = {}
                 <input autoComplete="off" id="gt-role" className={s.input} type="text" placeholder="e.g. Cashier" maxLength={ROLE_MAX} value={role} onChange={e => setRole(e.target.value)} data-testid="gt-role" />
               </div>
               <AppliedWhen choice={choice} pickedDay={pickedDay} onChoice={c => { setChoice(c); setError('') }} onPickedDay={setPickedDay} />
-              {error && <p className={s.err} role="alert" style={{ marginTop: 0, marginBottom: '.6rem' }}>{error}</p>}
+              {error && <p className={s.err} role="alert" style={{ marginTop: 0, marginBottom: '.5rem' }}>{error}</p>}
               <button type="submit" className={s.primary} data-testid="gt-submit">Track it</button>
               {apps.length > 0 && (
                 <div className={s.actions}>
@@ -166,12 +166,12 @@ export default function GuestTracker({ still = false }: { still?: boolean } = {}
               </section>
             )}
 
-            <ul style={{ listStyle: 'none', margin: '1.25rem 0 0', padding: 0, display: 'grid', gap: '.6rem' }} aria-label="Your applications">
+            <ul style={{ listStyle: 'none', margin: '1.25rem 0 0', padding: 0, display: 'grid', gap: '.5rem' }} aria-label="Your applications">
               {apps.map(a => (
                 <li key={a.id} className={`${s.card} ${s.quiet}`} style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '.75rem', flexWrap: 'wrap' }}>
                   <div style={{ flex: '1 1 14rem', minWidth: 0 }}>
                     <p className={s.title} style={{ fontSize: 'var(--fs-lead)', margin: 0 }}>{a.company}</p>
-                    <p className={s.small} style={{ margin: '.15rem 0 0', color: 'var(--sub)' }}>
+                    <p className={s.small} style={{ margin: '.125rem 0 0', color: 'var(--sub)' }}>
                       {a.role} · Day {daysSince(a.appliedAt)} · applied {shortDay(a.appliedAt)}{a.status !== 'active' ? ` · ${a.status}` : ''}
                     </p>
                   </div>

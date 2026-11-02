@@ -204,7 +204,7 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
     maxHeight: '85dvh',
     overflowY: 'auto',
     // Solid, never glass: a panel over content (CLAUDE.md, PR #322 rule) — the old 3% white let the page show through.
-    background: '#0e111c',
+    background: 'var(--surface-overlay)',
     borderRadius: 20,
     border: '1px solid var(--line2)',
     padding: '0 0 env(safe-area-inset-bottom, 16px)',
@@ -219,11 +219,11 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
   const closeBtnStyle: React.CSSProperties = {
     position: 'absolute',
     top: 16,
-    right: 18,
+    right: 20,
     background: 'none',
     border: 'none',
     color: 'var(--dim)',
-    fontSize: 20,
+    fontSize: 'var(--fs-h3)',
     lineHeight: 1,
     cursor: 'pointer',
     padding: 4,
@@ -240,23 +240,23 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
     marginBottom: 16,
     display: 'flex',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
     fontFamily: 'var(--mono)',
-    fontSize: 13,
+    fontSize: 'var(--fs-sm)',
   }
 
   const headingStyle: React.CSSProperties = {
     fontFamily: 'var(--display)',
-    fontSize: 24,
+    fontSize: 'var(--fs-xl)',
     fontWeight: 800,
     color: 'var(--white)',
     lineHeight: 1.15,
-    marginBottom: 6,
+    marginBottom: 8,
   }
 
   const subtitleStyle: React.CSSProperties = {
     fontFamily: 'var(--mono)',
-    fontSize: 13,
+    fontSize: 'var(--fs-sm)',
     color: 'var(--sub)',
     lineHeight: 1.5,
     marginBottom: 4,
@@ -264,7 +264,7 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
 
   const jobLineStyle: React.CSSProperties = {
     fontFamily: 'var(--mono)',
-    fontSize: 12,
+    fontSize: 'var(--fs-meta)',
     color: 'var(--dim)',
     marginBottom: 24,
   }
@@ -272,34 +272,34 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
   const primaryBtnStyle: React.CSSProperties = {
     display: 'block',
     width: '100%',
-    padding: '14px 20px',
+    padding: '16px 20px',
     background: 'rgba(16,185,129,.12)',
     color: 'var(--green)',
     border: '1px solid var(--green)',
     borderRadius: 11,
     fontFamily: 'var(--mono)',
-    fontSize: 14,
+    fontSize: 'var(--fs-ui)',
     fontWeight: 600,
     cursor: loading ? 'not-allowed' : 'pointer',
     opacity: loading ? 0.6 : 1,
     textAlign: 'left',
-    marginBottom: 10,
+    marginBottom: 12,
     transition: 'background .15s, opacity .15s',
   }
 
   const secondaryBtnStyle: React.CSSProperties = {
     display: 'block',
     width: '100%',
-    padding: '13px 20px',
+    padding: '12px 20px',
     background: 'none',
     color: 'var(--sub)',
     border: '1px solid var(--line)',
     borderRadius: 11,
     fontFamily: 'var(--mono)',
-    fontSize: 14,
+    fontSize: 'var(--fs-ui)',
     cursor: 'pointer',
     textAlign: 'left',
-    marginBottom: 10,
+    marginBottom: 12,
     transition: 'border-color .15s, color .15s',
   }
 
@@ -312,7 +312,7 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
     border: 'none',
     borderRadius: 11,
     fontFamily: 'var(--mono)',
-    fontSize: 13,
+    fontSize: 'var(--fs-sm)',
     cursor: 'pointer',
     textAlign: 'left',
     transition: 'color .15s',
@@ -321,13 +321,13 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
   const reasonBtnStyle: React.CSSProperties = {
     display: 'block',
     width: '100%',
-    padding: '13px 16px',
+    padding: '12px 16px',
     background: 'none',
     color: 'var(--sub)',
     border: '1px solid var(--line)',
     borderRadius: 10,
     fontFamily: 'var(--mono)',
-    fontSize: 13,
+    fontSize: 'var(--fs-sm)',
     cursor: 'pointer',
     textAlign: 'left',
     marginBottom: 8,
@@ -336,23 +336,23 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
 
   const confirmedCheckStyle: React.CSSProperties = {
     fontFamily: 'var(--display)',
-    fontSize: 40,
+    fontSize: 'var(--fs-fig-m)',
     fontWeight: 800,
     color: 'var(--green)',
     lineHeight: 1,
-    marginBottom: 10,
+    marginBottom: 12,
   }
 
   const closeFullBtnStyle: React.CSSProperties = {
     display: 'block',
     width: '100%',
-    padding: '13px 20px',
+    padding: '12px 20px',
     background: 'none',
     color: 'var(--sub)',
     border: '1px solid var(--line)',
     borderRadius: 11,
     fontFamily: 'var(--mono)',
-    fontSize: 14,
+    fontSize: 'var(--fs-ui)',
     cursor: 'pointer',
     textAlign: 'center',
     transition: 'border-color .15s, color .15s',
@@ -361,17 +361,17 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
   const trackerBtnStyle: React.CSSProperties = {
     display: 'block',
     width: '100%',
-    padding: '13px 20px',
+    padding: '12px 20px',
     background: 'rgba(16,185,129,.12)',
     color: 'var(--green)',
     border: '1px solid var(--green)',
     borderRadius: 11,
     fontFamily: 'var(--mono)',
-    fontSize: 14,
+    fontSize: 'var(--fs-ui)',
     fontWeight: 600,
     cursor: 'pointer',
     textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
     transition: 'background .15s',
   }
 
@@ -450,7 +450,7 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
               onChoice={c => { setWhenChoice(c); setWhenError('') }}
               onPickedDay={setWhenDay}
             />
-            {whenError && <div role="alert" style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--red)', marginBottom: 10 }}>{whenError}</div>}
+            {whenError && <div role="alert" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--red)', marginBottom: 12 }}>{whenError}</div>}
             <button
               style={{ ...primaryBtnStyle, textAlign: 'center' }}
               disabled={loading}
@@ -469,12 +469,12 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
         {/* ── LISTING GONE (couldn't apply — flag for admin review) ── */}
         {step === 'listing_gone' && (
           <div style={innerStyle}>
-            <div style={{ ...confirmedCheckStyle, fontSize: 40 }}>
+            <div style={{ ...confirmedCheckStyle, fontSize: 'var(--fs-fig-m)' }}>
               {reportedGone === 'signin' ? 'Thanks for flagging.' : 'Flagged for review.'}
             </div>
             <div style={{
               fontFamily: 'var(--body)',
-              fontSize: 14,
+              fontSize: 'var(--fs-ui)',
               color: 'var(--sub)',
               lineHeight: 1.6,
               marginBottom: 24,
@@ -503,7 +503,7 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
 
             <div style={headingStyle}>What&apos;s holding you back?</div>
 
-            <div style={{ marginTop: 18 }}>
+            <div style={{ marginTop: 20 }}>
               {NOT_YET_REASONS.map(reason => (
                 <button
                   key={reason}
@@ -523,10 +523,10 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
         {/* ── NOT YET CONFIRMED ── */}
         {step === 'not_yet_confirmed' && (
           <div style={innerStyle}>
-            <div style={{ ...confirmedCheckStyle, fontSize: 40 }}>Got it.</div>
+            <div style={{ ...confirmedCheckStyle, fontSize: 'var(--fs-fig-m)' }}>Got it.</div>
             <div style={{
               fontFamily: 'var(--body)',
-              fontSize: 14,
+              fontSize: 'var(--fs-ui)',
               color: 'var(--sub)',
               lineHeight: 1.6,
               marginBottom: 24,
@@ -548,7 +548,7 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
 
             <div style={headingStyle}>What happened?</div>
 
-            <div style={{ marginTop: 18 }}>
+            <div style={{ marginTop: 20 }}>
               {DECLINED_REASONS.map(reason => (
                 <button
                   key={reason}
@@ -588,28 +588,28 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
             {creditEarned && (
               <div style={{
                 background: 'rgba(16,185,129,.1)', border: '1px solid rgba(16,185,129,.25)',
-                borderRadius: 8, padding: '.5rem .85rem', marginBottom: '.75rem',
+                borderRadius: 8, padding: '.5rem .75rem', marginBottom: '.75rem',
                 fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)',
-                display: 'flex', alignItems: 'center', gap: '.4rem',
+                display: 'flex', alignItems: 'center', gap: '.5rem',
               }}>
                 +1 AI credit earned for tracking
               </div>
             )}
 
             {responsePct != null && (
-              <div style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--text)', lineHeight: 1.6, marginBottom: 10 }} data-testid="checkpoint-reply-rate">
+              <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--text)', lineHeight: 1.6, marginBottom: 12 }} data-testid="checkpoint-reply-rate">
                 {companyName} usually replies to {responsePct}% of applicants.
               </div>
             )}
 
             {isLoggedIn ? (
-              <div style={{ fontFamily: 'var(--body)', fontSize: 14, color: 'var(--sub)', lineHeight: 1.6, marginBottom: 22 }} data-testid="checkpoint-signed-in">
+              <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-ui)', color: 'var(--sub)', lineHeight: 1.6, marginBottom: 24 }} data-testid="checkpoint-signed-in">
                 {checkinPlan.length
                   ? <>We&apos;ll email you on {joinDays(checkinPlan)} to ask what happened, unless you update it first.</>
                   : <>Update it in your tracker when you hear back.</>}
               </div>
             ) : (
-              <div style={{ marginBottom: 18 }}>
+              <div style={{ marginBottom: 20 }}>
                 <CheckinEmailAsk company={companyName} plan={checkinPlan} next={checkpointNext} inviteWaiting={inviteWaiting} trackerLink={false} />
               </div>
             )}

@@ -39,7 +39,7 @@
 .ungraded { margin: var(--sp-1) 0 0; font-size: var(--fs-lead); font-weight: 600; color: var(--text-1); }
 .verdict { margin: var(--sp-3) 0 0; font-size: var(--fs-lead); line-height: 1.5; color: var(--text-2); max-width: 60ch; text-wrap: pretty; }
 .evidence { display: flex; align-items: flex-start; gap: var(--sp-2); margin: var(--sp-3) 0 0; font-size: var(--fs-sm); line-height: 1.5; color: var(--text-3); }
-.evidence svg { margin-top: 3px; color: var(--text-4); }
+.evidence svg { margin-top: 4px; color: var(--text-4); }
 .meta { display: flex; align-items: center; gap: var(--sp-2) var(--sp-4); flex-wrap: wrap; margin-top: var(--sp-3); }
 .metaText { font-size: var(--fs-meta); color: var(--text-4); }
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr)); gap: var(--sp-3); margin-top: var(--sp-6); }
@@ -53,7 +53,7 @@
 .blockHead { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-3) var(--sp-4); flex-wrap: wrap; margin-bottom: var(--sp-4); }
 .blockHead > div { min-width: 0; flex: 1 1 280px; }
 .h2 { margin: 0; font-family: var(--display); font-weight: 700; font-size: var(--fs-h3); line-height: var(--lh-snug); letter-spacing: var(--ls-heading); color: var(--text-1); display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
-.count { font-family: var(--body); font-size: var(--fs-sm); font-weight: 600; color: var(--text-2); background: var(--surface-2); border: 1px solid var(--border-2); border-radius: var(--r-pill); padding: 1px 10px; font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.count { font-family: var(--body); font-size: var(--fs-sm); font-weight: 600; color: var(--text-2); background: var(--surface-2); border: 1px solid var(--border-2); border-radius: var(--r-pill); padding: 1px 12px; font-variant-numeric: tabular-nums; letter-spacing: 0; }
 .blockSub { margin: var(--sp-1) 0 0; font-size: var(--fs-sm); color: var(--text-3); line-height: 1.5; }
 .tools { display: flex; align-items: center; gap: var(--sp-3) var(--sp-4); flex-wrap: wrap; margin-bottom: var(--sp-4); }
 .provenance { flex: 1 1 260px; margin: 0; font-size: var(--fs-sm); color: var(--text-3); line-height: 1.55; }
@@ -73,7 +73,7 @@
 .acctMeta { display: flex; align-items: center; gap: 4px; margin-top: 2px; font-size: var(--fs-meta); color: var(--text-4); }
 .acctBody { margin: 0; font-size: var(--fs-body); line-height: var(--lh-body); color: var(--text-2); overflow-wrap: anywhere; }
 .acctFoot { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; margin-top: var(--sp-3); font-size: var(--fs-meta); color: var(--text-4); }
-.via { display: inline-flex; align-items: center; gap: 6px; }
+.via { display: inline-flex; align-items: center; gap: 8px; }
 .reply { margin-top: var(--sp-3); padding: var(--sp-3) var(--sp-4); border-radius: var(--r-control); background: var(--info-tint); border: 1px solid var(--info-line); }
 .replyHd { margin: 0 0 4px; font-size: var(--fs-meta); color: var(--text-3); }
 .replyBody { margin: 0; font-size: var(--fs-sm); color: var(--text-2); line-height: 1.6; white-space: pre-wrap; }
@@ -85,7 +85,7 @@
 .quote { margin: 0; background: var(--surface-1); border: 1px solid var(--border-1); border-radius: var(--r-card); padding: var(--sp-4) var(--sp-5); }
 .quoteText { margin: 0 0 var(--sp-3); font-size: var(--fs-body); line-height: var(--lh-body); color: var(--text-2); overflow-wrap: anywhere; }
 .quoteMeta { display: flex; align-items: center; gap: var(--sp-2) var(--sp-3); flex-wrap: wrap; font-size: var(--fs-meta); color: var(--text-4); }
-.srcLink { display: inline-flex; align-items: center; gap: 3px; min-height: 32px; color: var(--accent); text-decoration: none; }
+.srcLink { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; color: var(--accent); text-decoration: none; }
 .srcLink:hover { color: var(--text-1); }
 .note { margin-top: var(--sp-3); border: 1px dashed var(--border-2); border-radius: var(--r-control); padding: 0 var(--sp-4); }
 .note > summary { cursor: pointer; list-style: none; min-height: 44px; display: flex; align-items: center; font-size: var(--fs-sm); color: var(--text-3); }
@@ -98,7 +98,7 @@
 .sec { background: var(--surface-1); border: 1px solid var(--border-1); border-radius: var(--r-card); scroll-margin-top: 80px; min-width: 0; }
 .secOpen { border-color: var(--border-2); }
 .secHd { width: 100%; display: flex; align-items: center; gap: var(--sp-3); min-height: 60px; padding: var(--sp-3) var(--sp-4); background: none; border: 0; border-radius: var(--r-card); cursor: pointer; text-align: left; color: inherit; font: inherit; }
-.secHd:hover .secTtl { color: #fff; }
+.secHd:hover .secTtl { color: var(--text-1); }
 .secIco { width: 36px; height: 36px; flex-shrink: 0; border-radius: var(--r-control); background: var(--surface-2); border: 1px solid var(--border-1); display: flex; align-items: center; justify-content: center; color: var(--text-3); }
 .secTxt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .secTtl { font-size: var(--fs-body); font-weight: 600; color: var(--text-1); display: flex; align-items: center; gap: var(--sp-2); }
@@ -127,12 +127,12 @@
 .dist { margin-top: var(--sp-4); }
 .distBar { display: flex; height: 8px; border-radius: var(--r-pill); overflow: hidden; margin: var(--sp-2) 0; gap: 2px; }
 .distKey { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-4); font-size: var(--fs-sm); color: var(--text-3); }
-.distKey li { display: inline-flex; align-items: center; gap: 6px; }
+.distKey li { display: inline-flex; align-items: center; gap: 8px; }
 .distKey b { color: var(--text-1); font-weight: 600; }
 .swatch { width: 8px; height: 8px; border-radius: 2px; }
 
 .row { display: flex; align-items: center; gap: var(--sp-3) var(--sp-4); flex-wrap: wrap; padding: var(--sp-3) var(--sp-4); border-radius: var(--r-control); background: var(--surface-2); border: 1px solid var(--border-1); }
-.rowName { flex: 1 1 8rem; min-width: 0; display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); font-weight: 500; color: var(--text-1); overflow-wrap: anywhere; }
+.rowName { flex: 1 1 8rem; min-width: 0; display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-sm); font-weight: 500; color: var(--text-1); overflow-wrap: anywhere; }
 .rowBar { flex: 2 1 10rem; min-width: 0; }
 .rowBar .bar { margin: 0; }
 
