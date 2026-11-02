@@ -145,7 +145,7 @@ test('tone: thresholds in one place, grades follow the letter', () => {
   assert.equal(ghostRateTone(0.62), 'bad')
   assert.equal(ghostRateTone(null), null)
   assert.equal(responseRateTone(0.87), 'good')
-  assert.equal(responseRateTone(0.45), 'caution')
+  assert.equal(responseRateTone(0.55), 'caution')
   assert.equal(responseRateTone(0.13), 'bad')
   for (const s of [100, 93, 88, 80, 79, 72, 69, 40, 0]) {
     const risk = gradeRisk(s)

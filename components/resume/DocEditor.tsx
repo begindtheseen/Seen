@@ -130,7 +130,7 @@ export default function DocEditor({ doc, onChange, highlightId }: Props) {
         <div className={s.secHead}><span className={s.secTitle}>Contact</span></div>
         <div className={s.row}>
           <Field label="Full name" value={b.name} onChange={(v) => update((x) => { x.basics.name = v })} placeholder="Your name" />
-          <Field label="Headline (optional)" value={b.headline} onChange={(v) => update((x) => { x.basics.headline = v })} placeholder="Journeyman Electrician" />
+          <Field label="Headline (optional)" value={b.headline} onChange={(v) => update((x) => { x.basics.headline = v })} placeholder="Job title" />
         </div>
         <div className={s.row}>
           <Field label="Email" type="email" value={b.email} onChange={(v) => update((x) => { x.basics.email = v })} placeholder="you@example.com" />
@@ -294,7 +294,7 @@ function RoleEditor({ role, index, count, highlightId, onChange, onMove, onRemov
         </div>
       </div>
       <div className={s.row}>
-        <Field label="Title" value={role.title} onChange={(v) => set({ title: v })} placeholder="Journeyman Electrician" />
+        <Field label="Title" value={role.title} onChange={(v) => set({ title: v })} placeholder="Job title" />
         <Field label="Company" value={role.company} onChange={(v) => set({ company: v })} placeholder="Desert Power Solutions" />
       </div>
       <div className={s.row}>

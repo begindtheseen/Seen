@@ -75,7 +75,7 @@ const card: React.CSSProperties = { background: 'var(--card)', border: '1px soli
 const kicker: React.CSSProperties = { ...mono('var(--fs-meta)', 'var(--blue)'), textTransform: 'uppercase', letterSpacing: '.16em', marginBottom: '.5rem' }
 const h2: React.CSSProperties = { fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', margin: '0 0 .5rem', letterSpacing: '-.02em' }
 const bodyText: React.CSSProperties = { color: 'var(--sub)', fontSize: 'var(--fs-ui)', lineHeight: 1.7, margin: '0 0 1.5rem', maxWidth: 560 }
-const primaryBtn: React.CSSProperties = { background: 'var(--cta)', border: 'none', borderRadius: 9, padding: '.75rem 1.5rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)', color: 'var(--text-1)', cursor: 'pointer' }
+const primaryBtn: React.CSSProperties = { background: 'var(--cta)', border: 'none', borderRadius: 10, padding: '.75rem 1.5rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', color: 'var(--text-1)', cursor: 'pointer' }
 const ghostBtn: React.CSSProperties = { background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem 1rem', ...mono('var(--fs-meta)', 'var(--white)'), cursor: 'pointer' }
 const inputStyle: React.CSSProperties = { flex: 1, minWidth: 200, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.75rem 1rem', ...mono('var(--fs-meta)', 'var(--white)'), outline: 'none', boxSizing: 'border-box' }
 
@@ -962,7 +962,7 @@ function ApplicationsInbox({ listing, token, onClose, canClose }: { listing: Lis
           {closedNote && <div role="status" style={{ ...mono('var(--fs-meta)', 'var(--green)'), marginBottom: '.75rem', lineHeight: 1.6 }}>✓ {closedNote}</div>}
           {pending?.status === 'hired' && (
             <div id="inbox-status-prompt" style={{ background: 'var(--raised)', border: '1px solid rgba(16,185,129,.45)', borderRadius: 11, padding: '.75rem 1rem', marginBottom: '.75rem' }}>
-              <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-body)', color: 'var(--white)' }}>Mark {pending.app.name} as hired 🎉</div>
+              <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-body)', color: 'var(--white)' }}>Mark {pending.app.name} as hired</div>
               <div style={{ ...mono('var(--fs-meta)', 'var(--sub)'), lineHeight: 1.6, margin: '.25rem 0 .75rem' }}>
                 Is the role filled? You can close the listing now and send everyone still waiting a decline message — you’ll confirm everyone you hired and choose the message first.
               </div>

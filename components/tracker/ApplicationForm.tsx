@@ -81,8 +81,9 @@ export default function ApplicationForm({ title, initial, notice, submitLabel, b
                 </select>
               </div>
               <div className={s.field}>
-                {/* Owner decision 2026-10-21: every day on Seen is the California calendar — said, not assumed (M8). */}
-                <label htmlFor="af-date">Applied on (California time)</label>
+                {/* Owner decision 2026-10-21: every day on Seen is the California calendar (the value is read as a
+                    California date — lib/stores/applicationEdit); the label stays short. */}
+                <label htmlFor="af-date">Applied on</label>
                 <input id="af-date" type="date" className={s.input} value={form.appliedOn} max={today} onChange={set('appliedOn')} required />
               </div>
             </div>

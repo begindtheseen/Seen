@@ -93,16 +93,16 @@ export function EmployerReputation() {
           {loading && <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>Loading…</span>}
         </div>
       ) : (
-        <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginBottom: score || loading ? '1.6rem' : 0 }}>
+        <div style={{ display: 'flex', marginBottom: score || loading ? '1.5rem' : 0 }}>
           <input autoComplete="off"
             value={name}
             onChange={e => setName(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') look() }}
             placeholder="Your company name"
             aria-label="Your company name"
-            style={{ flex: 1, minWidth: 220, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.75rem 1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', outline: 'none' }}
+            style={{ flex: 1, minWidth: 0, background: 'var(--raised)', border: '1px solid var(--border-2)', borderRight: 'none', borderRadius: '10px 0 0 10px', padding: '.75rem 1rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-ui)', color: 'var(--text-1)', outline: 'none' }}
           />
-          <button onClick={look} disabled={loading || !name.trim()} style={{ background: 'var(--cta)', border: 'none', borderRadius: 9, padding: '.75rem 1.5rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', color: 'var(--text-1)', cursor: 'pointer', opacity: loading ? .6 : 1 }}>
+          <button onClick={look} disabled={loading || !name.trim()} style={{ flexShrink: 0, minHeight: 44, background: 'var(--surface-2)', border: '1px solid var(--border-2)', borderRadius: '0 10px 10px 0', padding: '.75rem 1rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', color: 'var(--text-1)', cursor: loading || !name.trim() ? 'default' : 'pointer', opacity: loading || !name.trim() ? .6 : 1 }}>
             {loading ? 'Checking…' : 'Check my reputation →'}
           </button>
         </div>
@@ -135,7 +135,7 @@ export function EmployerReputation() {
                   ? 'You respond better than most. A Transparency Verified badge makes that visible on your profile so more strong candidates apply.'
                   : `${ghost ?? ''}% of applicants reported never hearing back. Candidates see this before applying — the strongest ones self-select out. Commit to responding, get Verified, and win them back.`}
               </p>
-              <a href="#promote" style={{ display: 'inline-block', background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', textDecoration: 'none' }}>Get Transparency Verified →</a>
+              <a href="#promote" style={{ display: 'inline-block', background: 'var(--surface-2)', border: '1px solid var(--border-2)', borderRadius: 10, padding: '.5rem 1rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', color: 'var(--text-1)', textDecoration: 'none' }}>Get Transparency Verified →</a>
             </div>
           </div>
         ) : fpReports > 0 ? (
@@ -144,7 +144,7 @@ export function EmployerReputation() {
             <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.65, margin: '0 0 1rem', maxWidth: 520 }}>
               Candidates can read the {fpReports.toLocaleString()} applicant account{fpReports === 1 ? '' : 's'} about &ldquo;{checked}&rdquo;, but Seen doesn&apos;t grade a company or show ghost / response rates until at least {MIN_REPORTS_FOR_GRADE} real reports back it. Get Transparency Verified now so the first thing candidates see is your commitment to respond.
             </p>
-            <a href="#promote" style={{ display: 'inline-block', background: 'var(--cta)', border: 'none', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-meta)', color: 'var(--text-1)', textDecoration: 'none' }}>Get Transparency Verified →</a>
+            <a href="#promote" style={{ display: 'inline-block', background: 'var(--surface-2)', border: '1px solid var(--border-2)', borderRadius: 10, padding: '.5rem 1rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', color: 'var(--text-1)', textDecoration: 'none' }}>Get Transparency Verified →</a>
           </div>
         ) : (
           <div style={{ paddingTop: '1.5rem', borderTop: '1px solid var(--line)' }}>
@@ -152,7 +152,7 @@ export function EmployerReputation() {
             <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.65, margin: '0 0 1rem', maxWidth: 520 }}>
               You&apos;re a blank slate — which is an opportunity. Get Transparency Verified now and you signal &ldquo;we respond&rdquo; from day one, before a single ghost report can define you.
             </p>
-            <a href="#promote" style={{ display: 'inline-block', background: 'var(--cta)', border: 'none', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-meta)', color: 'var(--text-1)', textDecoration: 'none' }}>Get Transparency Verified →</a>
+            <a href="#promote" style={{ display: 'inline-block', background: 'var(--surface-2)', border: '1px solid var(--border-2)', borderRadius: 10, padding: '.5rem 1rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', color: 'var(--text-1)', textDecoration: 'none' }}>Get Transparency Verified →</a>
           </div>
         )
       )}

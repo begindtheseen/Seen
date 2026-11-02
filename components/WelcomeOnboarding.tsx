@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import Icon from '@/components/ui/Icon'
 
 // First-run getting-started guide shown at the top of the dashboard. It reflects REAL
 // progress (résumé uploaded? first application tracked? a company checked?) so it doubles
@@ -30,7 +31,7 @@ export default function WelcomeOnboarding({
   const steps = [
     {
       done: state.hasResume,
-      icon: '📄',
+      icon: <Icon name="file-text" size={14} />,
       title: 'Add your résumé',
       sub: 'Unlocks résumé-fit scoring and lets you earn AI credits',
       cta: 'Upload résumé',
@@ -49,7 +50,7 @@ export default function WelcomeOnboarding({
     },
     {
       done: state.companiesChecked > 0,
-      icon: '🏢',
+      icon: <Icon name="building-2" size={14} />,
       title: 'Check a company before you apply',
       sub: 'Know who actually responds — and who ghosts — up front',
       cta: 'Browse companies',
@@ -75,7 +76,7 @@ export default function WelcomeOnboarding({
           <div className="deyebrow" style={{ color: 'var(--accent)' }}>✦ Getting started</div>
           <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: '.25rem 0 .25rem' }}>
             {/* Sign-up no longer asks a name first (it is asked later, in Settings): no "Welcome to Seen, there". */}
-            {name && name !== 'there' ? <>Welcome to Seen, {name} 👋</> : <>Welcome to Seen 👋</>}
+            {name && name !== 'there' ? <>Welcome to Seen, {name}</> : <>Welcome to Seen</>}
           </h2>
           <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.55, margin: 0 }}>
             Seen shows you which companies actually respond — so you stop wasting applications. Three quick steps to set you up:

@@ -1,12 +1,16 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import Icon from '@/components/ui/Icon'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { AppStore } from '@/lib/stores/AppStore'
 import { applicationFromListing } from '@/lib/stores/listingApplication'
 import { aiHeaders } from '@/lib/aiHeaders'
 import ModalPortal from '@/components/ModalPortal'
+import { dialogKey } from '@/components/ui/Dialog'
+import { showToast } from '@/lib/toast'
+import { useFocusTrap } from '@/lib/hooks/useFocusTrap'
 import { displayCompanyName } from '@/lib/companyDisplay'
 import { buildCompanySummary } from '@/lib/companyPageSummary'
 import { appliedAtFromChoice, checkinEmailPlan, joinDays, type AppliedChoice } from '@/lib/trackCapture'
@@ -72,6 +76,15 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
   // tracker record and every sentence here carry.
   const companyName = displayCompanyName(job.company) || job.company
   const [loading, setLoading] = useState(false)
+  // Escape dismisses like ✕, the scrim and the phone's Back (THE dialog's own key rule, components/ui/Dialog),
+  // and the focus trap hands focus back to the Apply button that opened the checkpoint when it closes.
+  const sheetRef = useRef<HTMLDivElement>(null)
+  useFocusTrap(sheetRef, true)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (dialogKey(e.key, true, onClose)) e.stopPropagation() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
 
   const [creditEarned, setCreditEarned] = useState(false)
   // "I applied earlier": the check-in clock starts at the real date (lib/trackCapture.ts).
@@ -383,7 +396,7 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
       style={backdropStyle}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div style={sheetStyle} role="dialog" aria-modal="true" aria-label={step === 'main' ? `Did you apply to ${job.company}?` : 'Application tracking'}>
+      <div ref={sheetRef} style={sheetStyle} role="dialog" aria-modal="true" aria-label={step === 'main' ? `Did you apply to ${job.company}?` : 'Application tracking'}>
         {/* ── MAIN ── */}
         {step === 'main' && (
           <div style={innerStyle}>
@@ -423,7 +436,7 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
               onClick={handleListingGone}
               disabled={loading}
             >
-              🚫 Couldn&apos;t — the listing was gone or closed
+              <Icon name="ban" size={14} /> Couldn&apos;t — the listing was gone or closed
             </button>
 
             <button
@@ -510,7 +523,9 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
                   style={reasonBtnStyle}
                   onClick={() => {
                     saveSkipReason(companyName, job.title, reason, 'not_yet')
-                    setStep('not_yet_confirmed')
+                    // One tap finishes it (round 1: Did you apply? → What's holding you back? → Got it. was three stacked popups).
+                    showToast(`Got it — we'll remind you about ${companyName}.`)
+                    onClose()
                   }}
                 >
                   {reason}

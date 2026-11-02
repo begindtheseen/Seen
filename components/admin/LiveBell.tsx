@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Icon from '@/components/ui/Icon'
 import { relTime } from './primitives'
 import type { LiveEvent } from '@/lib/hooks/useAdminLive'
 
@@ -36,7 +37,7 @@ export function LiveBell({ events, unread, markRead, live }: {
           boxShadow: '0 6px 24px rgba(0,0,0,.4)',
         }}
       >
-        <span style={{ fontSize: 'var(--fs-lead)', lineHeight: 1 }}>🔔</span>
+        <span style={{ fontSize: 'var(--fs-lead)', lineHeight: 1 }}><Icon name="bell" size={18} /></span>
         {/* live dot */}
         <span style={{
           position: 'absolute', top: 8, left: 8, width: 6, height: 6, borderRadius: 999,

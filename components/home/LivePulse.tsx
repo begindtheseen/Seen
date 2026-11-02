@@ -37,7 +37,7 @@ function ago(iso: string): string {
   return `${Math.floor(s / (86400 * 30))}mo ago`
 }
 
-export default function LivePulse() {
+export default function LivePulse({ totals = null }: { totals?: { reports: number; companies: number } | null }) {
   const [rows, setRows] = useState<Row[]>([])
   const [total, setTotal] = useState(0)
 
@@ -86,7 +86,7 @@ export default function LivePulse() {
       <div className={styles.head}>
         <span className={styles.live}><span className={styles.dot} />Live</span>
         <span className={styles.title}>Latest applicant accounts</span>
-        {total > 0 && <span className={styles.count}>{total.toLocaleString()} applicant accounts across every company on Seen</span>}
+        {totals ? <a className={styles.count} href="/data">{totals.reports.toLocaleString()} applicant accounts behind {totals.companies.toLocaleString()} graded companies · open data →</a> : total > 0 && <span className={styles.count}>{total.toLocaleString()} applicant accounts</span>}
         <Link href="/feed" className={styles.more}>Open the feed →</Link>
       </div>
       <div className={styles.rail} data-marquee>

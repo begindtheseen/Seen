@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
+import Icon from '@/components/ui/Icon'
 
 // Renewal nudge (Wave 3). A scoped employer whose Featured placement or Verified badge is lapsing (or
 // has lapsed) sees a quiet banner with a one-click re-buy through the EXISTING one-time checkout — so
@@ -43,7 +44,7 @@ export function EmployerPerkBanner() {
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', flexWrap: 'wrap', marginBottom: '1.5rem', padding: '.75rem 1rem', background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.3)', borderRadius: 10 }}>
-      <span aria-hidden style={{ fontSize: 'var(--fs-lead)', flexShrink: 0 }}>⏳</span>
+      <span aria-hidden style={{ color: 'var(--caution-text)', flexShrink: 0, display: 'inline-flex' }}><Icon name="hourglass" size={18} /></span>
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--white)' }}>{messages.join(' · ')}</div>
         <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.125rem' }}>Renew to keep your reach and badge live — one-time, no auto-charge.</div>

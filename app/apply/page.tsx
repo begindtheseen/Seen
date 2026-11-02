@@ -1,6 +1,7 @@
 'use client'
 
 import { Suspense, useEffect, useState } from 'react'
+import Icon, { type IconName } from '@/components/ui/Icon'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { AppStore } from '@/lib/stores/AppStore'
@@ -62,7 +63,7 @@ function ApplyContent() {
   const [phase, setPhase] = useState<Phase>('ask')
   const [answer, setAnswer] = useState<Answer>(null)
   const [saving, setSaving] = useState(false)
-  const [insight, setInsight] = useState<string | null>(null)
+  const [insight, setInsight] = useState<{ icon: IconName; text: string } | null>(null)
   const [notYetReason, setNotYetReason] = useState('')
 
   useEffect(() => {
@@ -94,14 +95,14 @@ function ApplyContent() {
       const ghostPct = Math.round(score.ghost_rate * 100)
       const wait = score.avg_wait_days
       if (score.ghost_rate > 0.6) {
-        setInsight(`⚠ ${co} has a ${ghostPct}% ghost rate. We'll alert you if they go silent past ${wait} days.`)
+        setInsight({ icon: 'triangle-alert', text: `${co} has a ${ghostPct}% ghost rate. We'll alert you if they go silent past ${wait} days.` })
       } else if (score.risk_level === 'safe') {
-        setInsight(`✅ ${co} has a strong hiring grade (${grade(score.overall_score)}). Most applicants hear back within ${wait} days.`)
+        setInsight({ icon: 'circle-check', text: `${co} has a strong hiring grade (${grade(score.overall_score)}). Most applicants hear back within ${wait} days.` })
       } else {
-        setInsight(`📊 ${co} typically responds within ${wait} days. Your Day 7 and Day 14 check-ins are now scheduled.`)
+        setInsight({ icon: 'chart-column', text: `${co} typically responds within ${wait} days. Your Day 7 and Day 14 check-ins are now scheduled.` })
       }
     } else {
-      setInsight(`📊 Tracked. Your Day 7 check-in is scheduled — we'll ask if ${co} responded.`)
+      setInsight({ icon: 'chart-column', text: `Tracked. Your Day 7 check-in is scheduled — we'll ask if ${co} responded.` })
     }
 
     setAnswer('yes')
@@ -167,7 +168,7 @@ function ApplyContent() {
         {phase === 'ask' ? <>Did you apply to <span style={{ color: riskColor }}>{co}</span>?</> :
          phase === 'not_yet_reason' ? 'What\'s holding you back?' :
          phase === 'changed_reason' ? 'What changed your mind?' :
-         phase === 'done_yes' ? 'Application tracked ✅' :
+         phase === 'done_yes' ? <>Application tracked <Icon name="circle-check" size={18} /></> :
          'Got it.'}
       </h1>
       {role && phase === 'ask' && (
@@ -241,13 +242,13 @@ function ApplyContent() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
               {[
-                ['📊', 'Expected response window for ' + (co || 'this company')],
-                ['👻', 'Ghost-risk warning if they go silent'],
-                ['📅', 'Day 7 / 14 / 30 check-in reminders'],
-                ['🎉', 'Outcome card + share image when it closes'],
+                ['chart-column', 'Expected response window for ' + (co || 'this company')],
+                ['ghost', 'Ghost-risk warning if they go silent'],
+                ['calendar', 'Day 7 / 14 / 30 check-in reminders'],
+                ['share-2', 'Outcome card + share image when it closes'],
               ].map(([icon, text]) => (
                 <div key={text} style={{ display: 'flex', alignItems: 'center', gap: '.5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'rgba(52,211,153,0.85)' }}>
-                  <span style={{ flexShrink: 0 }}>{icon}</span><span>{text}</span>
+                  <Icon name={icon as IconName} size={14} /><span>{text}</span>
                 </div>
               ))}
             </div>
@@ -267,7 +268,7 @@ function ApplyContent() {
               disabled={saving}
               style={{ width: '100%', background: 'var(--good-tint)', border: '1.5px solid rgba(16,185,129,0.5)', color: 'var(--green)', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-body)', borderRadius: 12, padding: '1rem 1.25rem', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1, letterSpacing: '-.01em', textAlign: 'left', boxShadow: '0 0 24px rgba(16,185,129,0.1)' }}
             >
-              ✅ Yes, I applied
+              <Icon name="circle-check" size={16} /> Yes, I applied
               <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 400, color: 'rgba(52,211,153,0.65)', marginTop: '.25rem' }}>Start tracking your timeline</div>
             </button>
 
@@ -275,7 +276,7 @@ function ApplyContent() {
               onClick={handleNotYet}
               style={{ width: '100%', background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--white)', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-ui)', borderRadius: 12, padding: '.75rem 1.25rem', cursor: 'pointer', textAlign: 'left' }}
             >
-              ⏳ Not yet
+              <Icon name="hourglass" size={16} /> Not yet
               <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 400, color: 'var(--sub)', marginTop: '.25rem' }}>Save it and come back</div>
             </button>
 
@@ -284,13 +285,13 @@ function ApplyContent() {
                 onClick={handleChanged}
                 style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', borderRadius: 10, padding: '.75rem 1rem', cursor: 'pointer', textAlign: 'left' }}
               >
-                ❌ Changed my mind
+                <Icon name="circle-x" size={14} /> Changed my mind
               </button>
               <button
                 onClick={handleRemind}
                 style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', borderRadius: 10, padding: '.75rem 1rem', cursor: 'pointer', textAlign: 'left' }}
               >
-                🔔 Remind me later
+                <Icon name="bell" size={14} /> Remind me later
               </button>
             </div>
           </div>
@@ -348,7 +349,7 @@ function ApplyContent() {
           {insight && (
             <div style={{ background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 12, padding: '1rem 1rem', marginBottom: '1.25rem' }}>
               <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--text-3)', fontWeight: 500, marginBottom: '.5rem' }}>Unlocked insight</div>
-              <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'rgba(255,255,255,0.85)', lineHeight: 1.7 }}>{insight}</div>
+              <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'rgba(255,255,255,0.85)', lineHeight: 1.7 }}><Icon name={insight.icon} size={14} /> {insight.text}</div>
             </div>
           )}
           <button

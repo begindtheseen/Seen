@@ -19,6 +19,7 @@ import ExportPanel from '@/components/resume/ExportPanel'
 import FixPreview from '@/components/resume/FixPreview'
 import UpgradeModal from '@/components/UpgradeModal'
 import PageHeader from '@/components/shell/PageHeader'
+import Icon from '@/components/ui/Icon'
 import { useAuth } from '@/lib/auth'
 import { RESUME_PARSE_COST, creditCostLabel } from '@/lib/creditRules'
 import { aiHeaders } from '@/lib/aiHeaders'
@@ -271,7 +272,7 @@ function StudioInner() {
         {mode === 'empty' && (
           <div className={s.grid} style={{ gridTemplateColumns: '1fr' }}>
             <div className={`${s.drop}${dragging ? ` ${s.dropActive}` : ''}`} onDragOver={(e) => { e.preventDefault(); setDragging(true) }} onDragLeave={() => setDragging(false)} onDrop={(e) => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) uploadFile(f) }}>
-              <div style={{ fontSize: 'var(--fs-h2)', marginBottom: '.5rem' }}>📄</div>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '.5rem', color: 'var(--text-3)' }}><Icon name="file-text" size={32} strokeWidth={1.5} /></div>
               <div className={s.cardTitle}>Drop your résumé here</div>
               <div className={s.dim} style={{ marginBottom: '1rem' }}>PDF, Word or text. We read the layout (columns, bold headings, bullets), not just the characters.</div>
               <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -313,14 +314,14 @@ function StudioInner() {
               </div>
             )}
             <div className={`${s.seg} ${s.mobileOnly}`}>
-              {(['edit', 'health', 'tailor', 'export'] as Tab[]).map((t) => <button key={t} type="button" className={`${s.segBtn}${tab === t ? ` ${s.segBtnActive}` : ''}`} onClick={() => setTab(t)}>{t === 'edit' ? '📝 Document' : t === 'health' ? `💚 Health${health ? ` ${health.score}` : ''}` : t === 'tailor' ? '🎯 Tailor' : '📤 Export'}</button>)}
+              {(['edit', 'health', 'tailor', 'export'] as Tab[]).map((t) => <button key={t} type="button" className={`${s.segBtn}${tab === t ? ` ${s.segBtnActive}` : ''}`} onClick={() => setTab(t)}>{t === 'edit' ? 'Document' : t === 'health' ? `Health${health ? ` ${health.score}` : ''}` : t === 'tailor' ? 'Tailor' : 'Export'}</button>)}
             </div>
             <div className={s.grid}>
               {showEditor && <div><DocEditor doc={doc} onChange={onChange} highlightId={highlight} /></div>}
               {showPanel && (
                 <div className={s.panel}>
                   <div className={`${s.seg} ${s.hideMobile}`}>
-                    {(['health', 'tailor', 'export'] as Tab[]).map((t) => <button key={t} type="button" className={`${s.segBtn}${panelTab === t ? ` ${s.segBtnActive}` : ''}`} onClick={() => setTab(t)}>{t === 'health' ? `💚 Health${health ? ` · ${health.score}` : ''}` : t === 'tailor' ? '🎯 Tailor' : '📤 Export'}</button>)}
+                    {(['health', 'tailor', 'export'] as Tab[]).map((t) => <button key={t} type="button" className={`${s.segBtn}${panelTab === t ? ` ${s.segBtnActive}` : ''}`} onClick={() => setTab(t)}>{t === 'health' ? `Health${health ? ` · ${health.score}` : ''}` : t === 'tailor' ? 'Tailor' : 'Export'}</button>)}
                   </div>
                   {panelTab === 'health' && undo && (
                     <div className={s.okBox} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>

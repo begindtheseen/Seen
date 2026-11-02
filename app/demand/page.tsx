@@ -1,7 +1,16 @@
 'use client'
 
+// /demand — hiring demand by metro. Design review 2026-11-02: rebuilt on the /agencies pattern — ink
+// labels, outlined status chips with an icon (never a coloured word inside running text), ONE bar colour,
+// figures as figures, a sober headline. The data path (GET /api/demand, generate-on-miss, filters, the
+// stale notice) is unchanged.
 import { useState, useEffect, useMemo } from 'react'
 import PageHeader from '@/components/shell/PageHeader'
+import Badge, { Chip } from '@/components/ui/Badge'
+import Button from '@/components/ui/Button'
+import Icon, { type IconName } from '@/components/ui/Icon'
+import StatTile from '@/components/ui/StatTile'
+import st from './demand.module.css'
 
 interface DemandJob {
   t: string
@@ -33,84 +42,67 @@ function relAgo(iso?: string | null): string {
   return `${Math.floor(d / 30)}mo ago`
 }
 
-
-const URG_CFG = {
-  hot:  { label: '🔥 High demand', cls: 'hot' },
-  warm: { label: '🌡️ Active market', cls: 'warm' },
-  cool: { label: '❄️ Stable', cls: 'cool' },
+// Market status as an outlined ink chip with an icon — demand is a reading, not a good/bad verdict.
+const URG_CFG: Record<DemandCity['urg'], { label: string; icon: IconName }> = {
+  hot: { label: 'High demand', icon: 'trending-up' },
+  warm: { label: 'Active market', icon: 'gauge' },
+  cool: { label: 'Stable', icon: 'minus' },
 }
 
-function DemandBar({ di }: { di: number }) {
-  const color = di >= 75 ? 'var(--red)' : di >= 55 ? 'var(--amber)' : 'var(--green)'
-  return (
-    <div style={{ flex: 1, height: 5, background: 'var(--line)', borderRadius: 3, overflow: 'hidden' }}>
-      <div style={{ width: `${di}%`, height: '100%', background: color, borderRadius: 3, transition: 'width .4s ease' }} />
-    </div>
-  )
+// The demand index word: ink, beside the figure, never a colour of its own.
+function diWord(di: number): string {
+  if (di >= 80) return 'Critical'
+  if (di >= 65) return 'High'
+  if (di >= 45) return 'Active'
+  return 'Moderate'
 }
 
-function diLabel(di: number): { label: string; color: string } {
-  if (di >= 80) return { label: 'Critical', color: 'var(--red)' }
-  if (di >= 65) return { label: 'High', color: 'var(--amber)' }
-  if (di >= 45) return { label: 'Active', color: 'var(--blue)' }
-  return { label: 'Moderate', color: 'var(--dim)' }
-}
+const INDUSTRIES = ['Tech / Software', 'Healthcare', 'Logistics / Warehouse', 'Finance', 'Trades / Construction']
+const LEVELS = ['Entry level', 'Mid level', 'Senior']
 
 function CityCard({ city }: { city: DemandCity }) {
   const cfg = URG_CFG[city.urg]
   const live = city.kind === 'live'
   return (
-    <div className="dcity">
-      <div className="dc-hdr">
-        <div>
-          <div className="dc-city">{city.city}</div>
-          {/* Honest vintage chip: live-from-corpus vs modeled-from-BLS — never both as "Live" */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginTop: '.25rem', flexWrap: 'wrap' }}>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, letterSpacing: '.06em', color: live ? 'var(--green)' : 'var(--blue)', border: `1px solid ${live ? 'rgba(16,185,129,.35)' : 'var(--info-line)'}`, borderRadius: 4, padding: '.0625rem .25rem' }}>
-              {live ? '● LIVE · Seen listings' : '≈ MODELED · BLS blend'}
-            </span>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>
-              {city.src}{city.updated_at ? ` · updated ${relAgo(city.updated_at)}` : ''}
-            </span>
+    <article className={st.card}>
+      <div className={st.cardHd}>
+        <div className={st.cardWho}>
+          <div className={st.city}>{city.city}</div>
+          <div className={st.chips}>
+            {/* Honest vintage chip: live-from-corpus vs modeled-from-BLS — never both as "Live". */}
+            {live
+              ? <Badge icon="radio">Live · Seen listings</Badge>
+              : <Badge icon="chart-column">Modeled · BLS blend</Badge>}
+            <Badge icon={cfg.icon}>{cfg.label}</Badge>
+            <span className={st.src}>{city.src}{city.updated_at ? ` · updated ${relAgo(city.updated_at)}` : ''}</span>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexShrink: 0 }}>
-          <a
-            href="/companies"
-            style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', textDecoration: 'none' }}
-          >
-            Best companies ↗
-          </a>
-          <span className={`dc-urg ${cfg.cls}`}>{cfg.label}</span>
-        </div>
+        <a href="/companies" className={st.cardLink}>Best companies <Icon name="arrow-up-right" size={14} /></a>
       </div>
-      <div className="dc-body">
+      <div className={st.rows}>
         {city.jobs.map((job, i) => (
-          <div key={i} className="dc-row" title={job.note}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
-                <div className="dc-job">{job.t}</div>
-                <a
-                  href={`/jobs?q=${encodeURIComponent(job.t.split('/')[0].trim())}&loc=${encodeURIComponent(city.city)}`}
-                  style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}
-                >
-                  Find these jobs →
+          <div key={i} className={st.row} title={job.note}>
+            <div className={st.rowMain}>
+              <div className={st.rowTop}>
+                <span className={st.job}>{job.t}</span>
+                <a href={`/jobs?q=${encodeURIComponent(job.t.split('/')[0].trim())}&loc=${encodeURIComponent(city.city)}`} className={st.find}>
+                  Find these jobs <Icon name="arrow-right" size={14} />
                 </a>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginTop: '.25rem' }}>
-                <DemandBar di={job.di} />
-                <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', flexShrink: 0 }}>{job.l}</span>
-                {(() => { const dl = diLabel(job.di); return <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: dl.color, marginLeft: '.5rem', fontWeight: 500 }}>{dl.label}</span>; })()}
+              <div className={st.rowMeta}>
+                <span className={st.track} aria-hidden="true"><span className={st.fill} style={{ width: `${Math.max(2, Math.min(100, job.di))}%` }} /></span>
+                <span className={st.level}>{job.di}/100 · {diWord(job.di)} · {job.l}</span>
               </div>
             </div>
             {/* Live counts are exact Seen listings; BLS counts are model estimates — say so. */}
-            <div className="dc-count" style={{ marginLeft: '.75rem', flexShrink: 0 }} title={live ? `${job.count} live listings on Seen` : 'Estimate modeled from BLS sector data'}>
+            <div className={st.count} title={live ? `${job.count} live listings on Seen` : 'Estimate modeled from BLS sector data'}>
               {live ? job.count.toLocaleString() : `~${job.count.toLocaleString()}`}
+              <span className={st.countSub}>{live ? 'listings' : 'estimated'}</span>
             </div>
           </div>
         ))}
       </div>
-    </div>
+    </article>
   )
 }
 
@@ -191,132 +183,96 @@ export default function DemandPage() {
     return { total, cities: filtered.length, entryLevel, avgDI }
   }, [filtered])
 
-  const selectStyle: React.CSSProperties = {
-    background: 'var(--surface)',
-    border: '1.5px solid var(--line2)',
-    borderRadius: 8,
-    padding: '.5rem 1rem',
-    color: 'var(--white)',
-    fontFamily: 'var(--mono)',
-    fontSize: 'var(--fs-meta)',
-    outline: 'none',
-    cursor: 'pointer',
-    flex: 1,
-    minWidth: 140,
-  }
+  const anyLive = (data ?? []).some(c => c.kind === 'live')
+  // "~" whenever any shown city is modeled: those totals are estimates, not counted listings.
+  const modeled = filtered.some(c => c.kind !== 'live')
+  const approx = (n: number) => (modeled ? `~${n.toLocaleString()}` : n.toLocaleString())
+  const anyFilter = !!(locFilter || nicheFilter || expFilter)
 
   return (
     <div className="page-full">
-      <div className="demand-page">
-        {/* Header */}
-        <div className="demand-hdr">
-          <PageHeader
-            eyebrow={<>Job demand{blsPeriod ? ` · BLS ${blsPeriod}` : ''}{(data ?? []).some(c => c.kind === 'live') ? ' + live Seen listings' : ' · modeled'}</>}
-            tone="amber"
-            title="Where jobs desperately need people"
-            crumbLabel="Hiring demand"
-            sub={<>Two honest sources, labeled per card: <span style={{ color: 'var(--green)' }}>● LIVE</span> markets computed from real listings on Seen, and <span style={{ color: 'var(--blue)' }}>≈ MODELED</span> markets from the BLS blend. Search any city — if we don&apos;t have it, we generate it from live listings on the spot.</>}
-          />
+      <div className={st.wrap}>
+        <PageHeader
+          eyebrow={<>Hiring demand{blsPeriod ? ` · BLS ${blsPeriod}` : ''}{anyLive ? ' · live Seen listings' : ' · modeled'}</>}
+          title="Hiring demand by metro"
+          crumbLabel="Hiring demand"
+          sub="Which roles are hiring where, from two sources each card names: markets counted from live listings on Seen, and markets modeled from BLS sector data. Search a city — one we don't track yet is built from live listings on the spot."
+        />
 
-          {/* Filters */}
-          <div className="demand-filters">
-            <input autoComplete="off"
+        <div className={st.filters} role="search">
+          <div className={st.field}>
+            <Icon name="search" size={18} className={st.fieldIcon} />
+            <label htmlFor="demand-loc" className="sr-only">Filter by city or state</label>
+            <input
+              id="demand-loc"
+              autoComplete="off"
               type="text"
-              placeholder="Filter by city or state..."
+              className={`ui-input ${st.input}`}
+              placeholder="City or state"
               value={locFilter}
               onChange={e => setLocFilter(e.target.value)}
-              style={{ ...selectStyle, caretColor: 'var(--blue)' }}
             />
-            <select value={nicheFilter} onChange={e => setNicheFilter(e.target.value)} style={selectStyle}>
-              <option value="">All industries</option>
-              <option value="Tech / Software">Tech / Software</option>
-              <option value="Healthcare">Healthcare</option>
-              <option value="Logistics / Warehouse">Logistics / Warehouse</option>
-              <option value="Finance">Finance</option>
-              <option value="Trades / Construction">Trades / Construction</option>
-            </select>
-            <select value={expFilter} onChange={e => setExpFilter(e.target.value)} style={selectStyle}>
-              <option value="">Any level</option>
-              <option value="Entry level">Entry level</option>
-              <option value="Mid level">Mid level</option>
-              <option value="Senior">Senior</option>
-            </select>
-            {(locFilter || nicheFilter || expFilter) && (
-              <button
-                onClick={() => { setLocFilter(''); setNicheFilter(''); setExpFilter('') }}
-                style={{ background: 'none', border: '1px solid var(--line2)', color: 'var(--muted)', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', cursor: 'pointer', flexShrink: 0 }}
-              >
-                ✕ Clear
-              </button>
-            )}
+          </div>
+          <div className={st.chipRow} role="group" aria-label="Industry">
+            <span className={st.chipLbl}>Industry</span>
+            <Chip selected={nicheFilter === ''} onClick={() => setNicheFilter('')}>All</Chip>
+            {INDUSTRIES.map(n => <Chip key={n} selected={nicheFilter === n} onClick={() => setNicheFilter(n)}>{n}</Chip>)}
+          </div>
+          <div className={st.chipRow} role="group" aria-label="Level">
+            <span className={st.chipLbl}>Level</span>
+            <Chip selected={expFilter === ''} onClick={() => setExpFilter('')}>Any</Chip>
+            {LEVELS.map(l => <Chip key={l} selected={expFilter === l} onClick={() => setExpFilter(l)}>{l}</Chip>)}
+            {anyFilter && <Chip icon="x" onClick={() => { setLocFilter(''); setNicheFilter(''); setExpFilter('') }}>Clear</Chip>}
           </div>
         </div>
 
         {/* Freshness, said out loud: the BLS blend is refreshed monthly by cron; when that has not
             happened for 65+ days the data is stale and the page says so instead of hiding it. */}
         {fresh.stale && (
-          <div style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.3)', borderRadius: 10, padding: '.75rem 1rem', marginBottom: '1rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--amber)', lineHeight: 1.6 }}>
-            ⚠ Modeled figures last refreshed {fresh.updatedAt ? relAgo(fresh.updatedAt) : 'a while ago'}{blsPeriod ? ` (BLS ${blsPeriod})` : ''}. Treat them as a vintage, not a live reading.
+          <div className={st.stale} role="note">
+            <Icon name="triangle-alert" size={16} />
+            <span>Stale: modeled figures last refreshed {fresh.updatedAt ? relAgo(fresh.updatedAt) : 'a while ago'}{blsPeriod ? ` (BLS ${blsPeriod})` : ''}. Treat them as a vintage, not a live reading.</span>
           </div>
         )}
-        {/* Stats row — "~" whenever any city is modeled: these totals are estimates, not counted listings. */}
-        {(() => { const modeled = filtered.some(c => c.kind !== 'live'); const t = (n: string) => (modeled ? `~${n}` : n); return (
-        <div className="demand-stat-row">
-          {[
-            { n: t(stats.total.toLocaleString()), l: modeled ? 'Openings (modeled)' : 'Openings tracked' },
-            { n: stats.cities, l: 'Markets' },
-            { n: t(stats.entryLevel.toLocaleString()), l: modeled ? 'Entry-level (modeled)' : 'Entry-level jobs' },
-            { n: `${stats.avgDI}/100`, l: 'Avg demand index' },
-          ].map((s, i) => (
-            <div key={i} className="dsr">
-              <div className="dsr-n">{s.n}</div>
-              <div className="dsr-l">{s.l}</div>
-            </div>
-          ))}
-        </div>
-        ) })()}
 
-        {/* City grid */}
+        <div className={st.stats}>
+          <StatTile label={modeled ? 'Openings (modeled)' : 'Openings tracked'} value={approx(stats.total)} />
+          <StatTile label="Markets" value={stats.cities} instant />
+          <StatTile label={modeled ? 'Entry-level (modeled)' : 'Entry-level jobs'} value={approx(stats.entryLevel)} />
+          <StatTile label="Avg demand index" value={`${stats.avgDI}/100`} />
+        </div>
+
         {data === null ? (
           /* Honest loading skeleton — never a fabricated dataset while we wait */
-          <div className="demand-grid">
-            {[0, 1, 2, 3].map(i => (
-              <div key={i} className="dcity" style={{ minHeight: 180, opacity: 0.55 }}>
-                <div style={{ height: 12, width: `${58 - i * 6}%`, background: 'var(--line2)', borderRadius: 4, margin: '1rem' }} />
-                {[0, 1, 2].map(j => <div key={j} style={{ height: 9, width: `${80 - j * 14}%`, background: 'var(--line)', borderRadius: 4, margin: '.75rem 1rem' }} />)}
-              </div>
-            ))}
+          <div className={st.grid} aria-label="Loading demand data" role="status">
+            {[0, 1, 2, 3].map(i => <div key={i} className={`sk ${st.sk}`} />)}
           </div>
         ) : filtered.length > 0 ? (
-          <div className="demand-grid">
-            {filtered.map(city => (
-              <CityCard key={city.city} city={city} />
-            ))}
+          <div className={st.grid}>
+            {filtered.map(city => <CityCard key={city.city} city={city} />)}
           </div>
         ) : (
-          <div style={{ textAlign: 'center', padding: '4rem 2rem', color: 'var(--muted)', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', lineHeight: 1.7 }}>
+          <div className={st.empty}>
             {loadFailed ? (
-              <>Couldn&apos;t load demand data just now — refresh to retry.</>
+              <p>Couldn&apos;t load demand data just now — refresh to retry.</p>
             ) : locFilter.trim().length >= 3 ? (
               /* Generate-on-miss: the searched city isn't tracked yet — build it from live listings */
               <>
-                <div style={{ marginBottom: '1rem' }}>&ldquo;{locFilter.trim()}&rdquo; isn&apos;t tracked yet.</div>
-                <button
-                  onClick={generateCity}
-                  disabled={genState === 'loading'}
-                  style={{ background: 'rgba(16,185,129,.08)', border: '1px solid rgba(16,185,129,.35)', color: 'var(--green)', borderRadius: 8, padding: '.75rem 1.25rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', cursor: genState === 'loading' ? 'wait' : 'pointer' }}
-                >
-                  {genState === 'loading' ? `Scanning live listings near ${locFilter.trim()}…` : `⚡ Generate demand for “${locFilter.trim()}” from live Seen listings`}
-                </button>
-                {genState === 'failed' && genMsg && (
-                  <div style={{ marginTop: '1rem', color: 'var(--amber)', fontSize: 'var(--fs-meta)' }}>{genMsg}</div>
-                )}
+                <p>&ldquo;{locFilter.trim()}&rdquo; isn&apos;t tracked yet.</p>
+                <Button variant="primary" icon="zap" onClick={generateCity} loading={genState === 'loading'}>
+                  {genState === 'loading' ? `Scanning live listings near ${locFilter.trim()}…` : `Build demand for “${locFilter.trim()}” from live listings`}
+                </Button>
+                {genState === 'failed' && genMsg && <p role="alert">{genMsg}</p>}
               </>
             ) : (
-              <>No markets match your filters. Try clearing them — or type a city to generate its live demand.</>
+              <p>No markets match your filters. Clear them, or type a city to build its live demand.</p>
             )}
           </div>
         )}
+
+        <p className={st.fine}>
+          Live markets count open listings on Seen by role family. Modeled markets are estimates from the BLS sector blend, marked &ldquo;~&rdquo;. The demand index (0–100) is a bounded model: for live markets it weighs how fresh and how many the listings are and whether pay is shown; for modeled markets it comes from BLS sector data. It is a model, not a count of people hiring.
+        </p>
       </div>
     </div>
   )

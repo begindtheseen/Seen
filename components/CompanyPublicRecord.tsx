@@ -14,6 +14,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { httpHref } from '@/lib/safeHref.js'
+import Icon from '@/components/ui/Icon'
 
 interface Signal {
   source: string
@@ -65,8 +66,9 @@ export default function CompanyPublicRecord({ companyName }: { companyName: stri
 
   return (
     <div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: '.25rem', display: 'flex', alignItems: 'center', gap: '.5rem' }}>
-        <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--blue)', display: 'inline-block', flexShrink: 0 }} />
+      {/* Section label in ink (DESIGN.md §2) — the accent dot it carried was decoration. */}
+      <div className="ui-eyebrow" style={{ marginBottom: '.25rem', display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+        <Icon name="file-text" size={14} />
         Public records
       </div>
       <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginBottom: '1rem', lineHeight: 1.5 }}>
@@ -78,7 +80,7 @@ export default function CompanyPublicRecord({ companyName }: { companyName: stri
           <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 8, padding: '.75rem 1rem' }}>
             <a href={httpHref(s.source_url) ?? undefined} target="_blank" rel="noopener noreferrer nofollow"
                style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--text-1)', lineHeight: 1.5, textDecoration: 'none', display: 'block' }}>
-              {s.title} <span style={{ color: 'var(--blue)' }}>↗</span>
+              {s.title} <Icon name="arrow-up-right" size={12} className="co-pr-ext" />
             </a>
             {s.detail && (
               <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.55, marginTop: '.5rem' }}>{s.detail}</div>
@@ -87,7 +89,7 @@ export default function CompanyPublicRecord({ companyName }: { companyName: stri
               <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', border: '1px solid var(--line2)', borderRadius: 4, padding: '.125rem .5rem' }}>
                 {s.source_label}
               </span>
-              {s.location && <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>📍 {s.location}</span>}
+              {s.location && <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="map-pin" size={12} />{s.location}</span>}
               {s.event_date && <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>{relativeDate(s.event_date)}</span>}
             </div>
           </div>

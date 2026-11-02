@@ -59,9 +59,11 @@
 .missingTitle { margin: 0; font-family: var(--display); font-weight: 700; font-size: var(--fs-h3); color: var(--text-1); }
 
 .foot { position: sticky; bottom: 0; z-index: 10; background: var(--surface-overlay); border-top: 1px solid var(--border-2); padding: var(--sp-3) var(--sp-4) calc(var(--sp-3) + env(safe-area-inset-bottom, 0px)); }
-.footIn { max-width: var(--w-narrow); margin: 0 auto; display: flex; flex-direction: column; gap: var(--sp-2); }
-.check { align-self: center; }
-.footRow { display: flex; gap: var(--sp-2); align-items: stretch; }
+/* The phone tab bar is fixed over the bottom 64px: the sticky bar stops above it, not under it. */
+@media (max-width: 768px) { :global(html.tabbar) .foot { bottom: calc(64px + env(safe-area-inset-bottom, 0px)); padding-bottom: var(--sp-3); } }
+.inlineActions { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: 0 0 var(--sp-4); }
+.check { flex: 0 1 auto; min-width: 0; max-width: 44%; }
+.footRow { max-width: var(--w-narrow); margin: 0 auto; display: flex; gap: var(--sp-2); align-items: stretch; }
 .grow { flex: 1 1 0; min-width: 0; }
 .iconBtn { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; width: 44px; min-height: 44px; border-radius: var(--r-control); border: 1px solid var(--border-2); background: transparent; color: var(--text-3); cursor: pointer; }
 .iconBtn:hover { color: var(--text-1); border-color: var(--border-3); }

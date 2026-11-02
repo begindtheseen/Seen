@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, type ReactNode } from 'react'
+import Icon from '@/components/ui/Icon'
 import type { AdminStats, RecentReport, Issue, RedditDispute, RedditDisputeCounts, ListingDispute, ListingDisputeCounts, ListingDisputeApplied, ListingTicket, InactiveReport, DupCluster, RecentJob, JobGroup, DupGroup, MergePrefill, MergeLog, FeatureFlag } from './types'
 import { Card, CardHeader, Badge, relTime, outcomeColor, availColor, runRefreshAndClear, runClearStale, refreshResultMsg } from './primitives'
 import { clearStaleMessage } from './clearStale'
@@ -74,7 +75,7 @@ export function JobCrisisBanner({
     >
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-body)', color: 'var(--red)', letterSpacing: '-.01em', marginBottom: '.25rem' }}>
-          ⚠️ JOB CRISIS — only {health.active.toLocaleString()} active listings
+          <Icon name="triangle-alert" size={16} /> JOB CRISIS — only {health.active.toLocaleString()} active listings
         </div>
         <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5 }}>
           {health.stale.toLocaleString()} stale, {stalePct}% of corpus unavailable. Auto-refresh recommended.
@@ -103,7 +104,7 @@ export function JobCrisisBanner({
           opacity: running ? 0.7 : 1,
         }}
       >
-        {running ? '⏳ Refreshing…' : 'Run emergency refresh →'}
+        {running ? <><Icon name="hourglass" size={14} /> Refreshing…</> : 'Run emergency refresh →'}
       </button>
     </div>
   )
@@ -141,14 +142,14 @@ const JOB_DEFS = [
 
 export function JobRunner({ token }: { token: string }) {
   const [running, setRunning] = useState<string | null>(null)
-  const [label, setLabel] = useState<Record<string, string>>({})
+  const [label, setLabel] = useState<Record<string, ReactNode>>({})
   const [result, setResult] = useState('')
 
   function hdrs() { return { 'Content-Type': 'application/json', 'X-Admin-Token': token } }
 
   async function run(job: string) {
     setRunning(job)
-    setLabel(l => ({ ...l, [job]: '⏳ Running…' }))
+    setLabel(l => ({ ...l, [job]: <><Icon name="hourglass" size={14} /> Running…</> }))
     setResult('')
     try {
       const url = job === 'refresh_jobs' ? '/api/refresh-jobs' : '/api/demand'
@@ -609,7 +610,7 @@ export function ListingDisputesPanel({ token }: { token: string }) {
                     employer's dispute against the candidate signal — never one side blind. */}
                 {d.seeker_reports && d.seeker_reports.count > 0 && (
                   <div style={{ marginTop: '.25rem', padding: '.25rem .5rem', border: '1px solid rgba(245,158,11,.3)', borderRadius: 6, background: 'rgba(245,158,11,.06)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--amber)' }}>
-                    👤 Seeker side: {d.seeker_reports.count} report{d.seeker_reports.count === 1 ? '' : 's'} on this listing
+                    <Icon name="user" size={14} /> Seeker side: {d.seeker_reports.count} report{d.seeker_reports.count === 1 ? '' : 's'} on this listing
                     {d.seeker_reports.expired > 0 ? ` · ${d.seeker_reports.expired} say inactive` : ''}
                     {d.seeker_reports.unknown > 0 ? ` · ${d.seeker_reports.unknown} unsure` : ''}
                     {d.kind === 'still_active' ? ' — approving clears these reports; denying lets them stand.' : ''}
@@ -736,18 +737,18 @@ export function ListingTicketsPanel({ token }: { token: string }) {
             {/* Seeker side */}
             {rep && rep.count > 0 && (
               <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--amber)', marginBottom: '.25rem' }}>
-                👤 Seeker: {rep.count} report{rep.count === 1 ? '' : 's'}{rep.expired > 0 ? ` · ${rep.expired} say inactive` : ''}{rep.unknown > 0 ? ` · ${rep.unknown} unsure` : ''}
+                <Icon name="user" size={14} /> Seeker: {rep.count} report{rep.count === 1 ? '' : 's'}{rep.expired > 0 ? ` · ${rep.expired} say inactive` : ''}{rep.unknown > 0 ? ` · ${rep.unknown} unsure` : ''}
               </div>
             )}
             {/* Employer side */}
             {d ? (
               <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '.25rem' }}>
-                🏢 Employer: <span style={{ color: listingKindColor(d.kind) }}>{LISTING_KIND_LABEL[d.kind] || d.kind}</span>{d.status !== 'open' ? ` · ${d.status}` : ''} — {d.detail}
+                <Icon name="building-2" size={14} /> Employer: <span style={{ color: listingKindColor(d.kind) }}>{LISTING_KIND_LABEL[d.kind] || d.kind}</span>{d.status !== 'open' ? ` · ${d.status}` : ''} — {d.detail}
                 {pcEntries.length > 0 && <span style={{ color: 'var(--blue)' }}> · proposes: {pcEntries.map(([k, v]) => `${k}=${String(v)}`).join(', ')}</span>}
                 {d.admin_note && <span style={{ color: 'var(--muted)' }}> · note: {d.admin_note}</span>}
               </div>
             ) : (
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginBottom: '.25rem' }}>🏢 No employer dispute filed.</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginBottom: '.25rem' }}><Icon name="building-2" size={14} /> No employer dispute filed.</div>
             )}
 
             {isUuid && <a href={`/jobs/${encodeURIComponent(t.job_id)}`} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none' }}>↗ View listing</a>}
@@ -1641,11 +1642,11 @@ export function JobDedupePanel({ token }: { token: string }) {
       />
       <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginBottom: msg ? '.65rem' : 0 }}>
         <button onClick={scan} disabled={scanning || deduping} style={{ ...btnBase, borderColor: 'var(--blue)', color: 'var(--blue)' }}>
-          {scanning ? '⏳ Scanning…' : '⟳ Scan for dupes'}
+          {scanning ? <><Icon name="hourglass" size={14} /> Scanning…</> : '⟳ Scan for dupes'}
         </button>
         {suspected !== null && suspected > 0 && (
           <button onClick={dedupe} disabled={deduping || scanning} style={{ ...btnBase, borderColor: 'var(--red)', color: 'var(--red)' }}>
-            {deduping ? '⏳ Removing…' : `✕ Remove ${suspected} dupe${suspected !== 1 ? 's' : ''}`}
+            {deduping ? <><Icon name="hourglass" size={14} /> Removing…</> : `✕ Remove ${suspected} dupe${suspected !== 1 ? 's' : ''}`}
           </button>
         )}
       </div>
@@ -1670,7 +1671,7 @@ export function JobDedupePanel({ token }: { token: string }) {
           <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)' }}>Min listings per search</span>
           <input type="number" min={5} max={60} value={target} onChange={e => setTarget(e.target.value)}
             style={{ width: 64, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 6, padding: '.25rem .5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', outline: 'none' }} />
-          <button onClick={saveTarget} disabled={targetSaving} style={{ ...btnBase, borderColor: 'var(--green)', color: 'var(--green)' }}>{targetSaving ? '⏳ Saving…' : 'Save'}</button>
+          <button onClick={saveTarget} disabled={targetSaving} style={{ ...btnBase, borderColor: 'var(--green)', color: 'var(--green)' }}>{targetSaving ? <><Icon name="hourglass" size={14} /> Saving…</> : 'Save'}</button>
         </div>
         <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.5rem' }}>
           If a search has fewer related listings than this, Seen pulls more from online and stores them. Higher = aggregate harder; lower = calm it down. (5–60)
@@ -1929,7 +1930,7 @@ export function DeployPanel() {
           letterSpacing: '-.01em', textAlign: 'left' as const,
         }}
       >
-        {deploying ? '⏳ Deploying…' : saved ? '🚀 Deploy latest Claude changes →' : '⚙ Paste deploy hook URL above to enable'}
+        {deploying ? <><Icon name="hourglass" size={14} /> Deploying…</> : saved ? 'Deploy latest Claude changes →' : '⚙ Paste deploy hook URL above to enable'}
         {saved && !deploying && (
           <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 400, color: 'var(--sub)', marginTop: '.25rem' }}>
             Pushes all Claude commits live in ~1 min

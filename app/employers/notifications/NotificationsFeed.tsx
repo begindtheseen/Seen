@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { pacificParts } from '@/lib/time/pacific.js';
+import Icon, { type IconName } from '@/components/ui/Icon'
 
 // Renders the derived employer feed. The server component owns the fetch + derivation
 // (lib/server/employerNotifications.js); this component owns presentation and two client-only
@@ -69,12 +70,12 @@ function relTime(iso: string | null, nowMs: number): string {
   return `${mo}mo ago`
 }
 
-const KIND_META: Record<FeedItem['kind'], { icon: string; color: string; ring: string; label: string }> = {
-  posting_expired: { icon: '🛑', color: 'var(--red)', ring: 'rgba(239,68,68,.28)', label: 'Dropped off' },
-  posting_stale: { icon: '⏳', color: 'var(--amber)', ring: 'rgba(245,158,11,.28)', label: 'Dropping off soon' },
-  posting_nearing_stale: { icon: '⏳', color: 'var(--amber)', ring: 'rgba(245,158,11,.22)', label: 'Aging off' },
-  posting_expiring: { icon: '📅', color: 'var(--amber)', ring: 'rgba(245,158,11,.25)', label: 'Expiring — repost' },
-  new_applicants: { icon: '👥', color: 'var(--blue)', ring: 'rgba(59,130,246,.26)', label: 'New applicants' },
+const KIND_META: Record<FeedItem['kind'], { icon: IconName; color: string; ring: string; label: string }> = {
+  posting_expired: { icon: 'circle-x', color: 'var(--red)', ring: 'rgba(239,68,68,.28)', label: 'Dropped off' },
+  posting_stale: { icon: 'hourglass', color: 'var(--amber)', ring: 'rgba(245,158,11,.28)', label: 'Dropping off soon' },
+  posting_nearing_stale: { icon: 'hourglass', color: 'var(--amber)', ring: 'rgba(245,158,11,.22)', label: 'Aging off' },
+  posting_expiring: { icon: 'calendar', color: 'var(--amber)', ring: 'rgba(245,158,11,.25)', label: 'Expiring — repost' },
+  new_applicants: { icon: 'users', color: 'var(--blue)', ring: 'rgba(59,130,246,.26)', label: 'New applicants' },
 }
 
 const STORAGE_PREFIX = 'seen:employer-notifs:lastvisit:'
@@ -146,7 +147,7 @@ export function NotificationsFeed({
                 padding: '1rem 1.25rem',
               }}
             >
-              <span style={{ fontSize: 'var(--fs-lead)', lineHeight: 1.2, flexShrink: 0 }} aria-hidden>{meta.icon}</span>
+              <span style={{ color: meta.color, display: 'inline-flex', flexShrink: 0 }} aria-hidden><Icon name={meta.icon} size={18} /></span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '.5rem', flexWrap: 'wrap' }}>
                   <span style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-ui)', fontWeight: 700, color: 'var(--white)' }}>{it.title}</span>

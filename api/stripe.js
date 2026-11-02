@@ -368,6 +368,7 @@ export default async function handler(req, res) {
     const origin = req.headers.origin || 'https://seenjobs.io';
     const form = new URLSearchParams({
       'payment_method_types[]': 'card',
+      'adaptive_pricing[enabled]': 'false', // prices are in USD; never re-present them in the buyer's local currency
       'line_items[0][quantity]': '1',
       mode: 'payment',
       success_url: `${origin}/employers?purchased=${skuKey}&session_id={CHECKOUT_SESSION_ID}`,
@@ -449,6 +450,7 @@ export default async function handler(req, res) {
 
     const form = new URLSearchParams({
       'payment_method_types[]': 'card',
+      'adaptive_pricing[enabled]': 'false', // prices are in USD; never re-present them in the buyer's local currency
       'line_items[0][quantity]': '1',
       client_reference_id: uid,
       cancel_url: `${origin}/pricing`,

@@ -43,8 +43,8 @@ export default async function CompareSlugsPage({ params }: { params: Promise<{ s
   if (!parsed) {
     return (
       <div className="page-full"><div style={wrap}>
-        <h1 style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)' }}>Compare companies</h1>
-        <p style={{ color: 'var(--sub)' }}>Use the format <code>/compare/amazon-vs-google</code>, or <Link href="/compare" style={{ color: 'var(--blue)' }}>pick two companies</Link>.</p>
+        <h1 style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--text-1)' }}>Compare companies</h1>
+        <p style={{ color: 'var(--text-3)' }}>Use the format <code>/compare/amazon-vs-google</code>, or <Link href="/compare" style={{ color: 'var(--accent)' }}>pick two companies</Link>.</p>
       </div></div>
     )
   }
@@ -72,13 +72,13 @@ export default async function CompareSlugsPage({ params }: { params: Promise<{ s
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }} />
       <div style={wrap}>
         <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.2em', color: 'var(--text-3)', marginBottom: '.75rem', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ width: 20, height: 1, background: 'var(--blue)', display: 'inline-block' }} />
+          <span style={{ width: 20, height: 1, background: 'currentColor', display: 'inline-block' }} />
           Compare
         </div>
-        <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.5rem,5vw,2.2rem)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', lineHeight: 1.1, margin: '0 0 .75rem' }}>
+        <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.5rem,5vw,2.2rem)', fontWeight: 800, color: 'var(--text-1)', letterSpacing: '-.03em', lineHeight: 1.1, margin: '0 0 .75rem' }}>
           {aName} vs {bName}: hiring transparency
         </h1>
-        <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-body)', lineHeight: 1.7, fontWeight: 400, margin: '0 0 2rem' }}>
+        <p style={{ color: 'var(--text-3)', fontSize: 'var(--fs-body)', lineHeight: 1.7, fontWeight: 400, margin: '0 0 2rem' }}>
           {answer} {(a && b && pct(a.ghost_rate) != null && pct(b.ghost_rate) != null) ? `Ghost rates: ${aName} ${pct(a.ghost_rate)}% vs ${bName} ${pct(b.ghost_rate)}%.` : 'Add your experience to fill the gaps.'}
         </p>
 
@@ -91,8 +91,8 @@ export default async function CompareSlugsPage({ params }: { params: Promise<{ s
           <ComparePicker initialA={aName} initialB={bName} />
         </div>
 
-        <p style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '1.5rem', lineHeight: 1.7 }}>
-          Seen Grades are community signals from applicant accounts, not verified facts. Track your application in the <Link href="/tracker" style={{ color: 'var(--blue)' }}>tracker</Link> or <Link href="/report" style={{ color: 'var(--blue)' }}>report an outcome</Link>.
+        <p style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--text-4)', marginTop: '1.5rem', lineHeight: 1.7 }}>
+          Seen Grades are community signals from applicant accounts, not verified facts. Track your application in the <Link href="/tracker" style={{ color: 'var(--accent)' }}>tracker</Link> or <Link href="/report" style={{ color: 'var(--accent)' }}>report an outcome</Link>.
         </p>
       </div>
     </div>

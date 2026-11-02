@@ -2,15 +2,26 @@ import type { Metadata } from 'next'
 import { pageMetadata } from '@/lib/seo'
 import Link from 'next/link'
 import { getLeaderboard, getScoresByNames, slugify, grade, type LeaderboardRow } from '@/lib/growth'
-import { gradeTone, toneText, ghostRateTone, responseRateTone } from '@/lib/ui/tone.js'
+import { gradeTone, toneText, ghostRateTone, ghostRateWord, responseRateTone, responseRateWord } from '@/lib/ui/tone.js'
 import { STAFFING_AGENCIES } from '@/lib/agencies'
 import { assembleGhostReport, pickHeadline, weekProvenance } from '@/lib/server/ghostReport'
+import { displayCompanyName } from '@/lib/companyDisplay'
+import PageHeader from '@/components/shell/PageHeader'
+import Badge from '@/components/ui/Badge'
+import Button from '@/components/ui/Button'
+import Icon from '@/components/ui/Icon'
+import StatTile from '@/components/ui/StatTile'
+import st from './ghost.module.css'
 
 // The Weekly Ghost Report — the amplifier engine's flagship, auto-generated public data story
 // (playbook/CONTENT_ENGINE.md). Server component + hourly ISR, reading cached scores DIRECTLY
 // from Supabase via lib/growth (never a self-fetch of the live API — see lib/growth.ts). Every
 // number is computed by lib/server/ghostReport.js, which ranks ONLY rows with real applicant
 // reports and never fabricates a figure. The link's share card is app/ghost-report/opengraph-image.
+//
+// Design review 2026-11-02: the headline is ONE short line; the generated sentence (pickHeadline, the
+// postable line) is the lede in body type. Figures are ink; the only toned figure is the one a threshold
+// decides (lib/ui/tone.js ghostRateTone), and it carries its word and icon.
 
 export const revalidate = 3600
 
@@ -24,9 +35,6 @@ export const metadata: Metadata = pageMetadata({
   // This segment ships its own share card (app/ghost-report/opengraph-image.tsx); file-based images win.
   image: { url: '/ghost-report/opengraph-image', width: 1200, height: 630, alt: 'The Weekly Ghost Report on Seen' },
 })
-
-const wrap = { maxWidth: 760, margin: '0 auto', padding: '3.5rem 1.25rem 5rem', width: '100%', boxSizing: 'border-box' as const }
-const mono = (size: string, color: string): React.CSSProperties => ({ fontFamily: 'var(--mono)', fontSize: size, color })
 
 // weekProvenance (the "week of …" label + rotation seed) is shared from lib/server/ghostReport so
 // the public page, the admin panel, and the OG card all resolve the SAME week and headline.
@@ -46,32 +54,27 @@ async function loadRows(): Promise<{ rows: LeaderboardRow[]; agencyNames: string
 
 type Ranked = ReturnType<typeof assembleGhostReport>['worstOffenders'][number]
 
-function Stat({ value, label, color }: { value: string; label: string; color: string }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '.25rem', minWidth: 0 }}>
-      <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-fig)', fontWeight: 600, color, lineHeight: 1 }}>{value}</div>
-      <div style={mono('var(--fs-meta)', 'var(--dim)')}>{label}</div>
-    </div>
-  )
-}
-
+// One ranked company: letter (toned by the grade), name, the two rates as badges that carry their word
+// and icon (lib/ui/tone.js), and the evidence count — the same row the agencies index uses.
 function OffenderRow({ r, rank }: { r: Ranked; rank: number }) {
-  const accent = toneText(gradeTone(r.overallScore))
+  const letterTone = gradeTone(r.overallScore)
+  const gTone = r.ghostPct != null ? ghostRateTone(r.ghostPct / 100) : null
+  const rTone = r.replyPct != null ? responseRateTone(r.replyPct / 100) : null
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '.75rem 1rem', marginBottom: '.5rem' }}>
-      <div style={{ ...mono('var(--fs-meta)', 'var(--muted)'), minWidth: 40, textAlign: 'right', flexShrink: 0 }}>{rank}</div>
-      <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-xl)', fontWeight: 600, color: accent, minWidth: 36, textAlign: 'center', flexShrink: 0 }}>{grade(r.overallScore)}</div>
-      <div style={{ minWidth: 0, flex: 1 }}>
-        <Link href={`/company/${slugify(r.name)}`} style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', textDecoration: 'none', textTransform: 'capitalize' }}>{r.name}</Link>
-        <div style={{ ...mono('var(--fs-meta)', 'var(--dim)'), marginTop: '.125rem' }}>
-          {r.reportCount.toLocaleString()} report{r.reportCount !== 1 ? 's' : ''}
-          {r.isAgency ? ' · staffing agency' : ''}
-          {r.thin ? ' · early signal — low confidence' : ''}
+    <div className={st.row}>
+      <div className={st.rank}>{rank}</div>
+      <div className={st.letter} style={{ color: toneText(letterTone) }}>{grade(r.overallScore)}</div>
+      <div className={st.main}>
+        <Link href={`/company/${slugify(r.name)}`} prefetch={false} className={st.name}>{displayCompanyName(r.name)}</Link>
+        <div className={st.rates}>
+          {r.ghostPct != null && gTone && <Badge tone={gTone}>{r.ghostPct}% ghost · {ghostRateWord(gTone).toLowerCase()}</Badge>}
+          {r.replyPct != null && rTone && <Badge tone={rTone}>{r.replyPct}% reply · {responseRateWord(rTone).toLowerCase()}</Badge>}
         </div>
-      </div>
-      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-        {r.ghostPct != null && <div style={mono('var(--fs-meta)', toneText(ghostRateTone(r.ghostPct / 100)))}>{r.ghostPct}% ghost</div>}
-        {r.replyPct != null && <div style={mono('var(--fs-meta)', toneText(responseRateTone(r.replyPct / 100)))}>{r.replyPct}% reply</div>}
+        <div className={st.meta}>
+          {r.reportCount.toLocaleString()} applicant account{r.reportCount !== 1 ? 's' : ''}
+          {r.isAgency ? ' · staffing agency' : ''}
+          {r.thin ? ' · early signal, low confidence' : ''}
+        </div>
       </div>
     </div>
   )
@@ -83,78 +86,74 @@ export default async function GhostReportPage() {
   const { rows, agencyNames } = await loadRows()
   const report = assembleGhostReport(rows, { agencyNames, weekLabel, weekNumber, topN: 5 })
   const h = report.headline
-  const headline = pickHeadline(report)
+  const lede = pickHeadline(report)
+  const avgGhostTone = h.avgGhostRatePct != null ? ghostRateTone(h.avgGhostRatePct / 100) : null
 
   return (
     <div className="page-full">
-      <div style={wrap}>
-        <div style={{ ...mono('var(--fs-meta)', 'var(--blue)'), textTransform: 'uppercase', letterSpacing: '.2em', marginBottom: '.75rem', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ width: 20, height: 1, background: 'var(--blue)', display: 'inline-block' }} />
-          Weekly Ghost Report · {weekLabel} · updates hourly
-        </div>
-        <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.7rem,5.5vw,2.5rem)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', lineHeight: 1.08, margin: '0 0 1rem' }}>
-          {headline}
-        </h1>
+      <div className={st.wrap}>
+        <PageHeader
+          size="lg"
+          eyebrow={<>Weekly Ghost Report · {weekLabel}</>}
+          title="This week's ghost report"
+          crumbLabel="Ghost report"
+          sub={lede}
+        />
 
         {report.hasReported ? (
           <>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem 2rem', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.25rem 1.5rem', margin: '1.25rem 0 2.5rem' }}>
-              <Stat value={h.reportsTotal.toLocaleString()} label="applicant accounts" color="var(--white)" />
-              <Stat value={String(h.companiesTracked)} label="companies with reports" color="var(--white)" />
-              {h.avgGhostRatePct != null && <Stat value={`${h.avgGhostRatePct}%`} label="avg reported ghost rate" color="var(--red)" />}
-              {h.avgWaitDays != null && <Stat value={`${h.avgWaitDays}d`} label="avg reported wait to silence" color="var(--amber)" />}
-              {h.agenciesTracked > 0 && <Stat value={String(h.agenciesTracked)} label="staffing agencies tracked" color="var(--blue)" />}
+            {/* Figures are ink. The average ghost rate is the one reading a threshold decides, so it alone
+                carries a tone — with its word and icon. "In this report" = the companies ranked here, not
+                every company on Seen (the homepage and /data total different sets). */}
+            <div className={st.stats}>
+              <StatTile label="Applicant accounts" value={h.reportsTotal} note="in this report" instant />
+              <StatTile label="Companies" value={h.companiesTracked} note="with reports" instant />
+              {h.avgGhostRatePct != null && <StatTile label="Avg ghost rate" value={h.avgGhostRatePct} suffix="%" tone={avgGhostTone} toneWord={ghostRateWord(avgGhostTone)} note="reported" instant />}
+              {h.avgWaitDays != null && <StatTile label="Avg wait to silence" value={h.avgWaitDays} suffix="d" note="reported" instant />}
+              {h.agenciesTracked > 0 && <StatTile label="Staffing agencies" value={h.agenciesTracked} note="tracked" instant />}
             </div>
 
             {report.agencySpotlight && (
-              <div style={{ background: 'var(--bad-tint)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 12, padding: '1rem 1.25rem', marginBottom: '2rem' }}>
-                <div style={{ ...mono('var(--fs-meta)', 'var(--red)'), textTransform: 'uppercase', letterSpacing: '.15em', marginBottom: '.5rem' }}>Agency spotlight</div>
-                <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', lineHeight: 1.5 }}>
-                  <span style={{ textTransform: 'capitalize' }}>{report.agencySpotlight.name}</span> is the most-reported ghosting staffing agency this week — {report.agencySpotlight.ghostPct}% of {report.agencySpotlight.reportCount.toLocaleString()} reported applications got no response at all.
-                </div>
-                <Link href="/agencies" style={{ ...mono('var(--fs-meta)', 'var(--blue)'), textDecoration: 'none', display: 'inline-block', marginTop: '.5rem' }}>See the full staffing-agency ghost index →</Link>
+              <div className={st.spot}>
+                <Badge tone="bad" icon="ghost">Agency spotlight</Badge>
+                <p className={st.spotText}>
+                  {displayCompanyName(report.agencySpotlight.name)} is the most-reported ghosting staffing agency this week — {report.agencySpotlight.ghostPct}% of {report.agencySpotlight.reportCount.toLocaleString()} reported applications got no response at all.
+                </p>
+                <Link href="/agencies" prefetch={false} className={st.spotLink}>See the full staffing-agency ghost index <Icon name="arrow-right" size={14} /></Link>
               </div>
             )}
 
             {report.worstOffenders.length > 0 && (
-              <section style={{ marginBottom: '2.5rem' }}>
-                <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', margin: '0 0 .25rem' }}>Most-reported ghosters</h2>
-                <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 400 }}>Ranked by reported ghost rate among companies with real applicant accounts. No reports, no number.</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-                {report.worstOffenders.map((r, i) => (
-                <OffenderRow key={r.name} r={r} rank={i + 1} />
-                ))}
-                </div>
-                </section>
-                )}
+              <section className={st.section}>
+                <h2 className={st.h2}>Most-reported ghosters</h2>
+                <p className={st.lede}>Ranked by reported ghost rate among companies with real applicant accounts. No reports, no number.</p>
+                {report.worstOffenders.map((r, i) => <OffenderRow key={r.name} r={r} rank={i + 1} />)}
+              </section>
+            )}
 
-                {report.responseLeaders.length > 0 && (
-                <section style={{ marginBottom: '2.5rem' }}>
-                <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', margin: '0 0 .25rem' }}>Actually replies</h2>
-                <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 400 }}>The companies applicants reported hearing back from most — proof that responding is a choice.</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-                {report.responseLeaders.map((r, i) => (
-                <OffenderRow key={r.name} r={r} rank={i + 1} />
-                ))}
-                </div>
-                </section>
-                )}
+            {report.responseLeaders.length > 0 && (
+              <section className={st.section}>
+                <h2 className={st.h2}>Actually replies</h2>
+                <p className={st.lede}>The companies applicants reported hearing back from most — proof that responding is a choice.</p>
+                {report.responseLeaders.map((r, i) => <OffenderRow key={r.name} r={r} rank={i + 1} />)}
+              </section>
+            )}
           </>
         ) : (
-          <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.5rem', margin: '1.5rem 0 2.5rem' }}>
-            <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-ui)', lineHeight: 1.7, fontWeight: 400, margin: 0 }}>
+          <div className={st.waiting}>
+            <p>
               The report is waiting on its first substantial batch of applicant outcomes. The framework is live — every report you submit becomes a data point in next week&apos;s edition. We&apos;ll never print a number we don&apos;t have.
             </p>
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', margin: '0 0 2.5rem' }}>
-          <Link href="/report?outcome=ghosted" className="btn" style={{ background: 'var(--cta)', color: 'var(--text-1)', padding: '.75rem 1.25rem', fontWeight: 800 }}>Been ghosted? Add it — 2 min →</Link>
-          <Link href="/agencies" className="btn btn-ghost" style={{ padding: '.75rem 1.25rem' }}>The full ghost index</Link>
+        <div className={st.actions}>
+          <Button href="/report?outcome=ghosted" variant="primary" size="lg" prefetch={false}>Been ghosted? Add it — 2 min →</Button>
+          <Button href="/agencies" variant="ghost" size="lg" prefetch={false}>The full ghost index</Button>
         </div>
 
-        <p style={{ ...mono('var(--fs-meta)', 'var(--dim)'), lineHeight: 1.7 }}>
-          Methodology: applicant-reported outcomes, trust-weighted, aggregated with public hiring signals into a 0–100 Seen Grade. These are community signals, not verified facts, and update hourly as reports arrive. Percentages appear only where applicants have actually reported outcomes; companies with no reports show no number — Seen never fabricates a rate. Report counts include outcomes submitted to Seen and outcomes shared publicly in discussion threads or on review sites (labeled and down-weighted); web-research estimates are never counted as reports. Where reports are few, rates can be blended with a public-data baseline and are marked low confidence.
+        <p className={st.fine}>
+          Methodology: applicant-reported outcomes, trust-weighted, aggregated with public hiring signals into a 0–100 Seen Grade. These are community signals, not verified facts, and update as reports arrive. Percentages appear only where applicants have actually reported outcomes; companies with no reports show no number — Seen never fabricates a rate. Report counts include outcomes submitted to Seen and outcomes shared publicly in discussion threads or on review sites (labeled and down-weighted); web-research estimates are never counted as reports. Where reports are few, rates can be blended with a public-data baseline and are marked low confidence.
         </p>
       </div>
     </div>

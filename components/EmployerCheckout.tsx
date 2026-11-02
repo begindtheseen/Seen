@@ -34,7 +34,7 @@ export function EmployerPurchaseConfirm() {
   return (
     <div style={{ background: 'var(--good-tint)', border: '1px solid rgba(16,185,129,.35)', borderRadius: 14, padding: '1.25rem 1.5rem', marginBottom: '2rem', textAlign: 'center' }}>
       <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', marginBottom: '.25rem' }}>
-        {state === 'pending' ? 'Confirming your purchase…' : `🎉 You're in — ${name} is booked.`}
+        {state === 'pending' ? 'Confirming your purchase…' : `You're in — ${name} is booked.`}
       </div>
       <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6 }}>
         {state === 'pending' ? 'One moment while we confirm your payment…' : okCopy}
@@ -118,7 +118,7 @@ export function EmployerCheckout() {
                   {company.trim() ? <Link href={`/employers/dashboard?company=${encodeURIComponent(company.trim())}`} style={{ color: 'var(--sub)' }}>See what Seen has for “{company.trim()}” →</Link> : null}
                 </div>
                 {err && <div role="alert" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--red)' }}>{err}</div>}
-                <button type="submit" disabled={busy} style={{ ...btn, opacity: busy ? .6 : 1 }}>{busy ? 'Starting…' : `Continue to payment — ${price} →`}</button>
+                <button type="submit" disabled={busy} style={{ ...btn, background: 'var(--cta)', borderColor: 'var(--cta)', color: 'var(--text-1)', opacity: busy ? .6 : 1 }}>{busy ? 'Starting…' : `Continue to payment — ${price} →`}</button>
                 <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.6, textAlign: 'center' }}>
                   One-time payment via Stripe, no account. By continuing you agree to the <Link href="/terms#employer" style={{ color: 'var(--sub)' }}>employer terms</Link>; payments never change a score.
                 </div>
@@ -138,8 +138,10 @@ const inp: React.CSSProperties = {
   background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem .75rem',
   fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', outline: 'none', width: '100%', boxSizing: 'border-box',
 }
+// Outlined: /employers has ONE filled button (the claim panel's), so a pricing card's action is ink on a
+// bordered surface (DESIGN.md §5). Body 600 — never the display face on a control (§3).
 const btn: React.CSSProperties = {
-  display: 'block', width: '100%', textAlign: 'center', background: 'var(--cta)',
-  border: 'none', borderRadius: 8, padding: '.75rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)',
-  color: 'var(--text-1)', cursor: 'pointer',
+  display: 'block', width: '100%', textAlign: 'center', background: 'var(--surface-2)',
+  border: '1px solid var(--border-2)', borderRadius: 10, padding: '.75rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)',
+  color: 'var(--text-1)', cursor: 'pointer', minHeight: 44,
 }

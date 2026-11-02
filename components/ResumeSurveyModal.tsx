@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import Icon from '@/components/ui/Icon'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import ModalPortal from '@/components/ModalPortal'
@@ -301,7 +302,7 @@ export default function ResumeSurveyModal({ onClose, onCreditsEarned, onExhauste
 
           {phase === 'error' && (
             <div style={{ padding: '2rem 1.5rem', textAlign: 'center' }}>
-              <div style={{ fontSize: 'var(--fs-h2)', marginBottom: '1rem' }}>⚠️</div>
+              <div style={{ fontSize: 'var(--fs-h2)', marginBottom: '1rem' }}><Icon name="triangle-alert" /></div>
               <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-body)', fontWeight: 600, color: 'var(--white)', marginBottom: '.5rem' }}>Something went wrong</div>
               <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1.5rem' }}>Tap retry to try again.</div>
               <button onClick={loadSurvey} style={{ background: 'var(--cta)', border: 'none', color: 'var(--text-1)', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', borderRadius: 8, padding: '.5rem 1.25rem', cursor: 'pointer', marginBottom: '0.5rem', width: '100%' }}>Retry →</button>

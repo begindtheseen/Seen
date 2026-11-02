@@ -8,6 +8,7 @@ import { ResumeStore } from '@/lib/stores/ResumeStore'
 import { ResumeDocStore } from '@/lib/stores/ResumeDocStore'
 import type { ResumeDoc } from '@/lib/resume/types'
 import { SavedJobsStore } from '@/lib/stores/SavedJobs'
+import { _sync } from '@/lib/sync'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { parseResumeFile } from '@/lib/resumeUploadClient'
@@ -25,6 +26,7 @@ import { RESUME_OPTIMIZE_COST, creditCostLabel, priceLabel, MAX_RESUMES_PRO } fr
 import { markQuiet } from '@/lib/quietWindow'
 import { MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
 import PageHeader from '@/components/shell/PageHeader'
+import Icon, { type IconName } from '@/components/ui/Icon'
 import { replaceParam, readParam, useScrollMemory } from '@/lib/nav/urlState'
 import ResumeLibraryPanel from '@/components/resume/ResumeLibraryPanel'
 import ResumePicker from '@/components/resume/ResumePicker'
@@ -144,11 +146,19 @@ const inputStyle: React.CSSProperties = {
   padding: '.5rem 1rem', color: 'var(--white)', fontFamily: 'var(--body)', fontSize: 'var(--fs-ui)',
   outline: 'none', caretColor: 'var(--blue)', marginBottom: '.75rem', boxSizing: 'border-box',
 }
+// The filled button (one per screen) and the outlined second action. Both the body face at 600 — the
+// display face is for headings only (DESIGN.md §3).
 const btnPrimary: React.CSSProperties = {
   background: 'var(--cta)', color: 'var(--text-1)', border: 'none', borderRadius: 8,
-  padding: '.75rem 1.25rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)',
+  padding: '.75rem 1.25rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-ui)',
   cursor: 'pointer', boxShadow: 'var(--sh-control)', width: '100%',
 }
+const btnOutlined: React.CSSProperties = {
+  background: 'var(--surface-2)', color: 'var(--text-1)', border: '1px solid var(--border-2)', borderRadius: 8,
+  padding: '.75rem 1.25rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-ui)',
+  cursor: 'pointer', width: '100%',
+}
+const freeLine: React.CSSProperties = { fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.5rem', textAlign: 'center' }
 
 const label = (text: string) => (
   <label style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', textTransform: 'uppercase' as const, letterSpacing: '.08em', color: 'var(--dim)', display: 'block', marginBottom: '.25rem' }}>
@@ -222,7 +232,7 @@ function FitView({ out, intel, jobCompany, insights }: { out: OptimizerOutput; i
           </ul>
         ) : intel && intel.report_count ? (
           <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--accent)', lineHeight: 1.6 }}>
-            📊 Seen data on {jobCompany}: {Math.round((intel.ghost_rate || 0) * 100)}% ghost · {Math.round((intel.response_rate || 0) * 100)}% respond{intel.overall_score != null ? ` · grade ${Math.round(intel.overall_score)}/100` : ''}.
+            Seen data on {jobCompany}: {Math.round((intel.ghost_rate || 0) * 100)}% ghost · {Math.round((intel.response_rate || 0) * 100)}% respond{intel.overall_score != null ? ` · grade ${Math.round(intel.overall_score)}/100` : ''}.
           </div>
         ) : (
           <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--green)' }}>No risk flags — clean signals for this role.</div>
@@ -297,19 +307,19 @@ function RewriteView({ out, copy, copied, onRerun, pro }: { out: PaidOptimize; c
 
 // ═══ STRATEGY — playbook views (reused) ═══
 function CoachResultView({ d }: { d: CoachResult }) {
-  const steps = [
-    { icon: '🔍', title: 'Find the hiring manager', content: d.hiring_manager_script, label: 'LinkedIn message template' },
-    { icon: '⏰', title: 'Apply in the first 24–48 hours', content: d.timing_note, label: 'Why timing matters' },
-    { icon: '🏢', title: 'Company research intel', content: d.company_intel, label: 'What to know before you apply' },
-    { icon: '📄', title: 'Cover letter framework', content: d.cover_letter_framework, label: 'The cover letter that works' },
-    { icon: '🤝', title: 'Referral strategy', content: d.referral_strategy, label: 'How to get a referral' },
+  const steps: Array<{ icon: IconName; title: string; content?: string; label: string }> = [
+    { icon: 'search', title: 'Find the hiring manager', content: d.hiring_manager_script, label: 'LinkedIn message template' },
+    { icon: 'clock', title: 'Apply in the first 24–48 hours', content: d.timing_note, label: 'Why timing matters' },
+    { icon: 'building-2', title: 'Company research intel', content: d.company_intel, label: 'What to know before you apply' },
+    { icon: 'file-text', title: 'Cover letter framework', content: d.cover_letter_framework, label: 'The cover letter that works' },
+    { icon: 'handshake', title: 'Referral strategy', content: d.referral_strategy, label: 'How to get a referral' },
   ]
   return (
     <div style={{ animation: 'fadeUp .3s ease both' }}>
       {steps.filter(s => s.content).map(s => (
         <Card key={s.title}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', marginBottom: '.75rem' }}>
-            <div style={{ width: 28, height: 28, borderRadius: 7, background: 'var(--gdim)', border: '1px solid var(--gmid)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--fs-ui)', flexShrink: 0 }}>{s.icon}</div>
+            <div style={{ width: 28, height: 28, borderRadius: 7, background: 'var(--gdim)', border: '1px solid var(--gmid)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--fs-ui)', flexShrink: 0 }}><Icon name={s.icon} size={14} /></div>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--white)' }}>{s.title}</div>
               <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--muted)' }}>{s.label}</div>
@@ -340,10 +350,10 @@ function ProposalResultView({ d }: { d: ProposalResult }) {
   )
 }
 
-function ResultEmpty({ icon, text, link }: { icon: string; text: string; link?: { href: string; label: string } }) {
+function ResultEmpty({ icon, text, link }: { icon: IconName; text: string; link?: { href: string; label: string } }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 220, color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-72)', textAlign: 'center', gap: '.75rem', whiteSpace: 'pre-line' }}>
-      <div style={{ fontSize: 'var(--fs-fig-m)' }}>{icon}</div>
+      <div style={{ display: 'flex' }}><Icon name={icon} size={32} strokeWidth={1.5} /></div>
       <div>{text}</div>
       {link && <a href={httpHref(link.href) ?? undefined} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--blue)', fontWeight: 600, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}>{link.label}</a>}
     </div>
@@ -648,6 +658,9 @@ function ResumePageInner() {
         await ResumeStore.save(r.text, r.fileName, wc, user?.id, isLoggedIn)
         // Résumé Studio reuses the server's layout-aware parse instead of re-parsing the text.
         if (r.doc) ResumeDocStore.putParsed(user?.id, r.text, r.doc as ResumeDoc)
+        // Settings' city stays empty after an upload that names one (round 1): fill it from the résumé once.
+        const docCity = (r.doc as ResumeDoc | undefined)?.basics?.location?.trim()
+        if (isLoggedIn && !profile?.city && docCity && docCity.length <= 80) void _sync('save_profile', { profile: { city: docCity } }).catch(() => {})
         setResumeText(r.text); setResumeMeta({ fileName: r.fileName, wordCount: wc }); setError('')
         if (resumeList?.ready) void reloadResumes() // the upload replaced the default résumé
       } else {
@@ -899,11 +912,11 @@ function ResumePageInner() {
   const reportHref = `/report?company=${encodeURIComponent(jobCompany)}&role=${encodeURIComponent(jobTitle)}`
 
   const tabs: Array<{ id: Tab; label: string }> = [
-    { id: 'fit', label: '🎯 Fit' },
-    { id: 'rewrite', label: '✍️ Rewrite' },
-    { id: 'humanproof', label: '🗣 HumanProof' },
-    { id: 'strategy', label: '🧠 Strategy' },
-    { id: 'export', label: '📤 Export' },
+    { id: 'fit', label: 'Fit' },
+    { id: 'rewrite', label: 'Rewrite' },
+    { id: 'humanproof', label: 'HumanProof' },
+    { id: 'strategy', label: 'Strategy' },
+    { id: 'export', label: 'Export' },
   ]
 
   return (
@@ -978,7 +991,7 @@ function ResumePageInner() {
               {label('Which job?')}
               {savedJobs.length > 0 ? (
                 <select value={savedId} onChange={e => pickSavedJob(e.target.value)} style={{ ...inputStyle, fontFamily: 'var(--body)', cursor: 'pointer' }}>
-                  <option value="">📌 Choose a saved job…</option>
+                  <option value="">Choose a saved job…</option>
                   {savedJobs.map(s => <option key={String(s.job_id)} value={String(s.job_id)}>{(s.role || 'Role')}{s.company ? ' — ' + s.company : ''}</option>)}
                 </select>
               ) : (
@@ -994,7 +1007,7 @@ function ResumePageInner() {
 
               {companyIntel && (
                 <div style={{ background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 8, padding: '.5rem .75rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', color: 'var(--accent)', marginBottom: '.5rem', lineHeight: 1.6, overflowWrap: 'anywhere' }}>
-                  📊 Seen data on {jobCompany}: {Math.round((companyIntel.ghost_rate || 0) * 100)}% ghost · {Math.round((companyIntel.response_rate || 0) * 100)}% respond{companyIntel.overall_score != null ? ` · grade ${Math.round(companyIntel.overall_score)}/100` : ''}.
+                  Seen data on {jobCompany}: {Math.round((companyIntel.ghost_rate || 0) * 100)}% ghost · {Math.round((companyIntel.response_rate || 0) * 100)}% respond{companyIntel.overall_score != null ? ` · grade ${Math.round(companyIntel.overall_score)}/100` : ''}.
                 </div>
               )}
 
@@ -1019,8 +1032,8 @@ function ResumePageInner() {
 
               <button style={{ ...btnPrimary, opacity: fitState === 'loading' ? 0.6 : 1, cursor: fitState === 'loading' ? 'not-allowed' : 'pointer' }} onClick={analyze} disabled={fitState === 'loading'}>
                 {fitState === 'loading' ? 'Analyzing…' : analyzed ? 'Re-analyze →' : 'Analyze my application →'}
-                <span style={{ marginLeft: '.5rem', fontSize: 'var(--fs-55)', opacity: .65, fontFamily: 'var(--mono)', fontWeight: 400 }}>· free</span>
               </button>
+              <div style={freeLine}>Free — no AI credit used.</div>
             </div>
           </div>
 
@@ -1034,9 +1047,10 @@ function ResumePageInner() {
                   <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-65)', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.75rem' }}>
                     A health score with every weak bullet pinpointed and fixed without inventing a word · a tailored version built only from your own facts · PDF, Word, text, Markdown and JSON Resume exports in three templates, each checked the way a parser reads it.
                   </p>
-                  <Link href="/resume/studio" style={{ ...btnPrimary, display: 'block', textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box' } as React.CSSProperties}>Open Résumé Studio →<span style={{ marginLeft: '.5rem', fontSize: 'var(--fs-55)', opacity: .65, fontFamily: 'var(--mono)', fontWeight: 400 }}>· free</span></Link>
+                  <Link href="/resume/studio" style={{ ...btnOutlined, display: 'block', textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box' } as React.CSSProperties}>Open Résumé Studio →</Link>
+                  <div style={freeLine}>Free.</div>
                 </Card>
-                <ResultEmpty icon="🎯" text={'Your fit score, safe rewrites, a human-sounding pass,\nand the strategy to get through appear here.'} />
+                <ResultEmpty icon="target" text={'Your fit score, safe rewrites, a human-sounding pass,\nand the strategy to get through appear here.'} />
               </>
             ) : (
               <>
@@ -1048,19 +1062,19 @@ function ResumePageInner() {
 
                 {/* FIT */}
                 {tab === 'fit' && (
-                  fitState === 'loading' ? <ResultEmpty icon="⏳" text={'Scoring your fit…'} />
-                  : fitState === 'disabled' ? <ResultEmpty icon="🚧" text={'SeenFit is temporarily unavailable.'} />
-                  : fitState === 'error' ? <div><ResultEmpty icon="⚠️" text={'Could not score your fit. Try again.'} />{fitErrRef && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', color: 'var(--dim)', marginTop: '.25rem' }}>Error ref: {fitErrRef} — share this if it keeps happening.</div>}<button onClick={() => runFit()} style={{ ...btnPrimary, marginTop: '.5rem' }}>Retry</button></div>
-                  : fitState === 'preview' ? <ResultEmpty icon="📄" text={previewLink ? 'Seen could only read a summary of this listing, and its page would not open from here. Open the listing, copy the posting, and paste it into the job description box.' : 'This listing only has a summary. Paste the full posting into the job description box to optimize for it.'} link={previewLink ? { href: previewLink, label: 'Open the listing ↗' } : undefined} />
+                  fitState === 'loading' ? <ResultEmpty icon="hourglass" text={'Scoring your fit…'} />
+                  : fitState === 'disabled' ? <ResultEmpty icon="circle-slash" text={'SeenFit is temporarily unavailable.'} />
+                  : fitState === 'error' ? <div><ResultEmpty icon="triangle-alert" text={'Could not score your fit. Try again.'} />{fitErrRef && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', color: 'var(--dim)', marginTop: '.25rem' }}>Error ref: {fitErrRef} — share this if it keeps happening.</div>}<button onClick={() => runFit()} style={{ ...btnPrimary, marginTop: '.5rem' }}>Retry</button></div>
+                  : fitState === 'preview' ? <ResultEmpty icon="file-text" text={previewLink ? 'Seen could only read a summary of this listing, and its page would not open from here. Open the listing, copy the posting, and paste it into the job description box.' : 'This listing only has a summary. Paste the full posting into the job description box to optimize for it.'} link={previewLink ? { href: previewLink, label: 'Open the listing ↗' } : undefined} />
                   : fitOut ? <FitView out={fitOut} intel={companyIntel} jobCompany={jobCompany} insights={insights} /> : null
                 )}
 
                 {/* REWRITE — the paid plan (a strict superset of the free Fit tab) */}
                 {tab === 'rewrite' && (
-                  fitState === 'loading' || paidState === 'checking' ? <ResultEmpty icon="⏳" text={'Checking for a plan you already built…'} />
-                  : paidState === 'preview' || fitState === 'preview' ? <ResultEmpty icon="📄" text={previewLink ? 'Seen could only read a summary of this listing. Open it, copy the posting, paste it into the job description box — no credit is used for a preview.' : 'This listing only has a summary. Paste the full posting into the job description box to optimize for it — no credit is used for a preview.'} link={previewLink ? { href: previewLink, label: 'Open the listing ↗' } : undefined} />
-                  : paidState === 'no_requirements' ? <ResultEmpty icon="📄" text={paidNote || NO_REQUIREMENTS_NOTE} />
-                  : paidState === 'loading' ? <ResultEmpty icon="✍️" text={'Building your rewrite plan…'} />
+                  fitState === 'loading' || paidState === 'checking' ? <ResultEmpty icon="hourglass" text={'Checking for a plan you already built…'} />
+                  : paidState === 'preview' || fitState === 'preview' ? <ResultEmpty icon="file-text" text={previewLink ? 'Seen could only read a summary of this listing. Open it, copy the posting, paste it into the job description box — no credit is used for a preview.' : 'This listing only has a summary. Paste the full posting into the job description box to optimize for it — no credit is used for a preview.'} link={previewLink ? { href: previewLink, label: 'Open the listing ↗' } : undefined} />
+                  : paidState === 'no_requirements' ? <ResultEmpty icon="file-text" text={paidNote || NO_REQUIREMENTS_NOTE} />
+                  : paidState === 'loading' ? <ResultEmpty icon="pencil" text={'Building your rewrite plan…'} />
                   : paidState === 'done' && paid ? <RewriteView out={paid} copy={copy} copied={copied} pro={pro} onRerun={() => { void runPaid(true) }} />
                   : fitOut ? (
                     <Card>
@@ -1071,7 +1085,7 @@ function ResumePageInner() {
                       {paidState === 'error' && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--red)', marginBottom: '.5rem' }}>Could not build the plan — no credit was used if it failed. Try again.</div>}
                       <button style={btnPrimary} data-testid="resume-paid-btn" onClick={pressPaid}>Build my rewrite plan →<span style={{ marginLeft: '.5rem', fontSize: 'var(--fs-55)', opacity: .65, fontFamily: 'var(--mono)', fontWeight: 400 }}>· {priceLabel(RESUME_OPTIMIZE_COST, pro)}</span></button>
                     </Card>
-                  ) : <ResultEmpty icon="✍️" text={'Run the analysis first — then build the rewrite plan for this job.'} />
+                  ) : <ResultEmpty icon="pencil" text={'Run the analysis first — then build the rewrite plan for this job.'} />
                 )}
 
                 {/* HUMANPROOF */}
@@ -1095,14 +1109,14 @@ function ResumePageInner() {
                         )}
                       </Card>
                     )}
-                    {hpState === 'loading' && <ResultEmpty icon="🗣" text={'Making it sound real…'} />}
-                    {hpState === 'error' && <div><ResultEmpty icon="⚠️" text={'Could not run HumanProof.'} /><button onClick={runHumanProof} style={{ ...btnPrimary, marginTop: '.5rem' }}>Retry</button></div>}
+                    {hpState === 'loading' && <ResultEmpty icon="message-square" text={'Making it sound real…'} />}
+                    {hpState === 'error' && <div><ResultEmpty icon="triangle-alert" text={'Could not run HumanProof.'} /><button onClick={runHumanProof} style={{ ...btnPrimary, marginTop: '.5rem' }}>Retry</button></div>}
                     {hpState === 'locked' && (
                       <Card style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: 'var(--fs-xl)', marginBottom: '.5rem' }}>🔒</div>
+                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '.5rem', color: 'var(--text-3)' }}><Icon name="lock" size={28} strokeWidth={1.5} /></div>
                         <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: 'var(--fs-body)', marginBottom: '.5rem' }}>Your application is optimized. Now make it sound real.</div>
                         <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-66)', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1rem' }}>Unlock HumanProof so it sounds specific &amp; natural, stays interview-defensible, and carries no unsupported claims.</p>
-                        <button onClick={() => { setUpgradeReason('pro'); setUpgradeFeature('HumanProof'); setShowUpgrade(true) }} style={{ background: 'var(--cta)', color: 'var(--text-1)', border: 'none', borderRadius: 10, padding: '.75rem 1.5rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)', cursor: 'pointer' }}>Unlock HumanProof</button>
+                        <button onClick={() => { setUpgradeReason('pro'); setUpgradeFeature('HumanProof'); setShowUpgrade(true) }} style={{ background: 'var(--cta)', color: 'var(--text-1)', border: 'none', borderRadius: 10, padding: '.75rem 1.5rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-ui)', cursor: 'pointer' }}>Unlock HumanProof</button>
                         <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--muted)', lineHeight: 1.6, margin: '.75rem 0 0' }}>{LOCK_NOTE}</p>
                       </Card>
                     )}
@@ -1181,8 +1195,8 @@ function ResumePageInner() {
                         <button style={btnPrimary} onClick={runAdvantage}>Build my advantage →<span style={{ marginLeft: '.5rem', fontSize: 'var(--fs-55)', opacity: .65, fontFamily: 'var(--mono)', fontWeight: 400 }}>· {priceLabel(RESUME_OPTIMIZE_COST, pro)}</span></button>
                       </Card>
                     )}
-                    {advState === 'loading' && <ResultEmpty icon="🧠" text={'Building your advantage…'} />}
-                    {advState === 'error' && <div><ResultEmpty icon="⚠️" text={'Could not build the advantage playbook.'} /><button onClick={runAdvantage} style={{ ...btnPrimary, marginTop: '.5rem' }}>Retry</button></div>}
+                    {advState === 'loading' && <ResultEmpty icon="brain" text={'Building your advantage…'} />}
+                    {advState === 'error' && <div><ResultEmpty icon="triangle-alert" text={'Could not build the advantage playbook.'} /><button onClick={runAdvantage} style={{ ...btnPrimary, marginTop: '.5rem' }}>Retry</button></div>}
                     {advState === 'done' && advResult && (<><CoachResultView d={advResult} /><ProposalResultView d={advResult} /></>)}
                   </div>
                 )}
@@ -1222,7 +1236,7 @@ function ResumePageInner() {
                       {kicker('Now apply — and get Seen')}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                         {httpHref(jobUrl) && <a href={httpHref(jobUrl) ?? '#'} target="_blank" rel="noopener noreferrer" style={{ display: 'block', textAlign: 'center', ...btnPrimary, textDecoration: 'none', boxSizing: 'border-box' } as React.CSSProperties}>Continue to apply →</a>}
-                        <a href={trackHref} style={{ display: 'block', textAlign: 'center', background: 'var(--green)', color: 'var(--ink)', borderRadius: 8, padding: '.75rem 1rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', textDecoration: 'none' }}>📌 Track this application</a>
+                        <a href={trackHref} style={{ display: 'block', textAlign: 'center', background: 'var(--accent-tint)', color: 'var(--accent)', border: '1px solid var(--accent-line)', borderRadius: 8, padding: '.75rem 1rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', textDecoration: 'none' }}>Track this application</a>
                         <a href={reportHref} style={{ display: 'block', textAlign: 'center', background: 'none', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-68)', textDecoration: 'none' }}>Report what happened →</a>
                       </div>
                     </Card>

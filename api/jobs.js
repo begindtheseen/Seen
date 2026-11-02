@@ -8,6 +8,33 @@ import { filterAndRank, relevanceScore, isTitleRelated, sortByProximity, locatio
 import { sortByPriority, companyMatchesQuery, queryNamesCompany, isSeedListing } from '../lib/server/jobPriority.js';
 import { waitUntil } from '@vercel/functions';
 import { aggregateForQuery, upsertJobs, inferLevel, wasRecentlyPulled, recordPull, adzunaPay, cleanDescription } from '../lib/server/jobSources.js';
+
+// Adzuna rows stored before 2026-10-20 carry Adzuna's own salary ESTIMATE (salary_is_predicted) as if it were
+// the posting's pay (adzunaPay() drops estimates at ingest since then; a re-seen row keeps its old value). A
+// tester saw "$416k–$624k/yr" on a Turing teaser. Those rows show no pay at all.
+const ADZUNA_ESTIMATE_CUTOFF = '2026-10-20';
+export function honestSalary(j) {
+  if (/^adzuna$/i.test(String(j?.source || '')) && j?.created_at && String(j.created_at) < ADZUNA_ESTIMATE_CUTOFF) return null;
+  const s = j?.salary == null ? null : String(j.salary).trim();
+  if (!s) return null;
+  // A pay line below any legal wage is a parse of tips, a stipend or a per-task rate ("$2/hr" on a DashMart card):
+  // better no pay than a wrong one.
+  const nums = (s.match(/\$?\s*([\d,]+(?:\.\d+)?)\s*(k)?/gi) || []).map((m) => { const mm = m.match(/([\d,]+(?:\.\d+)?)\s*(k)?/i); return parseFloat(mm[1].replace(/,/g, '')) * (mm[2] ? 1000 : 1); }).filter((n) => n > 0);
+  if (nums.length) {
+    const hourly = /\/\s*h(?:ou)?r\b|per hour|hourly/i.test(s);
+    const top = Math.max(...nums);
+    if (hourly ? top < 7 : top < 12000) return null;
+  }
+  return s;
+}
+
+// A title that ends in a place outside the US ("Team Lead, Android – Athens, Greece") is a non-US posting even when
+// its location field says "Remote": the location scope check runs on that tail too (lib/jobs/usLocation.js).
+function titleNamesNonUs(title) {
+  const t = String(title || '');
+  const m = t.match(/(?:[-–—|(]\s*)([A-Z][\w .'-]*,\s*[A-Z][\w .'-]+)\)?\s*$/);
+  return !!(m && locationScope(m[1]) === 'non_us');
+}
 import { locationScope } from '../lib/jobs/usLocation.js';
 import { preferFullText } from '../lib/jobs/listingTwins.js';
 import { loadTenantNames, applyTenantNames, withTenantName } from '../lib/server/tenantNames.js';
@@ -353,7 +380,12 @@ export default async function handler(req, res) {
     // radius === '0'/'remote' means REMOTE: skip geo filtering entirely and search remote
     // listings — the old clamp silently turned "Remote" into an ordinary 25-mile search.
     const isRemote = String(radius) === '0' || String(radius).toLowerCase() === 'remote';
-    const isRemoteListing = (j) => /\bremote\b|\bwork from home\b|\banywhere\b/i.test(`${j.location || ''} ${j.type || ''} ${j.description || ''}`);
+    // A listing is remote when its location/type says so, or its text says so plainly near the top (a
+    // description that merely mentions "remote" — "not remote", "remote teams we support" — ranked a San
+    // Francisco office job #1 in a Remote search).
+    const isRemoteListing = (j) => /\bremote\b|\bwork from home\b|\banywhere\b/i.test(`${j.location || ''} ${j.type || ''}`)
+      || (/\b(?:fully|100%|is|are) remote\b|\bremote[- ](?:first|friendly|ok|position|role|work|job)\b|\bwork from home\b|\bwork from anywhere\b/i.test(String(j.description || '').slice(0, 600))
+        && !/\b(?:not|no|non-?)\s*remote\b|\bon-?site only\b/i.test(String(j.description || '').slice(0, 600)));
     if (isRemote) { loc = 'remote'; }
     const radiusMiles = isRemote ? Infinity : Math.min(500, Math.max(5, parseInt(radius, 10) || 25));
     const distanceKm = isRemote ? null : milesToKm(radiusMiles);
@@ -411,7 +443,7 @@ export default async function handler(req, res) {
       // Phoenix" on 2026-10-23). An Adzuna teaser of a posting we hold in full from the employer's
       // board is hidden behind that full-text row (lib/jobs/listingTwins.js).
       for (const j of preferFullText([...inArea.map(toUiRow), ...base])) {
-        if (locationScope(j.location) === 'non_us') continue;
+        if (locationScope(j.location) === 'non_us' || titleNamesNonUs(j.title)) continue;
         if (isSeedListing(j)) { seedsDropped++; continue; }
         const key = j.id || `${(j.title || '').toLowerCase()}|${(j.company || '').toLowerCase()}|${(j.location || '').toLowerCase()}`;
         if (seenKeys.has(key)) continue;
@@ -684,7 +716,7 @@ function toUiRow(j, loc = '') {
   return {
     id: j.id || null, // keep the DB id — without it /jobs/<id> permalinks can never resolve
     title: j.title, company: j.company, location: j.location || loc,
-    salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
+    salary: honestSalary(j), url: j.apply_url || j.url || null, description: j.description,
     type: j.type || 'Full-time', level: inferLevel(j.title || ''),
     source: j.source || 'Seen', ...scoreRow(j),
     search_query: j.search_query || null, // provenance for the merged re-filter downstream
@@ -745,7 +777,7 @@ async function corpusRelevant({ supabaseUrl, dbHeaders, terms, query, canonical,
     return rel.slice(0, limit).map(j => ({
       id: j.id || null,
       title: j.title, company: j.company, location: j.location || loc,
-      salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
+      salary: honestSalary(j), url: j.apply_url || j.url || null, description: j.description,
       type: j.type || 'Full-time', level: inferLevel(j.title || ''),
       source: j.source || 'Seen', ...scoreRow(j),
       search_query: j.search_query || null,
@@ -769,7 +801,7 @@ async function nearestListings(loc, supabaseUrl, dbHeaders) {
   const mapUi = rows => (Array.isArray(rows) ? rows : []).map(j => ({
     id: j.id || null,
     title: j.title, company: j.company, location: j.location,
-    salary: j.salary, url: j.apply_url, description: j.description,
+    salary: honestSalary(j), url: j.apply_url, description: j.description,
     type: j.type || 'Full-time', level: inferLevel(j.title || ''),
     source: j.source || 'Seen', ...scoreRow(j),
     posted_at: j.created_at || null,
@@ -905,7 +937,7 @@ async function handleCompanyJobs(req, res, body) {
     const cached = preferFullText((r.ok ? await r.json() : []).filter(j => nameKey(j.company) === nameKey(safeName) && locationScope(j.location) !== 'non_us')).slice(0, 20);
     if (Array.isArray(cached) && cached.length >= 3) {
       const names = await loadTenantNames(SUPABASE_URL, dbHeaders);
-      const jobs = applyTenantNames(cached.map(j => ({ title: j.title, company: j.company, location: j.location, salary: j.salary, url: j.apply_url, source: j.source, type: j.type, level: inferLevel(j.title || ''), ...scoreRow(j), ats_tenant: j.ats_tenant || null })), names);
+      const jobs = applyTenantNames(cached.map(j => ({ title: j.title, company: j.company, location: j.location, salary: honestSalary(j), url: j.apply_url, source: j.source, type: j.type, level: inferLevel(j.title || ''), ...scoreRow(j), ats_tenant: j.ats_tenant || null })), names);
       return res.status(200).json({ ok: true, jobs, _src: 'cache' });
     }
   } catch(e) { console.warn('company_jobs cache:', e.message); }
@@ -940,7 +972,7 @@ async function handleCompanyJobs(req, res, body) {
       })
       .map(j => ({
         title: j.title, company: j.company, location: j.location,
-        salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
+        salary: honestSalary(j), url: j.apply_url || j.url || null, description: j.description,
         source: j.source, type: j.type, level: inferLevel(j.title || ''),
         ...scoreRow(j),
       }));
@@ -996,7 +1028,7 @@ async function handleRecommended(req, res, _body) {
       company: j.company,
       ats_tenant: j.ats_tenant || null,
       location: j.location,
-      salary: j.salary,
+      salary: honestSalary(j),
       apply_url: j.apply_url,
       description: j.description,
       type: j.type || 'Full-time',

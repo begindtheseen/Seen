@@ -309,7 +309,7 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
           {app.status !== 'withdrawn' && (
             <button
               type="button"
-              className={`${s.act} ${s.actPrimary}`}
+              className={s.act}
               onClick={() => onShare(app)}
             >
               <Icon name="image" size={15} />Share outcome card
@@ -347,19 +347,19 @@ function CheckIn({ check, onAnswer, onSnooze, ghostRate, avgWaitDays }: {
   if (checkType === 'response_check') {
     answers.push({ icon: 'circle-check', label: 'Got a response', data: { got_response: true, response_type: 'unknown', days_to_response: daysElapsed }, tone: 'good' })
     answers.push({ icon: 'calendar', label: 'Interview', data: { got_response: true, response_type: 'interview', days_to_response: daysElapsed }, tone: 'good' })
-    answers.push({ label: '⏳ Not yet', data: { got_response: false, not_yet: true }, tone: 'neutral' })
+    answers.push({ icon: 'hourglass', label: 'Not yet', data: { got_response: false, not_yet: true }, tone: 'neutral' })
     answers.push({ icon: 'circle-x', label: 'Rejected', data: { got_response: true, response_type: 'rejection', days_to_response: daysElapsed } })
     answers.push({ icon: 'ghost', label: 'Ghosted', data: { got_response: false, response_type: 'ghosted', days_to_response: daysElapsed } })
     answers.push({ icon: 'undo-2', label: 'I withdrew', data: { got_response: false, response_type: 'withdrew', withdrew: true, days_to_response: daysElapsed } })
   } else if (checkType === 'interview_check') {
     answers.push({ icon: 'circle-check', label: 'Had an interview', data: { had_interview: true, interview_type: 'interview' }, tone: 'good' })
     answers.push({ icon: 'phone', label: 'Phone screen', data: { had_interview: true, interview_type: 'phone_screen' }, tone: 'good' })
-    answers.push({ label: '⏳ Not yet', data: { had_interview: false, ended: false, not_yet: true }, tone: 'neutral' })
+    answers.push({ icon: 'hourglass', label: 'Not yet', data: { had_interview: false, ended: false, not_yet: true }, tone: 'neutral' })
     answers.push({ icon: 'circle-x', label: 'Rejected', data: { had_interview: false, ended: true, outcome: 'rejected' } })
     answers.push({ icon: 'undo-2', label: 'I withdrew', data: { had_interview: false, ended: true, outcome: 'withdrew', withdrew: true } })
   } else {
     answers.push({ icon: 'trophy', label: 'Got an offer', data: { outcome: 'offer' }, tone: 'good' })
-    answers.push({ label: '⏳ Still waiting', data: { outcome: 'active' }, tone: 'neutral' })
+    answers.push({ icon: 'hourglass', label: 'Still waiting', data: { outcome: 'active' }, tone: 'neutral' })
     answers.push({ icon: 'circle-x', label: 'Rejected', data: { outcome: 'rejected' } })
     answers.push({ icon: 'ghost', label: 'Ghosted', data: { outcome: 'ghosted' } })
     answers.push({ icon: 'undo-2', label: 'I withdrew', data: { outcome: 'withdrew', withdrew: true } })
@@ -555,11 +555,13 @@ function TrackerPage() {
     const at = sortApplications(data, 'attention', due).findIndex(a => a.id === id)
     setFilterText(''); setSortMode('attention')
     if (at >= 0) setVisible(v => Math.max(v, Math.ceil((at + 1) / PAGE_SIZE) * PAGE_SIZE))
-    setTimeout(() => {
+    let tries = 0
+    const find = () => {
       const el = document.getElementById(`app_${id}`)
-      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }) }
-      setTimeout(() => setHighlightId(''), 2800)
-    }, 300)
+      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => setHighlightId(''), 2800); return }
+      if (++tries < 40) setTimeout(find, 100) // up to 4 s for the list to render on a slow phone
+    }
+    setTimeout(find, 300)
   }, [setExpandedId])
 
   const loadApps = useCallback(async () => {
@@ -595,14 +597,18 @@ function TrackerPage() {
   const [fabTucked, setFabTucked] = useState(false)
   useEffect(() => {
     let last = window.scrollY
+    let settle: ReturnType<typeof setTimeout> | null = null
     const onScroll = () => {
       const y = window.scrollY
+      if (settle) clearTimeout(settle)
+      // Comes back the moment the scroll pauses (round 1: it stayed hidden until the very top on a phone).
+      settle = setTimeout(() => setFabTucked(false), 900)
       if (Math.abs(y - last) < 8) return
       setFabTucked(y > last && y > 120)
       last = y
     }
     window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
+    return () => { window.removeEventListener('scroll', onScroll); if (settle) clearTimeout(settle) }
   }, [])
 
   // Back to the tracker lands where the list was scrolled — unless the URL names a card to jump to.
@@ -1159,8 +1165,9 @@ function TrackerPage() {
             <div className={s.emptyIcon}><Icon name="list-checks" size={28} /></div>
             <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', marginBottom: '.5rem' }}>No applications yet</div>
             <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.6, maxWidth: 420, margin: '0 auto' }}>Add one you already sent, or hit Apply on a job here and it lands on this list by itself.</div>
+            {/* Outlined: the page's one filled button is the header's (the floating + on phones). */}
             <div className={s.emptyBtns}>
-              <button type="button" className={`${s.act} ${s.actPrimary}`} onClick={() => setShowManual(true)}>+ Track application</button>
+              <button type="button" className={s.act} onClick={() => setShowManual(true)}>+ Track application</button>
               <Link href="/jobs" className={s.act}>Browse jobs →</Link>
             </div>
           </div>

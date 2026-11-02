@@ -133,6 +133,7 @@
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 .select:hover, .select:focus { border-color: var(--accent-line); background: var(--accent-tint); }
+.select:focus-visible { border-color: var(--accent); box-shadow: var(--sh-focus); }
 .select option { background: var(--surface-overlay); color: var(--text); }
 
 .foot {

@@ -6,6 +6,7 @@
 // malformed payload degrades gracefully to a retry prompt rather than taking down the route.
 
 import { Component, type ReactNode } from 'react'
+import Icon from './ui/Icon'
 
 interface Props {
   children: ReactNode
@@ -43,7 +44,7 @@ export default class ErrorBoundary extends Component<Props, { hasError: boolean 
           textAlign: 'center',
         }}
       >
-        <div style={{ fontSize: 'var(--fs-xl)', marginBottom: '.5rem' }}>⚠️</div>
+        <div style={{ fontSize: 'var(--fs-xl)', marginBottom: '.5rem' }}><Icon name="triangle-alert" /></div>
         <div style={{ fontFamily: 'var(--body)', fontWeight: 600, color: 'var(--white)', fontSize: 'var(--fs-body)', marginBottom: '.25rem' }}>
           This section couldn&apos;t be displayed
         </div>

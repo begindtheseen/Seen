@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useEmployerCompany } from './EmployerCompanyContext'
 import { useAuth } from '@/lib/auth'
 import { httpHref } from '@/lib/safeHref.js'
+import Icon from '@/components/ui/Icon'
 
 // Manage your listings — the employer portal's first real management surface
 // (seen-command#94). Seen's corpus is ingest-driven and the portal is account-free, so
@@ -86,7 +87,7 @@ export function EmployerListings() {
 
   return (
     <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 18, padding: '2rem', marginBottom: '2.5rem' }}>
-      <div style={{ ...mono('var(--fs-meta)', 'var(--blue)'), textTransform: 'uppercase', letterSpacing: '.16em', marginBottom: '.5rem' }}>Your listings</div>
+      <div style={{ ...mono('var(--fs-meta)', 'var(--text-3)'), textTransform: 'uppercase', letterSpacing: '.16em', marginBottom: '.5rem' }}>Your listings</div>
       <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--white)', margin: '0 0 .5rem', letterSpacing: '-.02em' }}>Filled the role? Close the listing in one click.</h2>
       <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-ui)', lineHeight: 1.7, margin: '0 0 1.5rem', maxWidth: 560 }}>
         A filled role that stays listed collects applications you&apos;ll never answer — and every one of those becomes a ghost report against your score. Find your live listings and close the ones that are done. We confirm against your own posting before anything is removed.
@@ -101,16 +102,16 @@ export function EmployerListings() {
           {loading && <span style={mono('var(--fs-meta)', 'var(--dim)')}>Loading…</span>}
         </div>
       ) : (
-        <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginBottom: listings || loading ? '1.6rem' : 0 }}>
+        <div style={{ display: 'flex', marginBottom: listings || loading ? '1.5rem' : 0 }}>
           <input autoComplete="off"
             value={name}
             onChange={e => setName(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') look() }}
-            placeholder="Your company name (as it appears on the listing)"
+            placeholder="Company name as it appears on the listing"
             aria-label="Your company name, as it appears on the listing"
-            style={{ flex: 1, minWidth: 220, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.75rem 1rem', ...mono('var(--fs-meta)', 'var(--white)'), outline: 'none' }}
+            style={{ flex: 1, minWidth: 0, background: 'var(--raised)', border: '1px solid var(--border-2)', borderRight: 'none', borderRadius: '10px 0 0 10px', padding: '.75rem 1rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-ui)', color: 'var(--text-1)', outline: 'none' }}
           />
-          <button onClick={look} disabled={loading || !name.trim()} style={{ background: 'var(--cta)', border: 'none', borderRadius: 9, padding: '.75rem 1.5rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', color: 'var(--text-1)', cursor: 'pointer', opacity: loading ? .6 : 1 }}>
+          <button onClick={look} disabled={loading || !name.trim()} style={{ flexShrink: 0, minHeight: 44, background: 'var(--surface-2)', border: '1px solid var(--border-2)', borderRadius: '0 10px 10px 0', padding: '.75rem 1rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', color: 'var(--text-1)', cursor: loading || !name.trim() ? 'default' : 'pointer', opacity: loading || !name.trim() ? .6 : 1 }}>
             {loading ? 'Looking…' : 'Show my listings →'}
           </button>
         </div>
@@ -133,10 +134,13 @@ export function EmployerListings() {
                     </div>
                   </div>
                   {done ? (
-                    <div style={{ maxWidth: 320, ...mono('var(--fs-meta)', st.closed ? 'var(--green)' : 'var(--amber)'), lineHeight: 1.55 }}>
-                      {st.closed
-                        ? (st.already ? '✓ Already removed from Seen.' : '✓ Removed from Seen — your posting confirmed this role is closed.')
-                        : '⏳ Your posting still looks live at the source, so we’ve flagged it for our team to verify and remove.'}
+                    <div style={{ maxWidth: 320, display: 'flex', gap: '.5rem', alignItems: 'flex-start', ...mono('var(--fs-meta)', st.closed ? 'var(--green)' : 'var(--amber)'), lineHeight: 1.55 }}>
+                      <span style={{ flexShrink: 0, marginTop: 2 }}><Icon name={st.closed ? 'circle-check' : 'hourglass'} size={14} /></span>
+                      <span>
+                        {st.closed
+                          ? (st.already ? 'Already removed from Seen.' : 'Removed from Seen — your posting confirmed this role is closed.')
+                          : 'Your posting still looks live at the source, so we’ve flagged it for our team to verify and remove.'}
+                      </span>
                     </div>
                   ) : (
                     <button onClick={() => close(l.id)} disabled={st.busy} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem 1rem', ...mono('var(--fs-meta)', 'var(--white)'), cursor: st.busy ? 'default' : 'pointer', opacity: st.busy ? .6 : 1 }}>

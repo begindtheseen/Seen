@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import Icon from '@/components/ui/Icon'
 import { useFocusTrap } from '@/lib/hooks/useFocusTrap'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
@@ -641,7 +642,7 @@ export default function ApplyOptimizeModal({
   }
 
   const title = step === 'done'
-    ? '🎉 You\'re ready to apply'
+    ? 'You\'re ready to apply'
     : step === 'review'
     ? 'Your Application Intelligence'
     : step === 'optimizing' ? 'Optimizing your resume…'
@@ -743,7 +744,7 @@ export default function ApplyOptimizeModal({
           {step === 'not-logged-in' && (
             <>
               <div style={{ textAlign: 'center', padding: '.5rem 0 1.25rem' }}>
-                <div style={{ fontSize: 'var(--fs-h2)', marginBottom: '.75rem' }}>👋</div>
+                <div style={{ fontSize: 'var(--fs-h2)', marginBottom: '.75rem' }}><Icon name="user" /></div>
                 <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', marginBottom: '.25rem' }}>Sign in to apply &amp; track</div>
                 <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.7, marginBottom: '1.25rem' }}>
                   Track responses, get ghost-risk warnings, and receive day-7/14/30 check-ins.
@@ -775,7 +776,7 @@ export default function ApplyOptimizeModal({
           {step === 'no-resume' && (
             <>
               <div style={{ textAlign: 'center', padding: '.5rem 0 1rem' }}>
-                <div style={{ fontSize: 'var(--fs-h2)', marginBottom: '.75rem' }}>📄</div>
+                <div style={{ fontSize: 'var(--fs-h2)', marginBottom: '.75rem' }}><Icon name="file-text" /></div>
                 <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', marginBottom: '.25rem' }}>Upload your resume first</div>
                 <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.7, marginBottom: '1.25rem' }}>
                   Seen needs your resume to rewrite bullets for this specific role.
@@ -801,7 +802,7 @@ export default function ApplyOptimizeModal({
           {step === 'resume-corrupted' && (
             <>
               <div style={{ textAlign: 'center', padding: '.5rem 0 1rem' }}>
-                <div style={{ fontSize: 'var(--fs-h2)', marginBottom: '.75rem' }}>📄</div>
+                <div style={{ fontSize: 'var(--fs-h2)', marginBottom: '.75rem' }}><Icon name="file-text" /></div>
                 <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', marginBottom: '.25rem' }}>We couldn&apos;t read your saved resume</div>
                 <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.7, marginBottom: '1.25rem' }}>
                   It didn&apos;t convert to clean text — this is common with resumes exported or scanned on a phone.
@@ -976,7 +977,7 @@ export default function ApplyOptimizeModal({
 
                 {hpState === 'locked' && (
                   <div style={{ background: 'var(--gdim)', border: '1px solid var(--line2)', borderRadius: 12, padding: '1rem', textAlign: 'center' }}>
-                    <div style={{ fontSize: 'var(--fs-h3)', marginBottom: '.5rem' }}>🔒</div>
+                    <div style={{ fontSize: 'var(--fs-h3)', marginBottom: '.5rem' }}><Icon name="lock" /></div>
                     <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: 'var(--fs-ui)', marginBottom: '.5rem' }}>
                       Your application is optimized. Now make it sound real.
                     </div>
@@ -1118,7 +1119,7 @@ export default function ApplyOptimizeModal({
           {step === 'done' && (
             <>
               <div style={{ textAlign: 'center', padding: '.5rem 0 1.25rem' }}>
-                <div style={{ fontSize: 'var(--fs-fig-m)', marginBottom: '.75rem' }}>✉️</div>
+                <div style={{ fontSize: 'var(--fs-fig-m)', marginBottom: '.75rem' }}><Icon name="mail" /></div>
                 <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', marginBottom: '.5rem' }}>
                   Check your email
                 </div>

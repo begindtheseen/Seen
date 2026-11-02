@@ -56,7 +56,7 @@ export function DeclineMessagePicker({ templates, value, onChange, allowNone }: 
 type Result = { hired: number; declined: number; skipped: number; closed: boolean }
 
 const mono = (size: string, color: string): React.CSSProperties => ({ fontFamily: 'var(--mono)', fontSize: size, color })
-const btn: React.CSSProperties = { borderRadius: 9, padding: '.5rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)', cursor: 'pointer' }
+const btn: React.CSSProperties = { borderRadius: 10, padding: '.5rem 1rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', cursor: 'pointer' }
 
 export default function FillListingPanel({ listing, apps, call, onDone, onCancel, initialPicked }: {
   listing: { id: string; title: string; company: string }

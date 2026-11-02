@@ -23,7 +23,7 @@ export default function RoundsPrompt({ app, onSubmit, onSkip }: Props) {
       <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: '1.5rem 1.5rem 2rem', animation: 'fadeUp .25s ease backwards' }}>
         <div style={{ width: 36, height: 3, background: 'var(--line2)', borderRadius: 2, margin: '0 auto .75rem' }} />
         <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', marginBottom: '.25rem', letterSpacing: '-.02em' }}>
-          🎉 Congrats on the offer!
+          Congrats on the offer!
         </div>
         <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '1.25rem' }}>
           {app.company} · {app.role}
@@ -81,7 +81,7 @@ export default function RoundsPrompt({ app, onSubmit, onSkip }: Props) {
             onClick={onSkip}
           >Skip</button>
           <button
-            style={{ flex: 2, background: 'var(--green)', border: 'none', borderRadius: 8, padding: '.75rem 1rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-ui)', color: 'var(--ink)', cursor: 'pointer' }}
+            style={{ flex: 2, background: 'var(--cta)', border: 'none', borderRadius: 8, padding: '.75rem 1rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-ui)', color: 'var(--ink)', cursor: 'pointer' }}
             onClick={() => onSubmit(rounds, notes)}
           >Share to community →</button>
         </div>

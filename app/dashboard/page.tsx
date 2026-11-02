@@ -16,7 +16,6 @@ import { STAGES } from '@/lib/constants'
 import { _sync } from '@/lib/sync'
 import { isChecklistDismissed, withChecklistDismissed } from '@/lib/onboardingPrefs'
 import { healthUnlockLine, HEALTH_MIN_APPS } from '@/lib/dashboardCopy'
-import WelcomeOnboarding from '@/components/WelcomeOnboarding'
 import InviteCard from '@/components/growth/InviteCard'
 import type { Application } from '@/lib/types'
 import { isGradeableScore } from '@/lib/gradeGate'
@@ -347,26 +346,25 @@ export default function DashboardPage() {
           ? { t: "You're on track.", s: `${health.responseRate}% of your applications got a reply. A follow-up on the quiet ones could tip it.`, badge: 'On track', tone: 'amber' }
           : { t: 'Room to improve.', s: `${health.ghostRate}% of your applications went silent. Check a company's ghost rate before applying and tailor your résumé.`, badge: 'Needs attention', tone: 'red' }
   const signalCount = alertCount + (surveyInsight ? 1 : 0)
-  const today = new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles', month: 'short', year: 'numeric' })
+  // A fresh account (nothing tracked, and not because the load failed): the empty health / pipeline / signals
+  // boxes collapse into one row with the one button (DESIGN.md §5).
+  const fresh = apps.length === 0 && !loadFailed
+  const startSteps = [
+    { done: hasResume, label: 'Add your résumé', href: '/resume' },
+    { done: apps.length > 0, label: 'Track your first application', href: '/tracker?add=1' },
+    { done: recentCos.length > 0, label: 'Check a company before you apply', href: '/companies' },
+  ]
+  const startNext = startSteps.find(st => !st.done)
+  const startDone = startSteps.filter(st => st.done).length
 
   return (
     <div className="page-full">
       <div className={styles.dash}>
 
-        {/* ── First-run getting-started guide ── */}
-        {showOnboarding && (
-          <WelcomeOnboarding
-            name={name}
-            state={{ hasResume, appsCount: apps.length, companiesChecked: recentCos.length }}
-            onDismiss={dismissOnboarding}
-          />
-        )}
-
         {/* ── Intro: who, what matters today, one primary action. (Settings / sign-out live in the
             nav's account menu; Pro shows in the nav.) ── */}
         <header className={styles.intro}>
           <div style={{ minWidth: 0 }}>
-            <div className={styles.eyebrow}>Command Center · {today}</div>
             <h1 className={styles.hello}>{greeting}, {name}<span className={styles.dot}>.</span></h1>
             <p className={styles.status}>
               {loadFailed
@@ -374,8 +372,20 @@ export default function DashboardPage() {
                 : <>{statusLine}{apps.length ? <span className={styles.statusDim}> · {apps.length} tracked total</span> : null}</>}
             </p>
           </div>
-          <Link href="/tracker?add=1" className={`${styles.primary}`}>+ Track application</Link>
+          {/* The page's one filled button. A fresh account gets it in the empty row below instead. */}
+          {!fresh && <Link href="/tracker?add=1" className={`${styles.primary}`}>+ Track application</Link>}
         </header>
+
+        {/* ── Getting started: one line under the greeting, not a card above the fold (DESIGN.md §5) ── */}
+        {showOnboarding && (
+          <div role="status" style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap', padding: '.25rem .75rem', marginBottom: '1rem', border: '1px solid var(--border-1)', borderRadius: 'var(--r-control)', background: 'var(--surface-2)', fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--text-3)' }}>
+            <span style={{ fontWeight: 600, color: 'var(--text-2)' }}>Getting started · {startDone}/{startSteps.length}</span>
+            {startNext
+              ? <Link href={startNext.href} style={{ display: 'inline-flex', alignItems: 'center', minHeight: 40, color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>Next: {startNext.label} →</Link>
+              : <span>All set.</span>}
+            <button type="button" onClick={dismissOnboarding} aria-label="Hide getting started" title="Hide getting started" style={{ marginLeft: 'auto', marginRight: '-.75rem', display: 'grid', placeItems: 'center', minWidth: 44, minHeight: 44, background: 'none', border: 'none', color: 'var(--text-4)', cursor: 'pointer' }}><Icon name="x" size={14} /></button>
+          </div>
+        )}
 
         {loadFailed && (
           <div style={{ marginBottom: '1rem' }}>
@@ -388,6 +398,19 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {fresh ? (
+          <section className={styles.card} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+            <div style={{ minWidth: 0, flex: '1 1 240px' }}>
+              <b style={{ display: 'block', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-body)', color: 'var(--white)' }}>Nothing yet — track your first application</b>
+              <p style={{ margin: '.25rem 0 0', fontSize: 'var(--fs-sm)', lineHeight: 1.55, color: 'var(--sub)' }}>Your response rate, pipeline and signals fill in from here.</p>
+            </div>
+            <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+              <Link href="/tracker?add=1" className={styles.primary}>+ Track application</Link>
+              <Link href="/jobs" className={styles.ghostBtn}>Find jobs →</Link>
+            </div>
+          </section>
+        ) : (
+        <>
         {/* ── Row 1: search health | next best move ── */}
         <div className={styles.row}>
           <section className={`${styles.card} ${styles.health}`}>
@@ -435,7 +458,7 @@ export default function DashboardPage() {
                 <b>Start tracking applications</b>
                 <p>Your real response rate, ghost rate and company benchmarks fill in from here.</p>
                 <div className={styles.emptyBtns}>
-                  <Link href="/jobs" className={`${styles.primary}`}>Find jobs</Link>
+                  <Link href="/jobs" className={styles.ghostBtn}>Find jobs</Link>
                   <Link href="/tracker?add=1" className={styles.ghostBtn}>Add one I applied to</Link>
                 </div>
               </div>
@@ -522,6 +545,9 @@ export default function DashboardPage() {
                 2026-10-25). The paid ask lives on the tracker card the day an interview arrives. */}
           </section>
         </div>
+
+        </>
+        )}
 
         {/* ── Benchmarks (only once there is enough of your own data) ── */}
         {benchmarks && (

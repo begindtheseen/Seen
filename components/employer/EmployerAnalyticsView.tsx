@@ -470,5 +470,5 @@ export function EmployerAnalyticsView() {
 
 const ctaStyle: React.CSSProperties = {
   display: 'inline-block', background: 'var(--cta)', border: 'none', borderRadius: 8,
-  padding: '.5rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-meta)', color: 'var(--text-1)', textDecoration: 'none',
+  padding: '.5rem 1rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', color: 'var(--text-1)', textDecoration: 'none',
 }

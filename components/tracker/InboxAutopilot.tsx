@@ -118,6 +118,20 @@ export default function InboxAutopilot({ apps, token, onAppsChanged, status }: {
   if (!st || !st.ready) return null // not live yet (migration pending) or still loading
 
   if (!st.enabled) {
+    // Before the first application the promo is one line (the empty tracker should read as one thing to
+    // do); with ≥1 application it is the full pitch. "Turn it on" is outlined either way — the tracker's
+    // one filled button is "+ Track application" (DESIGN.md §5).
+    if (apps.length === 0) {
+      return (
+        <section className={s.card} id="autopilot" style={{ padding: '.5rem 1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap', fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--text-3)' }}>
+            <span><b style={{ color: 'var(--text-2)', fontWeight: 600 }}>Inbox Autopilot</b> — forward job emails and the tracker fills itself.</span>
+            <button className={s.link} style={{ marginLeft: 'auto', minHeight: 40 }} disabled={busy} onClick={() => act('inbox_enable')}>{busy ? 'Turning on…' : 'Turn it on →'}</button>
+          </div>
+          {err && <div className={s.err}>{err}</div>}
+        </section>
+      )
+    }
     return (
       <section className={s.card} id="autopilot">
         <div className={s.pitch}>
@@ -127,7 +141,7 @@ export default function InboxAutopilot({ apps, token, onAppsChanged, status }: {
             <p className={s.sub}>Forward your job emails to a private Seen address. Every “thanks for applying”, interview invite and rejection updates your applications on its own — no typing.</p>
             <p className={s.fine}>Free. Seen keeps only the company, the role and what happened — never the email itself. Turn it off any time and it’s all deleted.</p>
           </div>
-          <button className="btn btn-green" disabled={busy} onClick={() => act('inbox_enable')}>{busy ? 'Turning on…' : 'Turn it on'}</button>
+          <button className="btn btn-ghost" disabled={busy} onClick={() => act('inbox_enable')}>{busy ? 'Turning on…' : 'Turn it on'}</button>
         </div>
         {err && <div className={s.err}>{err}</div>}
       </section>
@@ -185,7 +199,7 @@ export default function InboxAutopilot({ apps, token, onAppsChanged, status }: {
             <div key={ev.id} className={s.ask}>
               <span>Seen read {ev.kind === 'interview' ? 'an interview invite' : ev.kind === 'offer' ? 'an offer' : 'a rejection'} from <b>{ev.company}</b>. Add it to {ev.company}’s grade? <span className={s.muted}>Anonymous — it warns the next applicant.</span></span>
               <span className={s.btns}>
-                <button className="btn btn-green" style={{ fontSize: 'var(--fs-meta)' }} disabled={busy} onClick={() => share(ev, true)}>Yes</button>
+                <button className="btn btn-ghost" style={{ fontSize: 'var(--fs-meta)' }} disabled={busy} onClick={() => share(ev, true)}>Yes</button>
                 <button className="btn btn-ghost" style={{ fontSize: 'var(--fs-meta)' }} disabled={busy} onClick={() => share(ev, false)}>No</button>
               </span>
             </div>

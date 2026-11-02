@@ -31,6 +31,7 @@ import { EmployerReplyManager } from '@/components/employer/EmployerReplyManager
 import { EmployerPerkBanner } from '@/components/employer/EmployerPerkBanner'
 import { firstPartyReportCount } from '@/lib/server/reportCounts'
 import { isGradeableScore, notEnoughReviewsLabel } from '@/lib/gradeGate'
+import Icon, { type IconName } from '@/components/ui/Icon'
 
 type Score = {
   overall_score: number | null
@@ -314,7 +315,7 @@ export function EmployerHub() {
         {/* Entry state — no company chosen yet */}
         {!company && !loading && (
           <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16, padding: '2rem', textAlign: 'center' }}>
-            <div style={{ fontSize: 'var(--fs-fig)', marginBottom: '.5rem' }}>🏢</div>
+            <div style={{ color: 'var(--text-3)', marginBottom: '.5rem', display: 'flex', justifyContent: 'center' }}><Icon name="building-2" size={28} /></div>
             <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', marginBottom: '.5rem' }}>Enter your company to open your dashboard</div>
             <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.65, margin: '0 auto', maxWidth: 460 }}>
               We&apos;ll pull your live listings on Seen and every applicant outcome candidates have reported for you — no account required.
@@ -361,7 +362,7 @@ export function EmployerHub() {
                       ? 'The listings request did not get through, so the postings count below is not your real number.'
                       : 'Seen is out of its live job-board budget for the moment, so the postings count below is not your real number. The hourly refresh fills it in.'}
                 </div>
-                <button type="button" onClick={() => load(company)} style={{ minHeight: 44, padding: '.5rem 1rem', background: 'rgba(255,255,255,.06)', border: '1px solid var(--line2)', borderRadius: 10, color: 'var(--white)', fontFamily: 'var(--display)', fontWeight: 700, fontSize: 'var(--fs-sm)', cursor: 'pointer' }}>Retry</button>
+                <button type="button" onClick={() => load(company)} style={{ minHeight: 44, padding: '.5rem 1rem', background: 'rgba(255,255,255,.06)', border: '1px solid var(--line2)', borderRadius: 10, color: 'var(--white)', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', cursor: 'pointer' }}>Retry</button>
               </div>
             )}
             {/* ── Reputation hero (always visible above the tabs) ──────────────── */}
@@ -615,12 +616,12 @@ function UpdatesTab() {
         <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', marginBottom: '1rem' }}>What you&apos;ll see here</div>
         <div style={{ display: 'grid', gap: '1rem' }}>
           {[
-            { emoji: '👥', t: 'New applicants', d: 'How many candidates reported applying to each of your roles recently.' },
-            { emoji: '⚖️', t: 'Dispute verdicts', d: 'When an admin resolves a report you disputed, the outcome lands here with its dispute number.' },
-            { emoji: '⏳', t: 'Listings aging off', d: 'Indexed listings drop off Seen when their source stops showing them (stale at 7 days, gone at 14). Still hiring? Post the role yourself to keep it live.' },
+            { icon: 'users' as IconName, t: 'New applicants', d: 'How many candidates reported applying to each of your roles recently.' },
+            { icon: 'flag' as IconName, t: 'Dispute verdicts', d: 'When an admin resolves a report you disputed, the outcome lands here with its dispute number.' },
+            { icon: 'hourglass' as IconName, t: 'Listings aging off', d: 'Indexed listings drop off Seen when their source stops showing them (stale at 7 days, gone at 14). Still hiring? Post the role yourself to keep it live.' },
           ].map(r => (
             <div key={r.t} style={{ display: 'flex', gap: '.75rem', alignItems: 'flex-start' }}>
-              <span style={{ fontSize: 'var(--fs-lead)', lineHeight: 1.3 }} aria-hidden>{r.emoji}</span>
+              <span style={{ color: 'var(--text-3)', display: 'inline-flex', marginTop: 2 }} aria-hidden><Icon name={r.icon} size={18} /></span>
               <div>
                 <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-ui)', fontWeight: 700, color: 'var(--white)' }}>{r.t}</div>
                 <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-meta)', lineHeight: 1.6, margin: '.125rem 0 0' }}>{r.d}</p>

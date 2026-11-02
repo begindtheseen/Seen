@@ -11,6 +11,7 @@ import { aiHeaders } from '@/lib/aiHeaders'
 import { ResumeStore } from '@/lib/stores/ResumeStore'
 import { parseResumeFile } from '@/lib/resumeUploadClient'
 import PageHeader from '@/components/shell/PageHeader'
+import Icon from '@/components/ui/Icon'
 import InviteCard from '@/components/growth/InviteCard'
 import JobAlertsCard from '@/components/settings/JobAlertsCard'
 import DangerConfirmDialog from '@/components/DangerConfirmDialog'
@@ -101,7 +102,8 @@ export default function ProfilePage() {
     if (!isLoggedIn) { router.replace(loginHref(`${window.location.pathname}${window.location.search}${window.location.hash}`)); return }
     // Instant fill from this user's cache (now that the user id is known), then the DB wins.
     const fill = (p: CachedProfile) => {
-      if (!touched.current.name) setName(p.name)
+      // A name equal to the email's local part came from a sign-up default, not the person (round 1: FIRST NAME = email prefix).
+      if (!touched.current.name) setName(p.name && p.name.toLowerCase() === String(user?.email || '').split('@')[0].toLowerCase() ? '' : p.name)
       if (!touched.current.city) setCity(p.city)
       if (!touched.current.experience) setExperience(p.experience)
       setInitName(p.name); setInitCity(p.city); setInitExperience(p.experience)
@@ -352,10 +354,10 @@ export default function ProfilePage() {
             </div>
             {/* div, not <nav>: globals.css styles every nav element as the fixed site bar */}
             <div className={styles.jumps} role="navigation" aria-label="Settings sections">
-              <a href="#profile" className={styles.jump}><span>👤</span>Profile</a>
-              <a href="#resume" className={styles.jump}><span>📄</span>Résumé</a>
-              {alertsReady && <a href="#alerts" className={styles.jump}><span>🔔</span>Job alerts</a>}
-              <a href="#security" className={styles.jump}><span>🔒</span>Security</a>
+              <a href="#profile" className={styles.jump}><span><Icon name="user" size={16} /></span>Profile</a>
+              <a href="#resume" className={styles.jump}><span><Icon name="file-text" size={16} /></span>Résumé</a>
+              {alertsReady && <a href="#alerts" className={styles.jump}><span><Icon name="bell" size={16} /></span>Job alerts</a>}
+              <a href="#security" className={styles.jump}><span><Icon name="lock" size={16} /></span>Security</a>
               <a href="#plan" className={styles.jump}><span>◈</span>Plan &amp; billing</a>
               {inviteReady && <a href="#invite" className={styles.jump}><span>↗</span>Invite friends</a>}
               <a href="#danger" className={`${styles.jump} ${styles.jumpDanger}`}><span>⚠</span>Delete account</a>
@@ -425,7 +427,7 @@ export default function ProfilePage() {
               </div>
               {resumeMeta && (
                 <div className={styles.file}>
-                  <div className={styles.fileIco}>📄</div>
+                  <div className={styles.fileIco}><Icon name="file-text" size={18} /></div>
                   <div style={{ minWidth: 0 }}>
                     <div className={styles.fileName}>{resumeMeta.fileName}</div>
                     <div className={styles.fileMeta}>✓ {resumeMeta.wordCount.toLocaleString()} words · matched to jobs</div>
@@ -483,7 +485,7 @@ export default function ProfilePage() {
                   </div>
                   {passMsg && <div className={`${styles.msg} ${passMsgOk ? styles.ok : styles.err}`}>{passMsg}</div>}
                   <div className={styles.btnRow} style={{ marginTop: '1rem' }}>
-                    <button type="button" className={styles.primary} onClick={updatePassword} disabled={updatingPass}>{updatingPass ? 'Updating…' : 'Update password →'}</button>
+                    <button type="button" className={styles.ghost} onClick={updatePassword} disabled={updatingPass}>{updatingPass ? 'Updating…' : 'Update password →'}</button>
                     <button type="button" className={styles.ghost} onClick={() => { setShowPassForm(false); setPassMsg('') }}>Cancel</button>
                   </div>
                 </div>
@@ -494,14 +496,14 @@ export default function ProfilePage() {
                   <div className={styles.rowT}>Sign out of Seen</div>
                   <div className={styles.rowS}>On this device. Your applications stay synced to your account.</div>
                 </div>
-                <button type="button" className={`${styles.ghost} ${styles.danger}`} onClick={signOut}>Sign out</button>
+                <button type="button" className={styles.ghost} onClick={signOut}>Sign out</button>
               </div>
               <div className={styles.row}>
                 <div>
                   <div className={styles.rowT}>Sign out of all devices</div>
                   <div className={styles.rowS}>Ends every session on every phone and computer — use it if you signed in somewhere you don’t control.</div>
                 </div>
-                <button type="button" className={`${styles.ghost} ${styles.danger}`} onClick={() => setConfirmSignOutAll(true)} disabled={signingOutAll} aria-haspopup="dialog">{signingOutAll ? 'Signing out…' : 'Sign out everywhere'}</button>
+                <button type="button" className={styles.ghost} onClick={() => setConfirmSignOutAll(true)} disabled={signingOutAll} aria-haspopup="dialog">{signingOutAll ? 'Signing out…' : 'Sign out everywhere'}</button>
               </div>
               {signOutAllMsg && <div className={`${styles.msg} ${styles.err}`} role="alert">{signOutAllMsg}</div>}
               {confirmSignOutAll && (
@@ -563,7 +565,7 @@ export default function ProfilePage() {
                   </p>
                   <div className={styles.btnRow}>
                     {sub?.cancel_at_period_end ? (
-                      <button type="button" className={styles.primary} onClick={() => manageSubscription('resume_subscription')} disabled={portalLoading}>{portalLoading ? 'Working…' : 'Resume membership'}</button>
+                      <button type="button" className={styles.ghost} onClick={() => manageSubscription('resume_subscription')} disabled={portalLoading}>{portalLoading ? 'Working…' : 'Resume membership'}</button>
                     ) : (
                       <button type="button" className={`${styles.ghost} ${styles.danger}`} onClick={() => manageSubscription('cancel_subscription')} disabled={portalLoading || !sub} title={!sub ? 'No active Stripe subscription on file' : undefined}>{portalLoading ? 'Working…' : 'Cancel membership'}</button>
                     )}
@@ -587,7 +589,7 @@ export default function ProfilePage() {
                   </div>
                   <p className={styles.cardS} style={{ margin: '0 0 1rem' }}>{offerLine()}</p>
                   <div className={styles.btnRow}>
-                    <button type="button" className={styles.primary} onClick={() => router.push('/pricing')}>See what’s free and what’s paid →</button>
+                    <button type="button" className={styles.ghost} onClick={() => router.push('/pricing')}>See what’s free and what’s paid →</button>
                   </div>
                 </>
               )}

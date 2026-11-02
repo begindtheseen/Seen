@@ -17,12 +17,14 @@ import { useEmployerCompany } from './EmployerCompanyContext'
 const mono = (size: string, color: string): React.CSSProperties => ({ fontFamily: 'var(--mono)', fontSize: size, color })
 
 // All three point at the ONE unified hub (/employers/dashboard), each deep-linking to its tab —
-// no more redirect hop through the retired standalone pages.
-const SURFACES: { tab?: string; emoji: string; title: string; desc: string }[] = [
-  { emoji: '▦', title: 'Your dashboard', desc: 'Every live posting Seen has indexed for you, next to the real outcomes candidates reported after applying.' },
-  { tab: 'analytics', emoji: '📈', title: 'Posting analytics', desc: 'Where your applicants come from, application volume over time, and your response and ghost rates by role.' },
-  { tab: 'updates', emoji: '🔔', title: 'Posting updates', desc: 'New applicants and postings about to go stale or expire — computed live the moment you open it.' },
+// no more redirect hop through the retired standalone pages. Rendered as one sentence with three
+// links, not three identical cards (DESIGN.md §5).
+const SURFACES: { tab?: string; title: string }[] = [
+  { title: 'your dashboard' },
+  { tab: 'analytics', title: 'posting analytics' },
+  { tab: 'updates', title: 'posting updates' },
 ]
+const surfaceLink: React.CSSProperties = { color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }
 
 export function EmployerSurfaces() {
   const { company, setCompany } = useEmployerCompany()
@@ -37,35 +39,26 @@ export function EmployerSurfaces() {
 
   return (
     <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 18, padding: '2rem', marginBottom: '2.5rem' }}>
-      <div style={{ ...mono('var(--fs-meta)', 'var(--blue)'), textTransform: 'uppercase', letterSpacing: '.16em', marginBottom: '.5rem' }}>Your tools</div>
+      <div style={{ ...mono('var(--fs-meta)', 'var(--text-3)'), textTransform: 'uppercase', letterSpacing: '.16em', marginBottom: '.5rem' }}>Your tools</div>
       <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--white)', margin: '0 0 .5rem', letterSpacing: '-.02em' }}>Your dashboard, analytics &amp; notifications.</h2>
-      <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-ui)', lineHeight: 1.7, margin: '0 0 1.5rem', maxWidth: 560 }}>
-        Go beyond the headline grade: track every posting and applicant outcome, see how your listings actually perform, and stay ahead of new applicants and expiring posts. Enter your company once and we&apos;ll carry it through to each.
-      </p>
 
-      <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+      <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
         <input
           value={company}
           onChange={e => setCompany(e.target.value)}
           placeholder="Your company name"
           aria-label="Your company name"
           autoComplete="off"
-          style={{ flex: 1, minWidth: 220, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.75rem 1rem', ...mono('var(--fs-meta)', 'var(--white)'), outline: 'none' }}
+          style={{ flex: 1, minWidth: 220, background: 'var(--raised)', border: '1px solid var(--border-2)', borderRadius: 10, padding: '.75rem 1rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-ui)', color: 'var(--text-1)', outline: 'none' }}
         />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: '1rem' }}>
-        {SURFACES.map(s => (
-          <Link key={s.title} href={hrefFor(s.tab)} style={{ display: 'block', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 14, padding: '1.25rem', textDecoration: 'none' }}>
-            <div style={{ fontSize: 'var(--fs-h3)', marginBottom: '.5rem' }} aria-hidden>{s.emoji}</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.25rem' }}>
-              <span style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)' }}>{s.title}</span>
-              <span style={{ color: 'var(--blue)' }} aria-hidden>→</span>
-            </div>
-            <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-meta)', lineHeight: 1.6, margin: 0 }}>{s.desc}</p>
-          </Link>
-        ))}
-      </div>
+      <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-body)', lineHeight: 1.7, margin: 0, maxWidth: 560 }}>
+        Open <Link href={hrefFor(SURFACES[0].tab)} style={surfaceLink}>{SURFACES[0].title}</Link> for every live posting Seen has
+        indexed next to the outcomes candidates reported, <Link href={hrefFor(SURFACES[1].tab)} style={surfaceLink}>{SURFACES[1].title}</Link> for
+        where applicants come from and your response and ghost rates by role, and <Link href={hrefFor(SURFACES[2].tab)} style={surfaceLink}>{SURFACES[2].title}</Link> for
+        new applicants and postings about to go stale — computed live the moment you open it.
+      </p>
 
       <p style={{ ...mono('var(--fs-meta)', 'var(--muted)'), lineHeight: 1.6, margin: '1rem 0 0' }}>
         {q

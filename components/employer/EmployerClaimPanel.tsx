@@ -26,7 +26,9 @@ const card: React.CSSProperties = { background: 'var(--card)', border: '1px soli
 const kicker: React.CSSProperties = { fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.16em', color: 'var(--text-3)', marginBottom: '.5rem' }
 const h2: React.CSSProperties = { fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--white)', margin: '0 0 .5rem', letterSpacing: '-.02em' }
 const body: React.CSSProperties = { color: 'var(--sub)', fontSize: 'var(--fs-ui)', lineHeight: 1.7, margin: '0 0 1.5rem', maxWidth: 560 }
-const primaryBtn: React.CSSProperties = { background: 'var(--cta)', border: 'none', borderRadius: 9, padding: '.75rem 1.5rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)', color: 'var(--text-1)', cursor: 'pointer' }
+// THE one filled button on /employers (DESIGN.md §5): claiming is what a visitor is here to do. Buttons are
+// the body face at 600 — the display face is for headings only (§3).
+const primaryBtn: React.CSSProperties = { background: 'var(--cta)', border: 'none', borderRadius: 10, padding: '.75rem 1.5rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', color: 'var(--text-1)', cursor: 'pointer' }
 const mono = (size: string, color: string): React.CSSProperties => ({ fontFamily: 'var(--mono)', fontSize: size, color })
 
 export function EmployerClaimPanel() {

@@ -140,7 +140,7 @@ export default function HomeHero() {
       <section className={styles.hero}>
         <span className={`${styles.eyebrow} ${styles.stage} ${styles.d1}`}>
           <span className={styles.pulse} />
-          Real hiring outcomes from real applicants
+          Real applicant outcomes
         </span>
 
         {/* Kinetic headline: each word rises from behind its own clip, 42ms apart. */}

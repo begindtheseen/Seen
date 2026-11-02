@@ -14,7 +14,7 @@
 .offer, .pack { margin-top: .75rem; padding-top: .75rem; border-top: 1px solid rgba(16, 185, 129, .25); }
 .offerTitle { font-family: var(--body); font-weight: 600; font-size: var(--fs-lead); color: var(--white); margin-bottom: .5rem; overflow-wrap: anywhere; }
 .list { margin: 0 0 .75rem; padding-left: 1rem; font-size: var(--fs-ui); line-height: 1.6; color: var(--sub); }
-.cta { width: 100%; min-height: 48px; border: none; border-radius: 10px; background: var(--green); color: var(--bg); font-family: var(--body); font-weight: 600; font-size: var(--fs-body); cursor: pointer; padding: .75rem 1rem; }
+.cta { width: 100%; min-height: 48px; border: none; border-radius: 10px; background: var(--cta); color: var(--text-1); font-family: var(--body); font-weight: 600; font-size: var(--fs-body); cursor: pointer; padding: .75rem 1rem; }
 .cta:disabled { opacity: .65; cursor: default; }
 .fine { margin: .5rem 0 0; font-family: var(--mono); font-size: var(--fs-meta); color: var(--muted); text-align: center; }
 .err { margin: .5rem 0 0; font-size: var(--fs-sm); color: var(--red); }

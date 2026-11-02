@@ -44,7 +44,7 @@
   outline: none;
   caret-color: var(--accent);
 }
-.input:focus { border-color: var(--accent); box-shadow: var(--sh-focus); }
+.input:focus-visible { border-color: var(--accent); box-shadow: var(--sh-focus); }
 .locInput { padding-right: 2.5rem; }
 
 .pin {
@@ -87,6 +87,7 @@
   outline: none;
   cursor: pointer;
 }
+.radius:focus-visible { border-color: var(--accent); box-shadow: var(--sh-focus); }
 
 .go {
   flex: none;
@@ -220,9 +221,11 @@
   .compact.whereOpen .go { display: none; }
   .compact:not(.whereOpen) .whereChip {
     display: flex; align-items: center; gap: var(--sp-2); width: 100%; min-height: 44px;
-    margin-top: var(--sp-1); padding: 0 var(--sp-1); border: 0; background: none;
-    color: var(--sub); font: inherit; font-size: var(--fs-meta); text-align: left; cursor: pointer;
+    margin-top: var(--sp-1); padding: 0 0 0 var(--sp-1); border: 0; background: none;
+    color: var(--text-3); font: inherit; font-size: var(--fs-sm); text-align: left; cursor: pointer;
   }
+  .whereChip:focus-visible { outline: none; }
+  .whereChip:focus-visible .whereEdit { box-shadow: var(--sh-focus); border-color: var(--accent); }
   .whereText { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .whereEdit { flex: none; color: var(--accent); font-weight: 600; }
+  .whereEdit { flex: none; display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--sp-4); border: 1px solid var(--border-2); border-radius: var(--r-pill); color: var(--text-1); font-size: var(--fs-sm); font-weight: 600; }
 }

@@ -9,6 +9,7 @@ import { markIntentionalSignOut } from '@/lib/sessionExpired'
 import { useFocusTrap } from '@/lib/hooks/useFocusTrap'
 import styles from '../Nav.module.css'
 import empStyles from './EmployerNav.module.css'
+import Icon from '@/components/ui/Icon'
 
 // EmployerNav / EmployerFooter — the ONE shared chrome for the /employers portal.
 //
@@ -185,20 +186,20 @@ export function EmployerNav() {
         </div>
 
         <div className="side-menu-label">For employers</div>
-        <Link href="/employers" className={`side-menu-item${pathname === '/employers' ? ' active' : ''}`}><span className="side-menu-icon">📊</span>Reputation</Link>
-        <Link href="/employers/dashboard" className={`side-menu-item${pathname.startsWith('/employers/dashboard') ? ' active' : ''}`}><span className="side-menu-icon">▦</span>Dashboard</Link>
-        <Link href="/employers/verified" className={`side-menu-item${pathname.startsWith('/employers/verified') ? ' active' : ''}`}><span className="side-menu-icon">✓</span>Get Verified</Link>
-        <Link href="/employers#promote" className="side-menu-item"><span className="side-menu-icon">◈</span>Pricing</Link>
+        <Link href="/employers" className={`side-menu-item${pathname === '/employers' ? ' active' : ''}`}><span className="side-menu-icon"><Icon name="chart-column" size={16} /></span>Reputation</Link>
+        <Link href="/employers/dashboard" className={`side-menu-item${pathname.startsWith('/employers/dashboard') ? ' active' : ''}`}><span className="side-menu-icon"><Icon name="layout-dashboard" size={16} /></span>Dashboard</Link>
+        <Link href="/employers/verified" className={`side-menu-item${pathname.startsWith('/employers/verified') ? ' active' : ''}`}><span className="side-menu-icon"><Icon name="shield-check" size={16} /></span>Get Verified</Link>
+        <Link href="/employers#promote" className="side-menu-item"><span className="side-menu-icon"><Icon name="tag" size={16} /></span>Pricing</Link>
 
         <div className="side-menu-label">Account</div>
         {ready && isLoggedIn && employerCompany && (
-          <div className="side-menu-item" style={{ color: 'var(--green)' }}><span className="side-menu-icon">🏢</span>Managing {employerCompany}</div>
+          <div className="side-menu-item" style={{ color: 'var(--green)' }}><span className="side-menu-icon"><Icon name="building-2" size={16} /></span>Managing {employerCompany}</div>
         )}
-        <Link href="/" className="side-menu-item"><span className="side-menu-icon">💼</span>Switch to job search</Link>
+        <Link href="/" className="side-menu-item"><span className="side-menu-icon"><Icon name="briefcase" size={16} /></span>Switch to job search</Link>
 
         <div style={{ marginTop: 'auto', padding: '1rem 1.25rem 1.25rem', borderTop: '1px solid var(--line)', display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
           {ready && isLoggedIn ? (
-            <button onClick={handleSignOut} style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.25)', color: 'var(--red)', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, cursor: 'pointer', width: '100%' }}>Sign out</button>
+            <button onClick={handleSignOut} className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }}>Sign out</button>
           ) : (
             <>
               <Link href="/login?type=employer" className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setMenuOpen(false)}>Sign in</Link>

@@ -19,7 +19,7 @@ import Badge from '@/components/ui/Badge'
 import Icon, { type IconName } from '@/components/ui/Icon'
 import StatTile from '@/components/ui/StatTile'
 import { accountsLine } from '@/lib/glossary.js'
-import { gradeTone, ghostRateTone, responseRateTone, wastedEffortTone, ghostRateWord, responseRateWord, wastedEffortWord, toneText, toneFill, type Tone } from '@/lib/ui/tone.js'
+import { gradeTone, ghostRateTone, responseRateTone, wastedEffortTone, ghostRateWord, responseRateWord, wastedEffortWord, gradeWord, toneText, toneFill } from '@/lib/ui/tone.js'
 import c from './company.module.css'
 import { isGradeableScore, notEnoughReviewsLabel, gradeBasisLabel, MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
 import { Crumbs } from '@/components/shell/PageHeader'
@@ -183,8 +183,9 @@ function WebReviewsSection({ reviews, hidden }: { reviews: WebReview[]; hidden: 
   if (!reviews || reviews.length === 0) return null
   const { quotes, summaries } = splitWebReviews(reviews)
   // Open, but paged like the accounts list: the first few quotes, then "Show more" (26 open quotes made
-  // the phone page 12,000px long).
-  const [shown, setShown] = useState(4)
+  // the phone page 12,000px long). Three on a phone, four on a desktop. The section mounts only after the
+  // client fetch fills webReviews, so reading the viewport here never disagrees with server HTML.
+  const [shown, setShown] = useState(() => (typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches ? 3 : 4))
   const sentiment = (s: string): { tone: 'good' | 'bad' | 'caution'; word: string } =>
     s === 'positive' ? { tone: 'good', word: 'Positive' } : s === 'negative' ? { tone: 'bad', word: 'Negative' } : { tone: 'caution', word: 'Mixed' }
   return (
@@ -259,11 +260,13 @@ function OutcomeDistribution({ reports, label }: { reports: Report[]; label: str
   )
 }
 
-// Truthful "self-filling" status: the company is queued for the public-discussion enrichment cron.
+// Truthful "self-filling" status: the company is queued for the public-discussion enrichment cron. It
+// names the company the ONE way the page does (displayCompanyName — the hero said "ZZZ …" while this line
+// said "Zzz …"), and promises nothing: a name nobody has written about yields nothing, and says so.
 function EnrichmentNotice({ companyName }: { companyName: string }) {
   return (
     <p role="status" className={c.fine}>
-      We&apos;re gathering public hiring discussions about <span style={{ textTransform: 'capitalize' }}>{companyName}</span> — check back shortly.
+      We have no reports for {displayCompanyName(companyName)} yet. Seen is looking for public hiring discussions that name it; if any exist, they will appear here.
     </p>
   )
 }
@@ -291,7 +294,17 @@ function Section({ id, icon, title, summary, count, open, onToggle, children }: 
   )
 }
 
-const GRADE_WORD: Record<Tone, string> = { good: 'Good record', caution: 'Mixed record', bad: 'Poor record' }
+// "About four in ten" for 40%: the About line is generated from the SAME number the tiles show, so the
+// stored web-research paraphrase ("roughly one-third report ghosting" under a 40% figure) can no longer
+// disagree with it.
+function tenthsPhrase(pct: number): string {
+  const n = Math.round(pct / 10)
+  if (n <= 0) return 'almost none'
+  if (n >= 10) return 'nearly all'
+  if (n === 5) return 'about half'
+  const w = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'][n]
+  return `about ${w} in ten`
+}
 
 // ── Main Page ──────────────────────────────────────────────────────────────────
 
@@ -316,7 +329,12 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const [industry, setIndustry] = useState(seed?.industry || '')
   const [loading, setLoading] = useState(!seed)
   const [error, setError] = useState('')
-  const [notFound, setNotFound] = useState(false)
+  // The score API answered `no_data` (no score row, no reports, no mentions). On its own that is not
+  // "unknown": a company can have listings and no reports yet — so the page also asks for its job posts
+  // (the `companies` row the listings hang on). No score + no listings + no reports = a name Seen knows
+  // nothing about, and the page says exactly that instead of a full page of CTAs (tester 2026-11-02).
+  const [noData, setNoData] = useState(false)
+  const [hasListings, setHasListings] = useState<boolean | null>(null)
   // Self-filling pages: the score API reports when this company is queued for public-discussion
   // enrichment (api/enrich-companies cron). Only 'queued' / 'running' ever render a line.
   const [enrichmentStatus, setEnrichmentStatus] = useState<string | null>(null)
@@ -497,10 +515,21 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
         // A non-2xx here is a FAILURE, not "no data": it used to fall through to "No score data found
         // for this company" under an SSR header that still showed the grade (audit 2026-10-24 R-1).
         if (!sRes.ok) throw new Error(`score HTTP ${sRes.status}`)
-        const sJson = await sRes.json() as { score?: CompanyScore; ok?: boolean; not_found?: boolean; enrichment?: { status?: string } }
+        const sJson = await sRes.json() as { score?: CompanyScore | null; ok?: boolean; no_data?: boolean; enrichment?: { status?: string } }
         setEnrichmentStatus(typeof sJson.enrichment?.status === 'string' ? sJson.enrichment.status : null)
-        if (sJson.not_found) {
-          setNotFound(true)
+        if (sJson.no_data || !sJson.score) {
+          setNoData(true)
+          // Does Seen know this company at all? Its listings say so. Only a known company is remembered
+          // as "recently checked" (seen_recent_cos feeds the dashboard, the palette and the micro-survey).
+          fetch(`/api/jobs?action=company_jobs&company=${encodeURIComponent(companyName)}`)
+            .then(r => r.ok ? r.json() : { jobs: [] })
+            .then(d => {
+              if (!alive) return
+              const jobs = Array.isArray(d?.jobs) ? d.jobs : []
+              setCompanyJobs(jobs); setJobsFetched(true); setHasListings(jobs.length > 0)
+              if (jobs.length > 0) rememberVisit()
+            })
+            .catch(() => { if (alive) { setJobsFetched(true); setHasListings(false) } })
         } else {
           rememberVisit()
           if (sJson.score) {
@@ -634,25 +663,25 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const shownWebReviews = webReviews.filter(rv => !looksLikeBotOrLinkText(rv.text))
   const updatedLine = graded ? lastUpdatedLabel(score.updated_at) : ''
 
-  if (!loading && notFound) {
+  // A name Seen knows nothing about: no score row, no listings, no reports. A true empty state — the
+  // name once, one sentence, ONE outlined action; no Track / prep / share, and it is never remembered as
+  // "recently checked". The route answers 200 (existence is decided client-side), so the <meta> keeps it
+  // out of the index; the layout's companyRobots (lib/companyMeta.ts) already says noindex server-side
+  // for an ungraded name. React 19 hoists the <meta> into <head>.
+  const unknown = !loading && !error && noData && hasListings === false && !reportsLoading && reports.length === 0
+  if (unknown) {
     return (
       <div className="page-full">
-        {/* Soft-404: the company's existence is decided client-side (api/reports.js web check), so the
-            route answers 200 — keep the "Can't verify" state out of the index. React 19 hoists this <meta>
-            into <head>. */}
         <meta name="robots" content="noindex" />
         <div className={c.missing}>
           <Icon name="circle-help" size={40} className={c.missingIcon} />
-          <h1 className={c.missingTitle}>Can&apos;t verify &ldquo;{companyName}&rdquo;</h1>
-          <p className={c.missingText}>
-            We couldn&apos;t find a company by that name. Looking for a job instead? Search open roles — or use the company&apos;s official name to check how it treats applicants.
-          </p>
-          {/* A job title typed into a company box lands here (conversion audit 2026-10-24: "barista").
-              The primary way on is the job search for the same words (lib/searchRoute.ts). */}
+          <h1 className={c.missingTitle}>{displayName}</h1>
+          <p className={c.missingText}>Seen has no applicant accounts for this company yet.</p>
           <div className={c.missingActions}>
-            <Button variant="primary" href={jobsSearchHref(companyName)} iconRight="arrow-right">See &ldquo;{companyName}&rdquo; jobs</Button>
-            <Button variant="secondary" href="/companies">Browse company grades</Button>
+            <Button variant="secondary" href={reportHref} iconRight="arrow-right">Report an outcome</Button>
           </div>
+          {/* A job title typed into a company box lands here too (conversion audit 2026-10-24: "barista"). */}
+          <p className={c.fine}>Looking for a job instead? <a href={jobsSearchHref(companyName)} className={c.textLink}>Search &ldquo;{companyName}&rdquo; jobs</a> · <a href="/companies" className={c.textLink}>Browse company grades</a></p>
         </div>
       </div>
     )
@@ -795,7 +824,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                   <div className={c.scoreLine}>
                     <span className="sr-only">{`Seen Grade ${g}, ${score.overall_score} out of 100`}</span>
                     <span className={c.score} aria-hidden="true"><Odometer value={score.overall_score} instant={!!seed} /><span className={c.scoreOf}>/100</span></span>
-                    {tone && <Badge tone={tone}>{GRADE_WORD[tone]}</Badge>}
+                    {tone && <Badge tone={tone}>{gradeWord(tone)}</Badge>}
                   </div>
                   {verdict && <p className={c.verdict}>{verdict}</p>}
                   <p className={c.evidence}><Icon name="users" size={14} />{evidenceParts.join(' · ')}{fpReports === 0 && webEst > 0 ? ' · web-research estimate' : ''}</p>
@@ -868,6 +897,12 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                   {reportsProvenanceLine(sum)}
                   {sum.listedNote ? ` ${sum.listedNote}` : ''}
                   {commentaryN > 0 ? ` ${commentaryN} ${commentaryN === 1 ? 'quote is' : 'quotes are'} commentary, not counted.` : ''}
+                  {/* The grade's count is stored when the rows are imported (company_scores.first_party_report_count);
+                      each card is re-judged by today's stricter first-hand rules (lib/reports/feedFilter.js). When the
+                      two disagree — Stripe: "10 accounts from public posts" over ten "Commentary" cards — say so. */}
+                  {fpReports > 0 && seenRows.length === 0 && publicRows.length > 0 && commentaryN === publicRows.length
+                    ? ` The ${fpReports} account${fpReports === 1 ? '' : 's'} counted in the grade ${fpReports === 1 ? 'was' : 'were'} accepted when imported; under today's stricter first-hand rules every quote below reads as commentary, so none is shown as a counted account.`
+                    : ''}
                   {hiddenPublicN > 0 ? ` ${hiddenPublicN} hidden (links or bot text).` : ''}
                 </p>
                 <div className={c.cityFilter}>
@@ -1160,7 +1195,9 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                 summary={score
                   ? (!graded ? `${ungradedLabel} · summary & public records` : `Based on ${gradeBasisLabel(score)}${webEst > 0 ? ' + public web research' : ''} · summary & public records`)
                   : 'Public records & data status'}>
-                {score?.summary ? <p className={c.panelText}>{score.summary}</p> : null}
+                {sum.ratesShown && sum.ghostPct != null && sum.responsePct != null
+                  ? <p className={c.panelText}>{`${tenthsPhrase(sum.ghostPct).charAt(0).toUpperCase()}${tenthsPhrase(sum.ghostPct).slice(1)} reported applicants (${sum.ghostPct}%) say ${displayName} ghosted them; ${sum.responsePct}% heard back.`}</p>
+                  : score?.summary ? <p className={c.panelText}>{score.summary}</p> : null}
                 {score && (
                   <p className={c.fine}>
                     {!graded

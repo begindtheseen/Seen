@@ -157,7 +157,6 @@ export default function JobsPage() {
         <div className="jpage-hdr">
           <PageHeader
             eyebrow="Job search · transparency-first"
-            tone="green"
             title="Open positions"
             crumbLabel="Jobs"
             sub="Ranked by how well they match your search. Every listing shows how complete its posting is and how the employer treats applicants — not just pay and location."
@@ -189,9 +188,10 @@ export default function JobsPage() {
             </button>
             </div>
             {/* Compact: where the search is, as one tap target that opens the location row. */}
-            <button type="button" className={bar.whereChip} onClick={openWhere} aria-label={`Change location: ${location.trim() || 'anywhere'}, ${radiusLabel}`}>
-              <Icon name="map-pin" size={14} />
-              <span className={bar.whereText}>{location.trim() || 'Anywhere'} · {radiusLabel}</span>
+            {/* Remote results are not the city's results: the chip reads "Remote" alone (phone tester 2026-11-02). */}
+            <button type="button" className={bar.whereChip} onClick={openWhere} aria-label={radius === '0' ? 'Change location: Remote' : `Change location: ${location.trim() || 'anywhere'}, ${radiusLabel}`}>
+              <Icon name={radius === '0' ? 'globe' : 'map-pin'} size={14} />
+              <span className={bar.whereText}>{radius === '0' ? 'Remote' : `${location.trim() || 'Anywhere'} · ${radiusLabel}`}</span>
               <span className={bar.whereEdit}>Change</span>
             </button>
             <div className={bar.row} onPointerDownCapture={() => { if (searched) setWhereOpen(true) }}>
@@ -330,7 +330,7 @@ export default function JobsPage() {
                     <span className={bar.dividerSub}>Not {query.trim() ? `“${query.trim()}”` : 'this role'} — they share a word with your search.</span>
                   </div>
                 )}
-                <JobCard job={job} more={more} index={i} onSaveToggle={handleSaveToggle} onOpen={j => setDetailJob(j)} onApply={j => takesSeenApply(j) ? setDetailJob(j) : setApplyJob(j)} onCheckCompany={co => setCheckCompany(co)} alreadyApplied={appliedCos.has(job.id) || (!!job.apply_url && appliedCos.has(job.apply_url))} employerScore={coScores[job.company.toLowerCase().trim()]?.overall_score ?? null} />
+                <JobCard job={job} more={more} index={i} onSaveToggle={handleSaveToggle} onOpen={j => setDetailJob(j)} onCheckCompany={co => setCheckCompany(co)} alreadyApplied={appliedCos.has(job.id) || (!!job.apply_url && appliedCos.has(job.apply_url))} employerScore={coScores[job.company.toLowerCase().trim()]?.overall_score ?? null} />
               </Fragment>
             ))}
           </div>

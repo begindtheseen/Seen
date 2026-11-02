@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Icon from '@/components/ui/Icon'
 import ModalPortal from '@/components/ModalPortal'
 
 // One user row in the KPI drill-down, with a two-step delete (full admins only).
@@ -118,8 +119,8 @@ export function UserRow({ r, token, onDeleted, ts }: { r: Record<string, unknown
             {grantMsg && <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--red)', whiteSpace: 'nowrap' }}>{grantMsg}</span>}
           </>
         )}
-        <button onClick={() => setShowPw(true)} title="Emergency: set a new password for this account" style={{ marginLeft: 'auto', background: 'none', border: '1px solid rgba(59,130,246,.4)', borderRadius: 5, color: 'var(--blue)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .5rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>🔑 Reset PW</button>
-        <button onClick={() => setShowModal(true)} title="Permanently delete this user and all their data" style={{ background: 'none', border: '1px solid rgba(239,68,68,.35)', borderRadius: 5, color: 'var(--red)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .5rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>🗑 Delete</button>
+        <button onClick={() => setShowPw(true)} title="Emergency: set a new password for this account" style={{ marginLeft: 'auto', background: 'none', border: '1px solid rgba(59,130,246,.4)', borderRadius: 5, color: 'var(--blue)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .5rem', cursor: 'pointer', whiteSpace: 'nowrap' }}><Icon name="lock" size={14} /> Reset PW</button>
+        <button onClick={() => setShowModal(true)} title="Permanently delete this user and all their data" style={{ background: 'none', border: '1px solid rgba(239,68,68,.35)', borderRadius: 5, color: 'var(--red)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .5rem', cursor: 'pointer', whiteSpace: 'nowrap' }}><Icon name="trash-2" size={14} /> Delete</button>
       </div>
       {showPw && (
         <ModalPortal>

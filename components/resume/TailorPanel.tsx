@@ -154,7 +154,7 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
           <div style={{ marginBottom: '.5rem' }}>
             <span className={s.label}>Saved job</span>
             <select className={s.input} value={savedId} onChange={(e) => pickSaved(e.target.value)}>
-              <option value="">📌 Choose a saved job…</option>
+              <option value="">Choose a saved job…</option>
               {savedJobs.map((j) => <option key={String(j.job_id)} value={String(j.job_id)}>{j.role || 'Role'}{j.company ? ` — ${j.company}` : ''}</option>)}
             </select>
           </div>

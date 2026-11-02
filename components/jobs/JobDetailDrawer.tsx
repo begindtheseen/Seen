@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useFocusTrap } from '@/lib/hooks/useFocusTrap'
 import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import { aiHeaders } from '@/lib/aiHeaders'
+import { notify } from '@/lib/notify'
 import { useAuth } from '@/lib/auth'
 import type { Job } from '@/lib/types'
 import ModalPortal from '@/components/ModalPortal'
@@ -220,6 +221,32 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
     else { SavedJobsStore.save(job, isLoggedIn); setSaved(true) }
   }
 
+  // "Not active? Report it" (moved here from the card, 2026-11-02). A listing snapshot rides along so
+  // admin can see the report even for a live search result (j_<hash> id) never saved to the board.
+  const [reportedInactive, setReportedInactive] = useState(false)
+  const [reportingInactive, setReportingInactive] = useState(false)
+  useEffect(() => { setReportedInactive(false) }, [job.id])
+  async function reportInactive() {
+    if (!user) { notify({ title: 'Sign in to report listings', severity: 'info', duration: 2600 }); return }
+    setReportingInactive(true)
+    try {
+      await fetch('/api/user-sync', {
+        method: 'POST',
+        headers: await aiHeaders(),
+        body: JSON.stringify({
+          action: 'report_job_availability',
+          job_id: String(job.id),
+          status: 'expired',
+          snapshot: { company: job.company || null, title: job.title || null, city: job.location || null, apply_url: job.apply_url || null },
+        }),
+      })
+      setReportedInactive(true)
+      notify({ title: 'Thanks — reported', sub: 'We’ll review this listing', severity: 'success', duration: 2600 })
+    } catch { /* silent */ } finally {
+      setReportingInactive(false)
+    }
+  }
+
   const avail = job.availability_status
   const companyName = displayCompanyName(job.company) || job.company
   const preview = isDescriptionPreview(job)
@@ -278,11 +305,6 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
                 {job.location && <span className={d.place}><Icon name="map-pin" size={14} />{job.location}</span>}
                 {metaBits.map(m => <span key={m}>{m}</span>)}
               </p>
-              {externalApply && (
-                <a href={postingHref ?? undefined} target="_blank" rel="noopener noreferrer" data-testid="posting-link" onClick={() => trackApplyClick(job)} className={w.postingLink}>
-                  Open the job posting <Icon name="arrow-up-right" size={14} />
-                </a>
-              )}
             </div>
             <ListingScoreRing score={job.score} size={40} />
           </header>
@@ -300,22 +322,29 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
             {avail === 'expired' && <p className={d.notice} data-tone="bad"><Icon name="circle-x" size={14} />Likely closed — check the company&apos;s careers page.</p>}
             {/* Factual freshness — literally-true observations of OUR data (never an employer verdict). */}
             {job.freshness?.label && <p className={d.fine}>{job.freshness.label}</p>}
+            {!reportedInactive ? (
+              <button type="button" onClick={reportInactive} disabled={reportingInactive} className={d.textBtn}>
+                <Icon name="flag" size={14} />{reportingInactive ? 'Reporting…' : 'Not active? Report it'}
+              </button>
+            ) : (
+              <span className={d.fine}><Icon name="check" size={14} /> Reported — thanks</span>
+            )}
           </div>
 
           {/* AI Insights — only when there is a posting to read (one "no description" message, below). */}
           {insightsState !== 'no_desc' && (
             <section className={d.card} aria-label={`What ${companyName || 'this company'} is hiring for`}>
               <h3 className="ui-eyebrow">What {companyName || 'this company'} is hiring for</h3>
+              {/* One sentence, then the paste button on its own line (the posting itself is the Apply button below). */}
               {insightsState === 'preview' && (
-                <div className={d.p}>
-                  This source gives Seen only a preview of the posting, so there is nothing to analyze yet.{' '}
-                  {postingHref ? <a href={postingHref} target="_blank" rel="noopener noreferrer" className={d.link}>Open the full posting</a> : 'The full posting is on the employer\'s site.'}
+                <div className={d.stack}>
+                  <p className={d.p}>This source gives Seen only a preview of the posting, so there is nothing to analyze yet. The full posting is on the employer&apos;s site.</p>
                   <PastePosting onAnalyze={analyzePasted} />
                 </div>
               )}
               {insightsState === 'unread' && (
-                <div className={d.p}>
-                  {insightNote || "This listing doesn't state what it requires, so there is nothing to analyze — no credit used."}
+                <div className={d.stack}>
+                  <p className={d.p}>{insightNote || "This listing doesn't state what it requires, so there is nothing to analyze — no credit used."}</p>
                   <PastePosting onAnalyze={analyzePasted} />
                 </div>
               )}
@@ -323,7 +352,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
               {insightsState === 'unavailable' && <p className={d.p}>AI insights are unavailable for this listing.</p>}
               {insightsState === 'uncached' && (
                 <div className={d.stack}>
-                  <p className={d.p}>Nobody has analyzed this listing yet. Generate what they really want, the unstated expectations and an insider tip.</p>
+                  <p className={d.p}>Read the posting against your résumé — {priceLabel(insightPrice, pro)}.</p>
                   <Button variant="secondary" full onClick={revealInsights} data-testid="reveal-insights" icon="sparkles">Reveal AI insights · {priceLabel(insightPrice, pro)}</Button>
                   <p className={d.fine}>Once generated it is free for everyone for 7 days.{pro === true ? '' : ` ${dailyResetLabel()}.`}</p>
                 </div>

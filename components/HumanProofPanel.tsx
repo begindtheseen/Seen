@@ -11,6 +11,7 @@
 // bypass, beat, or trick AI detectors, ATS, or employers.
 
 import { useState, useCallback } from 'react'
+import Icon from '@/components/ui/Icon'
 import { ResumeStore } from '@/lib/stores/ResumeStore'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { useAuth } from '@/lib/auth'
@@ -172,7 +173,7 @@ export default function HumanProofPanel({ job, optimized = false }: { job: Job; 
     return (
       <div style={{ marginTop: '1.5rem' }}>
         <div style={{ background: 'var(--gdim)', border: '1px solid var(--line2)', borderRadius: 12, padding: '1.5rem', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ fontSize: 'var(--fs-xl)', marginBottom: '.5rem' }}>🔒</div>
+          <div style={{ fontSize: 'var(--fs-xl)', marginBottom: '.5rem' }}><Icon name="lock" /></div>
           <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: 'var(--fs-body)', marginBottom: '.5rem' }}>
             {optimized ? 'Your application is optimized. Now make it sound real.' : 'Make your application sound real.'}
           </div>

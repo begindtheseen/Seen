@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import Icon from '@/components/ui/Icon'
 import { supabase } from '@/lib/supabase'
 import type { Application } from '@/lib/types'
 import ModalPortal from '@/components/ModalPortal'
@@ -653,7 +654,7 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
           {/* ── ERROR ── */}
           {phase === 'error' && (
             <div style={{ padding: '2rem 1.5rem', textAlign: 'center' }}>
-              <div style={{ fontSize: 'var(--fs-h2)', marginBottom: '1rem' }}>⚠️</div>
+              <div style={{ fontSize: 'var(--fs-h2)', marginBottom: '1rem' }}><Icon name="triangle-alert" /></div>
               <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-body)', fontWeight: 600, color: 'var(--white)', marginBottom: '.5rem' }}>Couldn't load survey</div>
               <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1.5rem' }}>
                 Something went wrong — tap retry to try again.

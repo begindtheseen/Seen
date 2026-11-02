@@ -651,9 +651,17 @@ async function handleStudio(req, res, body) {
           const unopt = unoptimizableListing({ resume: serializeToText(docFromBody(body)), jobDescription: body.jobDescription, job: body.jobTitle, company: body.company, taxonomy });
           if (unopt) return res.status(422).json({ error: 'no_requirements', ...unopt, cost: 0, charged: false });
         }
+        // The plan is computed BEFORE the credit is taken: a tailor that cannot move the fit score (an
+        // engineer's résumé went 70 → 70 and paid 1 credit, round 1) is returned free, with a plain reason.
+        if (!(await resolveAuthedUser(req))) return res.status(401).json({ error: 'Sign in to use AI features', credits_required: true });
+        const out = await tailorAction(body, { taxonomy, fit });
+        const before = out?.plan?.score?.before, after = out?.plan?.score?.after;
+        if (typeof before === 'number' && typeof after === 'number' && after <= before) {
+          const proNow = (await resolveProAccess(req)).pro;
+          return res.status(200).json({ ...out, charged: false, no_gain: true, pro: !!proNow, note: `This posting scores ${before}/100 against your résumé as it is — tailoring would not raise it, so no credit was used.` });
+        }
         const gate = await gateAI(req, 'resume_tailor');
         if (!gate.ok) return res.status(gate.status).json({ error: gate.error, credits_required: gate.credits_required, pro_required: gate.pro_required, balance: gate.balance ?? 0 });
-        const out = await tailorAction(body, { taxonomy, fit });
         return res.status(200).json({ ...out, balance: gate.balance, pro: !!gate.pro, charged: !gate.pro });
       }
       default: return res.status(400).json({ error: `Unknown action: ${body.action}` });

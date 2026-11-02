@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
+import Icon from '@/components/ui/Icon'
 
 // The employer activation checklist — shown on the dashboard to a signed-in employer who hasn't
 // finished setting up (no approved claim yet). It replaces the old dead-end where a fresh employer
@@ -29,7 +30,7 @@ function Row({ n, state, title, desc, cta }: { n: number; state: StepState; titl
           border: done ? '1px solid rgba(16,185,129,.4)' : locked ? '1px solid var(--line2)' : 'none',
         }}
       >
-        {done ? '✓' : locked ? '🔒' : n}
+        {done ? <Icon name="check" size={14} /> : locked ? <Icon name="lock" size={13} /> : n}
       </span>
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-ui)', fontWeight: 700, color: 'var(--white)' }}>{title}</div>
@@ -42,7 +43,7 @@ function Row({ n, state, title, desc, cta }: { n: number; state: StepState; titl
 
 const primaryLink: React.CSSProperties = {
   display: 'inline-block', background: 'var(--cta)', border: 'none', borderRadius: 8,
-  padding: '.5rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-meta)', color: 'var(--text-1)', textDecoration: 'none',
+  padding: '.5rem 1rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', color: 'var(--text-1)', textDecoration: 'none',
 }
 const ghostLink: React.CSSProperties = {
   display: 'inline-block', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem 1rem',

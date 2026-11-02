@@ -12,7 +12,7 @@ import { gradeTone, toneText } from '@/lib/ui/tone.js'
 import s from './EmployerGradeChip.module.css'
 import { pathSegment } from '@/lib/safeHref.js'
 
-export default function EmployerGradeChip({ company, score, onClick, compact = false }: { company: string; score: number; onClick?: (e: React.MouseEvent) => void; /** Card size (24px tall; 44px on phones). */ compact?: boolean }) {
+export default function EmployerGradeChip({ company, score, onClick, compact = false }: { company: string; score: number; onClick?: (e: React.MouseEvent) => void; /** Card size (28px tall; 44px on phones). */ compact?: boolean }) {
   const name = displayCompanyName(company) || company
   return (
     <Link

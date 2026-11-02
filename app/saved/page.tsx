@@ -6,7 +6,6 @@
 // so opening it always resolves to the exact saved listing via /jobs/[id].
 
 import { useState, useEffect, useLayoutEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import { JobCache } from '@/lib/stores/JobCache'
@@ -17,6 +16,8 @@ import Link from 'next/link'
 import { pathSegment, httpHref } from '@/lib/safeHref.js'
 import { displayCompanyName } from '@/lib/companyDisplay'
 import { useScrollMemory } from '@/lib/nav/urlState'
+import Icon from '@/components/ui/Icon'
+import Button from '@/components/ui/Button'
 
 function savedAgo(iso?: string): string {
   if (!iso) return ''
@@ -30,7 +31,6 @@ function savedAgo(iso?: string): string {
 }
 
 export default function SavedPage() {
-  const router = useRouter()
   const { isLoggedIn } = useAuth()
   const [items, setItems] = useState<SavedJob[]>([])
   const [loading, setLoading] = useState(true)
@@ -69,17 +69,19 @@ export default function SavedPage() {
         <PageHeader
           eyebrow="Bookmarks"
           title="Saved jobs"
-          sub={loading ? 'Loading…' : items.length ? `${items.length} listing${items.length === 1 ? '' : 's'} saved — each reopens to the exact role you saved.` : 'Tap ♡ on any listing to keep it here.'}
+          sub={loading ? 'Loading…' : items.length ? `${items.length} listing${items.length === 1 ? '' : 's'} saved — each reopens to the exact role you saved.` : 'Tap the heart on any listing to keep it here.'}
         />
 
         {loading ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '40vh' }}><div className="spinner" /></div>
         ) : items.length === 0 ? (
           <div style={{ background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 12, padding: '2rem 1.5rem', textAlign: 'center' }}>
-            <div style={{ fontSize: 'var(--fs-xl)', marginBottom: '.5rem' }}>♡</div>
+            <div style={{ color: 'var(--text-3)', marginBottom: '.5rem', display: 'flex', justifyContent: 'center' }}><Icon name="heart" size={28} /></div>
             <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', marginBottom: '.5rem' }}>No saved jobs yet</div>
-            <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--sub)', fontWeight: 400, marginBottom: '1.25rem', lineHeight: 1.6 }}>Tap ♡ on any listing to save it here. Saved listings always reopen to the exact role you saved.</div>
-            <button onClick={() => router.push('/jobs')} style={{ background: 'var(--green)', color: 'var(--ink)', border: 'none', borderRadius: 8, padding: '.5rem 1.25rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', cursor: 'pointer' }}>Find jobs →</button>
+            <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--sub)', fontWeight: 400, marginBottom: '1.25rem', lineHeight: 1.6 }}>Tap the heart on any listing to save it here. Saved listings always reopen to the exact role you saved.</div>
+            {/* The empty state's one action, so it is the page's one filled button (var(--cta), not green: white on
+                green was 2.5:1). */}
+            <Button href="/jobs" variant="primary" iconRight="arrow-right">Find jobs</Button>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
@@ -103,7 +105,7 @@ export default function SavedPage() {
                     <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginTop: '.125rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {company}{s.location ? ` · ${s.location}` : ''}
                     </div>
-                    <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.25rem' }}>{savedAgo(s.saved_at)} · <span style={{ color: 'var(--green)' }}>Open in Seen →</span></div>
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.25rem' }}>{savedAgo(s.saved_at)} · <span style={{ color: 'var(--accent)' }}>Open in Seen →</span></div>
                   </Link>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexShrink: 0 }}>
                     {typeof s.score === 'number' && (

@@ -9,6 +9,9 @@ import { displayCompanyName } from '@/lib/companyDisplay'
 import { displayPay } from '@/lib/jobs/pay.js'
 import { roleSnippet, isDescriptionPreview } from '@/lib/jobs/descriptionText.js'
 import ListingScoreRing from '@/components/jobs/ListingScoreRing'
+import Button from '@/components/ui/Button'
+import Icon from '@/components/ui/Icon'
+import m from './SwipeJobDeck.module.css'
 
 // ── SwipeJobDeck ──────────────────────────────────────────────────────────────
 
@@ -155,17 +158,17 @@ export default function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply,
 
   if (stack.length === 0) {
     return (
-      <div style={{ textAlign: 'center', padding: '1.5rem 1rem', background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 14 }}>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '.5rem' }}>Deck cleared</div>
-        <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', letterSpacing: '-.02em', marginBottom: '.25rem' }}>
+      <div style={{ textAlign: 'center', padding: '24px 16px', background: 'var(--surface-1)', border: '1px solid var(--border-2)', borderRadius: 'var(--r-card)' }}>
+        <div className="ui-eyebrow" style={{ marginBottom: 8 }}>Deck cleared</div>
+        <div className="tnum" style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--text-1)', letterSpacing: '-.02em', marginBottom: 4 }}>
           You matched {savedCount} job{savedCount !== 1 ? 's' : ''}
         </div>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '1rem' }}>
+        <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--text-3)', marginBottom: 16 }}>
           Right-swiped jobs are in your Saved list
         </div>
-        <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-          <a href="/resume" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .75rem', background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 7, color: 'var(--accent)', textDecoration: 'none' }}>See all matches →</a>
-          <button onClick={() => setStack([...jobs])} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .75rem', background: 'none', border: '1px solid var(--line2)', borderRadius: 7, color: 'var(--dim)', cursor: 'pointer' }}>Replay deck</button>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+          <Button size="sm" variant="secondary" href="/saved" iconRight="arrow-right">Open saved jobs</Button>
+          <Button size="sm" variant="ghost" onClick={() => setStack([...jobs])} icon="refresh-cw">Replay deck</Button>
         </div>
       </div>
     )
@@ -192,23 +195,13 @@ export default function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply,
   const secondScale = 0.96 + dragProgress * 0.04
   const secondY = 8 - dragProgress * 8
 
-  // Continuous HSL scale: 25→0° (red), 60→60° (yellow), 95→120° (green).
-  // A null (unrated) listing gets a neutral desaturated gray — never a colored verdict.
-  const scoreHsl = (score: number | null, alpha: number) => {
-    if (score == null) return `hsla(0, 0%, 45%, ${alpha})`
-    const t = Math.max(0, Math.min(1, (score - 25) / 70))
-    const hue = Math.round(t * 120)
-    return `hsla(${hue}, 80%, 55%, ${alpha})`
-  }
-  const scoreGradient = (score: number | null) =>
-    `linear-gradient(145deg, ${scoreHsl(score, .15)} 0%, transparent 60%)`
-  const scoreBorder = (score: number | null) => scoreHsl(score, .45)
-  const scoreGlow = (score: number | null) => scoreHsl(score, .2)
-  const scoreStripe = (score: number | null) => scoreHsl(score, .75)
+  // The card is a plain surface (DESIGN.md §2): the score is the ring, never a glow, a tinted border or a
+  // tinted avatar — a hue that existed nowhere else (design review 2026-11-02).
+  const surface = { background: 'var(--surface-1)', border: '1px solid var(--border-2)', boxShadow: 'var(--sh-raised)' }
 
   return (
   <div>
-    <div className="swipe-deck" aria-label="Swipe job cards — drag right to save, left to pass" style={{ height: 340 }}>
+    <div className={`swipe-deck ${m.deck}`} aria-label="Swipe job cards — drag right to save, left to pass">
       {/* Third peek card */}
       {thirdJob && (
         <div className="swipe-peek" style={{ transform: 'scale(0.92) translateY(16px)', transformOrigin: 'bottom center', zIndex: 1 }} />
@@ -224,9 +217,7 @@ export default function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply,
         style={{
           transform: topTransform, opacity: topOpacity, zIndex: 3,
           transition: flyDir ? 'transform .3s ease, opacity .3s ease' : undefined,
-          background: scoreGradient(topJob.score),
-          borderColor: scoreBorder(topJob.score),
-          boxShadow: `0 8px 32px rgba(0,0,0,.45), 0 0 48px ${scoreGlow(topJob.score)}, inset 0 2px 0 ${scoreStripe(topJob.score)}, inset 0 1px 0 rgba(255,255,255,.08)`,
+          ...surface,
         }}
         onMouseDown={onMouseDown}
         onTouchStart={onTouchStart}
@@ -240,9 +231,9 @@ export default function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply,
         {/* APPLY badge (up swipe) */}
         <span style={{
           position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
-          fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500,
-          color: 'var(--blue)', background: 'rgba(59,130,246,.15)',
-          border: '1.5px solid rgba(59,130,246,.5)', borderRadius: 7,
+          fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', fontWeight: 600,
+          color: 'var(--accent)', background: 'var(--accent-tint)',
+          border: '1px solid var(--accent-line)', borderRadius: 'var(--r-chip)',
           padding: '.25rem .75rem', pointerEvents: 'none',
           opacity: showUp ? applyBadgeOpacity : 0, transition: 'opacity .1s',
         }}>↑ Apply Now</span>
@@ -250,34 +241,33 @@ export default function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply,
         {/* Card content */}
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.75rem', marginBottom: '.5rem' }}>
           <div style={{
-            width: 42, height: 42, borderRadius: 10,
-            background: `linear-gradient(135deg, ${scoreHsl(topJob.score, .25)}, rgba(255,255,255,.06))`,
-            border: `1px solid ${scoreBorder(topJob.score)}`,
+            width: 40, height: 40, borderRadius: 'var(--r-control)',
+            background: 'var(--surface-2)', border: '1px solid var(--border-2)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-lead)',
-            color: scoreHsl(topJob.score, 1), flexShrink: 0,
+            fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-ui)',
+            color: 'var(--text-2)', flexShrink: 0,
           }}>
             {(displayCompanyName(topJob.company) || '?')[0].toUpperCase()}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-body)', fontWeight: 600, color: 'var(--white)', letterSpacing: '-.02em', lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topJob.title}</div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.125rem' }}>{displayCompanyName(topJob.company)}{topJob.location ? ` · ${topJob.location}` : ''}</div>
+            <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-body)', fontWeight: 600, color: 'var(--text-1)', letterSpacing: '-.02em', lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topJob.title}</div>
+            <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--text-3)', marginTop: 2 }}>{displayCompanyName(topJob.company)}{topJob.location ? ` · ${topJob.location}` : ''}</div>
           </div>
           <ListingScoreRing score={topJob.score} size={40} />
         </div>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.25rem', marginBottom: '.5rem' }}>
-          {displayPay(topJob) && <span style={{ background: 'rgba(16,185,129,.12)', border: '1px solid rgba(16,185,129,.3)', borderRadius: 5, padding: '.25rem .5rem', fontSize: 'var(--fs-meta)', fontFamily: 'var(--mono)', color: 'var(--green)', fontWeight: 500 }}>{displayPay(topJob)}</span>}
-          {topJob.type && <span style={{ background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 5, padding: '.25rem .5rem', fontSize: 'var(--fs-meta)', fontFamily: 'var(--mono)', color: 'var(--accent)' }}>{topJob.type}</span>}
-          {topJob.level && <span style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 5, padding: '.25rem .5rem', fontSize: 'var(--fs-meta)', fontFamily: 'var(--mono)', color: 'var(--sub)' }}>{topJob.level}</span>}
+          {[displayPay(topJob), topJob.type, topJob.level].filter(Boolean).map(f => (
+            <span key={String(f)} className="tnum" style={{ border: '1px solid var(--border-2)', borderRadius: 'var(--r-chip)', padding: '4px 8px', fontSize: 'var(--fs-sm)', fontFamily: 'var(--body)', color: 'var(--text-2)' }}>{f}</span>
+          ))}
         </div>
 
         {/* The first thing the posting says about the ROLE — not the employer's mission paragraph
             that 302 SpaceX rows share (lib/jobs/descriptionText.js roleSnippet). */}
         {topJob.description && (
-          <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.55, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+          <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--text-3)', lineHeight: 1.55, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
             {roleSnippet(topJob.description, topJob.company, topJob.title, 220)}
-            {isDescriptionPreview(topJob) && <span style={{ color: 'var(--dim)' }}> (preview — full posting on the employer&apos;s site)</span>}
+            {isDescriptionPreview(topJob) && <span style={{ color: 'var(--text-4)' }}> (preview — full posting on the employer&apos;s site)</span>}
           </div>
         )}
 
@@ -288,8 +278,8 @@ export default function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply,
           const isHigh = sc.ghost_rate > 0.55
           return (
             <div style={{ marginTop: '.5rem', display: 'flex', alignItems: 'center', gap: '.25rem' }}>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: isHigh ? 'var(--red)' : 'var(--amber)', background: isHigh ? 'rgba(239,68,68,.1)' : 'rgba(245,158,11,.1)', border: `1px solid ${isHigh ? 'rgba(239,68,68,.25)' : 'rgba(245,158,11,.25)'}`, borderRadius: 5, padding: '.125rem .5rem' }}>
-                {isHigh ? '👻' : '⚠'} {ghostPct}% of applicants never hear back
+              <span className="tnum" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: isHigh ? 'var(--bad-text)' : 'var(--caution-text)', background: isHigh ? 'var(--bad-tint)' : 'var(--caution-tint)', border: `1px solid ${isHigh ? 'var(--bad-line)' : 'var(--caution-line)'}`, borderRadius: 'var(--r-chip)', padding: '2px 8px' }}>
+                <Icon name={isHigh ? 'ghost' : 'triangle-alert'} size={12} /> {ghostPct}% of applicants never hear back
               </span>
             </div>
           )
@@ -309,33 +299,19 @@ export default function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply,
         })()}
 
         <div style={{ position: 'absolute', bottom: '1rem', left: '1.25rem', right: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>{topJob.source || 'Job board'}</span>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>{stack.length} left{savedCount > 0 ? ` · ♡ ${savedCount} saved` : ''}</span>
+          <span style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>{topJob.source || 'Job board'}</span>
+          <span className="tnum" style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>{stack.length} left{savedCount > 0 ? ` · ♡ ${savedCount} saved` : ''}</span>
         </div>
       </div>
     </div>
 
-    {/* Action buttons */}
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', marginTop: '1rem' }}>
-      <button
-        onClick={() => advance('left')}
-        title="Skip"
-        style={{ width: 50, height: 50, borderRadius: '50%', border: '1px solid var(--line2)', background: 'var(--card)', color: 'var(--dim)', fontSize: 'var(--fs-lead)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--mono)' }}
-      >✕</button>
-      <button
-        onClick={() => advance('up')}
-        title="Apply now"
-        style={{ width: 62, height: 62, borderRadius: '50%', border: '1px solid rgba(59,130,246,.45)', background: 'rgba(59,130,246,.12)', color: 'var(--blue)', fontSize: 'var(--fs-h3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}
-      >↑</button>
-      <button
-        onClick={() => advance('right')}
-        title="Save"
-        style={{ width: 50, height: 50, borderRadius: '50%', border: '1px solid rgba(16,185,129,.45)', background: 'rgba(16,185,129,.12)', color: 'var(--green)', fontSize: 'var(--fs-lead)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-      >♡</button>
+    {/* Action buttons: Skip · Apply · Save — outlined, the accent on Apply only (SwipeJobDeck.module.css). */}
+    <div className={m.actions}>
+      <button type="button" onClick={() => advance('left')} title="Skip" aria-label="Skip" className={m.btn}>✕</button>
+      <button type="button" onClick={() => advance('up')} title="Apply now" aria-label="Apply now" className={`${m.btn} ${m.btnMain}`}>↑</button>
+      <button type="button" onClick={() => advance('right')} title="Save" aria-label="Save" className={m.btn}>♡</button>
     </div>
-    <div style={{ textAlign: 'center', marginTop: '.5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', letterSpacing: '.04em' }}>
-      drag or tap the buttons to decide
-    </div>
+    <div className={m.hint}>drag or tap the buttons to decide</div>
   </div>
   )
 }

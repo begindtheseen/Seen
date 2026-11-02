@@ -7,6 +7,7 @@ import { AppStore } from '@/lib/stores/AppStore'
 import CompanyScoreModal from '@/components/CompanyScoreModal'
 import { firstPartyReportCount } from '@/lib/server/reportCounts'
 import { isGradeableScore, MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
+import { MIN_SEEN_REPORTS_FOR_HIGH_CONFIDENCE } from '@/lib/companyPageSummary'
 import PageHeader from '@/components/shell/PageHeader'
 import { gradeLetter, displayCompanyName } from '@/lib/companyDisplay'
 import { gradeTone, ghostRateTone, responseRateTone, ghostRateWord, responseRateWord, toneText, toneFill } from '@/lib/ui/tone.js'
@@ -55,6 +56,27 @@ function evidenceLabel(sc: Company['score']): string {
 // nobody curates.
 const WELL_EVIDENCED_REPORTS = 10
 const TOP_SLOTS = 20
+
+// The confidence a card may CLAIM, from the fields the leaderboard payload carries (no stored data_quality
+// reaches the client). It is the company page's own display cap (lib/companyPageSummary.ts
+// capDisplayConfidence): a grade reads at most "Moderate confidence" until MIN_SEEN_REPORTS_FOR_HIGH_CONFIDENCE
+// of its applicant accounts came from Seen users, and "Low" under WELL_EVIDENCED_REPORTS accounts (the
+// thin-signal bar every ranked surface uses). Tier 2 = enough Seen-user reports for the stored word to be
+// read uncapped; it never says "High" on its own, because that word is not in the payload (do not invent it).
+type EvidenceTier = 0 | 1 | 2
+function evidenceTier(sc: Company['score']): EvidenceTier {
+  const fp = firstPartyReportCount(sc)
+  if (fp < WELL_EVIDENCED_REPORTS) return 0
+  return (sc.seen_user_report_count ?? 0) >= MIN_SEEN_REPORTS_FOR_HIGH_CONFIDENCE ? 2 : 1
+}
+function confidenceWord(tier: EvidenceTier): string {
+  return tier === 0 ? 'Low confidence' : tier === 1 ? 'Moderate confidence' : 'Confidence not capped'
+}
+function confidenceNote(tier: EvidenceTier, sc: Company['score']): string {
+  if (tier === 0) return `Fewer than ${WELL_EVIDENCED_REPORTS} applicant accounts behind this grade.`
+  if (tier === 1) return `Shown as moderate until ${MIN_SEEN_REPORTS_FOR_HIGH_CONFIDENCE} reports come from Seen users (${sc.seen_user_report_count ?? 0} so far) — most of this evidence is public posts.`
+  return `${sc.seen_user_report_count} of its applicant accounts were filed by Seen users.`
+}
 
 type SortKey = 'score' | 'ghost' | 'wait'
 const SORTS: Array<{ key: SortKey; label: string }> = [
@@ -162,18 +184,26 @@ export default function CompaniesPage() {
     if (sort === 'score') list = [...list].sort((a, b) => b.score.overall_score - a.score.overall_score)
     if (sort === 'ghost') list = [...list].sort((a, b) => a.score.ghost_rate - b.score.ghost_rate)
     if (sort === 'wait') list = [...list].sort((a, b) => a.score.avg_wait_days - b.score.avg_wait_days)
-    // Stable partition: well-evidenced companies take the top slots in the chosen order; the rest
-    // follow in the same order. Filtering by name keeps the plain order (the visitor asked for a name).
+    // Stable partition by evidence tier: grades whose confidence is not capped first, then the capped
+    // ("0 from Seen users") ones, then the thin ones — each tier in the chosen order, equal values broken
+    // by more applicant accounts, then more Seen-user reports. A perfect 100 with eleven public posts no
+    // longer outranks a well-evidenced 94 (design review 2026-11-02). Filtering by name keeps the plain
+    // order (the visitor asked for a name).
     if (q) return list
-    const strong = list.filter((c) => firstPartyReportCount(c.score) >= WELL_EVIDENCED_REPORTS)
-    const thin = list.filter((c) => firstPartyReportCount(c.score) < WELL_EVIDENCED_REPORTS)
-    return [...strong, ...thin]
+    const evidence = (a: Company, b: Company) => firstPartyReportCount(b.score) - firstPartyReportCount(a.score) || (b.score.seen_user_report_count ?? 0) - (a.score.seen_user_report_count ?? 0)
+    const key = (c: Company) => sort === 'score' ? -c.score.overall_score : sort === 'ghost' ? c.score.ghost_rate : c.score.avg_wait_days
+    const within = (a: Company, b: Company) => key(a) - key(b) || evidence(a, b)
+    return ([2, 1, 0] as EvidenceTier[]).flatMap((t) => list.filter((c) => evidenceTier(c.score) === t).sort(within))
   }, [companies, q, sort])
-  // Where the thinner grades begin (the heading sits before this index), or -1 when none / searching.
-  const thinStart = useMemo(() => {
-    if (q) return -1
-    const i = filtered.findIndex((c) => firstPartyReportCount(c.score) < WELL_EVIDENCED_REPORTS)
-    return i >= 0 && i < filtered.length ? i : -1
+  // Where each lower tier begins (its heading sits before that index), or -1 when none / searching / the
+  // tier above it is empty (a heading over the whole board says nothing).
+  const tierStart = useMemo(() => {
+    const start = (t: EvidenceTier) => {
+      if (q) return -1
+      const i = filtered.findIndex((c) => evidenceTier(c.score) === t)
+      return i > 0 ? i : -1
+    }
+    return { capped: start(1), thin: start(0) }
   }, [filtered, q])
 
   function lookUp(e: React.FormEvent) {
@@ -194,6 +224,7 @@ export default function CompaniesPage() {
           sub={<>Ranked by Seen Grade: who answers applicants, who ghosts them, and how long they take. A company is graded once it has at least one real applicant account (sent to Seen or posted publicly) and {MIN_REPORTS_FOR_GRADE} in total (an online mention counts half).</>}
         />
 
+        {/* One box, like the hero's: the field and its button share a border; the button sits inside. */}
         <form onSubmit={lookUp} className={s.search} role="search">
           <label htmlFor="co-search" className="sr-only">Search the scoreboard or look up any company</label>
           <div className={s.field}>
@@ -211,8 +242,8 @@ export default function CompaniesPage() {
             enterKeyHint="search"
             onChange={(e) => setQuery(e.target.value)}
           />
-          </div>
           <Button type="submit" variant="primary" disabled={!q} className={s.searchBtn}>Look up</Button>
+          </div>
         </form>
         <p className={s.hint}>Not on the board? Press Enter to open its page — the first lookup researches it once and the result is cached for everyone.</p>
 
@@ -246,9 +277,14 @@ export default function CompaniesPage() {
               const g = gradeLetter(co.score.overall_score)
               const gt = co.score.ghost_rate > 0 ? ghostRateTone(co.score.ghost_rate) : null
               const rt = co.score.response_rate > 0 ? responseRateTone(co.score.response_rate) : null
-              const divider = thinStart >= 0 && i === thinStart ? (
+              const tier = evidenceTier(co.score)
+              const divider = tierStart.thin >= 0 && i === tierStart.thin ? (
                 <li key="thin-divider" className={s.divider}>
-                  Early grades · fewer than {WELL_EVIDENCED_REPORTS} applicant accounts{thinStart >= TOP_SLOTS ? '' : ` · the top ${TOP_SLOTS} need ${WELL_EVIDENCED_REPORTS}+`}
+                  Early grades · fewer than {WELL_EVIDENCED_REPORTS} applicant accounts{tierStart.thin >= TOP_SLOTS ? '' : ` · the top ${TOP_SLOTS} need ${WELL_EVIDENCED_REPORTS}+`}
+                </li>
+              ) : tierStart.capped >= 0 && i === tierStart.capped ? (
+                <li key="capped-divider" className={s.divider}>
+                  Moderate confidence · fewer than {MIN_SEEN_REPORTS_FOR_HIGH_CONFIDENCE} reports from Seen users — most evidence is public posts
                 </li>
               ) : null
               return (
@@ -285,6 +321,8 @@ export default function CompaniesPage() {
                         <span className={s.score}><b className="tnum">{co.score.overall_score}</b>/100</span>
                         <span className={s.basis}>{evidenceLabel(co.score)}</span>
                       </div>
+                      {/* The same word the company page shows, so a 100/100 built on public posts is read as it should be. */}
+                      <Badge icon="gauge" title={confidenceNote(tier, co.score)} className={s.conf}>{confidenceWord(tier)}</Badge>
                       <div className={s.bar} aria-hidden="true"><div style={{ width: `${Math.max(4, co.score.overall_score)}%`, background: toneFill(tone) }} /></div>
                     </a>
                   </li>

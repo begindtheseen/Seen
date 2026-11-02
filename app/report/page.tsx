@@ -11,6 +11,8 @@ import { reportSourceBadge } from '@/lib/reportSource'
 import type { Application } from '@/lib/types'
 import PageHeader from '@/components/shell/PageHeader'
 import { formatPacific } from '@/lib/time/pacific.js'
+import Icon, { type IconName } from '@/components/ui/Icon'
+import st from './report.module.css'
 
 type Outcome = 'ghosted' | 'autoreject' | 'human' | 'waiting' | ''
 type Stage = 'application' | 'phone' | 'interview' | 'final' | ''
@@ -22,8 +24,11 @@ const OUTCOME_LABELS: Record<string, string> = {
 }
 const outcomeLabel = (o: string) => OUTCOME_LABELS[o] || (o ? o.charAt(0).toUpperCase() + o.slice(1) : '—')
 
+// Every field is a 44px target on phones (the smoke measured 36px inputs at 390).
 const inputStyle: React.CSSProperties = {
   width: '100%',
+  minHeight: 44,
+  boxSizing: 'border-box',
   background: 'var(--surface)',
   border: '1.5px solid var(--line2)',
   borderRadius: 8,
@@ -37,8 +42,9 @@ const inputStyle: React.CSSProperties = {
 }
 
 const selectStyle: React.CSSProperties = {
-  ...{} as React.CSSProperties,
   width: '100%',
+  minHeight: 44,
+  boxSizing: 'border-box',
   background: 'var(--surface)',
   border: '1.5px solid var(--line2)',
   borderRadius: 8,
@@ -57,36 +63,27 @@ const lbl = (text: string) => (
   </label>
 )
 
+// Outcome / stage chips: real radios, each a 44px pill; an icon from the one icon set (never an emoji).
 function RadioGroup<T extends string>({
   name, options, value, onChange,
 }: {
   name: string
-  options: { value: T; label: string }[]
+  options: { value: T; label: string; icon?: IconName }[]
   value: T
   onChange: (v: T) => void
 }) {
   return (
     <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginBottom: '.75rem' }}>
       {options.map(o => (
-        <label
-          key={o.value}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '.25rem',
-            background: value === o.value ? 'var(--bdim)' : 'var(--surface)',
-            border: `1.5px solid ${value === o.value ? 'var(--blue)' : 'var(--line2)'}`,
-            borderRadius: 8, padding: '.5rem .75rem', cursor: 'pointer',
-            fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: value === o.value ? 'var(--white)' : 'var(--sub)',
-            transition: 'all .15s',
-          }}
-        >
+        <label key={o.value} className={`${st.radio}${value === o.value ? ' ' + st.radioOn : ''}`}>
           <input
             type="radio"
             name={name}
             value={o.value}
             checked={value === o.value}
             onChange={() => onChange(o.value)}
-            style={{ display: 'none' }}
           />
+          {o.icon && <Icon name={o.icon} size={16} />}
           {o.label}
         </label>
       ))}
@@ -138,6 +135,14 @@ function ReportPage() {
   const [companyLocked, setCompanyLocked] = useState(false)
   const roleRef = useRef<HTMLInputElement>(null)
   const locationRef = useRef<HTMLInputElement>(null)
+  // After a submit on a phone the viewport sat at the footer while the success card rendered where
+  // the form had been: bring the card into view and put focus on its heading (tester 2026-11-02).
+  const doneRef = useRef<HTMLHeadingElement>(null)
+  useEffect(() => {
+    if (!done) return
+    window.scrollTo({ top: 0, left: 0 })
+    doneRef.current?.focus({ preventScroll: true })
+  }, [done])
 
   useEffect(() => {
     try {
@@ -316,8 +321,8 @@ function ReportPage() {
     return (
       <div style={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 2rem 3rem' }}>
         <div style={{ textAlign: 'center', maxWidth: 440 }}>
-          <div style={{ fontSize: 'var(--fs-fig-l)', marginBottom: '1rem' }}>✅</div>
-          <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--white)', marginBottom: '.5rem' }}>
+          <div style={{ color: 'var(--good-text)', marginBottom: '1rem' }}><Icon name="circle-check" size={48} label="Submitted" /></div>
+          <h2 ref={doneRef} tabIndex={-1} style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--white)', marginBottom: '.5rem', outline: 'none' }}>
             Report submitted
           </h2>
           <p style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.7, marginBottom: '1.5rem' }}>
@@ -371,19 +376,19 @@ function ReportPage() {
         {appId && auto && !autoApp && (
           <div style={{ background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 10, padding: '.75rem 1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.75rem', flexWrap: 'wrap' }}>
             <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6 }}>
-              ✦ Prefilled from your tracker.{company ? ` Reporting your ${company} outcome.` : ''}
+              Prefilled from your tracker.{company ? ` Reporting your ${company} outcome.` : ''}
             </div>
             <button
               onClick={() => { const apps = AppStore.loadSync(); const a = apps.find(x => x.id === appId); if (a) setAutoApp(a) }}
               style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, color: 'var(--text-1)', border: 'none', background: 'var(--cta)', borderRadius: 8, padding: '.5rem 1rem', cursor: 'pointer', flexShrink: 0 }}
             >
-              ✦ Open share card
+              Open share card
             </button>
           </div>
         )}
         {urlPrefilled && (
           <div style={{ background: 'rgba(59,130,246,.08)', border: '1px solid rgba(59,130,246,.22)', borderRadius: 10, padding: '.75rem 1rem', marginBottom: '1.25rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6 }}>
-            ✦ Prefilled for you{company ? <> — reporting <span style={{ color: 'var(--white)', fontWeight: 700 }}>{company}</span></> : ''}. Fill any missing field and hit submit.
+            Prefilled for you{company ? <> — reporting <span style={{ color: 'var(--white)', fontWeight: 700 }}>{company}</span></> : ''}. Fill any missing field and hit submit.
           </div>
         )}
         <PageHeader
@@ -419,12 +424,12 @@ function ReportPage() {
             <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--line)' }}>
               The listing
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.75rem' }}>
+            <div className={st.two}>
               <div>
                 {lbl('Company name *')}
                 {companyLocked && company ? (
                   <div style={{ ...inputStyle, display: 'flex', alignItems: 'center', gap: '.5rem', borderColor: 'rgba(16,185,129,.45)' }}>
-                    <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>✓ {company}</span>
+                    <Icon name="check" size={16} /><span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>{company}</span>
                     <button type="button" onClick={() => setCompanyLocked(false)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', flexShrink: 0 }}>change</button>
                   </div>
                 ) : (
@@ -436,7 +441,7 @@ function ReportPage() {
                 <input autoComplete="off" ref={roleRef} type="text" placeholder="e.g. Software Engineer" value={role} onChange={e => setRole(e.target.value)} style={inputStyle} />
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.75rem' }}>
+            <div className={st.two}>
               <div>
                 {lbl('City, State *')}
                 <input autoComplete="off" ref={locationRef} type="text" placeholder="e.g. Austin, TX" value={location} onChange={e => setLocation(e.target.value)} style={inputStyle} />
@@ -459,10 +464,10 @@ function ReportPage() {
               value={outcome}
               onChange={setOutcome}
               options={[
-                { value: 'ghosted', label: '👻 Ghosted' },
-                { value: 'autoreject', label: '🤖 Auto-rejected' },
-                { value: 'human', label: '💬 Got a response' },
-                { value: 'waiting', label: '⏳ Still waiting' },
+                { value: 'ghosted', label: 'Ghosted', icon: 'ghost' },
+                { value: 'autoreject', label: 'Auto-rejected', icon: 'bot' },
+                { value: 'human', label: 'Got a response', icon: 'message-square' },
+                { value: 'waiting', label: 'Still waiting', icon: 'hourglass' },
               ]}
             />
 
@@ -489,7 +494,7 @@ function ReportPage() {
             <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--line)' }}>
               Details
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '.75rem' }}>
+            <div className={st.three}>
               <div>
                 {lbl('Interview rounds')}
                 <select value={rounds} onChange={e => setRounds(e.target.value)} style={selectStyle}>
@@ -529,7 +534,7 @@ function ReportPage() {
           <button
             onClick={submit}
             disabled={loading}
-            style={{ width: '100%', background: 'var(--cta)', color: 'var(--text-1)', border: 'none', borderRadius: 8, padding: '.75rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-ui)', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1, boxShadow: '0 0 20px rgba(59,130,246,0.3)' }}
+            style={{ width: '100%', background: 'var(--cta)', color: 'var(--text-1)', border: 'none', borderRadius: 8, padding: '.75rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-ui)', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1, boxShadow: 'var(--sh-control)' }}
           >
             {loading ? 'Submitting...' : 'Submit report →'}
           </button>

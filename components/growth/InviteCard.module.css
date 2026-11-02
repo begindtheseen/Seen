@@ -56,9 +56,11 @@
   cursor: pointer;
   white-space: nowrap;
 }
-.primary { border: 1px solid rgba(59,130,246,.6); background: var(--blue); color: var(--text-1); }
+/* Outlined ink: the dashboard's and Settings' one filled button is elsewhere (DESIGN.md §5), and white on
+   var(--blue) was 3.5:1. */
+.primary { border: 1px solid var(--border-2); background: var(--surface-2); color: var(--text-1); }
 .ghost { border: 1px solid var(--line2); background: transparent; color: var(--text-2); }
-.primary:focus-visible, .ghost:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.primary:focus-visible, .ghost:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .note { margin: .5rem 0 0; font-family: var(--body); font-size: var(--fs-sm); color: var(--sub, rgba(255,255,255,.72)); }
 .stats {
   display: grid;

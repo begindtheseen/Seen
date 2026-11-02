@@ -2,11 +2,15 @@
 .page { max-width: var(--w-mid); margin: 0 auto; padding: var(--sp-10) var(--sp-6) var(--sp-12); width: 100%; box-sizing: border-box; }
 @media (max-width: 560px) { .page { padding: var(--sp-6) var(--sp-4) var(--sp-10); } }
 
-.field { position: relative; flex: 1 1 16rem; min-width: 0; }
-.search { display: flex; gap: var(--sp-2); align-items: stretch; }
+/* One box (the hero's pattern): field + its button inside a shared border; the input itself is borderless. */
+.search { display: block; }
+.field { position: relative; display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-1); background: var(--surface-1); border: 1px solid var(--border-2); border-radius: var(--r-control); transition: border-color var(--dur-state) var(--ease-out), box-shadow var(--dur-state) var(--ease-out); }
+.field:hover { border-color: var(--border-3); }
+.field:focus-within { border-color: var(--accent); box-shadow: var(--sh-focus); }
 .searchIcon { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--text-4); pointer-events: none; }
-.searchInput { min-height: 48px; padding-left: 40px; font-size: var(--fs-body); }
-.searchBtn { min-height: 48px; flex-shrink: 0; }
+.searchInput { flex: 1; min-width: 0; min-height: 44px; padding-left: 40px; font-size: var(--fs-body); background: transparent; border: 0; box-shadow: none; }
+.searchInput:hover, .searchInput:focus, .searchInput:focus-visible { border: 0; box-shadow: none; }
+.searchBtn { min-height: 44px; flex-shrink: 0; }
 .hint { margin: var(--sp-2) 0 0; font-size: var(--fs-sm); color: var(--text-3); line-height: 1.5; }
 
 .controls { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; margin: var(--sp-6) 0 var(--sp-4); }
@@ -30,6 +34,7 @@
 .score { font-size: var(--fs-sm); color: var(--text-3); }
 .score b { font-size: var(--fs-lead); font-weight: 600; color: var(--text-1); }
 .basis { font-size: var(--fs-meta); color: var(--text-3); }
+.conf { align-self: flex-start; }
 .bar { height: 4px; border-radius: var(--r-pill); background: var(--border-1); overflow: hidden; }
 .bar > div { height: 100%; border-radius: var(--r-pill); }
 
@@ -37,7 +42,5 @@
 .empty p { margin: 0; }
 
 @media (max-width: 480px) {
-  .search { flex-wrap: wrap; }
-  .searchBtn { flex: 1 1 100%; }
   .total { margin-left: 0; flex-basis: 100%; }
 }

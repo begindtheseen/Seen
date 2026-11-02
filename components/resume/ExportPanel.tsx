@@ -109,7 +109,7 @@ export default function ExportPanel({ doc, pro, isLoggedIn, onNeedPro, role }: P
         )}
         <div className={s.findingActions}>
           <button type="button" className={s.btnPrimary} onClick={download} disabled={busy !== null}>{busy === 'download' ? 'Building…' : `⬇ Download ${FORMATS.find((f) => f.id === format)?.label}`}</button>
-          {(format === 'pdf' || format === 'docx' || format === 'txt') && <button type="button" className={s.btn} onClick={runAts} disabled={busy !== null}>{busy === 'ats' ? 'Checking…' : '🔍 Check what a parser reads'}</button>}
+          {(format === 'pdf' || format === 'docx' || format === 'txt') && <button type="button" className={s.btn} onClick={runAts} disabled={busy !== null}>{busy === 'ats' ? 'Checking…' : 'Check what a parser reads'}</button>}
           {format === 'txt' && <button type="button" className={s.btn} onClick={() => copy('txt')}>{copied === 'txt' ? '✓ Copied' : 'Copy text'}</button>}
           {format === 'md' && <button type="button" className={s.btn} onClick={() => copy('md')}>{copied === 'md' ? '✓ Copied' : 'Copy Markdown'}</button>}
         </div>

@@ -5,6 +5,7 @@
 // audit-logged with its prior values — reversible) and recomputes the touched companies' grades.
 
 import { useState } from 'react'
+import Icon from '@/components/ui/Icon'
 import { Card, CardHeader } from './primitives'
 import { drainAdminAction, num } from './drain'
 
@@ -46,8 +47,8 @@ export function ReportDupesCard({ token, onChanged }: { token: string; onChanged
     <Card style={{ marginBottom: '1.25rem' }}>
       <CardHeader title="Duplicate reports" action={<span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>Same company, outcome, source, role and text</span>} />
       <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginBottom: msg || rows.length ? '.6rem' : 0 }}>
-        <button onClick={scan} disabled={!!busy} style={{ ...btn, borderColor: 'var(--blue)', color: 'var(--blue)' }}>{busy === 'scan' ? '⏳ Scanning…' : '⟳ Scan for duplicate reports'}</button>
-        {!!found?.suspected && <button onClick={mark} disabled={!!busy} style={{ ...btn, borderColor: 'var(--red)', color: 'var(--red)' }}>{busy === 'mark' ? '⏳ Marking…' : `✕ Mark ${found.suspected} duplicate${found.suspected === 1 ? '' : 's'}`}</button>}
+        <button onClick={scan} disabled={!!busy} style={{ ...btn, borderColor: 'var(--blue)', color: 'var(--blue)' }}>{busy === 'scan' ? <><Icon name="hourglass" size={14} /> Scanning…</> : '⟳ Scan for duplicate reports'}</button>
+        {!!found?.suspected && <button onClick={mark} disabled={!!busy} style={{ ...btn, borderColor: 'var(--red)', color: 'var(--red)' }}>{busy === 'mark' ? <><Icon name="hourglass" size={14} /> Marking…</> : `✕ Mark ${found.suspected} duplicate${found.suspected === 1 ? '' : 's'}`}</button>}
       </div>
       {rows.length > 0 && !!found?.suspected && (
         <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--amber)', lineHeight: 1.6 }}>

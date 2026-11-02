@@ -214,6 +214,8 @@ export function useJobSearch() {
   const queryRef = useRef(query); queryRef.current = query
   const locationRef = useRef(location); locationRef.current = location
   const radiusRef = useRef(radius); radiusRef.current = radius
+  // The last fresh result per query|place, to tell a radius change that returned the very same rows apart from one that did not.
+  const lastResultRef = useRef<{ key: string; radius: string; ids: string } | null>(null)
   const jobsRef = useRef(jobs); jobsRef.current = jobs
   const filtersRef = useRef({ niche, level, jobType, posted }); filtersRef.current = { niche, level, jobType, posted }
   // The last COMMITTED search (Enter / Search / a pick / a link) — what the URL shows and "Show more"
@@ -645,6 +647,15 @@ export function useJobSearch() {
             ? `No ${q} jobs within ${r} mi of ${loc} — showing the nearest and remote ones`
             : `Only ${inR} within ${r} mi of ${loc} — the rest are further away or remote`
         }
+        // A radius change that brought back exactly the same rows must say so (round 1: 25 → 50 mi in Austin
+        // looked ignored — it was not, there was nothing more to find).
+        const ids = raw.map((j) => j.id).join(',')
+        const prev = lastResultRef.current
+        if (!note && placeSearch && prev && prev.key === `${q}|${loc}` && prev.radius !== rad && prev.ids === ids && raw.length) {
+          const a = parseInt(prev.radius, 10), b = parseInt(rad, 10)
+          note = `Same ${raw.length} results at ${rad} mi as at ${prev.radius} mi — nothing more between ${Math.min(a, b)} and ${Math.max(a, b)} miles of ${loc}.`
+        }
+        lastResultRef.current = { key: `${q}|${loc}`, radius: rad, ids }
         if (label) setStatusMsg(label)
         setNotice(note)
         cacheSearch(cacheKey, { jobs: raw, ts: Date.now(), hasMore: more, pages: 1, notice: note, label })

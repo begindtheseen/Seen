@@ -152,12 +152,12 @@ export function EmployerReplyManager({ company }: { company: string }) {
                     />
                     {err && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--red)' }}>{err}</div>}
                     <div style={{ display: 'flex', gap: '.5rem' }}>
-                      <button onClick={() => rep.id && submit(rep.id)} disabled={busy || !draft.trim()} style={{ background: 'var(--cta)', border: 'none', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-meta)', color: 'var(--text-1)', cursor: 'pointer', opacity: busy || !draft.trim() ? .6 : 1 }}>{busy ? 'Submitting…' : 'Submit for review'}</button>
+                      <button onClick={() => rep.id && submit(rep.id)} disabled={busy || !draft.trim()} style={{ background: 'var(--cta)', border: 'none', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', color: 'var(--text-1)', cursor: 'pointer', opacity: busy || !draft.trim() ? .6 : 1 }}>{busy ? 'Submitting…' : 'Submit for review'}</button>
                       <button onClick={() => { setOpenId(null); setDraft(''); setErr('') }} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', cursor: 'pointer' }}>Cancel</button>
                     </div>
                   </div>
                 ) : (
-                  <button onClick={() => { setOpenId(rep.id); setDraft(''); setErr('') }} disabled={!rep.id} style={{ background: 'transparent', border: '1px solid var(--line2)', borderRadius: 7, padding: '.5rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-meta)', color: 'var(--white)', cursor: rep.id ? 'pointer' : 'default', opacity: rep.id ? 1 : .5 }}>Respond →</button>
+                  <button onClick={() => { setOpenId(rep.id); setDraft(''); setErr('') }} disabled={!rep.id} style={{ background: 'transparent', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', color: 'var(--white)', cursor: rep.id ? 'pointer' : 'default', opacity: rep.id ? 1 : .5 }}>Respond →</button>
                 )}
               </div>
             )
