@@ -560,7 +560,7 @@ select.fi,select.fs,select.fi-r,select.fs-r{background-image:url("data:image/svg
 .check-count-go{margin-left:auto;color:var(--sub);white-space:nowrap}
 .app-check{margin-top:.75rem;padding:.75rem .75rem .75rem;border-radius:10px;background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.2);animation:riseIn .45s var(--ease-out,ease) backwards}
 .app-check-head{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.25rem}
-.app-check-tag{display:inline-flex;align-items:center;gap:.5rem;font-family:var(--mono);font-size:var(--fs-meta);text-transform:uppercase;letter-spacing:.1em;color:var(--amber)}
+.app-check-tag{display:inline-flex;align-items:center;gap:.5rem;font-family:var(--mono);font-size:var(--fs-meta);text-transform:uppercase;letter-spacing:.1em;color:var(--text-3)}
 .app-check-dot{width:6px;height:6px;border-radius:50%;background:var(--amber);flex-shrink:0;box-shadow:0 0 8px rgba(245,158,11,.6)}
 .app-check-later{background:none;border:none;font-family:var(--mono);font-size:var(--fs-meta);color:var(--muted);cursor:pointer;padding:.125rem .25rem}
 .app-check-later:hover{color:var(--sub)}

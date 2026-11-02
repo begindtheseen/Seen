@@ -17,7 +17,7 @@
 /* The lead card's tag sits INSIDE the card, first in its flow (it used to straddle the border by half its height). */
 .tag { display: inline-block; margin-bottom: var(--sp-3); background: var(--surface-2); border: 1px solid var(--accent-line); color: var(--accent); font-family: var(--mono); font-size: var(--fs-meta); font-weight: 500; letter-spacing: .04em; padding: .125rem .5rem; border-radius: var(--r-pill); white-space: nowrap; }
 .name { font-family: var(--mono); font-size: var(--fs-meta); text-transform: uppercase; letter-spacing: .14em; color: var(--text-4); margin-bottom: .5rem; }
-.lead .name { color: var(--accent); }
+.lead .name { color: var(--text-1); } /* the plan name is a label — the tag beside it carries the accent */
 .priceRow { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; margin-bottom: .25rem; }
 .price { font-family: var(--body); font-size: var(--fs-h2); font-weight: 600; color: var(--text-1); line-height: 1; font-variant-numeric: tabular-nums; }
 .per { font-family: var(--body); font-size: var(--fs-sm); color: var(--text-3); }

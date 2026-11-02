@@ -266,7 +266,7 @@ function RewriteView({ out, copy, copied, onRerun, pro }: { out: PaidOptimize; c
 
       {real.length > 0 && (
         <Card>
-          {kicker('Safe improvements to your own bullets', 'var(--green)')}
+          {kicker('Safe improvements to your own bullets', 'var(--text-3)')}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
             {real.map((b, i) => (
               <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.75rem .75rem', display: 'flex', gap: '.5rem', alignItems: 'flex-start' }}>
@@ -1012,7 +1012,7 @@ function ResumePageInner() {
               )}
 
               <button onClick={() => setShowManual(v => !v)} style={{ background: 'none', border: '1px solid var(--line2)', color: 'var(--dim)', borderRadius: 6, padding: '.5rem .75rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', cursor: 'pointer', marginBottom: (showManual || savedJobs.length === 0) ? '.75rem' : '1rem' }}>
-                {showManual ? '▲ Hide manual entry' : '✎ Enter job info manually'}
+                {showManual ? <><Icon name="arrow-up" size={14} /> Hide manual entry</> : <><Icon name="pencil" size={14} /> Enter job info manually</>}
               </button>
 
               {(showManual || savedJobs.length === 0) && (
@@ -1042,7 +1042,7 @@ function ResumePageInner() {
             {!analyzed ? (
               <>
                 <Card>
-                  {kicker('Before the job: fix the résumé itself', 'var(--accent)')}
+                  {kicker('Before the job: fix the résumé itself', 'var(--text-3)')}
                   <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: 'var(--fs-body)', marginBottom: '.25rem' }}>Résumé Studio</div>
                   <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-65)', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.75rem' }}>
                     A health score with every weak bullet pinpointed and fixed without inventing a word · a tailored version built only from your own facts · PDF, Word, text, Markdown and JSON Resume exports in three templates, each checked the way a parser reads it.
@@ -1134,7 +1134,7 @@ function ResumePageInner() {
                           </div>
                         </Card>
                         <Card>
-                          {kicker('Humanized bullets', 'var(--green)')}
+                          {kicker('Humanized bullets', 'var(--text-3)')}
                           {hp.integrity?.grounded && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--green)', marginBottom: '.5rem' }}>✓ Every number kept exactly as you wrote it — nothing added.</div>}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                             {hp.package.bullets.map((b, i) => (

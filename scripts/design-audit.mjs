@@ -66,7 +66,8 @@ for (const [w, h, mobile] of WIDTHS) {
       // DESIGN.md §2: eyebrows / section labels are ink. An uppercase ≤13px text with a hue and no chip background is a coloured label.
       const hue = (c) => { const m = c && c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/); if (!m) return false; const [r, g, b] = [+m[1], +m[2], +m[3]]; return Math.max(r, g, b) - Math.min(r, g, b) > 60; };
       const labels = []; const tiny = []; const emoji = []; let small = 0;
-      const EMOJI = /[\u{1F300}-\u{1FAFF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}]/u;
+      // Same rule as lib/ui/designRules.test.mjs: colour-font emoji, not typographic glyphs (✓ ✕ ☰ ✎ → pass).
+      const EMOJI = /\p{Emoji_Presentation}|\p{Extended_Pictographic}\uFE0F|[\u{1F000}-\u{1FFFF}]/u;
       for (const el of document.querySelectorAll('body *')) {
         if (!vis(el)) continue;
         const cs = getComputedStyle(el);

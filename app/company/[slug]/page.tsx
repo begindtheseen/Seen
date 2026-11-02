@@ -931,12 +931,12 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                 <p className={c.provenance}>
                   {reportsProvenanceLine(sum)}
                   {sum.listedNote ? ` ${sum.listedNote}` : ''}
-                  {commentaryN > 0 ? ` ${commentaryN} ${commentaryN === 1 ? 'quote is' : 'quotes are'} commentary, not counted.` : ''}
                   {/* The grade's count is stored when the rows are imported (company_scores.first_party_report_count);
                       each card is re-judged by today's stricter first-hand rules (lib/reports/feedFilter.js). When the
-                      two disagree — Stripe: "10 accounts from public posts" over ten "Commentary" cards — say so. */}
-                  {fpReports > 0 && seenRows.length === 0 && publicRows.length > 0 && commentaryN === publicRows.length
-                    ? ` The ${fpReports} account${fpReports === 1 ? '' : 's'} counted in the grade ${fpReports === 1 ? 'was' : 'were'} accepted when imported; under today's stricter first-hand rules every quote below reads as commentary, so none is shown as a counted account.`
+                      two disagree — Amazon: "25 from public posts" counted beside 47 "Commentary" cards; Stripe: ten of
+                      ten — say so in one sentence that carries both numbers, instead of two facts that contradict. */}
+                  {commentaryN > 0
+                    ? ` ${commentaryN} of the ${publicRows.length} public ${publicRows.length === 1 ? 'row reads' : 'rows read'} as commentary under today's stricter first-hand rules${(sum.sources?.public ?? 0) > publicRows.length - commentaryN ? ` — the ${sum.sources!.public} counted in the grade ${sum.sources!.public === 1 ? 'was' : 'were'} accepted when imported` : ''}.`
                     : ''}
                   {hiddenPublicN > 0 ? ` ${hiddenPublicN} hidden (links or bot text).` : ''}
                 </p>
