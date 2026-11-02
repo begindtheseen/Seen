@@ -115,6 +115,12 @@ const money = (p: Pay) => p.unit === 'hour'
 // device — round 4: all four personas lost it); this device keeps a copy as a backstop for a stash that failed.
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const postingKey = (appId: string) => `seen_prep_posting_${appId}`
+// Whether this application's prep is open is this tab's choice (phone round 2026-11-02: a card that reached
+// an interview grew to ~1,500px by itself). Closed by default; a tap opens it; a reload keeps the choice.
+// sessionStorage, swept on sign-out with the other per-person keys (lib/sessionLocalKeys.js).
+const openKey = (appId: string) => `seen_prep_open_${appId}`
+const readOpen = (appId: string): boolean => { try { return sessionStorage.getItem(openKey(appId)) === '1' } catch { return false } }
+const writeOpen = (appId: string, open: boolean) => { try { if (open) sessionStorage.setItem(openKey(appId), '1'); else sessionStorage.removeItem(openKey(appId)) } catch { /* private mode */ } }
 const stashPosting = (appId: string, text: string) => { try { if (text.trim()) localStorage.setItem(postingKey(appId), text.slice(0, 6000)); else localStorage.removeItem(postingKey(appId)) } catch { /* private mode */ } }
 const takePosting = (appId: string): string => { try { const v = localStorage.getItem(postingKey(appId)) || ''; return v } catch { return '' } }
 const dropPosting = (appId: string) => { try { localStorage.removeItem(postingKey(appId)) } catch { /* ignore */ } }
@@ -148,7 +154,11 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
   onSchedule: (iso: string) => void
 }) {
   const [data, setData] = useState<RecordData | null>(null)
-  const [open, setOpen] = useState(true)
+  // Closed until the person opens it; remembered per application for this tab. `lead` (just reached an
+  // interview) brings the one-line row into view but never opens it by itself.
+  const [open, setOpenState] = useState(false)
+  useEffect(() => { if (readOpen(appId)) setOpenState(true) }, [appId])
+  const setOpen = useCallback((next: boolean) => { setOpenState(next); writeOpen(appId, next) }, [appId])
   const [pack, setPack] = useState<Pack | null>(null)
   const [state, setState] = useState<'idle' | 'building' | 'need_resume' | 'error'>('idle')
   const [err, setErr] = useState('')
@@ -219,11 +229,11 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
     if (preview && preview.questions.length) funnelEvent('prep_preview_shown', { surface: 'tracker_prep', company, once: appId })
   }, [preview, appId, company])
 
-  // Reached an interview a moment ago: open and bring the prep into view (the moment the offer is for).
+  // Reached an interview a moment ago: bring the prep's row into view (the moment the offer is for). It
+  // stays one line until tapped — the card's own update buttons were what the person came for.
   const boxRef = useRef<HTMLElement>(null)
   useEffect(() => {
     if (!lead) return
-    setOpen(true)
     const t = setTimeout(() => boxRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 450)
     return () => clearTimeout(t)
   }, [lead])
@@ -259,11 +269,12 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
   useEffect(() => {
     if ((autoBuild || pending) && isPro && !pack && !built.current) {
       built.current = true
+      setOpen(true)
       const kept = postingRef.current || takePosting(appId)
       if (kept && !postingRef.current) setPostingBoth(kept)
       void build({ jobText: kept })
     }
-  }, [autoBuild, pending, isPro, pack, appId, build])
+  }, [autoBuild, pending, isPro, pack, appId, build, setOpen])
 
   // Both products come back to THIS card with the prep building (api/stripe.js success_url ?prep=<id>). The
   // posting goes to the server first so any device, any browser, builds with it.
@@ -334,13 +345,14 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
 
   return (
     <section ref={boxRef} className={`${s.box}${lead ? ` ${s.lead}` : ''}`} onClick={e => e.stopPropagation()} aria-label={`Interview prep for ${company}`} data-testid="interview-prep">
-      <button type="button" className={s.head} aria-expanded={open} onClick={() => setOpen(!open)}>
-        <span className={s.kicker}>Interview at {company}</span>
-        <span className={s.toggle}>{open ? 'Hide' : 'Show'}</span>
+      {/* One line closed ("Interview prep for Acme · Thu, Oct 29 →"); the same line with "Hide" open. */}
+      <button type="button" className={s.head} aria-expanded={open} onClick={() => setOpen(!open)} data-testid="prep-toggle">
+        <span className={s.kicker}>Interview prep for {company}{interviewAt ? <span className={s.when}> · {day(interviewAt)}</span> : null}</span>
+        <span className={s.toggle}>{open ? 'Hide' : '→'}</span>
       </button>
 
       {open && (
-        <>
+        <div className={s.inner}>
           {lead && !pack && <p className={s.leadLine} data-testid="prep-lead">They called you in. Here is what Seen knows about {company}&apos;s interviews, and a first look at your prep.</p>}
           {/* FREE — Seen's own data, for everyone */}
           <div className={s.facts}>
@@ -458,7 +470,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
               {(err || checkout.error) && <p className={s.err} role="alert">{err || checkout.error}</p>}
             </div>
           )}
-        </>
+        </div>
       )}
     </section>
   )

@@ -11,7 +11,6 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { listingHref } from '@/lib/listingHref.js'
 import OutcomeCard from '@/components/OutcomeCard'
-import RoundsPrompt from '@/components/RoundsPrompt'
 import { firstPartyReportCount } from '@/lib/server/reportCounts'
 import { isGradeableScore } from '@/lib/gradeGate'
 import { gradeLetter } from '@/lib/companyDisplay'
@@ -402,8 +401,10 @@ function TrackerPage() {
   // The account's rows could not be read: show the error + Retry and this device's local copy, never
   // "0 TOTAL · No applications yet" (R-1).
   const [loadFailed, setLoadFailed] = useState(false)
+  // The outcome card opens ONLY from the finished card's "Share outcome card" button — never by itself
+  // after an outcome is recorded (share cards are retired as a growth lever, owner 2026-10-24; phone
+  // round 2026-11-02: a full-screen share sheet opened over a rejection just logged).
   const [outcomeApp, setOutcomeApp] = useState<Application | null>(null)
-  const [roundsApp, setRoundsApp] = useState<Application | null>(null)
   const [showManual, setShowManual] = useState(false)
   const [showSurvey, setShowSurvey] = useState(false)
   // Survey source: prefer the résumé-based survey (asks about the user's past employers from
@@ -703,13 +704,6 @@ function TrackerPage() {
           .catch(() => {})
       }).catch(() => {})
     }
-    if (changes.status && ['hired', 'ghosted', 'rejected'].includes(changes.status)) {
-      const app = after.find(a => a.id === id)
-      if (app) {
-        setOutcomeApp(app)
-        if (changes.status === 'hired') setRoundsApp(app)
-      }
-    }
     return r
   }
 
@@ -834,12 +828,9 @@ function TrackerPage() {
     else if (r.status === 'failed') showToast('Saved on this device — it didn’t reach your account yet. Tap “Not synced · Retry” on the card.')
   }
 
-  // Route a terminal tracked app to the report page pre-loaded for one-click card creation.
-  // /report reads app_id + auto=1 and prefills + renders the OutcomeCard inline from real
-  // tracker data (no re-typing). This is the tracker→report→share virality loop.
-  const handleShare = (app: Application) => {
-    router.push(`/report?app_id=${encodeURIComponent(app.id)}&auto=1`)
-  }
+  // "Share outcome card" on a finished card: the card's own outcome sheet, here, on request only. (It used
+  // to route to /report?auto=1, which filed the outcome a second time on the way to the same card.)
+  const handleShare = (app: Application) => setOutcomeApp(app)
 
   // A check-in answer is DATA ON THE APPLICATION (H3): a check_answered marker plus whatever it means
   // for the stage/status, in ONE update_application call — so the next device knows it was answered
@@ -988,16 +979,6 @@ function TrackerPage() {
         otherGrades={Object.entries(companyScores).filter(([k]) => k !== outcomeApp.company.toLowerCase().trim()).map(([, v]) => gradeLetter(v.overall_score))}
       />
     )}
-    {roundsApp && !outcomeApp && (
-      <RoundsPrompt
-        app={roundsApp}
-        onSubmit={(rounds, notes) => {
-          EventStore.add({ appId: roundsApp.id, type: 'rounds_reported', data: { rounds, notes } })
-          setRoundsApp(null)
-        }}
-        onSkip={() => setRoundsApp(null)}
-      />
-    )}
     <div className="page-full">
       <div className={s.body} style={{ maxWidth: 1000, margin: '0 auto', padding: '2.5rem 1rem', width: '100%', boxSizing: 'border-box' }}>
 
@@ -1008,7 +989,7 @@ function TrackerPage() {
           eyebrow="Application tracker"
           title="My applications"
           sub="Your applications sync to your account. Seen checks in with you at day 7, 14 and 30."
-          actions={<button type="button" className={`${s.act} ${s.actPrimary} ${s.deskOnly}`} onClick={() => setShowManual(true)}>+ Track application</button>}
+          actions={apps.length > 0 ? <button type="button" className={`${s.act} ${s.actPrimary} ${s.deskOnly}`} onClick={() => setShowManual(true)}>+ Track application</button> : undefined}
         />
 
         {loadFailed && (
@@ -1022,7 +1003,9 @@ function TrackerPage() {
           </div>
         )}
 
-        {/* Inbox Autopilot — forwarded job emails keep these cards up to date (hidden until it is live) */}
+        {/* Inbox Autopilot — forwarded job emails keep these cards up to date (hidden until it is live). Its
+            working panel sits up here; while it is off, the promo sits UNDER the list (one line on a fresh
+            account): nothing promotional above the first application card (phone round 2026-11-02). */}
         <InboxAutopilot apps={apps} token={token} onAppsChanged={loadApps} status={inboxStatus} />
 
         {/* Stats — tiles on wide screens; one line on phones so the cards come first */}
@@ -1033,9 +1016,9 @@ function TrackerPage() {
             {withdrawn.length > 0 && <><span className={s.sep}>·</span><b>{withdrawn.length}</b> withdrawn</>}
           </div>
         )}
-        {/* Hidden when the account could not be read and this device holds nothing: a row of zeros under an
-            error block would still read as "you have no applications" (R-1). */}
-        {!(loadFailed && apps.length === 0) && (
+        {/* Only once there is a list: a row of zeros is not information, and under a failed load it would
+            still read as "you have no applications" (R-1). */}
+        {apps.length > 0 && (
         <div className={`${s.statTiles} ${s.deskOnly}`}>
           {[
             { label: 'Total', n: apps.length },
@@ -1159,57 +1142,17 @@ function TrackerPage() {
           </button>
         )}
 
-        {/* Empty state — both ways in: track one yourself, or Apply on a job. Never shown for a failed load. */}
+        {/* Empty state — the whole screen on a fresh account: one sentence, the page's ONE filled button, a
+            text link to the other way in (Apply on a job). Never shown for a failed load. */}
         {apps.length === 0 && !loadFailed && (
-          <div className={s.empty}>
+          <div className={`${s.empty} ${s.emptyCard}`} data-testid="tracker-empty">
             <div className={s.emptyIcon}><Icon name="list-checks" size={28} /></div>
             <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', marginBottom: '.5rem' }}>No applications yet</div>
             <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.6, maxWidth: 420, margin: '0 auto' }}>Add one you already sent, or hit Apply on a job here and it lands on this list by itself.</div>
-            {/* Outlined: the page's one filled button is the header's (the floating + on phones). */}
             <div className={s.emptyBtns}>
-              <button type="button" className={s.act} onClick={() => setShowManual(true)}>+ Track application</button>
-              <Link href="/jobs" className={s.act}>Browse jobs →</Link>
+              <button type="button" className={`${s.act} ${s.actPrimary}`} onClick={() => setShowManual(true)}>+ Track application</button>
             </div>
-          </div>
-        )}
-
-        {/* Survey CTA — once at least one application is a week old there is something to report */}
-        {anyWeekOld && !showSurvey && (
-          <div
-            className={s.after}
-            role="button"
-            tabIndex={0}
-            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSurveyMode('resume'); setShowSurvey(true) } }}
-            onClick={() => { setSurveyMode('resume'); setShowSurvey(true) }}
-            style={{
-              background: 'var(--accent-tint)',
-              border: '1px solid var(--accent-line)',
-              borderRadius: 10,
-              padding: '.75rem 1rem',
-              marginBottom: '.75rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '.75rem',
-              cursor: 'pointer',
-              transition: 'background .15s',
-            }}
-          >
-            <div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--accent)', fontWeight: 500, marginBottom: '.125rem', display: 'flex', alignItems: 'center', gap: '.25rem' }}>
-                <Icon name="sparkles" size={13} />
-                {creditsEarned > 0 ? `You earned ${creditsEarned} credit${creditsEarned !== 1 ? 's' : ''} — keep going` : 'Earn up to 5 credits today'}
-              </div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)' }}>
-                Share what happened with your applications — 90 sec, helps future job seekers
-              </div>
-            </div>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--accent)', flexShrink: 0 }}>Start →</span>
-          </div>
-        )}
-        {creditsEarned > 0 && !showSurvey && (
-          <div className={s.after} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', textAlign: 'center', marginBottom: '.75rem' }}>
-            <Icon name="check" size={13} /> +{creditsEarned} credits earned this session
+            <Link href="/jobs" className={s.textLink}>Browse jobs →</Link>
           </div>
         )}
 
@@ -1252,6 +1195,46 @@ function TrackerPage() {
           <button type="button" className={`${s.act} ${s.more}`} onClick={() => setVisible(v => v + PAGE_SIZE)}>
             Show {Math.min(PAGE_SIZE, shownApps.length - pageApps.length)} more <span className={s.moreN}>· {shownApps.length - pageApps.length} not shown</span>
           </button>
+        )}
+
+        {/* Survey CTA — under the list (never above the first card), once an application is a week old */}
+        {anyWeekOld && !showSurvey && (
+          <div
+            className={s.after}
+            role="button"
+            tabIndex={0}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSurveyMode('resume'); setShowSurvey(true) } }}
+            onClick={() => { setSurveyMode('resume'); setShowSurvey(true) }}
+            style={{
+              background: 'var(--accent-tint)',
+              border: '1px solid var(--accent-line)',
+              borderRadius: 10,
+              padding: '.75rem 1rem',
+              marginBottom: '.75rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '.75rem',
+              cursor: 'pointer',
+              transition: 'background .15s',
+            }}
+          >
+            <div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--accent)', fontWeight: 500, marginBottom: '.125rem', display: 'flex', alignItems: 'center', gap: '.25rem' }}>
+                <Icon name="sparkles" size={13} />
+                {creditsEarned > 0 ? `You earned ${creditsEarned} credit${creditsEarned !== 1 ? 's' : ''} — keep going` : 'Earn up to 5 credits today'}
+              </div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)' }}>
+                Share what happened with your applications — 90 sec, helps future job seekers
+              </div>
+            </div>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--accent)', flexShrink: 0 }}>Start →</span>
+          </div>
+        )}
+        {creditsEarned > 0 && !showSurvey && (
+          <div className={s.after} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', textAlign: 'center', marginBottom: '.75rem' }}>
+            <Icon name="check" size={13} /> +{creditsEarned} credits earned this session
+          </div>
         )}
 
         {/* Housekeeping — under the list, out of the way of it; only once there is a list (≥2 cards). */}

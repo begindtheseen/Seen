@@ -8,6 +8,8 @@ import { _sync } from './sync'
 import { consumeIntentionalSignOut, handleSessionExpired, resetSessionExpiredGuard } from './sessionExpired'
 import type { UserProfile } from './types'
 import { resolveEmployerCompany, selectActiveClaim } from './server/employerClaims'
+import { SavedJobsStore } from './stores/SavedJobs'
+import GuestSavesPrompt, { GUEST_SAVES_EVENT } from '@/components/GuestSavesPrompt'
 
 /** An employer's request to manage a company (ADMIN-APPROVED CLAIMS model, migration 053).
  *  Only a 'approved' claim grants login-scoped access to that company's employer surfaces. */
@@ -169,6 +171,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) hadUser = true
       if (event === 'SIGNED_IN' && session?.user) {
+        // Jobs saved on this device while signed out are set aside BEFORE any page reads the account's
+        // list, and the person is asked once (components/GuestSavesPrompt.tsx: Keep · Discard). They are
+        // never imported on their own — device-local data must not flow into an account by itself.
+        const guestSaves = SavedJobsStore.stashGuestSaves()
+        if (guestSaves > 0) window.dispatchEvent(new CustomEvent(GUEST_SAVES_EVENT, { detail: { count: SavedJobsStore.guestSaves().length } }))
         setUser(session.user)
         resetSessionExpiredGuard()
       } else if (event === 'TOKEN_REFRESHED' && session?.user) {
@@ -228,6 +235,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={{ user, profile, isLoggedIn, isSeeker, isEmployer, ready, employerCompany, employerClaim, claimsReady, reloadClaims, token: getToken, loadProfile }}>
       {children}
+      <GuestSavesPrompt />
     </AuthContext.Provider>
   )
 }

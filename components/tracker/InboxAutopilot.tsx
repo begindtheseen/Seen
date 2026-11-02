@@ -119,21 +119,22 @@ export default function InboxAutopilot({ apps, token, onAppsChanged, status }: {
 
   if (!st.enabled) {
     // Before the first application the promo is one line (the empty tracker should read as one thing to
-    // do); with ≥1 application it is the full pitch. "Turn it on" is outlined either way — the tracker's
-    // one filled button is "+ Track application" (DESIGN.md §5).
+    // do); with ≥1 application it is the full pitch. Either way it is a promo, so it sits under the list
+    // (.promo) and "Turn it on" is outlined — the tracker's one filled button is "+ Track application"
+    // (DESIGN.md §5).
     if (apps.length === 0) {
       return (
-        <section className={s.card} id="autopilot" style={{ padding: '.5rem 1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap', fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--text-3)' }}>
-            <span><b style={{ color: 'var(--text-2)', fontWeight: 600 }}>Inbox Autopilot</b> — forward job emails and the tracker fills itself.</span>
-            <button className={s.link} style={{ marginLeft: 'auto', minHeight: 40 }} disabled={busy} onClick={() => act('inbox_enable')}>{busy ? 'Turning on…' : 'Turn it on →'}</button>
-          </div>
+        <section className={`${s.card} ${s.promo} ${s.oneLine}`} id="autopilot" data-testid="autopilot-promo">
+          <p className={s.oneLineRow}>
+            <b>Inbox Autopilot</b> — forward job emails, the tracker fills itself.{' '}
+            <button className={s.link} disabled={busy} onClick={() => act('inbox_enable')}>{busy ? 'Turning on…' : 'Turn it on →'}</button>
+          </p>
           {err && <div className={s.err}>{err}</div>}
         </section>
       )
     }
     return (
-      <section className={s.card} id="autopilot">
+      <section className={`${s.card} ${s.promo}`} id="autopilot" data-testid="autopilot-promo">
         <div className={s.pitch}>
           <div>
             <div className={s.eyebrow}>New · Inbox Autopilot</div>
@@ -184,7 +185,7 @@ export default function InboxAutopilot({ apps, token, onAppsChanged, status }: {
 
       {settingUp && (
         <ol className={s.steps}>
-          <li><b>Gmail on a computer</b> (the phone app can’t set this up): Settings ⚙ → <i>See all settings</i> → <i>Forwarding and POP/IMAP</i> → <i>Add a forwarding address</i> → paste your Seen address. Leave forwarding itself <b>off</b> at the top of that page.</li>
+          <li><b>In Gmail on the desktop site</b> — its forwarding settings are only there (mail.google.com on a computer, or “Request desktop site” in your phone’s browser; copy your Seen address here first): Settings ⚙ → <i>See all settings</i> → <i>Forwarding and POP/IMAP</i> → <i>Add a forwarding address</i> → paste your Seen address. Leave forwarding itself <b>off</b> at the top of that page.</li>
           <li>Gmail sends Seen a confirmation code — it shows up right here within a minute. Paste it back into Gmail and click <i>Verify</i>.</li>
           <li>Make a filter so only job emails go to Seen: in Gmail’s search bar open <i>Show search options</i>, paste this into <i>Has the words</i>, click <i>Create filter</i>, tick <i>Forward it to</i> your Seen address.
             <div className={s.addrRow}><code className={s.filter}>{st.gmail_filter}</code><button className={s.link} onClick={() => copy(st.gmail_filter || '', 'filter')}>{copied === 'filter' ? 'Copied ✓' : 'Copy'}</button></div>

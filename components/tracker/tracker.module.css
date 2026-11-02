@@ -136,9 +136,12 @@
 .dialogBtns { display: flex; gap: .5rem; margin-top: .25rem; }
 .dialogBtns > * { flex: 1 1 0; }
 
-/* ── Empty state ── */
+/* ── Empty state: ONE card = the whole screen on a fresh account (header + this + the one-line Autopilot link) ── */
 .empty { text-align: center; padding: 2.5rem 1rem; }
+.emptyCard { background: var(--raised); border: 1px solid var(--line2); border-radius: var(--r-card); padding: 2rem 1rem; }
 .emptyBtns { display: flex; justify-content: center; flex-wrap: wrap; gap: .5rem; margin-top: 1.25rem; }
+.textLink { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 .75rem; margin-top: .25rem; font-family: var(--body); font-size: var(--fs-sm); font-weight: 600; color: var(--text-2); text-decoration: none; }
+.textLink:hover { color: var(--text-1); text-decoration: underline; }
 
 /* Housekeeping row under the list */
 .house { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--line); }

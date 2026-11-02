@@ -18,7 +18,7 @@ import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Icon, { type IconName } from '@/components/ui/Icon'
 import StatTile from '@/components/ui/StatTile'
-import { accountsLine } from '@/lib/glossary.js'
+import { accountsLabel, accountSources } from '@/lib/glossary.js'
 import { gradeTone, ghostRateTone, responseRateTone, wastedEffortTone, ghostRateWord, responseRateWord, wastedEffortWord, gradeWord, toneText, toneFill } from '@/lib/ui/tone.js'
 import c from './company.module.css'
 import { isGradeableScore, notEnoughReviewsLabel, gradeBasisLabel, MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
@@ -29,7 +29,7 @@ import WarnFriendShare from '@/components/growth/WarnFriendShare'
 import TrackCta from '@/components/company/TrackCta'
 import { warnFriendText } from '@/lib/growthCopy.js'
 import { gradeLetter, displayCompanyName, displayPlatform, isResolvedOutcome, lastUpdatedLabel } from '@/lib/companyDisplay'
-import { buildCompanySummary, publicRowsHeading, reportsProvenanceLine, reportsSectionSummary, MIN_REPORTS_FOR_RATES, type CompanySummary } from '@/lib/companyPageSummary'
+import { buildCompanySummary, reportsProvenanceLine, MIN_REPORTS_FOR_RATES, type CompanySummary } from '@/lib/companyPageSummary'
 import { feedRowVerdict } from '@/lib/reports/feedFilter.js'
 import { looksLikeBotOrLinkText, trimToSentence } from '@/lib/reports/excerptText.js'
 import { displayPay } from '@/lib/jobs/pay.js'
@@ -99,9 +99,15 @@ interface WebReview {
 
 type SectionKey = 'odds' | 'breakdown' | 'reports' | 'online' | 'reddit' | 'locations' | 'roles' | 'compare' | 'about'
 
-// Reddit "still checking" polling: 5 asks 4 s apart ≈ 20 s, then the section hides itself.
+// Reddit "still checking" polling: up to 5 asks 4 s apart, and never past REDDIT_POLL_DEADLINE_MS of wall
+// clock (a slow answer used to stretch five asks far beyond 20 s). The section renders only once at least two
+// threads exist — there is no "Checking…" row that could outlive its deadline (phone tester 2026-11-02: Fry's).
 const REDDIT_POLL_MS = 4000
 const REDDIT_POLL_ATTEMPTS = 5
+const REDDIT_POLL_DEADLINE_MS = 20000
+// A public-discussion enrichment request still 'queued' after this long is treated as nothing found: the
+// cron did not get to it, and the page promises nothing it cannot show.
+const ENRICHMENT_FRESH_MS = 24 * 60 * 60 * 1000
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -260,15 +266,25 @@ function OutcomeDistribution({ reports, label }: { reports: Report[]; label: str
   )
 }
 
-// Truthful "self-filling" status: the company is queued for the public-discussion enrichment cron. It
-// names the company the ONE way the page does (displayCompanyName — the hero said "ZZZ …" while this line
-// said "Zzz …"), and promises nothing: a name nobody has written about yields nothing, and says so.
-function EnrichmentNotice({ companyName }: { companyName: string }) {
-  return (
-    <p role="status" className={c.fine}>
-      We have no reports for {displayCompanyName(companyName)} yet. Seen is looking for public hiring discussions that name it; if any exist, they will appear here.
-    </p>
-  )
+type Enrichment = { status: string; requested_at?: string | null; done_at?: string | null } | null
+
+// The end state of a page with nothing to show (phone tester 2026-11-02: Fry's read "Seen is looking for
+// public hiring discussions…" beside a Reddit row that kept "checking"). ONE static sentence, decided from the
+// enrichment status the score answer carried — nothing polls for it. Only a request the cron is running now,
+// or queued within the last 24 h, adds that Seen is checking; 'empty' / 'done' / 'error', an older queue entry
+// or no queue at all read as what they are: nothing found yet. The company is named the ONE way the page
+// names it (displayCompanyName).
+function enrichmentLine(enrichment: Enrichment, name: string, now = Date.now()): string {
+  const base = 'No public hiring discussions found yet.'
+  if (!enrichment) return base
+  const requested = Date.parse(String(enrichment.requested_at || ''))
+  const fresh = Number.isFinite(requested) && now - requested < ENRICHMENT_FRESH_MS
+  const checking = enrichment.status === 'running' || (enrichment.status === 'queued' && fresh)
+  return checking ? `No public hiring discussions found yet — Seen is checking public posts that name ${name}.` : base
+}
+
+function EnrichmentNotice({ companyName, enrichment }: { companyName: string; enrichment: Enrichment }) {
+  return <p className={c.fine} data-enrichment={enrichment?.status || 'none'}>{enrichmentLine(enrichment, displayCompanyName(companyName))}</p>
 }
 
 // ── Collapsible section ────────────────────────────────────────────────────────
@@ -335,9 +351,9 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   // nothing about, and the page says exactly that instead of a full page of CTAs (tester 2026-11-02).
   const [noData, setNoData] = useState(false)
   const [hasListings, setHasListings] = useState<boolean | null>(null)
-  // Self-filling pages: the score API reports when this company is queued for public-discussion
-  // enrichment (api/enrich-companies cron). Only 'queued' / 'running' ever render a line.
-  const [enrichmentStatus, setEnrichmentStatus] = useState<string | null>(null)
+  // Self-filling pages: the score API reports this company's public-discussion enrichment request
+  // (api/enrich-companies cron) — its status and when it was requested. Read once; it decides one sentence.
+  const [enrichment, setEnrichment] = useState<Enrichment>(null)
   // Which detail sections are expanded. The evidence (applicant accounts, online quotes) is always open
   // on the page (audit #28: it used to sit inside 9 collapsed accordions); the detail rows start closed,
   // and a #hash in the URL (e.g. /company/x#locations) opens that section.
@@ -367,25 +383,29 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   }, [companyName])
   // Reddit discussion is fetched by the page (cache-first endpoint) so the SECTION can be hidden when
   // fewer than two relevant threads exist — one coincidental thread is not "discussion". null = not
-  // answered yet (the section shows while checking).
+  // answered yet (the section stays hidden until threads exist).
   const [reddit, setReddit] = useState<RedditDiscussionResult | null>(null)
   // `status:'checking'` means Reddit has not answered yet (a background search). The page re-asks every
-  // REDDIT_POLL_MS up to REDDIT_POLL_ATTEMPTS times (~20 s), then treats it as empty and hides the
-  // section — never a dead "Still checking… Retry" (audit 2026-10-23: three companies sat on it 15 s+).
+  // REDDIT_POLL_MS up to REDDIT_POLL_ATTEMPTS times and never past REDDIT_POLL_DEADLINE_MS, then treats it
+  // as empty. Nothing on the page shows the checking state (audit 2026-10-23: a dead "Still checking… Retry";
+  // phone tester 2026-11-02: "Checking public threads…" that never ended on a slow answer).
   useEffect(() => {
     let alive = true
     let attempts = 0
     let timer: ReturnType<typeof setTimeout> | undefined
+    const started = Date.now()
+    const ctrl = new AbortController()
     const ask = () => {
-      // GET so the CDN caches it (lib/server/publicRead.js); polled while the worker is still 'checking'.
-      fetch(`/api/company-reddit?company=${encodeURIComponent(companyName)}`)
+      // GET so the CDN caches it (lib/server/publicRead.js); re-asked while the worker is still 'checking'.
+      fetch(`/api/company-reddit?company=${encodeURIComponent(companyName)}`, { signal: ctrl.signal })
         .then(r => r.json().catch(() => ({})))
         .then((j: { items?: RedditDiscussionResult['items']; status?: string }) => {
           if (!alive) return
           const items = Array.isArray(j.items) ? j.items : []
           if (j.status === 'checking' && items.length === 0) {
             attempts += 1
-            if (attempts < REDDIT_POLL_ATTEMPTS) { setReddit({ items: [], status: 'checking' }); timer = setTimeout(ask, REDDIT_POLL_MS); return }
+            const expired = Date.now() - started >= REDDIT_POLL_DEADLINE_MS
+            if (attempts < REDDIT_POLL_ATTEMPTS && !expired) { setReddit({ items: [], status: 'checking' }); timer = setTimeout(ask, REDDIT_POLL_MS); return }
             setReddit({ items: [], status: 'empty' })
             return
           }
@@ -394,7 +414,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
         .catch(() => { if (alive) setReddit({ items: [], status: 'error' }) })
     }
     ask()
-    return () => { alive = false; if (timer) clearTimeout(timer) }
+    return () => { alive = false; ctrl.abort(); if (timer) clearTimeout(timer) }
   }, [companyName])
   const [companyJobs, setCompanyJobs] = useState<Array<{title:string;company:string;location:string;salary:string|null;url:string|null;source:string;type:string;level:string;score:number}>>([])
   const [jobsLoading, setJobsLoading] = useState(false)
@@ -515,8 +535,9 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
         // A non-2xx here is a FAILURE, not "no data": it used to fall through to "No score data found
         // for this company" under an SSR header that still showed the grade (audit 2026-10-24 R-1).
         if (!sRes.ok) throw new Error(`score HTTP ${sRes.status}`)
-        const sJson = await sRes.json() as { score?: CompanyScore | null; ok?: boolean; no_data?: boolean; enrichment?: { status?: string } }
-        setEnrichmentStatus(typeof sJson.enrichment?.status === 'string' ? sJson.enrichment.status : null)
+        const sJson = await sRes.json() as { score?: CompanyScore | null; ok?: boolean; no_data?: boolean; enrichment?: { status?: string; requested_at?: string | null; done_at?: string | null } }
+        const en = sJson.enrichment
+        setEnrichment(en && typeof en.status === 'string' ? { status: en.status, requested_at: en.requested_at ?? null, done_at: en.done_at ?? null } : null)
         if (sJson.no_data || !sJson.score) {
           setNoData(true)
           // Does Seen know this company at all? Its listings say so. Only a known company is remembered
@@ -629,9 +650,6 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   // the median of ≥5 listed reports that name a wait, else an honest "not enough data yet".
   const timing = replyTiming(score?.avg_wait_days, (allReports ?? reports).map(r => r.wait_days))
   const webEst = sum.webClaim
-  // Honest status line: only while the enrichment worker has this company queued/running AND the
-  // page has no first-party reports to show. It promises nothing about what will be found.
-  const gatheringPublic = !loading && !reportsLoading && fpReports === 0 && reports.length === 0 && (enrichmentStatus === 'queued' || enrichmentStatus === 'running')
   const logoLetter = (companyName[0] || '?').toUpperCase()
   const ghostPct = sum.ghostPct ?? 0
   const respPct = sum.responsePct ?? 0
@@ -661,6 +679,19 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const commentaryN = publicRows.filter(isCommentary).length
   const listRows = [...seenRows, ...publicRows]
   const shownWebReviews = webReviews.filter(rv => !looksLikeBotOrLinkText(rv.text))
+  // The page's end state when there is nothing to show: no accounts counted, none listed, no quotes. One
+  // sentence in the hero (enrichmentLine), rendered once both reads have answered — never a spinner.
+  const nothingFound = !loading && !reportsLoading && fpReports === 0 && reports.length === 0 && shownWebReviews.length === 0
+  // The reports section's own counts, each with its set named. The outcome mix is of the rows WITH a reported
+  // outcome and sums to that number; employee reviews are listed apart. A bare number badge used to sit in the
+  // heading beside a different number in the hero (phone tester 2026-11-02: "26" above, "49" here, "43" below).
+  const listedLine = sum.listed.rows === 0
+    ? 'None yet — be the first to report'
+    : [
+        `${sum.listed.withOutcome} with a reported outcome`,
+        `${sum.outcomes.ghosted} ghosted · ${sum.outcomes.rejected} rejected · ${sum.outcomes.interview} interviewed · ${sum.outcomes.hired} hired`,
+        sum.listed.employee > 0 ? `${sum.listed.employee} employee review${sum.listed.employee === 1 ? '' : 's'}` : '',
+      ].filter(Boolean).join(' · ')
   const updatedLine = graded ? lastUpdatedLabel(score.updated_at) : ''
 
   // A name Seen knows nothing about: no score row, no listings, no reports. A true empty state — the
@@ -723,8 +754,12 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
 
   // The evidence line under the grade: how many applicant accounts, and — once the list has loaded —
   // how many are public posts and how many Seen users filed (lib/glossary.js, audit #3).
-  const accounts = accountsLine(fpReports, sum.sources ? sum.sources.public : null, sum.sources ? sum.sources.seen : null)
-  const evidenceParts = [accounts, sum.employeeReviews > 0 ? `${sum.employeeReviews} employee review${sum.employeeReviews === 1 ? '' : 's'}` : '', sum.mentions > 0 ? `${sum.mentions} online mention${sum.mentions === 1 ? '' : 's'} (count half)` : ''].filter(Boolean)
+  // Every number on this page names the set it counts (DESIGN.md §1, Candid). The hero's count is the rows
+  // the grade stands on — company_scores.first_party_report_count at the last recompute — never the longer
+  // list below, which also holds still-waiting rows and commentary (26 vs 49 on /company/amazon, 2026-11-02).
+  const srcPhrase = accountSources(fpReports, sum.sources ? sum.sources.public : null, sum.sources ? sum.sources.seen : null)
+  const accounts = fpReports > 0 ? `${accountsLabel(fpReports)} counted in the grade${srcPhrase ? ` (${srcPhrase})` : ''}` : `${accountsLabel(0)} counted yet`
+  const evidenceParts = [accounts, sum.employeeReviews > 0 ? `${sum.employeeReviews} employee review${sum.employeeReviews === 1 ? '' : 's'} (adjust the score, never outcomes)` : '', sum.mentions > 0 ? `${sum.mentions} online mention${sum.mentions === 1 ? '' : 's'} (each counts half)` : ''].filter(Boolean)
   const tone = graded ? gradeTone(score.overall_score) : null
   const respTone = sum.ratesShown ? responseRateTone(score?.response_rate) : null
   const ghostTone = sum.ratesShown ? ghostRateTone(score?.ghost_rate) : null
@@ -808,6 +843,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                     ? `Seen has ${gradeBasisLabel(score)} for ${displayName} so far. A grade appears at ${MIN_REPORTS_FOR_GRADE} — each applicant account counts 1, each online mention counts ½.`
                     : `No applicant accounts for ${displayName} yet. A grade appears once there are ${MIN_REPORTS_FOR_GRADE}.`}
                 </p>
+                {nothingFound && <EnrichmentNotice companyName={companyName} enrichment={enrichment} />}
                 <div className={c.meta}>
                   <Button variant="secondary" size="sm" href={reportHref} icon="plus">Add yours to help grade it</Button>
                   <a href="/methods" className={c.textLink}>How grades work</a>
@@ -860,10 +896,12 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               })()}
             </>
           ) : (
-            <p className={c.fine}>
-              No score data found for this company.
-              {gatheringPublic && <EnrichmentNotice companyName={companyName} />}
-            </p>
+            /* No score row at all (the API answered no_data): what Seen holds, then the one end-state sentence.
+               A <div> — the old <p> wrapped the notice's own <p>, which the browser split in two. */
+            <div role="status">
+              <p className={c.fine}>No applicant accounts for {displayName} yet — a grade appears once there are {MIN_REPORTS_FOR_GRADE}.</p>
+              {nothingFound && <EnrichmentNotice companyName={companyName} enrichment={enrichment} />}
+            </div>
           )}
         </section>
 
@@ -884,11 +922,8 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
             <section className={c.block} id="sec-reports" aria-labelledby="co-accounts">
               <div className={c.blockHead}>
                 <div>
-                  <h2 id="co-accounts" className={c.h2}>
-                    {employeeN > 0 ? 'Applicant accounts & employee reviews' : 'Applicant accounts'}
-                    {employeeN === 0 && sum.listed.withOutcome > 0 ? <span className={c.count}>{sum.listed.withOutcome}</span> : null}
-                  </h2>
-                  <p className={c.blockSub}>{reports.length === 0 && reportsLoading ? 'Loading accounts…' : reportsSectionSummary(sum)}</p>
+                  <h2 id="co-accounts" className={c.h2}>{employeeN > 0 ? 'Applicant accounts & employee reviews' : 'Applicant accounts'}</h2>
+                  <p className={c.blockSub}>{reports.length === 0 && reportsLoading ? 'Loading accounts…' : listedLine}</p>
                 </div>
                 <Button variant="secondary" size="sm" href={reportHref} icon="plus">Report yours</Button>
               </div>
@@ -923,11 +958,13 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                     const when = reportDate(r.platform, r.report_text, r.created_at).label
                     const isPublic = i >= seenRows.length
                     const commentary = isPublic && isCommentary(r)
-                    // Group headings: Seen submissions first, then everything quoted from public sources.
+                    // Group headings name their set: reports people filed with Seen first, then every account and
+                    // quote compiled from public posts — still-waiting rows and commentary included, which the
+                    // hero's grade count never holds (that is why this number is the larger one).
                     const heading = i === 0 && seenRows.length > 0 && publicRows.length > 0
-                      ? <h3 className={c.group}>Submitted to Seen · {seenRows.length}</h3>
+                      ? <h3 className={c.group}>{seenRows.length} {seenRows.length === 1 ? 'report' : 'reports'} submitted to Seen</h3>
                       : i === seenRows.length && i > 0 && publicRows.length > 0
-                        ? <h3 className={c.group}>{publicRowsHeading(sum.listed)}</h3>
+                        ? <h3 className={c.group}>{publicRows.length} accounts and quotes from public posts</h3>
                         : null
                     const roleLine = r.role && !/^unknown/i.test(r.role) ? r.role : ''
                     // One outcome per card: the chip and the "ghosted at …" stage come from one helper.
@@ -980,7 +1017,6 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                   {location
                     ? <p>No accounts mention &ldquo;{location}&rdquo;. <button type="button" onClick={() => setLocation('')} className={c.textLink}>Clear the city filter</button></p>
                     : <p>No applicant accounts yet — {displayName} gets a grade once there are {MIN_REPORTS_FOR_GRADE}.</p>}
-                  {gatheringPublic && <EnrichmentNotice companyName={companyName} />}
                   <Button variant="secondary" href={reportHref} iconRight="arrow-right">Be the first to report</Button>
                 </div>
               )}
@@ -990,8 +1026,8 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               <section className={c.block} id="sec-online" aria-labelledby="co-online">
                 <div className={c.blockHead}>
                   <div>
-                    <h2 id="co-online" className={c.h2}>What people say online<span className={c.count}>{shownWebReviews.length}</span></h2>
-                    <p className={c.blockSub}>Quotes compiled from public reviews and discussions · each labelled by its source · not Seen&apos;s assessment</p>
+                    <h2 id="co-online" className={c.h2}>What people say online</h2>
+                    <p className={c.blockSub}>{shownWebReviews.length} quote{shownWebReviews.length === 1 ? '' : 's'} compiled from public reviews and discussions · each labelled by its source · not Seen&apos;s assessment</p>
                   </div>
                 </div>
                 <WebReviewsSection reviews={shownWebReviews} hidden={webReviews.length - shownWebReviews.length} />
@@ -1038,22 +1074,29 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                         <div><dt>Typical wait</dt><dd>{timing.known ? `${timing.days} days` : 'Not enough data yet'}</dd></div>
                       </dl>
                     </div>
-                    {(() => { const rows = ghostStageRows(hiringReports); const n = rows.reduce((a, r) => a + r.n, 0); return rows.length > 0 && (
+                    {(() => {
+                      const rows = ghostStageRows(hiringReports)
+                      const n = rows.reduce((a, r) => a + r.n, 0)
+                      const ghostedN = hiringReports.filter(r => r.outcome === 'ghosted').length
+                      // Each bar is a share of the n rows that NAMED a stage — not of every ghosted row and not of the
+                      // hero's count ("43%" read as a third number on the page) — so the line under the bars says
+                      // both numbers.
+                      return rows.length > 0 && (
                       <div className={c.panel}>
                         <h3 className="ui-eyebrow">Where they ghost</h3>
                         <HiringFunnel rows={rows} />
-                        <p className={c.fine}>Share of the {n} ghosted account{n !== 1 ? 's' : ''} that named the stage where contact stopped.</p>
+                        <p className={c.fine}>Each share is of the {n} ghosted account{n !== 1 ? 's' : ''} that named where contact stopped{ghostedN > n ? ` (${ghostedN - n} more ghosted ${ghostedN - n === 1 ? 'account' : 'accounts'} named no stage)` : ''}.</p>
                       </div>) })()}
                   </div>
-                  <OutcomeDistribution reports={outcomeReports} label={`Outcome distribution · ${outcomeReports.length} applicant account${outcomeReports.length === 1 ? '' : 's'} with an outcome${sum.listed.waiting > 0 ? ` · ${sum.listed.waiting} still waiting not counted` : ''}`} />
+                  <OutcomeDistribution reports={outcomeReports} label={`Outcome distribution · ${outcomeReports.length} listed account${outcomeReports.length === 1 ? '' : 's'} with a reported outcome${sum.listed.waiting > 0 ? ` · ${sum.listed.waiting} still waiting, not counted` : ''}`} />
                 </Section>
               )}
 
-              {/* Shown only while checking, or once at least two threads about hiring at this company exist
-                  (api/company-reddit.js MIN_SHOW_THREADS). A page without real discussion has no Reddit row. */}
-              {(reddit === null || reddit.status === 'checking' || reddit.items.length >= 2) && (
-                <Section id="reddit" icon="message-square" title="Reddit discussion" count={reddit?.items.length || null} open={open.reddit} onToggle={toggle}
-                  summary={reddit?.items.length ? `${reddit.items.length} public threads about hiring at ${displayName} — every item links to its source` : `Checking public threads about hiring at ${displayName}…`}>
+              {/* Shown once at least two threads about hiring at this company exist (api/company-reddit.js
+                  MIN_SHOW_THREADS) — never while checking. A page without real discussion has no Reddit row. */}
+              {reddit !== null && reddit.items.length >= 2 && (
+                <Section id="reddit" icon="message-square" title="Reddit discussion" count={reddit.items.length} open={open.reddit} onToggle={toggle}
+                  summary={`${reddit.items.length} public threads about hiring at ${displayName} — every item links to its source`}>
                   <CompanyRedditDiscussion companyName={displayName} hasReportData={reports.length > 0 || !!score} prefetched={reddit} />
                 </Section>
               )}
@@ -1065,7 +1108,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                 {cityRows.length > 0 && (
                   <div className={c.gapBottom}>
                     <h3 className="ui-eyebrow">Reported outcomes by city</h3>
-                    <p className={c.fine}>From {reportsWithCity} applicant account{reportsWithCity !== 1 ? 's' : ''} that named a city</p>
+                    <p className={c.fine}>From {reportsWithCity} listed account{reportsWithCity !== 1 ? 's' : ''} that named a city (still-waiting rows included)</p>
                     <div className={c.stack}>
                       {cityRows.map(row => {
                         const ghostPctVal = Math.round(row.ghostRate * 100)
@@ -1206,7 +1249,6 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                     <a href={reportHref} className={c.textLink}>Add your report</a>
                   </p>
                 )}
-                {gatheringPublic && <EnrichmentNotice companyName={companyName} />}
                 {/* Attributed public-record signals (SEC 8-K, etc.) — self-hides when there are none; never score-gated. */}
                 <div className={c.gapTop}><CompanyPublicRecord companyName={companyName} /></div>
               </Section>
@@ -1256,10 +1298,12 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               // The SAME confidence word the hero shows (lib/companyPageSummary.ts) — the card never counts on its own.
               confidence: sum.confidence?.word,
               risk: score.risk_level ?? undefined,
+              // Tag words come from the SAME thresholds as the tiles (lib/ui/tone.js): a 55% reply rate reads
+              // "Moderate" on the tile and must not become "Responsive" on the card.
               tags: [
-                (score.ghost_rate ?? 0) >= 0.5 ? 'High ghost rate' : null,
-                (score.response_rate ?? 0) >= 0.5 ? 'Responsive' : null,
-                (score.waste || 0) >= 50 ? 'High wasted-effort risk' : null,
+                ghostRateTone(score.ghost_rate) === 'bad' ? 'High ghost rate' : null,
+                responseRateTone(score.response_rate) === 'good' ? 'Responsive' : null,
+                wastedEffortTone(score.waste) === 'bad' ? 'High wasted-effort risk' : null,
                 (score.avg_wait_days || 0) >= 30 ? 'Long wait times' : null,
               ].filter(Boolean) as string[],
             }}

@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useLayoutEffect, useCallback } from 'react'
 import { useAuth } from '@/lib/auth'
-import { SavedJobsStore } from '@/lib/stores/SavedJobs'
+import { SavedJobsStore, SAVED_CHANGED_EVENT } from '@/lib/stores/SavedJobs'
 import { JobCache } from '@/lib/stores/JobCache'
 import { Score } from '@/lib/score'
 import type { SavedJob } from '@/lib/types'
@@ -50,6 +50,12 @@ export default function SavedPage() {
   }, [isLoggedIn])
 
   useEffect(() => { refresh() }, [refresh])
+  // "Keep" on the guest-saves prompt (components/GuestSavesPrompt) adds rows while this page is open.
+  useEffect(() => {
+    const on = () => { void refresh() }
+    window.addEventListener(SAVED_CHANGED_EVENT, on)
+    return () => window.removeEventListener(SAVED_CHANGED_EVENT, on)
+  }, [refresh])
   useScrollMemory(!loading)
 
   // Prime the session cache from the snapshot so the detail page loads instantly.

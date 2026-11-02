@@ -43,7 +43,9 @@
 .btn span:last-child { min-width: 0; overflow-wrap: anywhere; }
 .ico { font-size: var(--fs-ui); }
 .page .btn { align-self: flex-start; }
-.modal .btn { width: 100%; }
+/* In the outcome sheet the ONE filled/accent action is "Save image" (DESIGN.md §5): this one is outlined ink. */
+.modal .btn { width: 100%; border-color: var(--border-2); background: transparent; }
+.modal .btn:hover { background: var(--surface-overlay); }
 .note {
   margin: 0;
   font-family: var(--body);

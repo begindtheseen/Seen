@@ -10,7 +10,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Application } from '@/lib/types'
 import { drawOutcomeCard, type CardFormat, type OutcomeCardData, type CompanyGradeContext } from '@/lib/cardKit'
-import { ACCENTS, accentKeyForOutcome } from '@/lib/cardTheme.js'
 import { outcomeShareText, outcomeHeadline, companyHref, daysBetween } from '@/lib/cardCopy.js'
 import { gradeLetter } from '@/lib/companyDisplay'
 import { isGradeableScore } from '@/lib/gradeGate'
@@ -87,7 +86,9 @@ async function lookupGrade(company: string): Promise<CompanyGradeContext | null>
 export default function OutcomeCard({ app, onClose, onShared, otherGrades }: Props) {
   const data = useMemo(() => buildOutcome(app), [app])
   const status = data.outcome
-  const accent = ACCENTS[accentKeyForOutcome(status)].hex
+  // The sheet is drawn in the site's tokens (surface, ink text, the ONE accent on the one action) — never in
+  // the outcome's poster colour (owner 2026-11-02: one flat accent, no orange sheet).
+  const accent = 'var(--accent)'
   const head = outcomeHeadline({ outcome: status, company: data.company, days: data.days, reachedInterview: data.reachedInterview })
   // No public per-outcome page exists, so unfurl the company page (which has a dynamic OG image).
   // The slug must round-trip through /company/[slug]'s decoder — one scheme (lib/cardCopy.js).
