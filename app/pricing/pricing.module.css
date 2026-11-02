@@ -75,9 +75,9 @@
 /* Phones and narrow tablets: one column, Interview Prep first (the lead), then the pass, then Free. */
 @media (max-width: 860px) {
   .cards { grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
-  .cards .free { order: 1; } /* phones read top-down: what is free comes first, then the two one-time passes */
-  .cards .lead { order: 2; }
-  .cards .pass { order: 3; }
+  .cards .lead { order: 1; } /* owner decision (lib/pricing.test.mjs): Interview Prep leads on a phone; Free stays reachable below */
+  .cards .pass { order: 2; }
+  .cards .free { order: 3; }
   .steps { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 480px) {
