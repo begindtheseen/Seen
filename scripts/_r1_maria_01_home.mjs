@@ -1,0 +1,12 @@
+import { boot, BASE, sleep } from './_r1_maria_lib.mjs';
+const { page, shot, done, overflow, tiny, text } = await boot({ fresh: true });
+const t0 = Date.now();
+await page.goto(BASE + '/', { waitUntil: 'networkidle' });
+console.log('home load ms', Date.now() - t0);
+await sleep(1500);
+await shot('01-home-top');
+await shot('01-home-full', true);
+console.log('overflow', await overflow());
+console.log('tiny', await tiny());
+console.log('TEXT:\n', await text('body', 6000));
+await done();

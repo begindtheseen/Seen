@@ -34,7 +34,7 @@ import { localPack } from '../lib/server/prepLocal.js';
 import { SCORABLE_REPORTS_FILTER } from '../lib/server/reportCounts.js';
 import { ONE_TIME_SKUS } from '../lib/server/creditRules.js';
 import {
-  interviewRecord, payRange, followUpPlan, guardPack, fallbackPack, prepEmails, prepKey, signOffName, prepFamily,
+  interviewRecord, payRange, followUpPlan, guardPack, prepEmails, prepKey, signOffName, prepFamily,
 } from '../lib/server/interviewPrep.js';
 import { CLIENT_EVENTS, funnelRow, recordFunnelEvent } from '../lib/server/funnelEvents.js';
 import { guideFor } from '../lib/server/interviewGuides.js';

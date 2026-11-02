@@ -47,8 +47,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
   const A = ACCENTS[accentKeyForRisk(risk)]
   const accent = hasData ? A.hex : ACCENTS.interview.hex
   const letter = hasData ? grade(score) : null
-  const ghostPct = pct(s?.ghost_rate)
-  const respPct = pct(s?.response_rate)
   const wait = s?.avg_wait_days != null ? Math.round(s.avg_wait_days) : 0
 
   // Only FIRST-PARTY rows may be published as "applicant accounts" — the fused count once put

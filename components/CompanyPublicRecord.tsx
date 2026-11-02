@@ -13,6 +13,7 @@
 //  • A documented right-of-reply: employers can dispute from their dashboard; admins can retract.
 
 import { useState, useEffect, useCallback } from 'react'
+import { httpHref } from '@/lib/safeHref.js'
 
 interface Signal {
   source: string
@@ -75,7 +76,7 @@ export default function CompanyPublicRecord({ companyName }: { companyName: stri
       <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
         {items.map((s, i) => (
           <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 8, padding: '.75rem 1rem' }}>
-            <a href={s.source_url} target="_blank" rel="noopener noreferrer nofollow"
+            <a href={httpHref(s.source_url) ?? undefined} target="_blank" rel="noopener noreferrer nofollow"
                style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--text-1)', lineHeight: 1.5, textDecoration: 'none', display: 'block' }}>
               {s.title} <span style={{ color: 'var(--blue)' }}>↗</span>
             </a>

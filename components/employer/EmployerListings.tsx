@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useEmployerCompany } from './EmployerCompanyContext'
 import { useAuth } from '@/lib/auth'
+import { httpHref } from '@/lib/safeHref.js'
 
 // Manage your listings — the employer portal's first real management surface
 // (seen-command#94). Seen's corpus is ingest-driven and the portal is account-free, so
@@ -128,7 +129,7 @@ export function EmployerListings() {
                     <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-ui)', fontWeight: 700, color: 'var(--white)' }}>{l.title}</div>
                     <div style={{ ...mono('var(--fs-meta)', 'var(--dim)'), marginTop: 2 }}>
                       {[l.location, l.created_at ? `posted ${new Date(l.created_at).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}` : '', l.availability_status].filter(Boolean).join(' · ')}
-                      {l.apply_url && <> · <a href={l.apply_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--dim)' }}>view</a></>}
+                      {l.apply_url && <> · <a href={httpHref(l.apply_url) ?? undefined} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--dim)' }}>view</a></>}
                     </div>
                   </div>
                   {done ? (

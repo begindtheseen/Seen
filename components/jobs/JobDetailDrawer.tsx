@@ -64,7 +64,6 @@ interface InsightsResponse extends Partial<Insights> {
 type InsightsState = 'loading' | 'done' | 'unavailable' | 'no_desc' | 'uncached' | 'generating' | 'credits' | 'preview' | 'unread'
 
 const L1_TTL = 24 * 60 * 60 * 1000
-const OPTIMIZE_PRICE = creditCostLabel(RESUME_OPTIMIZE_COST)
 
 function Skeleton({ widths, h }: { widths: number[]; h: number }) {
   return (
@@ -280,7 +279,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
                 {metaBits.map(m => <span key={m}>{m}</span>)}
               </p>
               {externalApply && (
-                <a href={job.apply_url!} target="_blank" rel="noopener noreferrer" data-testid="posting-link" onClick={() => trackApplyClick(job)} className={w.postingLink}>
+                <a href={postingHref ?? undefined} target="_blank" rel="noopener noreferrer" data-testid="posting-link" onClick={() => trackApplyClick(job)} className={w.postingLink}>
                   Open the job posting <Icon name="arrow-up-right" size={14} />
                 </a>
               )}
@@ -410,7 +409,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
                       the existing add path. Nothing is spent. */}
                   <Button
                     variant={seenApply ? 'secondary' : 'primary'}
-                    href={job.apply_url!}
+                    href={postingHref ?? undefined}
                     target="_blank"
                     rel="noopener noreferrer"
                     data-testid="drawer-apply-link"

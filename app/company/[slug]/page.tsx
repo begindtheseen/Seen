@@ -1112,7 +1112,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                           {displayPay(j) && <span className={`${c.rolePay} tnum`}>{displayPay(j)}</span>}
                         </div>
                         <p className={c.roleMeta}>{[j.location || 'US', j.type, j.level, j.source].filter(Boolean).join(' · ')}</p>
-                        {j.url && <Button variant="secondary" size="sm" href={j.url} target="_blank" rel="noopener noreferrer" iconRight="arrow-up-right">Apply</Button>}
+                        {j.url && <Button variant="secondary" size="sm" href={httpHref(j.url) ?? undefined} target="_blank" rel="noopener noreferrer" iconRight="arrow-up-right">Apply</Button>}
                       </li>
                     ))}
                   </ul>

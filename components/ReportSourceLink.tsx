@@ -2,11 +2,12 @@
 // from lib/reportSource.ts reportSourceLink(), which only returns one for third-party rows whose
 // trailing URL belongs to the row's own source site. nofollow + ugc: Seen does not vouch for it.
 import type { CSSProperties } from 'react'
+import { httpHref } from '@/lib/safeHref.js'
 
 export default function ReportSourceLink({ url, host, posted, style, className }: { url: string; host: string; posted?: string | null; style?: CSSProperties; className?: string }) {
   return (
     <a
-      href={url}
+      href={httpHref(url) ?? undefined}
       target="_blank"
       rel="nofollow ugc noopener noreferrer"
       title={`Open the original public post on ${host}`}

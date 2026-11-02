@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useRef, Fragment } from 'react'
-import { useRouter } from 'next/navigation'
 import type { Job } from '@/lib/types'
 import { trackApplyClick } from '@/lib/trackApply'
 import { useJobSearch, type SortMode } from '@/lib/hooks/useJobSearch'
@@ -28,6 +27,7 @@ import Icon from '@/components/ui/Icon'
 import j from './jobs.module.css'
 import { useUrlPlace, useScrollMemory } from '@/lib/nav/urlState'
 import { JobCache } from '@/lib/stores/JobCache'
+import { httpHref } from '@/lib/safeHref.js'
 
 // Empty-state suggestions, most-held first. Live corpus counts by title (prod, read-only,
 // 2026-10-23): software engineer 3,960 · nurse 1,360 · sales associate 648 · customer service 489 ·
@@ -37,7 +37,6 @@ import { JobCache } from '@/lib/stores/JobCache'
 const SUGGESTED_ROLES = ['Cashier', 'Warehouse', 'Customer Service', 'Sales Associate', 'Nurse', 'Server', 'Data Analyst', 'Software Engineer']
 
 export default function JobsPage() {
-  const router = useRouter()
   const {
     isLoggedIn,
     query, setQuery,
@@ -86,7 +85,7 @@ export default function JobsPage() {
     if (job) { JobCache.set(job); setDetailJobState(job); jobPlace.open(String(job.id)) }
     else { setDetailJobState(null); jobPlace.close() }
   }
-  const [saveVersion, setSaveVersion] = useState(0)
+  const [, setSaveVersion] = useState(0)
   const [swipeMode, setSwipeMode] = useState(false)
   const [checkpointJob, setCheckpointJob] = useState<Job | null>(null)
   // When the checkpoint is opened AFTER the user already confirmed applying (the Apply &
@@ -317,7 +316,7 @@ export default function JobsPage() {
             onOpen={j => setDetailJob(j)}
             onDismiss={() => setSwipeMode(false)}
             onSave={() => setSaveVersion(v => v + 1)}
-            onApply={j => { if (takesSeenApply(j)) { setDetailJob(j); return } if (j.apply_url) { trackApplyClick(j); window.open(j.apply_url, '_blank', 'noopener,noreferrer') } setCheckpointJob(j) }}
+            onApply={j => { if (takesSeenApply(j)) { setDetailJob(j); return } const u = httpHref(j.apply_url); if (u) { trackApplyClick(j); window.open(u, '_blank', 'noopener,noreferrer') } setCheckpointJob(j) }}
             coScores={coScores}
           />
         ) : view === 'results' ? (

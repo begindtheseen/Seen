@@ -16,6 +16,7 @@ import { useAuth } from '@/lib/auth'
 import type { Job } from '@/lib/types'
 import { MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
 import { VerdictCard, WhyYouMatch, MissingList, Checklist, type Verdict, type ConstraintRow } from '@/components/optimizer/Verdict'
+import { httpHref } from '@/lib/safeHref.js'
 
 interface Contribution { factor: string; weight: number; raw: number; points: number; reason: string; scored?: boolean }
 interface RiskFlag { code: string; severity: 'low' | 'medium' | 'high'; message: string }
@@ -216,8 +217,8 @@ export default function SeenFitPanel({ job }: { job: Job }) {
 
       {/* Actions */}
       <div style={{ display: 'flex', gap: '.5rem' }}>
-        {job.apply_url && (
-          <a href={job.apply_url} target="_blank" rel="noopener noreferrer" onClick={() => sendFeedback('apply', out.run_id)} style={{ flex: 1, textAlign: 'center', background: 'var(--green)', color: 'var(--ink)', borderRadius: 8, padding: '.75rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)', textDecoration: 'none' }}>Apply now →</a>
+        {httpHref(job.apply_url) && (
+          <a href={httpHref(job.apply_url)!} target="_blank" rel="noopener noreferrer" onClick={() => sendFeedback('apply', out.run_id)} style={{ flex: 1, textAlign: 'center', background: 'var(--green)', color: 'var(--ink)', borderRadius: 8, padding: '.75rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)', textDecoration: 'none' }}>Apply now →</a>
         )}
         <button onClick={() => sendFeedback('save', out.run_id)} style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, padding: '.75rem 1rem', fontFamily: mono, fontSize: 'var(--fs-meta)', cursor: 'pointer' }}>Saved ✓</button>
       </div>

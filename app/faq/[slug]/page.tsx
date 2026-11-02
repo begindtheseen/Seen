@@ -192,7 +192,7 @@ export default async function FaqSlugPage({ params }: { params: Promise<{ slug: 
   if (graded && ghostPct != null && reported) {
     shortAnswer = isGhost
       ? `Based on real reported outcomes, ${name} ghosts roughly ${ghostPct}% of applicants${respPct != null ? `, and responds to about ${respPct}%` : ''}. That puts ${name} at a Seen Grade of ${graded.overall_score}/100 (${riskLabel(graded.risk_level).toLowerCase()}).`
-      : `${name} carries a Seen Grade of ${graded.overall_score}/100${wait != null ? `, with an average wait of about ${wait} days to hear back` : ''}${ghostPct != null ? ` and a ${ghostPct}% ghost rate` : ''}. Here's what applicants report.`
+      : `${name} carries a Seen Grade of ${graded.overall_score}/100${wait != null ? `, with an average wait of about ${wait} days to hear back` : ''} and a ${ghostPct}% ghost rate. Here's what applicants report.`
   } else if (graded) {
     shortAnswer = `${name} has a Seen Grade of ${graded.overall_score}/100. We don't yet have a precise ghost rate — add your experience to sharpen the picture for the next applicant.`
   } else if (fp > 0) {

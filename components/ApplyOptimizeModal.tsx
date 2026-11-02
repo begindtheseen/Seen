@@ -23,6 +23,7 @@ import { VerdictCard, WhyYouMatch, MissingList, Checklist, PaidPlanView, type Ve
 import ResumePicker from './resume/ResumePicker'
 import { ResumeLibrary, useResumeList, type SavedResume } from '@/lib/resumeLibrary'
 import { chooseResumeId } from '@/lib/resumeChoice.js'
+import { httpHref } from '@/lib/safeHref.js'
 
 // The optimizer's price, rendered from the credit rules — the same literal the server charges.
 const OPTIMIZE_PRICE = creditCostLabel(RESUME_OPTIMIZE_COST)
@@ -587,7 +588,7 @@ export default function ApplyOptimizeModal({
       document.body.appendChild(a); a.click(); a.remove()
       setTimeout(() => URL.revokeObjectURL(url), 10000)
     }
-    if (job.apply_url) { trackApplyClick(job); window.open(job.apply_url, '_blank', 'noopener,noreferrer') }
+    const applyHref = httpHref(job.apply_url); if (applyHref) { trackApplyClick(job); window.open(applyHref, '_blank', 'noopener,noreferrer') }
     onApplied()
     onClose()
   }
@@ -634,7 +635,7 @@ export default function ApplyOptimizeModal({
 
   // FREE: open the posting (new tab) and hand off to the tracker checkpoint — no credit.
   function applyWithoutOptimize() {
-    if (job.apply_url) { trackApplyClick(job); window.open(job.apply_url, '_blank', 'noopener,noreferrer') }
+    const applyHref = httpHref(job.apply_url); if (applyHref) { trackApplyClick(job); window.open(applyHref, '_blank', 'noopener,noreferrer') }
     onApplied()
     onClose()
   }
@@ -671,7 +672,7 @@ export default function ApplyOptimizeModal({
               {job.title} · {job.company}
             </div>
             {job.apply_url && (
-              <a href={job.apply_url} target="_blank" rel="noopener noreferrer" data-testid="modal-posting-link"
+              <a href={httpHref(job.apply_url) ?? undefined} target="_blank" rel="noopener noreferrer" data-testid="modal-posting-link"
                 onClick={() => trackApplyClick(job)}
                 style={{ display: 'inline-block', marginTop: '.25rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', textDecoration: 'none' }}>
                 Open the job posting ↗
@@ -698,7 +699,7 @@ export default function ApplyOptimizeModal({
                   This source gives Seen only a short preview, and the listing&apos;s own page would not hand over the rest just now. No credit was used. Open the listing, select all of its text, and paste it here — the check is free.
                 </div>
                 {job.apply_url && (
-                  <a href={job.apply_url} target="_blank" rel="noopener noreferrer" data-testid="needs-posting-link"
+                  <a href={httpHref(job.apply_url) ?? undefined} target="_blank" rel="noopener noreferrer" data-testid="needs-posting-link"
                     onClick={() => trackApplyClick(job)}
                     style={{ display: 'inline-block', marginTop: '.5rem', fontSize: 'var(--fs-72)', fontWeight: 700, color: 'var(--accent)', textDecoration: 'none' }}>
                     Open the listing ↗
@@ -757,7 +758,7 @@ export default function ApplyOptimizeModal({
                 }}>Sign in to apply →</button>
                 {job.apply_url && (
                   <a
-                    href={job.apply_url}
+                    href={httpHref(job.apply_url) ?? undefined}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{ display: 'block', textAlign: 'center', ...btnGhost, textDecoration: 'none' } as React.CSSProperties}
@@ -1131,7 +1132,7 @@ export default function ApplyOptimizeModal({
               <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                 {job.apply_url ? (
                   <a
-                    href={job.apply_url}
+                    href={httpHref(job.apply_url) ?? undefined}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{ display: 'block', textDecoration: 'none' }}

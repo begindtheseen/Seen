@@ -13,6 +13,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { PUBLIC_DISCUSSION_LABEL } from '@/lib/reportSource'
+import { httpHref } from '@/lib/safeHref.js'
 
 interface RedditThread {
   id: string
@@ -180,7 +181,7 @@ export default function CompanyRedditDiscussion({ companyName, hasReportData = f
         <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
           {items.map(t => (
             <div key={t.id} style={{ background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 8, padding: '.75rem 1rem' }}>
-              <a href={t.permalink} target="_blank" rel="noopener noreferrer nofollow"
+              <a href={httpHref(t.permalink) ?? undefined} target="_blank" rel="noopener noreferrer nofollow"
                  style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--text-1)', lineHeight: 1.5, textDecoration: 'none', display: 'block' }}>
                 {t.title} <span style={{ color: 'var(--blue)' }}>↗</span>
               </a>

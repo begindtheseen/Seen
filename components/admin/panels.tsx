@@ -9,6 +9,7 @@ import { drainAdminAction, num } from './drain'
 import { saveFile } from './saveFile'
 import { safeLocalGet, safeLocalSet } from '@/lib/safeStorage'
 import { pacificDate } from '@/lib/time/pacific.js';
+import { httpHref } from '@/lib/safeHref.js'
 
 const ISSUE_TYPE_LABEL: Record<string, string> = {
   wrong_data: 'Wrong data', duplicate: 'Duplicate', broken_listing: 'Broken listing', spam: 'Spam', other: 'Other',
@@ -442,7 +443,7 @@ export function RedditDisputesPanel({ token }: { token: string }) {
                 <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5, marginTop: '.125rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{d.detail}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap', marginTop: '.25rem' }}>
                   {d.permalink && (
-                    <a href={d.permalink} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none', fontWeight: 700 }}>↗ Disputed thread</a>
+                    <a href={httpHref(d.permalink) ?? undefined} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none', fontWeight: 700 }}>↗ Disputed thread</a>
                   )}
                   {d.contact && (
                     <a href={`mailto:${d.contact}`} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', textDecoration: 'none' }}>✉ {d.contact}</a>
@@ -852,7 +853,7 @@ export function InactiveRow({ report: r, token, onRefresh }: { report: InactiveR
               </div>
               {snap?.apply_url ? (
                 <div style={{ marginTop: '.25rem' }}>
-                  <a href={snap.apply_url} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none', fontWeight: 700 }}>↗ Open the live posting to investigate</a>
+                  <a href={httpHref(snap.apply_url) ?? undefined} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none', fontWeight: 700 }}>↗ Open the live posting to investigate</a>
                 </div>
               ) : (
                 <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.25rem' }}>No apply URL captured (reported before snapshotting shipped) — dismiss to clear.</div>
@@ -868,7 +869,7 @@ export function InactiveRow({ report: r, token, onRefresh }: { report: InactiveR
               </div>
               <div style={{ display: 'flex', gap: '.75rem', marginTop: '.25rem', flexWrap: 'wrap' }}>
                 <a href={`/jobs/${encodeURIComponent(r.job_id)}`} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none' }}>↗ View listing page</a>
-                {applyUrl && <a href={applyUrl} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none' }}>↗ Open apply URL</a>}
+                {httpHref(applyUrl) && <a href={httpHref(applyUrl)!} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none' }}>↗ Open apply URL</a>}
               </div>
             </>
           )}
@@ -1803,7 +1804,7 @@ export function AllJobsBrowser({ token, onUnauthorized }: { token: string; onUna
                         </div>
                       </div>
                       {j.apply_url && (
-                        <a href={j.apply_url} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none', flexShrink: 0 }}>↗</a>
+                        <a href={httpHref(j.apply_url) ?? undefined} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none', flexShrink: 0 }}>↗</a>
                       )}
                     </div>
                   )

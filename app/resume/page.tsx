@@ -160,14 +160,10 @@ const kicker = (text: string, color = 'var(--dim)') => (
   <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', textTransform: 'uppercase', letterSpacing: '.08em', color, marginBottom: '.5rem' }}>{text}</div>
 )
 
-function chip(text: string, color: string, bg: string, border: string) {
-  return <span style={{ background: bg, border: `1px solid ${border}`, color, borderRadius: 5, padding: '.25rem .5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-65)', maxWidth: '100%', overflowWrap: 'anywhere' }}>{text}</span>
-}
 
 function scoreColor(s: number): string {
   return s >= 70 ? 'var(--green)' : s >= 45 ? 'var(--amber)' : 'var(--red)'
 }
-function pct(n: number): string { return `${Math.round((n || 0) * 100)}%` }
 
 // ── Card wrapper ──
 function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
@@ -349,7 +345,7 @@ function ResultEmpty({ icon, text, link }: { icon: string; text: string; link?: 
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 220, color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-72)', textAlign: 'center', gap: '.75rem', whiteSpace: 'pre-line' }}>
       <div style={{ fontSize: 'var(--fs-fig-m)' }}>{icon}</div>
       <div>{text}</div>
-      {link && <a href={link.href} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--blue)', fontWeight: 600, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}>{link.label}</a>}
+      {link && <a href={httpHref(link.href) ?? undefined} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--blue)', fontWeight: 600, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}>{link.label}</a>}
     </div>
   )
 }

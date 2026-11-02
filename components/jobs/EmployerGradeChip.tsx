@@ -11,12 +11,13 @@ import { gradeLetter, displayCompanyName } from '@/lib/companyDisplay'
 import { companySlug } from '@/lib/searchRoute'
 import { gradeTone, toneText } from '@/lib/ui/tone.js'
 import s from './EmployerGradeChip.module.css'
+import { slugSegment } from '@/lib/safeHref.js'
 
 export default function EmployerGradeChip({ company, score, onClick, compact = false }: { company: string; score: number; onClick?: (e: React.MouseEvent) => void; /** Card size (24px tall; 44px on phones). */ compact?: boolean }) {
   const name = displayCompanyName(company) || company
   return (
     <Link
-      href={`/company/${companySlug(company)}`}
+      href={`/company/${slugSegment(companySlug(company))}`}
       prefetch={false}
       onClick={e => { e.stopPropagation(); onClick?.(e) }}
       title={`${name}'s Seen Grade from applicant accounts — how it treats applicants, not this posting`}

@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth'
 import FillListingPanel, { DeclineMessagePicker } from './FillListingPanel'
 import { declineTemplates } from '@/lib/server/seenApply.js'
 import ModalPortal from '@/components/ModalPortal'
+import { httpHref } from '@/lib/safeHref.js'
 
 // Manage your listings — the LOGIN-SCOPED listings manager (POST /api/employer-listings).
 //
@@ -110,7 +111,7 @@ function fmtDate(iso: string | null) {
 }
 
 export function EmployerListingsManager() {
-  const { ready, isLoggedIn, isEmployer, employerCompany, claimsReady, token } = useAuth()
+  const { ready, isLoggedIn, isEmployer, claimsReady, token } = useAuth()
 
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -423,7 +424,7 @@ export function EmployerListingsManager() {
                     {l.edited_at && <span style={{ color: 'var(--amber)' }}>· edited {fmtDate(l.edited_at)}</span>}
                     {l.status === 'filled' && <span style={{ color: 'var(--green)' }}>· filled</span>}
                     {!l.removed && l.expires_at && <span>· expires {fmtDate(l.expires_at)}</span>}
-                    {l.apply_url && l.apply_mode !== 'seen' && <>· <a href={l.apply_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--blue)', textDecoration: 'none' }}>Apply link ↗</a></>}
+                    {l.apply_url && l.apply_mode !== 'seen' && <>· <a href={httpHref(l.apply_url) ?? undefined} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--blue)', textDecoration: 'none' }}>Apply link ↗</a></>}
                     {seenApplyAvailable && l.is_employer_posted && <span>· {APPLY_MODE_LABEL[l.apply_mode || 'external']}</span>}
                   </div>
                   {l.removed && whyOpen[String(l.id)] && (

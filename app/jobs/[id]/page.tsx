@@ -58,7 +58,6 @@ interface ScoreExplanation {
 }
 
 // The optimizer's price, rendered from the credit rules (same label as the search drawer).
-const OPTIMIZE_PRICE = creditCostLabel(RESUME_OPTIMIZE_COST)
 
 const L1_TTL = 24 * 60 * 60 * 1000 // localStorage TTL — matches old _INSIGHTS_L1_TTL (24h)
 

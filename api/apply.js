@@ -120,7 +120,7 @@ function buildResumeHTML(text, name, role, company, optimizedBullets = [], keywo
   for (let i = 1; i < Math.min(7, lines.length); i++) {
     const l = lines[i];
     const isContact = /@/.test(l) || /\d{3}[\-\.\s\(]\d{3}/.test(l) ||
-      /^[A-Za-z\s]+,\s*[A-Z]{2}/.test(l) || /linkedin\.com|github\.com/i.test(l) ||
+      /^[A-Za-z\s]+,\s*[A-Z]{2}/.test(l) || /(?:linkedin|github)\.com/i.test(l) ||
       /^[\w\s,·\-\.\(\)@+]+$/.test(l) && l.length < 80;
     if (isContact) { contactLines.push(l); bodyStart = i + 1; }
     else if (contactLines.length > 0 && l.length < 100 && !/[A-Z]{3,}/.test(l)) {
