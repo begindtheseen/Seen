@@ -1,5 +1,5 @@
 import { ImageResponse } from 'next/og'
-import { getScore, companyExists, titleCase, displayCompanyName, grade, pct, firstPartyReportCount } from '@/lib/growth'
+import { getScore, companyExists, titleCase, displayCompanyName, grade, firstPartyReportCount } from '@/lib/growth'
 import { lastUpdatedLabel } from '@/lib/companyDisplay'
 import { loadCardFonts } from '@/lib/server/cardFonts'
 import { INK, TEXT, ACCENTS, accentKeyForRisk, riskForScore, rgba } from '@/lib/cardTheme.js'
