@@ -105,10 +105,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <AuthProvider>
           <AnalyticsProvider />
-          {/* Global aurora background orbs — renders on all pages */}
-          <div className="aurora" aria-hidden="true">
-            <div className="aurora-3" />
-          </div>
           {/* The connected shell: route progress hairline, nav, page, footer, phone tab bar, ⌘K palette. */}
           <RouteProgress />
           <NavMemory />

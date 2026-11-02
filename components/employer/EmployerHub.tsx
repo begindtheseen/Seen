@@ -9,7 +9,7 @@
 //   • A logged-in approved employer (ready && claimsReady && isEmployer && employerCompany && !godview)
 //     is pinned to their claimed company; the ?company= param is ignored for them.
 //   • Everyone else (a visitor, or an admin in ?godview=1) honors the ?company= param via a lookup
-//     input + Refresh. God-view shows the purple "Admin god-view" banner.
+//     input + Refresh. God-view shows the blue "Admin god-view" banner.
 //
 // The reputation hero + Overview read PUBLIC aggregate data by company name (score / reports-feed /
 // company_jobs) exactly like the old dashboard. The Listings / Analytics / Updates tabs are
@@ -127,7 +127,7 @@ export function EmployerHub() {
     } catch { /* history unavailable — the in-memory tab still switches */ }
   }, [])
 
-  // ── Sliding tab indicator — measure the active button and slide a gradient pill
+  // ── Sliding tab indicator — measure the active button and slide a filled pill
   //    behind it. Recomputes on tab change, on data load, and on resize. ──────────
   const tablistRef = useRef<HTMLDivElement | null>(null)
   const tabRefs = useRef<Record<TabKey, HTMLButtonElement | null>>({ overview: null, listings: null, analytics: null, updates: null })
@@ -239,7 +239,7 @@ export function EmployerHub() {
   const hasRep = isGradeableScore(score) && (score?.report_count ?? 0) > 0
 
   return (
-    <div style={{ minHeight: '100vh', background: 'radial-gradient(ellipse at 15% -5%,rgba(29,78,216,0.12) 0%,transparent 55%),radial-gradient(ellipse at 100% 5%,rgba(124,58,237,0.09) 0%,transparent 45%)' }}>
+    <div style={{ minHeight: '100vh', background: 'radial-gradient(ellipse at 15% -5%,rgba(37,99,235,.10) 0%,transparent 55%)' }}>
       {/* Shared employer chrome (EmployerNav.tsx) — logo→home, organized menu, sign out, mobile drawer */}
       <EmployerNav />
 
@@ -249,7 +249,7 @@ export function EmployerHub() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap', marginBottom: '.55rem' }}>
             <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--blue)' }}>Employer dashboard</span>
             {godview && (
-              <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: '#a78bfa', background: 'rgba(124,58,237,.12)', border: '1px solid rgba(124,58,237,.35)', borderRadius: 7, padding: '.16rem .5rem' }}>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--accent)', background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 7, padding: '.16rem .5rem' }}>
                 Admin god-view
               </span>
             )}
@@ -290,7 +290,7 @@ export function EmployerHub() {
         ) : (
           <>
             {godview && (
-              <div style={{ marginBottom: '1rem', padding: '.6rem .9rem', background: 'rgba(124,58,237,.06)', border: '1px solid rgba(124,58,237,.28)', borderRadius: 10, fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6 }}>
+              <div style={{ marginBottom: '1rem', padding: '.6rem .9rem', background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 10, fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6 }}>
                 Admin god-view — this is the same public data any visitor sees, scoped to the company in the URL. Change the company below to view another.
               </div>
             )}
@@ -303,7 +303,7 @@ export function EmployerHub() {
                 aria-label="Your company name"
                 style={{ flex: 1, minWidth: 220, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.7rem .9rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', outline: 'none' }}
               />
-              <button onClick={lookup} disabled={loading || !companyInput.trim()} style={{ background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 9, padding: '.7rem 1.4rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)', color: '#fff', cursor: loading ? 'default' : 'pointer', opacity: loading || !companyInput.trim() ? .6 : 1 }}>
+              <button onClick={lookup} disabled={loading || !companyInput.trim()} style={{ background: 'var(--cta)', border: 'none', borderRadius: 9, padding: '.7rem 1.4rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)', color: '#fff', cursor: loading ? 'default' : 'pointer', opacity: loading || !companyInput.trim() ? .6 : 1 }}>
                 {loading ? 'Loading…' : company ? 'Refresh →' : 'View dashboard →'}
               </button>
             </div>
@@ -393,7 +393,7 @@ export function EmployerHub() {
               </div>
             )}
 
-            {/* ── Tab bar (segmented control with sliding gradient pill) ────────── */}
+            {/* ── Tab bar (segmented control with sliding filled pill) ────────── */}
             <div ref={tablistRef} role="tablist" aria-label="Employer hub sections" className="emp-reveal" style={{ position: 'relative', display: 'flex', flexWrap: 'wrap', gap: 4, background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 12, padding: 4, marginBottom: '1.6rem', animationDelay: '140ms' }}>
               {ind && (
                 <span
@@ -402,8 +402,8 @@ export function EmployerHub() {
                   style={{
                     position: 'absolute', left: 0, top: 0, width: ind.width, height: ind.height,
                     transform: `translate(${ind.left}px, ${ind.top}px)`,
-                    background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', borderRadius: 9,
-                    boxShadow: '0 0 20px rgba(124,58,237,.32)', pointerEvents: 'none', zIndex: 0,
+                    background: 'var(--cta)', borderRadius: 9,
+                    boxShadow: 'var(--sh-control)', pointerEvents: 'none', zIndex: 0,
                   }}
                 />
               )}

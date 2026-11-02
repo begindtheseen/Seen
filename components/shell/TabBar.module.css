@@ -33,10 +33,10 @@
 }
 .on { color: #fff; }
 .on .ico {
-  background: rgba(99, 102, 241, 0.22);
-  box-shadow: inset 0 0 0 1px rgba(129, 140, 248, 0.35), 0 0 18px rgba(99, 102, 241, 0.2);
+  background: var(--accent-tint);
+  box-shadow: inset 0 0 0 1px var(--accent-line);
 }
-.on .label { color: #c7d2fe; }
+.on .label { color: var(--accent); }
 
 @media (prefers-reduced-motion: reduce) {
   .bar, .item, .ico { transition: none; }

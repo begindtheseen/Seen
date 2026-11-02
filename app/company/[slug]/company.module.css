@@ -7,7 +7,7 @@
 
 .stack { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
 .fine { margin: var(--sp-2) 0 0; font-size: var(--fs-sm); color: var(--text-3); line-height: var(--lh-body); }
-.textLink { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgba(129, 140, 248, 0.45); background: none; border: 0; padding: 0; font: inherit; cursor: pointer; display: inline-flex; align-items: center; min-height: 32px; }
+.textLink { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--accent-line); background: none; border: 0; padding: 0; font: inherit; cursor: pointer; display: inline-flex; align-items: center; min-height: 32px; }
 .textLink:hover { color: var(--text-1); }
 .gapTop { margin-top: var(--sp-4); }
 .gapBottom { margin-bottom: var(--sp-6); }

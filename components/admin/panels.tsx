@@ -58,7 +58,7 @@ export function JobCrisisBanner({
     <div
       role="alert"
       style={{
-        background: 'linear-gradient(90deg, rgba(239,68,68,.16), rgba(239,68,68,.06))',
+        background: 'var(--bad-tint)',
         border: '1px solid rgba(239,68,68,.5)',
         borderLeft: '4px solid var(--red)',
         borderRadius: 12,
@@ -1271,7 +1271,7 @@ export function CompanyExportPanel({ token }: { token: string }) {
             <button onClick={prepareJson} disabled={!!busy} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.42rem .9rem', borderRadius: 7, border: '1px solid rgba(59,130,246,.3)', background: 'rgba(59,130,246,.08)', color: 'var(--blue)', cursor: 'pointer', flexShrink: 0 }}>
               {busy === 'json' ? 'Assembling…' : 'Export JSON'}
             </button>
-            <button onClick={preparePdf} disabled={!!busy} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.42rem .9rem', borderRadius: 7, border: '1px solid rgba(124,58,237,.4)', background: 'rgba(124,58,237,.12)', color: 'var(--indigo, #a78bfa)', cursor: 'pointer', flexShrink: 0 }}>
+            <button onClick={preparePdf} disabled={!!busy} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.42rem .9rem', borderRadius: 7, border: '1px solid var(--accent-line)', background: 'var(--accent-tint)', color: 'var(--accent)', cursor: 'pointer', flexShrink: 0 }}>
               {busy === 'pdf' ? 'Generating…' : 'Generate Legal Audit PDF'}
             </button>
             <button onClick={preparePackage} disabled={!!busy} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.42rem .9rem', borderRadius: 7, border: '1px solid rgba(16,185,129,.45)', background: 'rgba(16,185,129,.1)', color: 'var(--green)', cursor: 'pointer', flexShrink: 0 }}>
@@ -1869,7 +1869,7 @@ export function DeployPanel() {
   const masked = saved ? saved.slice(0, 40) + '…' : ''
 
   return (
-    <Card style={{ marginBottom: '1.25rem', border: '1px solid rgba(99,102,241,.25)' }}>
+    <Card style={{ marginBottom: '1.25rem', border: '1px solid var(--accent-line)' }}>
       <CardHeader
         title="Deploy to production"
         action={
@@ -1900,7 +1900,7 @@ export function DeployPanel() {
             <button
               onClick={saveHook}
               disabled={!input.trim()}
-              style={{ background: 'rgba(99,102,241,.15)', border: '1px solid rgba(99,102,241,.35)', borderRadius: 7, padding: '.42rem .9rem', fontFamily: 'var(--mono)', fontSize: '.6rem', color: '#a5b4fc', cursor: 'pointer', flexShrink: 0 }}
+              style={{ background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 7, padding: '.42rem .9rem', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--accent)', cursor: 'pointer', flexShrink: 0 }}
             >
               Save →
             </button>
@@ -1919,18 +1919,18 @@ export function DeployPanel() {
         disabled={deploying}
         style={{
           width: '100%',
-          background: saved ? 'linear-gradient(135deg,rgba(99,102,241,.2),rgba(16,185,129,.15))' : 'var(--raised)',
-          border: `1px solid ${saved ? 'rgba(99,102,241,.4)' : 'var(--line2)'}`,
+          background: saved ? 'var(--accent-tint)' : 'var(--raised)',
+          border: `1px solid ${saved ? 'var(--accent-line)' : 'var(--line2)'}`,
           borderRadius: 9, padding: '.85rem 1.25rem',
           fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.95rem',
-          color: saved ? '#a5b4fc' : 'var(--sub)',
+          color: saved ? 'var(--accent)' : 'var(--sub)',
           cursor: deploying ? 'not-allowed' : 'pointer', opacity: deploying ? 0.7 : 1,
           letterSpacing: '-.01em', textAlign: 'left' as const,
         }}
       >
         {deploying ? '⏳ Deploying…' : saved ? '🚀 Deploy latest Claude changes →' : '⚙ Paste deploy hook URL above to enable'}
         {saved && !deploying && (
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', fontWeight: 400, color: 'rgba(165,180,252,.55)', marginTop: '.2rem' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', fontWeight: 400, color: 'var(--sub)', marginTop: '.2rem' }}>
             Pushes all Claude commits live in ~1 min
           </div>
         )}

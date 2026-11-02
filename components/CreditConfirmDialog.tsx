@@ -67,7 +67,7 @@ export default function CreditConfirmDialog({ cost = 1, action, onConfirm, onCan
             <button
               type="button"
               onClick={() => { markCreditUseConfirmed(user?.id); onConfirm() }}
-              style={{ width: '100%', padding: '.75rem 1rem', background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)', color: '#fff', border: 'none', borderRadius: 10, fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)', cursor: 'pointer' }}
+              style={{ width: '100%', padding: '.75rem 1rem', background: 'var(--cta)', color: '#fff', border: 'none', borderRadius: 10, fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)', cursor: 'pointer' }}
             >
               {pro ? 'Continue' : `Use ${label}`}
             </button>

@@ -30,5 +30,5 @@
   border: 1px solid var(--line2); color: var(--sub); font-size: var(--fs-sm); text-decoration: none;
   transition: color 0.15s ease, border-color 0.15s ease;
 }
-.link:hover { color: var(--white); border-color: rgba(129, 140, 248, 0.5); }
+.link:hover { color: var(--white); border-color: var(--accent-line); }
 

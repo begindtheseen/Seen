@@ -206,7 +206,7 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
   const liveFeed = useAdminLive(token, reload)
 
   return (
-    <div className="page-full" style={{ background: 'radial-gradient(ellipse at 10% 0%,rgba(29,78,216,0.1) 0%,transparent 50%),radial-gradient(ellipse at 90% 10%,rgba(124,58,237,0.07) 0%,transparent 45%)' }}>
+    <div className="page-full" style={{ background: 'radial-gradient(ellipse at 10% 0%,rgba(37,99,235,.10) 0%,transparent 50%)' }}>
       <LiveBell events={liveFeed.events} unread={liveFeed.unread} markRead={liveFeed.markRead} live={liveFeed.live} />
       <div className="adm-wrap">
 

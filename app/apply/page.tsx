@@ -222,7 +222,7 @@ function ApplyContent() {
                 </span>
               )}
               {score.avg_wait_days > 0 && (
-                <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', background: 'rgba(99,102,241,0.1)', color: 'rgba(180,180,255,0.85)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 4, padding: '.1rem .35rem' }}>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', background: 'var(--accent-tint)', color: 'var(--accent)', border: '1px solid var(--accent-line)', borderRadius: 4, padding: '.1rem .35rem' }}>
                   avg {score.avg_wait_days}d wait
                 </span>
               )}
@@ -265,7 +265,7 @@ function ApplyContent() {
             <button
               onClick={handleYes}
               disabled={saving}
-              style={{ width: '100%', background: 'linear-gradient(135deg, rgba(16,185,129,0.18) 0%, rgba(16,185,129,0.08) 100%)', border: '1.5px solid rgba(16,185,129,0.5)', color: 'var(--green)', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-body)', borderRadius: 12, padding: '.95rem 1.25rem', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1, letterSpacing: '-.01em', textAlign: 'left', boxShadow: '0 0 24px rgba(16,185,129,0.1)' }}
+              style={{ width: '100%', background: 'var(--good-tint)', border: '1.5px solid rgba(16,185,129,0.5)', color: 'var(--green)', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-body)', borderRadius: 12, padding: '.95rem 1.25rem', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1, letterSpacing: '-.01em', textAlign: 'left', boxShadow: '0 0 24px rgba(16,185,129,0.1)' }}
             >
               ✅ Yes, I applied
               <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 400, color: 'rgba(52,211,153,0.65)', marginTop: '.25rem' }}>Start tracking your timeline</div>
@@ -353,7 +353,7 @@ function ApplyContent() {
           )}
           <button
             onClick={() => router.push('/tracker?new=1')}
-            style={{ width: '100%', background: 'linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(16,185,129,0.1) 100%)', border: '1.5px solid rgba(16,185,129,0.4)', color: 'var(--green)', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-body)', borderRadius: 12, padding: '.95rem 1.25rem', cursor: 'pointer', marginBottom: '.65rem', letterSpacing: '-.01em' }}
+            style={{ width: '100%', background: 'var(--good-tint)', border: '1.5px solid rgba(16,185,129,0.4)', color: 'var(--green)', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-body)', borderRadius: 12, padding: '.95rem 1.25rem', cursor: 'pointer', marginBottom: '.65rem', letterSpacing: '-.01em' }}
           >
             View my tracker →
           </button>

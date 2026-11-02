@@ -107,7 +107,7 @@ export default async function GhostReportPage() {
             </div>
 
             {report.agencySpotlight && (
-              <div style={{ background: 'linear-gradient(135deg, rgba(239,68,68,.10), rgba(239,68,68,.02))', border: '1px solid rgba(239,68,68,.3)', borderRadius: 12, padding: '1.1rem 1.3rem', marginBottom: '2.2rem' }}>
+              <div style={{ background: 'var(--bad-tint)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 12, padding: '1.1rem 1.3rem', marginBottom: '2.2rem' }}>
                 <div style={{ ...mono('var(--fs-meta)', 'var(--red)'), textTransform: 'uppercase', letterSpacing: '.15em', marginBottom: '.4rem' }}>Agency spotlight</div>
                 <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', lineHeight: 1.5 }}>
                   <span style={{ textTransform: 'capitalize' }}>{report.agencySpotlight.name}</span> is the most-reported ghosting staffing agency this week — {report.agencySpotlight.ghostPct}% of {report.agencySpotlight.reportCount.toLocaleString()} reported applications got no response at all.
@@ -149,7 +149,7 @@ export default async function GhostReportPage() {
         )}
 
         <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', margin: '0 0 2.4rem' }}>
-          <Link href="/report?outcome=ghosted" className="btn" style={{ background: 'linear-gradient(135deg,var(--g-start),var(--g-mid),var(--g-end))', color: '#fff', padding: '.7rem 1.3rem', fontWeight: 800 }}>Been ghosted? Add it — 2 min →</Link>
+          <Link href="/report?outcome=ghosted" className="btn" style={{ background: 'var(--cta)', color: '#fff', padding: '.7rem 1.3rem', fontWeight: 800 }}>Been ghosted? Add it — 2 min →</Link>
           <Link href="/agencies" className="btn btn-ghost" style={{ padding: '.7rem 1.3rem' }}>The full ghost index</Link>
         </div>
 

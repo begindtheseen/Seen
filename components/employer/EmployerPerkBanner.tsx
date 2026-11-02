@@ -48,7 +48,7 @@ export function EmployerPerkBanner() {
         <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--white)' }}>{messages.join(' · ')}</div>
         <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.1rem' }}>Renew to keep your reach and badge live — one-time, no auto-charge.</div>
       </div>
-      <Link href="/employers#promote" style={{ flexShrink: 0, background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 8, padding: '.5rem 1.1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-meta)', color: '#fff', textDecoration: 'none' }}>Renew →</Link>
+      <Link href="/employers#promote" style={{ flexShrink: 0, background: 'var(--cta)', border: 'none', borderRadius: 8, padding: '.5rem 1.1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-meta)', color: '#fff', textDecoration: 'none' }}>Renew →</Link>
     </div>
   )
 }

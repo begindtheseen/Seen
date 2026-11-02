@@ -1,6 +1,6 @@
 /* Dashboard (Command Center). Two-column rows on desktop, one column on phones. One card
    material, one type scale, one accent: Syne for headings, DM Mono for labels/figures,
-   Seen's indigo/violet. Solid surfaces, no backdrop-filter (floating-panel rule). */
+   Seen's one flat blue accent. Solid surfaces, no backdrop-filter (floating-panel rule). */
 
 .dash {
   width: 100%;
@@ -16,7 +16,7 @@
 /* ── Intro ── */
 .intro { display: flex; align-items: flex-end; justify-content: space-between; gap: 1.2rem; padding: 2.1rem 0 1.5rem; }
 .hello { font-family: var(--display); font-weight: 800; font-size: clamp(2rem, 4.4vw, 3rem); letter-spacing: -0.05em; line-height: 1.02; color: var(--white); margin: 0.55rem 0 0.4rem; }
-.dot { background: linear-gradient(100deg, #a8a6ff, #e3a3ff); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.dot { color: var(--accent); }
 .status { margin: 0; font-size: var(--fs-body); color: var(--sub); }
 .statusDim { color: var(--dim); }
 
@@ -27,8 +27,8 @@
   border-radius: 12px;
   font-family: var(--body); font-weight: 600; font-size: var(--fs-ui); color: #fff;
   text-decoration: none; white-space: nowrap;
-  background: linear-gradient(110deg, #315bfa, #a33bf2);
-  box-shadow: 0 8px 30px rgba(97, 64, 227, 0.3);
+  background: var(--cta);
+  box-shadow: var(--sh-control);
 }
 .primary:hover { filter: brightness(1.08); }
 .ghostBtn {
@@ -38,7 +38,7 @@
   border: 1px solid var(--line2); background: rgba(255, 255, 255, 0.04); text-decoration: none;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
-.ghostBtn:hover { border-color: rgba(129, 140, 248, 0.45); background: rgba(99, 102, 241, 0.1); }
+.ghostBtn:hover { border-color: var(--accent-line); background: var(--accent-tint); }
 
 /* ── Rows + cards ── */
 .row { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 1rem; }
@@ -71,8 +71,8 @@
 
 /* ── Health card ── */
 .health {
-  border-color: rgba(129, 120, 220, 0.3);
-  background: radial-gradient(circle at 85% 0%, rgba(99, 82, 200, 0.42), transparent 58%), linear-gradient(135deg, #20234a, #111426);
+  border-color: var(--accent-line);
+  background: radial-gradient(circle at 85% 0%, var(--accent-tint), transparent 58%), #111426;
 }
 .healthBody { display: flex; align-items: center; gap: 1.3rem; margin: 1.25rem 0 1.3rem; }
 .ring {
@@ -152,7 +152,7 @@
   border: 1px solid rgba(255, 255, 255, 0.09); background: #12141f; text-decoration: none; color: inherit;
   transition: transform 0.35s var(--ease-out), border-color 0.2s ease;
 }
-.tool:hover { transform: translateY(-3px); border-color: rgba(129, 140, 248, 0.35); }
+.tool:hover { transform: translateY(-3px); border-color: var(--accent-line); }
 .tool .sym { margin-bottom: 0.85rem; }
 .tool small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 

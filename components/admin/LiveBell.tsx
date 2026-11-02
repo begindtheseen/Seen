@@ -9,7 +9,7 @@ import type { LiveEvent } from '@/lib/hooks/useAdminLive'
 // that arrive without a refresh. Fed by useAdminLive.
 
 const DOT: Record<LiveEvent['sev'], string> = {
-  blue: 'var(--blue)', green: 'var(--green)', money: '#f7c948', amber: 'var(--amber)', violet: 'var(--violet)',
+  blue: 'var(--blue)', green: 'var(--green)', money: '#f7c948', amber: 'var(--amber)', violet: 'var(--accent)',
 }
 
 export function LiveBell({ events, unread, markRead, live }: {

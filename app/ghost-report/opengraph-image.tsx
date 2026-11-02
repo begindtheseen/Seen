@@ -37,7 +37,7 @@ export default async function Image() {
           width: '100%', height: '100%', display: 'flex', flexDirection: 'column',
           background: '#05070f',
           backgroundImage:
-            'radial-gradient(ellipse at 25% 0%, rgba(239,68,68,0.16) 0%, transparent 55%), radial-gradient(ellipse at 90% 100%, rgba(124,58,237,0.14) 0%, transparent 55%)',
+            'radial-gradient(ellipse at 25% 0%, rgba(239,68,68,0.16) 0%, transparent 55%)',
           padding: '58px 68px', fontFamily: 'sans-serif',
         }}
       >

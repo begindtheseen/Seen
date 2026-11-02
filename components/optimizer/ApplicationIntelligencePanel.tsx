@@ -180,7 +180,7 @@ function ImproveSection({ questions, onAnswers, rerunning }: {
     .filter(a => a.answer.length > 0)
   return (
     <Card>
-      {kicker('Improve this result', 'var(--indigo)')}
+      {kicker('Improve this result', 'var(--accent)')}
       <div style={{ fontFamily: mono, fontSize: '.58rem', color: 'var(--sub)', marginBottom: '.75rem', lineHeight: 1.55 }}>
         Answer any of these with a real number or detail — we fold your confirmed evidence back in and re-score. Nothing is invented from a blank answer.
       </div>
@@ -203,7 +203,7 @@ function ImproveSection({ questions, onAnswers, rerunning }: {
       <button
         onClick={() => onAnswers(answered)}
         disabled={rerunning || answered.length === 0}
-        style={{ marginTop: '.85rem', width: '100%', background: answered.length ? 'linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%)' : 'var(--raised)', color: answered.length ? '#fff' : 'var(--muted)', border: 'none', borderRadius: 8, padding: '.65rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.78rem', cursor: (rerunning || !answered.length) ? 'not-allowed' : 'pointer', opacity: rerunning ? 0.6 : 1 }}
+        style={{ marginTop: '.85rem', width: '100%', background: answered.length ? 'var(--cta)' : 'var(--raised)', color: answered.length ? '#fff' : 'var(--muted)', border: 'none', borderRadius: 8, padding: '.65rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.78rem', cursor: (rerunning || !answered.length) ? 'not-allowed' : 'pointer', opacity: rerunning ? 0.6 : 1 }}
       >
         {rerunning ? 'Re-scoring…' : answered.length ? `Re-run with ${answered.length} answer${answered.length !== 1 ? 's' : ''} →` : 'Add an answer to re-run'}
       </button>

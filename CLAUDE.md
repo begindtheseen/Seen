@@ -34,6 +34,16 @@ When the owner needs to run SQL (migrations, fixes, queries), NEVER send a .sql 
 path. Put the SQL in the chat as a plain fenced code block he can copy straight into the Supabase SQL
 Editor — comments stripped, one block per migration, and say which to run first.
 
+## OWNER DECISION 2026-11-02: no purple, no gradient fills, no glow — ONE flat blue accent
+"Seenjobs needs to ditch the purple gradient as a whole — it's the tell-tale sign of vibecode slop." The whole
+indigo/violet family is retired, with the gradient CTA, the gradient headline text, the purple glow shadows and the
+animated aurora orbs. The look is now: dark surfaces, one flat accent (`--accent:#60a5fa` text/icons,
+`--accent-strong:#2563eb` fills, `--cta:#2563eb` / `--cta-hover:#1d4ed8` for THE primary button), the semantic
+good/caution/bad/info set, and plain shadows (`--sh-*`). `lib/ui/designRules.test.mjs` fails the suite on any
+indigo/violet/purple/fuchsia hex or rgb, any retired token (`--cta-gradient`, `--g-*`, `--violet`, `--purple`…), any
+gradient that mixes two colours, and any `background-clip:text`. Do not add a second hue "for pop"; do not bring
+back a gradient button; a new colour is a token in app/globals.css or it does not ship.
+
 ## North Star
 Read SEEN_STRATEGY.md at the start of every session. That document is the product strategy.
 Every code change must serve the strategy. When in doubt, re-read it.

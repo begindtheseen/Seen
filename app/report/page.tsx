@@ -332,8 +332,8 @@ function ReportPage() {
             </a>
           </div>
           {matchedAppId && !trackerUpdated && (
-            <div style={{ marginTop: '1.5rem', background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.2)', borderRadius: 10, padding: '1rem 1.15rem', textAlign: 'left' }}>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--indigo)', marginBottom: '.35rem' }}>Your tracker still shows this as active</div>
+            <div style={{ marginTop: '1.5rem', background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 10, padding: '1rem 1.15rem', textAlign: 'left' }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--accent)', marginBottom: '.35rem' }}>Your tracker still shows this as active</div>
               <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '.75rem' }}>Update it to match your report?</div>
               <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
                 {/* Pass the real login state — hardcoding false meant the change never synced
@@ -369,13 +369,13 @@ function ReportPage() {
     <div className="page-full">
       <div style={{ maxWidth: 680, margin: '0 auto', padding: '2.5rem 2rem', width: '100%', boxSizing: 'border-box' }}>
         {appId && auto && !autoApp && (
-          <div style={{ background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.22)', borderRadius: 10, padding: '.7rem 1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.75rem', flexWrap: 'wrap' }}>
+          <div style={{ background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 10, padding: '.7rem 1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.75rem', flexWrap: 'wrap' }}>
             <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6 }}>
               ✦ Prefilled from your tracker.{company ? ` Reporting your ${company} outcome.` : ''}
             </div>
             <button
               onClick={() => { const apps = AppStore.loadSync(); const a = apps.find(x => x.id === appId); if (a) setAutoApp(a) }}
-              style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, color: '#fff', border: 'none', background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)', borderRadius: 8, padding: '.45rem .9rem', cursor: 'pointer', flexShrink: 0 }}
+              style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, color: '#fff', border: 'none', background: 'var(--cta)', borderRadius: 8, padding: '.45rem .9rem', cursor: 'pointer', flexShrink: 0 }}
             >
               ✦ Open share card
             </button>
@@ -529,7 +529,7 @@ function ReportPage() {
           <button
             onClick={submit}
             disabled={loading}
-            style={{ width: '100%', background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)', color: '#fff', border: 'none', borderRadius: 8, padding: '.85rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-ui)', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1, boxShadow: '0 0 20px rgba(59,130,246,0.3)' }}
+            style={{ width: '100%', background: 'var(--cta)', color: '#fff', border: 'none', borderRadius: 8, padding: '.85rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-ui)', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1, boxShadow: '0 0 20px rgba(59,130,246,0.3)' }}
           >
             {loading ? 'Submitting...' : 'Submit report →'}
           </button>

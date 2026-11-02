@@ -152,7 +152,7 @@ export function EmployerReplyManager({ company }: { company: string }) {
                     />
                     {err && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--red)' }}>{err}</div>}
                     <div style={{ display: 'flex', gap: '.5rem' }}>
-                      <button onClick={() => rep.id && submit(rep.id)} disabled={busy || !draft.trim()} style={{ background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-meta)', color: '#fff', cursor: 'pointer', opacity: busy || !draft.trim() ? .6 : 1 }}>{busy ? 'Submitting…' : 'Submit for review'}</button>
+                      <button onClick={() => rep.id && submit(rep.id)} disabled={busy || !draft.trim()} style={{ background: 'var(--cta)', border: 'none', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-meta)', color: '#fff', cursor: 'pointer', opacity: busy || !draft.trim() ? .6 : 1 }}>{busy ? 'Submitting…' : 'Submit for review'}</button>
                       <button onClick={() => { setOpenId(null); setDraft(''); setErr('') }} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem .9rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', cursor: 'pointer' }}>Cancel</button>
                     </div>
                   </div>

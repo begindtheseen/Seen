@@ -64,16 +64,15 @@ export default function WelcomeOnboarding({
     <section
       style={{
         position: 'relative',
-        background: 'linear-gradient(160deg, rgba(99,102,241,.10), rgba(59,130,246,.05) 60%, transparent)',
-        border: '1px solid rgba(99,102,241,.28)',
+        background: 'linear-gradient(160deg, var(--accent-tint), transparent 60%)',
+        border: '1px solid var(--accent-line)',
         borderRadius: 16,
         padding: '1.15rem 1.15rem 1.25rem',
-        boxShadow: '0 0 40px rgba(99,102,241,.08)',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '.75rem', marginBottom: '.35rem' }}>
         <div style={{ minWidth: 0 }}>
-          <div className="deyebrow" style={{ color: 'var(--indigo)' }}>✦ Getting started</div>
+          <div className="deyebrow" style={{ color: 'var(--accent)' }}>✦ Getting started</div>
           <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: '.35rem 0 .2rem' }}>
             {/* Sign-up no longer asks a name first (it is asked later, in Settings): no "Welcome to Seen, there". */}
             {name && name !== 'there' ? <>Welcome to Seen, {name} 👋</> : <>Welcome to Seen 👋</>}
@@ -93,7 +92,7 @@ export default function WelcomeOnboarding({
       {/* Progress */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', margin: '.85rem 0 1rem' }}>
         <div style={{ flex: 1, height: 5, background: 'var(--line2)', borderRadius: 4, overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${(doneCount / steps.length) * 100}%`, background: 'linear-gradient(90deg,var(--blue),var(--indigo))', borderRadius: 4, transition: 'width .4s ease' }} />
+          <div style={{ height: '100%', width: `${(doneCount / steps.length) * 100}%`, background: 'var(--accent-strong)', borderRadius: 4, transition: 'width .4s ease' }} />
         </div>
         <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', flexShrink: 0, fontWeight: 500 }}>{doneCount}/{steps.length} done</span>
       </div>
@@ -108,7 +107,7 @@ export default function WelcomeOnboarding({
               style={{
                 display: 'flex', alignItems: 'center', gap: '.7rem', flexWrap: 'wrap',
                 background: s.done ? 'transparent' : 'var(--surface)',
-                border: `1px solid ${isNext ? 'rgba(99,102,241,.4)' : 'var(--line2)'}`,
+                border: `1px solid ${isNext ? 'var(--accent-line)' : 'var(--line2)'}`,
                 borderRadius: 11, padding: '.65rem .7rem',
                 opacity: s.done ? 0.72 : 1,
               }}

@@ -5,7 +5,7 @@
 .btn { background: none; border: 1px solid var(--line2); color: var(--sub); border-radius: 8px; padding: .45rem .8rem; font-family: var(--mono); font-size: .64rem; cursor: pointer; transition: border-color .15s, color .15s; white-space: nowrap; }
 .btn:hover { border-color: var(--sub); color: var(--white); }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
-.btnPrimary { background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); color: #fff; border: none; border-radius: 8px; padding: .7rem 1.1rem; font-family: var(--display); font-weight: 800; font-size: .82rem; cursor: pointer; box-shadow: 0 0 20px rgba(59, 130, 246, .25); }
+.btnPrimary { background: var(--cta); color: #fff; border: none; border-radius: 8px; padding: .7rem 1.1rem; font-family: var(--display); font-weight: 800; font-size: .82rem; cursor: pointer; box-shadow: var(--sh-control); }
 .btnPrimary:disabled { opacity: .55; cursor: not-allowed; box-shadow: none; }
 .btnGreen { background: var(--green); color: var(--ink); border: none; border-radius: 8px; padding: .6rem 1rem; font-family: var(--display); font-weight: 800; font-size: .78rem; cursor: pointer; }
 .btnGreen:disabled { opacity: .55; cursor: not-allowed; }
@@ -16,7 +16,7 @@
 .seg { display: flex; gap: .35rem; margin-bottom: .9rem; overflow-x: auto; scrollbar-width: none; }
 .seg::-webkit-scrollbar { display: none; }
 .segBtn { flex: 0 0 auto; white-space: nowrap; background: none; border: 1.5px solid var(--line2); color: var(--sub); border-radius: 8px; padding: .45rem .8rem; font-family: var(--mono); font-size: .66rem; cursor: pointer; transition: all .15s; }
-.segBtnActive { border-color: var(--green); color: var(--green); background: linear-gradient(135deg, rgba(16, 185, 129, .15), rgba(59, 130, 246, .15)); font-weight: 600; }
+.segBtnActive { border-color: var(--green); color: var(--green); background: var(--good-tint); font-weight: 600; }
 .mobileOnly { display: none; }
 .card { background: var(--surface); border: 1px solid var(--line2); border-radius: 12px; padding: 1.05rem; margin-bottom: .9rem; min-width: 0; }
 .cardTitle { font-family: var(--display); font-weight: 800; color: var(--white); font-size: .92rem; margin: 0 0 .25rem; }
@@ -103,7 +103,7 @@
 .check:last-child { border-bottom: none; }
 .ok { color: var(--green); flex-shrink: 0; }
 .bad { color: var(--red); flex-shrink: 0; }
-.notice { background: var(--idim); border: 1px solid var(--imid); border-radius: 8px; padding: .6rem .8rem; font-family: var(--mono); font-size: .62rem; color: #a5b4fc; line-height: 1.55; }
+.notice { background: var(--accent-tint); border: 1px solid var(--accent-line); border-radius: 8px; padding: .6rem .8rem; font-family: var(--mono); font-size: .62rem; color: var(--accent); line-height: 1.55; }
 .err { background: var(--rdim); border: 1px solid rgba(239, 68, 68, .25); border-radius: 8px; padding: .6rem .8rem; font-family: var(--mono); font-size: .66rem; color: var(--red); margin-bottom: .75rem; overflow-wrap: anywhere; }
 .okBox { background: var(--gdim); border: 1px solid var(--gmid); border-radius: 8px; padding: .6rem .8rem; font-family: var(--mono); font-size: .64rem; color: var(--green); margin-bottom: .75rem; }
 .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 220px; color: var(--muted); font-family: var(--mono); font-size: .72rem; text-align: center; gap: .6rem; white-space: pre-line; }

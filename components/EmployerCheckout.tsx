@@ -32,7 +32,7 @@ export function EmployerPurchaseConfirm() {
       ? "We've got your payment and emailed a receipt. The Ghost Index sponsor slot is a single, exclusive placement — our team sets it up (so it's never oversold) and follows up at the email you used, usually within one business day."
       : "We've got your payment and emailed a receipt. Transparency Verified is reviewed by our team against your real outcome data — we'll set it up and follow up at the email you used, usually within one business day."
   return (
-    <div style={{ background: 'linear-gradient(135deg,rgba(16,185,129,.12),rgba(16,185,129,.03))', border: '1px solid rgba(16,185,129,.35)', borderRadius: 14, padding: '1.25rem 1.5rem', marginBottom: '2rem', textAlign: 'center' }}>
+    <div style={{ background: 'var(--good-tint)', border: '1px solid rgba(16,185,129,.35)', borderRadius: 14, padding: '1.25rem 1.5rem', marginBottom: '2rem', textAlign: 'center' }}>
       <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', marginBottom: '.3rem' }}>
         {state === 'pending' ? 'Confirming your purchase…' : `🎉 You're in — ${name} is booked.`}
       </div>
@@ -139,7 +139,7 @@ const inp: React.CSSProperties = {
   fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', outline: 'none', width: '100%', boxSizing: 'border-box',
 }
 const btn: React.CSSProperties = {
-  display: 'block', width: '100%', textAlign: 'center', background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)',
+  display: 'block', width: '100%', textAlign: 'center', background: 'var(--cta)',
   border: 'none', borderRadius: 8, padding: '.7rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)',
   color: '#fff', cursor: 'pointer',
 }

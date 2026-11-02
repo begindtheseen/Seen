@@ -254,7 +254,7 @@ export default function FeedPage() {
                         </Link>
                       )}
                       {r.company_name && appliedCos.has(r.company_name.toLowerCase().trim()) && (
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', background: 'rgba(99,102,241,.12)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 4, padding: '.1rem .35rem', color: 'var(--indigo)', marginLeft: '.3rem', verticalAlign: 'middle' }}>
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 4, padding: '.1rem .35rem', color: 'var(--accent)', marginLeft: '.3rem', verticalAlign: 'middle' }}>
                           You applied
                         </span>
                       )}
@@ -326,7 +326,7 @@ export default function FeedPage() {
           <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '1rem' }}>
             Takes 60 seconds. Helps the next applicant who checks this company.
           </p>
-          <Link href="/report" style={{ display: 'inline-block', background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)', border: 'none', borderRadius: 8, padding: '.65rem 1.5rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', color: '#fff', textDecoration: 'none', boxShadow: '0 0 20px rgba(59,130,246,0.3)' }}>
+          <Link href="/report" style={{ display: 'inline-block', background: 'var(--cta)', border: 'none', borderRadius: 8, padding: '.65rem 1.5rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', color: '#fff', textDecoration: 'none', boxShadow: '0 0 20px rgba(59,130,246,0.3)' }}>
             Submit your report →
           </Link>
         </div>

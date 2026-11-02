@@ -1,7 +1,7 @@
 /* /pricing — one clear menu: Free, Interview Prep (the lead), the Job Search Pass.
    Phone first: the hero is short and the Interview Prep card (price + button) sits in the first screen
    at 390px. Every text size here is ≥ .75rem and every control ≥ 44px (CLAUDE.md phone floors).
-   One primary per view: the Interview Prep button carries the CTA gradient; the pass is secondary,
+   One primary per view: the Interview Prep button carries the flat CTA fill; the pass is secondary,
    Free is ghost. Green is reserved for success states (the "included" status). */
 
 .wrap { max-width: var(--w-mid); margin: 0 auto; padding: 3rem 1.5rem 4.5rem; width: 100%; box-sizing: border-box; }
@@ -25,8 +25,8 @@
 .btn { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 48px; box-sizing: border-box; border-radius: var(--r-control); padding: .75rem 1rem; font-family: var(--body); font-weight: 600; font-size: var(--fs-ui); cursor: pointer; text-decoration: none; text-align: center; border: 1px solid transparent; transition: background var(--dur-state) ease, border-color var(--dur-state) ease, transform var(--dur-press) ease; }
 .btn:active:not(:disabled) { transform: translateY(1px); }
 .btn:disabled { background: var(--surface-2); border-color: var(--border-1); color: var(--text-4); cursor: default; }
-.btnLead { background: var(--cta-gradient); color: #fff; box-shadow: var(--sh-control); }
-.btnLead:hover:not(:disabled) { background: var(--cta-gradient-hover, var(--cta-gradient)); }
+.btnLead { background: var(--cta); color: #fff; box-shadow: var(--sh-control); }
+.btnLead:hover:not(:disabled) { background: var(--cta-hover); }
 .btnPass { background: var(--surface-2); border-color: var(--border-2); color: var(--text-1); }
 .btnPass:hover:not(:disabled) { border-color: var(--border-3, var(--border-2)); background: var(--surface-3, var(--surface-2)); }
 .btnFree { background: none; border-color: var(--border-2); color: var(--text-2); }

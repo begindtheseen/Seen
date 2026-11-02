@@ -18,7 +18,7 @@ export default function Image() {
           justifyContent: 'center',
           background: '#05070f',
           backgroundImage:
-            'radial-gradient(ellipse at 25% 0%, rgba(99,102,241,0.20) 0%, transparent 55%), radial-gradient(ellipse at 90% 100%, rgba(124,58,237,0.16) 0%, transparent 55%)',
+            'radial-gradient(ellipse at 25% 0%, rgba(37,99,235,0.18) 0%, transparent 55%)',
           padding: '72px 80px',
           fontFamily: 'sans-serif',
         }}

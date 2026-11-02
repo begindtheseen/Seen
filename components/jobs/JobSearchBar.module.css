@@ -91,7 +91,7 @@
 .go {
   flex: none;
   min-height: 44px;
-  background: var(--cta-gradient);
+  background: var(--cta);
   color: #fff;
   border: none;
   border-radius: var(--r-control);
@@ -103,7 +103,7 @@
   box-shadow: var(--sh-control);
   transition: background var(--dur-state) var(--ease-out), box-shadow var(--dur-state) var(--ease-out), transform var(--dur-press) var(--ease-out);
 }
-.go:hover:not(:disabled) { background: var(--cta-gradient-hover); box-shadow: 0 10px 28px -10px rgba(124, 58, 237, .7); }
+.go:hover:not(:disabled) { background: var(--cta-hover); box-shadow: var(--sh-raised); }
 .go:active:not(:disabled) { transform: scale(.98); }
 .go:disabled { cursor: progress; background: var(--surface-2); color: var(--text-3); box-shadow: none; }
 
@@ -213,7 +213,7 @@
   .compact .goIcon {
     display: inline-flex; align-items: center; justify-content: center; flex: none;
     width: 44px; height: 44px; border: 0; border-radius: var(--r-control);
-    background: var(--cta-gradient); color: #fff; cursor: pointer;
+    background: var(--cta); color: #fff; cursor: pointer;
   }
   .compact .row { display: none; }
   .compact.whereOpen .row { display: flex; }

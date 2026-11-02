@@ -131,7 +131,7 @@ export default function HumanProofPanel({ job, optimized = false }: { job: Job; 
           </p>
           <button
             onClick={run}
-            style={{ width: '100%', background: 'linear-gradient(135deg,#10b981 0%,#3b82f6 100%)', color: '#fff', border: 'none', borderRadius: 10, padding: '.85rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.9rem', cursor: 'pointer' }}
+            style={{ width: '100%', background: 'var(--cta)', color: '#fff', border: 'none', borderRadius: 10, padding: '.85rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.9rem', cursor: 'pointer' }}
           >
             Humanize this application
           </button>
@@ -181,7 +181,7 @@ export default function HumanProofPanel({ job, optimized = false }: { job: Job; 
           </p>
           <button
             onClick={() => setShowUpgrade(true)}
-            style={{ background: 'linear-gradient(135deg,#10b981 0%,#3b82f6 100%)', color: '#fff', border: 'none', borderRadius: 10, padding: '.75rem 1.5rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', cursor: 'pointer' }}
+            style={{ background: 'var(--cta)', color: '#fff', border: 'none', borderRadius: 10, padding: '.75rem 1.5rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', cursor: 'pointer' }}
           >
             Unlock HumanProof
           </button>

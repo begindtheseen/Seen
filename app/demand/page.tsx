@@ -66,7 +66,7 @@ function CityCard({ city }: { city: DemandCity }) {
           <div className="dc-city">{city.city}</div>
           {/* Honest vintage chip: live-from-corpus vs modeled-from-BLS — never both as "Live" */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '.45rem', marginTop: '.18rem', flexWrap: 'wrap' }}>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, letterSpacing: '.06em', color: live ? 'var(--green)' : 'var(--blue)', border: `1px solid ${live ? 'rgba(16,185,129,.35)' : 'rgba(99,102,241,.35)'}`, borderRadius: 4, padding: '.08rem .35rem' }}>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, letterSpacing: '.06em', color: live ? 'var(--green)' : 'var(--blue)', border: `1px solid ${live ? 'rgba(16,185,129,.35)' : 'var(--info-line)'}`, borderRadius: 4, padding: '.08rem .35rem' }}>
               {live ? '● LIVE · Seen listings' : '≈ MODELED · BLS blend'}
             </span>
             <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>

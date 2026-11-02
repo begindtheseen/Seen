@@ -390,9 +390,9 @@ function LoginContent() {
   const destLabel = signupType === 'employer' ? 'your employer dashboard' : nextLabel(explicitReturn, intent.company)
 
   const btnStyle: React.CSSProperties = {
-    // The one primary on this screen: the CTA gradient, body face at a loaded weight (Syne is for headings).
+    // The one primary on this screen: the flat CTA fill, body face at a loaded weight (Syne is for headings).
     width: '100%', minHeight: 48, padding: '.85rem',
-    background: 'var(--cta-gradient)',
+    background: 'var(--cta)',
     color: '#fff', border: 'none', borderRadius: 'var(--r-control)',
     fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-ui)',
     cursor: loading ? 'not-allowed' : 'pointer', marginBottom: '.75rem',
@@ -432,7 +432,7 @@ function LoginContent() {
       <div className={styles.card}>
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '2rem', justifyContent: 'center' }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--blue)', boxShadow: '0 0 10px rgba(59,130,246,0.6)', display: 'inline-block' }} />
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--blue)', display: 'inline-block' }} />
           <span style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-h3)', fontWeight: 600, color: 'var(--white)', letterSpacing: '-.02em' }}>Seen</span>
         </div>
 

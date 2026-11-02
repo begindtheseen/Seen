@@ -55,7 +55,7 @@ export default async function VerifiedDirectoryPage() {
   const companies = await fetchDirectory()
 
   return (
-    <div className="rise-in" style={{ minHeight: '100vh', background: 'radial-gradient(ellipse at 15% -5%,rgba(29,78,216,0.12) 0%,transparent 55%),radial-gradient(ellipse at 100% 5%,rgba(124,58,237,0.09) 0%,transparent 45%)' }}>
+    <div className="rise-in" style={{ minHeight: '100vh', background: 'radial-gradient(ellipse at 15% -5%,rgba(29,78,216,0.12) 0%,transparent 55%)' }}>
       <EmployerNav />
 
       <div style={{ ...wrap, padding: '3.5rem 1.5rem 5rem' }}>
@@ -76,7 +76,7 @@ export default async function VerifiedDirectoryPage() {
             <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.65, maxWidth: 440, margin: '0 auto 1.4rem' }}>
               The first employers to commit to responding will be listed here. If you hire, be one of them.
             </p>
-            <Link href="/employers#promote" style={{ display: 'inline-block', background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 9, padding: '.7rem 1.6rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)', color: '#fff', textDecoration: 'none' }}>Get Transparency Verified →</Link>
+            <Link href="/employers#promote" style={{ display: 'inline-block', background: 'var(--cta)', border: 'none', borderRadius: 9, padding: '.7rem 1.6rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)', color: '#fff', textDecoration: 'none' }}>Get Transparency Verified →</Link>
           </div>
         ) : (
           <>
@@ -103,7 +103,7 @@ export default async function VerifiedDirectoryPage() {
             <div style={{ textAlign: 'center', marginTop: '3rem', padding: '2rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16 }}>
               <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', marginBottom: '.5rem' }}>Hire people who show up?</div>
               <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '1rem', lineHeight: 1.6 }}>Commit to responding to applicants and earn the Transparency Verified badge — reviewed against your real outcomes.</p>
-              <Link href="/employers#promote" style={{ display: 'inline-block', background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 9, padding: '.7rem 1.8rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)', color: '#fff', textDecoration: 'none' }}>Get Verified →</Link>
+              <Link href="/employers#promote" style={{ display: 'inline-block', background: 'var(--cta)', border: 'none', borderRadius: 9, padding: '.7rem 1.8rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)', color: '#fff', textDecoration: 'none' }}>Get Verified →</Link>
             </div>
           </>
         )}

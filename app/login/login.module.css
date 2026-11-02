@@ -22,13 +22,13 @@
   font-family: var(--mono); font-size: var(--fs-meta); color: var(--dim);
 }
 .textBtn:hover, .textBtn:focus-visible { color: var(--white); outline: none; }
-.textBtn:focus-visible { box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.6); }
+.textBtn:focus-visible { box-shadow: var(--sh-focus); }
 .linkBtn {
   display: inline-flex; align-items: center; min-height: 44px; padding: 0 0.4rem; margin: 0 -0.4rem;
   background: none; border: none; cursor: pointer; border-radius: 8px;
   font-family: var(--body); font-size: var(--fs-sm); color: var(--blue); text-decoration: underline;
 }
-.linkBtn:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.6); }
+.linkBtn:focus-visible { outline: none; box-shadow: var(--sh-focus); }
 .linkDim { color: var(--muted); font-family: var(--mono); font-size: var(--fs-meta); }
 
 /* Password field with a show/hide toggle inside it. */
@@ -42,7 +42,7 @@
   color: var(--dim); font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.04em;
 }
 .pwToggle:hover, .pwToggle:focus-visible { color: var(--white); outline: none; }
-.pwToggle:focus-visible { box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.6); }
+.pwToggle:focus-visible { box-shadow: var(--sh-focus); }
 
 .notice {
   background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px;

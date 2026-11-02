@@ -43,7 +43,7 @@ export default function ComparePicker({ initialA = '', initialB = '' }: { initia
       <span style={{ fontFamily: 'var(--body)', fontWeight: 600, color: 'var(--dim)', fontSize: 'var(--fs-sm)' }}>vs</span>
       <input autoComplete="off" value={b} onChange={e => setB(e.target.value)} placeholder="Second company"
         style={{ flex: '1 1 160px', minWidth: 0, background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 8, padding: '.7rem .9rem', color: 'var(--white)', fontFamily: 'var(--body)', fontSize: 'var(--fs-ui)', outline: 'none' }} />
-      <button type="submit" className="btn" style={{ flex: '0 0 auto', background: 'linear-gradient(135deg,var(--g-start),var(--g-mid),var(--g-end))', color: '#fff', padding: '.7rem 1.4rem', fontWeight: 800 }}>Compare</button>
+      <button type="submit" className="btn" style={{ flex: '0 0 auto', background: 'var(--cta)', color: '#fff', padding: '.7rem 1.4rem', fontWeight: 800 }}>Compare</button>
     </form>
   )
 }

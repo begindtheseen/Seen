@@ -76,7 +76,7 @@ export default async function RedditPage() {
           You&apos;ve seen the threads: &ldquo;applied 3 weeks ago, total silence — does anyone know if they ghost?&rdquo; The problem is the answer is buried across a thousand comments. Seen turns those scattered reports into one number per company: a ghost rate, a response rate, and a Seen Grade. No login, no scraping your inbox — just what applicants actually reported.
         </p>
         <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', margin: '0 0 2.6rem' }}>
-          <Link href="/report" className="btn" style={{ background: 'linear-gradient(135deg,var(--g-start),var(--g-mid),var(--g-end))', color: '#fff', padding: '.7rem 1.3rem', fontWeight: 800 }}>Drop your outcome (60 sec)</Link>
+          <Link href="/report" className="btn" style={{ background: 'var(--cta)', color: '#fff', padding: '.7rem 1.3rem', fontWeight: 800 }}>Drop your outcome (60 sec)</Link>
           <Link href="/companies" className="btn btn-ghost" style={{ padding: '.7rem 1.3rem' }}>Search a company</Link>
         </div>
 

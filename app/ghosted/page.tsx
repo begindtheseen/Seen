@@ -59,7 +59,7 @@ export default function GhostedPage() {
           You&apos;re not the exception — Criteria Corp&apos;s 2026 hiring research found 53% of job seekers were ghosted in the past year. The only thing that changes it is making it visible, per company, per agency.
         </p>
         <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', margin: '0 0 3rem' }}>
-          <Link href="/report?outcome=ghosted" className="btn" style={{ background: 'linear-gradient(135deg,var(--g-start),var(--g-mid),var(--g-end))', color: '#fff', padding: '.75rem 1.4rem', fontWeight: 800 }}>Report your ghosting (2 min) →</Link>
+          <Link href="/report?outcome=ghosted" className="btn" style={{ background: 'var(--cta)', color: '#fff', padding: '.75rem 1.4rem', fontWeight: 800 }}>Report your ghosting (2 min) →</Link>
           <Link href="/agencies" className="btn btn-ghost" style={{ padding: '.75rem 1.4rem' }}>See the Agency Ghost Index</Link>
         </div>
 

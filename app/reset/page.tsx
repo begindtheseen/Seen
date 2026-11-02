@@ -25,7 +25,7 @@ const sub: React.CSSProperties = { fontSize: 'var(--fs-sm)', color: 'var(--sub)'
 const fine: React.CSSProperties = { fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.55, marginBottom: '1.5rem' }
 const focusOn = (e: React.FocusEvent<HTMLInputElement>) => { e.target.style.borderColor = 'var(--blue)' }
 const focusOff = (e: React.FocusEvent<HTMLInputElement>) => { e.target.style.borderColor = 'var(--line2)' }
-const cta = (busy: boolean): React.CSSProperties => ({ width: '100%', padding: '.85rem', background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)', color: '#fff', border: 'none', borderRadius: 8, fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)', cursor: busy ? 'not-allowed' : 'pointer', marginBottom: '.75rem', boxShadow: '0 0 20px rgba(59,130,246,0.3)', opacity: busy ? 0.7 : 1 })
+const cta = (busy: boolean): React.CSSProperties => ({ width: '100%', padding: '.85rem', background: 'var(--cta)', color: '#fff', border: 'none', borderRadius: 8, fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)', cursor: busy ? 'not-allowed' : 'pointer', marginBottom: '.75rem', boxShadow: '0 0 20px rgba(59,130,246,0.3)', opacity: busy ? 0.7 : 1 })
 
 /** The neutral answer to "send me a code" — the same words whether or not the address has an account
  *  (the raw Supabase error, "Signups not allowed for otp", told anyone which emails are registered;
@@ -189,7 +189,7 @@ export default function ResetPage() {
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 1.5rem 1.5rem' }}>
       <div className="rise-in" style={{ width: '100%', maxWidth: 420 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '2rem', justifyContent: 'center' }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--blue)', boxShadow: '0 0 10px rgba(59,130,246,0.6)', display: 'inline-block' }} />
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--blue)', display: 'inline-block' }} />
           <span style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-h3)', fontWeight: 600, color: 'var(--white)', letterSpacing: '-.02em' }}>Seen</span>
         </div>
 

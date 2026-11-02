@@ -408,7 +408,7 @@ export function EmployerAnalyticsView() {
           <div style={kicker}>Report provenance</div>
           <h2 style={h2}>How each outcome reached Seen</h2>
           <p style={sub}>Whether the outcome was reported directly or gathered from public applicant discussion.</p>
-          <BreakdownTable rows={analytics.provenance} color="var(--purple)" />
+          <BreakdownTable rows={analytics.provenance} color="var(--accent)" />
         </div>
       </div>
 
@@ -469,6 +469,6 @@ export function EmployerAnalyticsView() {
 }
 
 const ctaStyle: React.CSSProperties = {
-  display: 'inline-block', background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 8,
+  display: 'inline-block', background: 'var(--cta)', border: 'none', borderRadius: 8,
   padding: '.55rem 1.1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-meta)', color: '#fff', textDecoration: 'none',
 }

@@ -116,10 +116,10 @@ const overlay: React.CSSProperties = {
 const sheet: React.CSSProperties = {
   width: '100%', maxWidth: 520,
   background: 'var(--surface)',
-  border: '1px solid rgba(99,102,241,.22)',
+  border: '1px solid var(--accent-line)',
   borderRadius: 20,
   overflow: 'hidden',
-  boxShadow: '0 40px 120px rgba(0,0,0,.7), 0 0 80px rgba(99,102,241,.15)',
+  boxShadow: '0 40px 120px rgba(0,0,0,.7)',
   maxHeight: '85dvh',
   overflowY: 'auto',
 }
@@ -138,10 +138,10 @@ const btnClose: React.CSSProperties = {
 
 const btnPrimary: React.CSSProperties = {
   width: '100%', padding: '.8rem 1rem',
-  background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)',
+  background: 'var(--cta)',
   color: '#fff', border: 'none', borderRadius: 10,
   fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.88rem',
-  cursor: 'pointer', boxShadow: '0 0 20px rgba(59,130,246,.3)',
+  cursor: 'pointer', boxShadow: 'var(--sh-control)',
 }
 
 const btnGhost: React.CSSProperties = {
@@ -153,7 +153,7 @@ const btnGhost: React.CSSProperties = {
 
 const btnGreen: React.CSSProperties = {
   width: '100%', padding: '.8rem 1rem',
-  background: 'linear-gradient(135deg,rgba(16,185,129,.25),rgba(16,185,129,.12))',
+  background: 'var(--good-tint)',
   color: 'var(--green)', border: '1.5px solid rgba(16,185,129,.45)',
   borderRadius: 10, fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.88rem',
   cursor: 'pointer',
@@ -833,8 +833,8 @@ export default function ApplyOptimizeModal({
                   <MissingList missing={diag.unsupported_requirements} limit={6} />
                 </div>
               )}
-              <div style={{ background: 'rgba(99,102,241,.07)', border: '1px solid rgba(99,102,241,.18)', borderRadius: 10, padding: '.8rem .95rem', marginBottom: '1rem' }}>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-52)', textTransform: 'uppercase', letterSpacing: '.1em', color: '#818cf8', fontWeight: 700, marginBottom: '.45rem' }}>What {pro === true ? 'the optimize' : OPTIMIZE_PRICE} adds — kept for 7 days</div>
+              <div style={{ background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 10, padding: '.8rem .95rem', marginBottom: '1rem' }}>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-52)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--accent)', fontWeight: 700, marginBottom: '.45rem' }}>What {pro === true ? 'the optimize' : OPTIMIZE_PRICE} adds — kept for 7 days</div>
                 {[
                   'Which of your bullets should lead each job for this posting',
                   'Number questions — your answer writes the bullet',
@@ -842,7 +842,7 @@ export default function ApplyOptimizeModal({
                   'A summary for this job, built only from your own facts',
                   'Wording proposals you accept one by one, and HumanProof',
                 ].map(t => (
-                  <div key={t} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'rgba(165,180,252,.85)', marginBottom: '.22rem' }}>• {t}</div>
+                  <div key={t} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--text)', marginBottom: '.22rem' }}>• {t}</div>
                 ))}
               </div>
 
@@ -1034,12 +1034,12 @@ export default function ApplyOptimizeModal({
                 </div>
               )}
               {pro === false && !upsellDismissed && result.charged && (
-                <div data-testid="credit-ledger" style={{ display: 'flex', alignItems: 'center', gap: '.6rem', background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 8, padding: '.5rem .6rem .5rem .85rem' }}>
+                <div data-testid="credit-ledger" style={{ display: 'flex', alignItems: 'center', gap: '.6rem', background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 8, padding: '.5rem .6rem .5rem .85rem' }}>
                   <button
                     onClick={() => { setUpgradeReason('generic'); setUpgradeFeature(undefined); setShowUpgrade(true) }}
                     style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--body)', fontSize: '.66rem', color: 'var(--sub)', lineHeight: 1.5 }}
                   >
-                    {OPTIMIZE_PRICE} used{balance != null ? ` · ${balance} left` : ''} · {dailyResetLabel()} · <span style={{ color: '#a5b4fc', fontWeight: 700 }}>{PASS_AFTER_WIN}</span>
+                    {OPTIMIZE_PRICE} used{balance != null ? ` · ${balance} left` : ''} · {dailyResetLabel()} · <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{PASS_AFTER_WIN}</span>
                   </button>
                   <button
                     onClick={() => setUpsellDismissed(true)}

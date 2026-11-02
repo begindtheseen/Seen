@@ -24,7 +24,7 @@ function Row({ n, state, title, desc, cta }: { n: number; state: StepState; titl
         style={{
           flexShrink: 0, width: 26, height: 26, borderRadius: 999, display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500,
-          background: done ? 'rgba(16,185,129,.15)' : locked ? 'var(--raised)' : 'linear-gradient(135deg,#1d4ed8,#7c3aed)',
+          background: done ? 'rgba(16,185,129,.15)' : locked ? 'var(--raised)' : 'var(--cta)',
           color: done ? 'var(--green)' : '#fff',
           border: done ? '1px solid rgba(16,185,129,.4)' : locked ? '1px solid var(--line2)' : 'none',
         }}
@@ -41,7 +41,7 @@ function Row({ n, state, title, desc, cta }: { n: number; state: StepState; titl
 }
 
 const primaryLink: React.CSSProperties = {
-  display: 'inline-block', background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 8,
+  display: 'inline-block', background: 'var(--cta)', border: 'none', borderRadius: 8,
   padding: '.55rem 1.1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-meta)', color: '#fff', textDecoration: 'none',
 }
 const ghostLink: React.CSSProperties = {

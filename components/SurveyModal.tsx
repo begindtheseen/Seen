@@ -216,8 +216,8 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
     width: '100%',
     background: 'var(--surface)',
     borderRadius: 18,
-    border: '1px solid rgba(99,102,241,.3)',
-    boxShadow: '0 0 80px rgba(99,102,241,.25)',
+    border: '1px solid var(--accent-line)',
+    boxShadow: 'var(--sh-overlay)',
     overflow: 'hidden',
     position: 'relative',
   }
@@ -244,15 +244,15 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
     width: 56,
     height: 56,
     borderRadius: 14,
-    background: 'linear-gradient(135deg, rgba(99,102,241,.3), rgba(99,102,241,.1))',
-    border: '1px solid rgba(99,102,241,.25)',
+    background: 'var(--accent-tint)',
+    border: '1px solid var(--accent-line)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: 24,
     fontFamily: 'var(--display)',
     fontWeight: 700,
-    color: 'var(--indigo)',
+    color: 'var(--accent)',
     flexShrink: 0,
   }
 
@@ -279,9 +279,9 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
     borderRadius: 20,
     fontSize: 12,
     fontFamily: 'var(--mono)',
-    background: 'rgba(99,102,241,.12)',
-    color: 'var(--indigo)',
-    border: '1px solid rgba(99,102,241,.2)',
+    background: 'var(--accent-tint)',
+    color: 'var(--accent)',
+    border: '1px solid var(--accent-line)',
   }
 
   const lossHookStyle: React.CSSProperties = {
@@ -296,7 +296,7 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
   const primaryBtnStyle: React.CSSProperties = {
     width: '100%',
     padding: '13px 20px',
-    background: 'var(--indigo)',
+    background: 'var(--cta)',
     color: '#fff',
     border: 'none',
     borderRadius: 10,
@@ -333,7 +333,7 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
   const progressBarFill: React.CSSProperties = {
     height: '100%',
     width: `${progress}%`,
-    background: 'linear-gradient(90deg, var(--indigo), #818cf8)',
+    background: 'var(--accent-strong)',
     borderRadius: 2,
     transition: 'width .4s cubic-bezier(.4,0,.2,1)',
   }
@@ -351,7 +351,7 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
   const questionPromptStyle: React.CSSProperties = {
     fontSize: 12,
     fontFamily: 'var(--mono)',
-    color: 'var(--indigo)',
+    color: 'var(--accent)',
     marginBottom: 10,
     opacity: 0.75,
   }
@@ -378,12 +378,12 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
 
   const creditPopInnerStyle: React.CSSProperties = {
     background: 'var(--card)',
-    border: '1px solid rgba(99,102,241,.4)',
+    border: '1px solid var(--accent-line)',
     borderRadius: 14,
     padding: '18px 32px',
     textAlign: 'center',
     animation: creditPopVisible ? 'surveyPopIn .35s cubic-bezier(.34,1.56,.64,1) forwards' : 'surveyPopOut .3s ease forwards',
-    boxShadow: '0 0 40px rgba(99,102,241,.3)',
+    boxShadow: 'var(--sh-raised)',
   }
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -421,13 +421,13 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
           line-height: 1.4;
         }
         .survey-option-btn:hover {
-          border-color: rgba(99,102,241,.5);
-          background: rgba(99,102,241,.07);
+          border-color: var(--accent-line);
+          background: var(--accent-tint);
         }
         .survey-option-btn.selected {
-          border-color: var(--indigo);
-          background: rgba(99,102,241,.14);
-          color: #c7d2fe;
+          border-color: var(--accent);
+          background: var(--accent-tint);
+          color: var(--white);
         }
         .survey-modal-animate {
           animation: surveyFadeIn .25s ease forwards;
@@ -450,7 +450,7 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
                   fontSize: 28,
                   fontFamily: 'var(--body)',
                   fontWeight: 600,
-                  color: '#a5b4fc',
+                  color: 'var(--accent)',
                   lineHeight: 1,
                 }}>
                   +{creditPopVal}
@@ -533,7 +533,7 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
                       fontSize: 24,
                       fontFamily: 'var(--body)',
                       fontWeight: 600,
-                      color: 'var(--indigo)',
+                      color: 'var(--accent)',
                       lineHeight: 1,
                     }}>
                       {value}
@@ -551,8 +551,8 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
               </div>
 
               <div style={{
-                background: 'rgba(99,102,241,.07)',
-                border: '1px solid rgba(99,102,241,.18)',
+                background: 'var(--accent-tint)',
+                border: '1px solid var(--accent-line)',
                 borderRadius: 10,
                 padding: '10px 14px',
                 fontSize: 13,
@@ -589,7 +589,7 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
                 <span>
                   Question {qIndex + 1} of {questions.length}
                   {questionsLeft > 0 && (
-                    <span style={{ color: 'var(--indigo)', marginLeft: 6 }}>
+                    <span style={{ color: 'var(--accent)', marginLeft: 6 }}>
                       · {questionsLeft} left
                     </span>
                   )}
@@ -660,7 +660,7 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
               </div>
               <button
                 onClick={() => targetApp && loadSurvey(targetApp)}
-                style={{ background: 'var(--indigo)', border: 'none', color: '#fff', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', borderRadius: 8, padding: '.6rem 1.25rem', cursor: 'pointer', marginBottom: '0.5rem', width: '100%' }}
+                style={{ background: 'var(--cta)', border: 'none', color: '#fff', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', borderRadius: 8, padding: '.6rem 1.25rem', cursor: 'pointer', marginBottom: '0.5rem', width: '100%' }}
               >
                 Retry →
               </button>

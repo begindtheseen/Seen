@@ -128,7 +128,7 @@ html.seen-first .logo-c:nth-child(3) .logo-l{animation-delay:.18s}
 html.seen-first .logo-c:nth-child(4) .logo-l{animation-delay:.23s}
 html.seen-first .logo-pulse{animation:spDot .32s var(--ease-out) .42s both}
 html.seen-first nav::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:1px;pointer-events:none;
-  background:linear-gradient(90deg,rgba(129,140,248,.9),rgba(59,130,246,.6) 40%,transparent 85%);
+  background:linear-gradient(90deg,rgba(96,165,250,.9),transparent 85%);
   transform-origin:left center;animation:growX 1.1s var(--ease-out) .1s both,spFadeOut .6s ease 1.5s forwards}
 @keyframes spFadeOut{to{opacity:0}}
 

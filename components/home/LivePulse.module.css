@@ -8,8 +8,8 @@
 @keyframes lpPing { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55) } 70% { box-shadow: 0 0 0 7px rgba(16, 185, 129, 0) } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0) } }
 .title { color: var(--sub); }
 .count { color: var(--dim); letter-spacing: 0.06em; text-transform: none; }
-.more { margin-left: auto; color: #a5b4fc; text-decoration: none; letter-spacing: 0.06em; text-transform: none; }
-.more:hover { color: #c7d2fe; }
+.more { margin-left: auto; color: var(--accent); text-decoration: none; letter-spacing: 0.06em; text-transform: none; }
+.more:hover { color: var(--white); }
 
 .rail {
   overflow: hidden; width: 100%;
@@ -33,7 +33,7 @@
   transition: border-color 0.18s ease, background 0.18s ease, transform 0.3s var(--ease-spring);
 }
 .chip b, .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.chip:hover { border-color: rgba(129, 140, 248, 0.45); background: rgba(99, 102, 241, 0.1); transform: translateY(-2px); }
+.chip:hover { border-color: var(--accent-line); background: var(--accent-tint); transform: translateY(-2px); }
 .chip b { color: var(--white); font-weight: 600; }
 .ico { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; font-size: var(--fs-meta); background: rgba(255, 255, 255, 0.05); }
 .what { max-width: 26ch; overflow: hidden; text-overflow: ellipsis; }

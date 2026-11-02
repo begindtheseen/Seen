@@ -144,7 +144,7 @@ function DataPanel({ name, s }: { name: string; s: GrowthScore }) {
 function CTAs({ name, cslug }: { name: string; cslug: string }) {
   return (
     <div style={{ display: 'flex', gap: '.7rem', flexWrap: 'wrap', margin: '2.4rem 0 0' }}>
-      <Link href={`/company/${cslug}`} className="btn" style={{ background: 'linear-gradient(135deg,var(--g-start),var(--g-mid),var(--g-end))', color: '#fff', padding: '.7rem 1.3rem', fontWeight: 700 }}>
+      <Link href={`/company/${cslug}`} className="btn" style={{ background: 'var(--cta)', color: '#fff', padding: '.7rem 1.3rem', fontWeight: 700 }}>
         See {name}&apos;s full hiring report →
       </Link>
       <Link href={`/tracker?add=1&company=${encodeURIComponent(name)}`} className="btn btn-ghost" style={{ padding: '.7rem 1.3rem' }}>

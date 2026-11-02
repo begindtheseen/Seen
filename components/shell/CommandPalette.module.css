@@ -14,7 +14,7 @@
   background: #0e111c;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 16px;
-  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(99, 102, 241, 0.12), 0 0 60px -20px rgba(99, 102, 241, 0.5);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.06);
   overflow: hidden;
   display: flex; flex-direction: column;
   max-height: min(70vh, 560px);
@@ -50,16 +50,16 @@
   padding: 0.55rem 0.7rem; border-radius: 10px; border: 0; background: transparent; cursor: pointer;
   color: var(--text); transition: background 0.12s ease;
 }
-.active { background: rgba(99, 102, 241, 0.14); }
+.active { background: var(--accent-tint); }
 .ico {
   width: 30px; height: 30px; flex: none; display: grid; place-items: center; border-radius: 8px;
   background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.08);
-  font-family: var(--body); font-weight: 600; font-size: var(--fs-sm); color: #c7d2fe;
+  font-family: var(--body); font-weight: 600; font-size: var(--fs-sm); color: var(--accent);
 }
 .text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.08rem; }
 .text b { font-family: var(--body); font-weight: 600; font-size: var(--fs-ui); color: var(--white); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .text small { font-size: var(--fs-meta); color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.enter { font-family: var(--mono); font-size: var(--fs-meta); color: #a5b4fc; opacity: 0; transition: opacity 0.12s ease, transform 0.25s var(--ease-out); transform: translateX(-4px); }
+.enter { font-family: var(--mono); font-size: var(--fs-meta); color: var(--accent); opacity: 0; transition: opacity 0.12s ease, transform 0.25s var(--ease-out); transform: translateX(-4px); }
 .active .enter { opacity: 1; transform: none; }
 .empty { padding: 1.4rem 1rem; text-align: center; color: var(--dim); font-size: var(--fs-sm); }
 

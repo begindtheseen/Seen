@@ -9,7 +9,7 @@
 
 .steps { display: flex; gap: .35rem; list-style: none; margin: .4rem 0 0; padding: 0; flex-wrap: wrap; }
 .steps li { font-family: var(--mono); font-size: .75rem; color: var(--dim); padding: .25rem .6rem; border: 1px solid var(--line); border-radius: 999px; }
-.stepNow { color: var(--white) !important; border-color: var(--indigo) !important; background: var(--idim); }
+.stepNow { color: var(--white) !important; border-color: var(--indigo) !important; background: var(--accent-tint); }
 .stepDone { color: var(--green) !important; border-color: var(--gmid) !important; }
 
 .lede { margin: 0; font-size: 1rem; color: var(--white); }

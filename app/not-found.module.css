@@ -7,10 +7,10 @@
   display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 1.15rem;
   border-radius: var(--r-control); font-family: var(--body); font-weight: 600; font-size: var(--fs-ui); text-decoration: none;
 }
-.primary { color: #fff; background: var(--cta-gradient); box-shadow: var(--sh-control); }
-.primary:hover { background: var(--cta-gradient-hover); }
+.primary { color: #fff; background: var(--cta); box-shadow: var(--sh-control); }
+.primary:hover { background: var(--cta-hover); }
 .ghost { color: var(--text-2); border: 1px solid var(--border-2); background: transparent; }
-.ghost:hover { border-color: rgba(129, 140, 248, 0.5); }
+.ghost:hover { border-color: var(--accent-line); }
 .fine { font-family: var(--body); font-size: var(--fs-sm); color: var(--text-3); margin-top: 1.6rem; }
 .fine a { color: var(--sub); }
 

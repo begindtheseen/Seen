@@ -767,7 +767,7 @@ function TrackerPage() {
           body: avgWait
             ? `You reached the interview stage at ${app.company} in ${days} days. Applicants there wait about ${avgWait} days just for a first response. Your interview prep is on the card.`
             : `You reached the interview stage at ${app.company} in ${days} days. Your interview prep is on the card — see what happened to others who interviewed there.`,
-          color: 'rgba(99,102,241,0.12)',
+          color: 'var(--accent-tint)',
         })
       } else if (rt !== 'withdrew') {
         const avgWait = score?.avg_wait_days || null
@@ -786,7 +786,7 @@ function TrackerPage() {
         setUpdateInsight({
           title: 'Interview stage confirmed',
           body: `You\'re in the interview stage at ${app.company} after ${days} days. Most applications never get this far. Your interview prep is on the card.`,
-          color: 'rgba(99,102,241,0.12)',
+          color: 'var(--accent-tint)',
         })
       }
     } else if (checkType === 'outcome_check') {
@@ -1062,7 +1062,7 @@ function TrackerPage() {
                 const interviewed = apps.filter(a => stageLevel(a.stage) >= 3 || a.status === 'hired').length
                 return [
                   { label: 'Applied', n: apps.length, color: 'var(--blue)' },
-                  { label: 'Screened', n: screened, color: '#6366f1' },
+                  { label: 'Screened', n: screened, color: 'var(--accent)' },
                   { label: 'Interview', n: interviewed, color: 'var(--amber)' },
                   { label: 'Hired', n: hired.length, color: 'var(--green)' },
                 ].map(s => (
@@ -1176,8 +1176,8 @@ function TrackerPage() {
             onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSurveyMode('resume'); setShowSurvey(true) } }}
             onClick={() => { setSurveyMode('resume'); setShowSurvey(true) }}
             style={{
-              background: 'linear-gradient(90deg, rgba(99,102,241,.1), rgba(124,58,237,.06))',
-              border: '1px solid rgba(99,102,241,.22)',
+              background: 'var(--accent-tint)',
+              border: '1px solid var(--accent-line)',
               borderRadius: 10,
               padding: '.65rem 1rem',
               marginBottom: '.75rem',
@@ -1190,7 +1190,7 @@ function TrackerPage() {
             }}
           >
             <div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--indigo)', fontWeight: 500, marginBottom: '.12rem', display: 'flex', alignItems: 'center', gap: '.35rem' }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--accent)', fontWeight: 500, marginBottom: '.12rem', display: 'flex', alignItems: 'center', gap: '.35rem' }}>
                 <Icon name="sparkles" size={13} />
                 {creditsEarned > 0 ? `You earned ${creditsEarned} credit${creditsEarned !== 1 ? 's' : ''} — keep going` : 'Earn up to 5 credits today'}
               </div>
@@ -1198,7 +1198,7 @@ function TrackerPage() {
                 Share what happened with your applications — 90 sec, helps future job seekers
               </div>
             </div>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--indigo)', flexShrink: 0 }}>Start →</span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--accent)', flexShrink: 0 }}>Start →</span>
           </div>
         )}
         {creditsEarned > 0 && !showSurvey && (
@@ -1236,7 +1236,7 @@ function TrackerPage() {
         {apps.length > 0 && (
           <div id="trackerList" style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
             {pageApps.map(app => (
-              <div key={app.id} style={highlightId === app.id ? { borderRadius: 12, boxShadow: '0 0 0 2px var(--green), 0 0 30px rgba(16,185,129,0.3)', transition: 'box-shadow 2.5s ease' } : undefined}>
+              <div key={app.id} style={highlightId === app.id ? { borderRadius: 12, boxShadow: '0 0 0 2px var(--green)', transition: 'box-shadow 2.5s ease' } : undefined}>
                 <AppCard app={app} expanded={expandedId === app.id} setExpanded={open => setExpandedId(open ? app.id : '')} onUpdate={handleUpdate} onEdit={a => { setEditNotice(''); setEditing(a) }} onRemove={handleRemove} onShare={handleShare} onReload={loadApps} intel={companyScores[app.company.toLowerCase().trim()]} check={checkByApp.get(app.id)} onAnswer={handleCheckAnswer} onSnooze={handleSnooze} sync={syncOf(app)} onRetry={handleRetry} isPro={isPro} autoPrep={prepReturn === app.id && isPro} leadPrep={leadPrepId === app.id} onSchedule={handleSchedule} />
               </div>
             ))}

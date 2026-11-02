@@ -63,7 +63,7 @@ async function drawCard(d: ListingCardData): Promise<HTMLCanvasElement> {
   g1.addColorStop(0, OC + '1A'); g1.addColorStop(1, 'rgba(0,0,0,0)')
   c.fillStyle = g1; c.fillRect(0, 0, W, H)
   const g2 = c.createRadialGradient(W, 0, 0, W, 0, 440)
-  g2.addColorStop(0, 'rgba(124,58,237,0.13)'); g2.addColorStop(1, 'rgba(0,0,0,0)')
+  g2.addColorStop(0, 'rgba(37,99,235,0.13)'); g2.addColorStop(1, 'rgba(0,0,0,0)')
   c.fillStyle = g2; c.fillRect(0, 0, W, H)
   rrPath(c, 1, 1, W - 2, H - 2, 24)
   c.strokeStyle = 'rgba(255,255,255,0.06)'; c.lineWidth = 1.5; c.stroke()
@@ -247,7 +247,7 @@ export default function ListingCard({ data, onClose }: { data: ListingCardData; 
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.5rem', marginBottom: '.7rem' }}>
           <button onClick={() => share('threads')} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.18)', color: '#fff', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, padding: '.7rem .9rem', borderRadius: 9, cursor: 'pointer' }}>🧵 Threads</button>
-          <button onClick={() => share('download')} disabled={!dataUrl} style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', color: 'rgba(180,180,255,0.85)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.7rem .9rem', borderRadius: 9, cursor: dataUrl ? 'pointer' : 'not-allowed', opacity: dataUrl ? 1 : 0.5 }}>↓ Save Image</button>
+          <button onClick={() => share('download')} disabled={!dataUrl} style={{ background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', color: 'var(--accent)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.7rem .9rem', borderRadius: 9, cursor: dataUrl ? 'pointer' : 'not-allowed', opacity: dataUrl ? 1 : 0.5 }}>↓ Save Image</button>
         </div>
 
         <button onClick={onClose} style={{ background: 'none', border: 'none', width: '100%', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'rgba(255,255,255,0.25)', cursor: 'pointer', padding: '.5rem', textAlign: 'center' }}>Skip</button>

@@ -106,7 +106,7 @@ export default function SeenFitPanel({ job }: { job: Job }) {
       <div style={{ marginTop: '1.5rem' }}>
         <button
           onClick={run}
-          style={{ width: '100%', background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)', color: '#fff', border: 'none', borderRadius: 10, padding: '.85rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.9rem', cursor: 'pointer' }}
+          style={{ width: '100%', background: 'var(--cta)', color: '#fff', border: 'none', borderRadius: 10, padding: '.85rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.9rem', cursor: 'pointer' }}
         >
           ✨ Check my fit for this job · free
         </button>

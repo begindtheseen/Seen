@@ -105,7 +105,7 @@ export default function DangerConfirmDialog({
               disabled={!armed || busy}
               aria-disabled={!armed || busy}
               data-testid={confirmTestId || `${testId}-confirm`}
-              style={{ width: '100%', minHeight: 44, padding: '.75rem 1rem', background: armed ? 'linear-gradient(135deg,#ef4444 0%,#b91c1c 100%)' : 'rgba(239,68,68,.15)', color: armed ? '#fff' : 'rgba(255,255,255,.55)', border: 'none', borderRadius: 10, fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)', cursor: armed && !busy ? 'pointer' : 'not-allowed', opacity: busy ? .7 : 1 }}
+              style={{ width: '100%', minHeight: 44, padding: '.75rem 1rem', background: armed ? 'var(--bad)' : 'rgba(239,68,68,.15)', color: armed ? '#fff' : 'rgba(255,255,255,.55)', border: 'none', borderRadius: 10, fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)', cursor: armed && !busy ? 'pointer' : 'not-allowed', opacity: busy ? .7 : 1 }}
             >
               {busy ? (busyLabel || confirmLabel) : confirmLabel}
             </button>

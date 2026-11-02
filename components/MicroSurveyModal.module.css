@@ -1,6 +1,6 @@
 /* MicroSurveyModal.module.css
    Compact bottom-corner card for the no-incentive micro-survey. Aura-Glass tokens
-   (var(--surface)/--raised/--line/--line2/--mono/--display/--indigo/etc). Light + unobtrusive —
+   (var(--surface)/--raised/--line/--line2/--mono/--display/--accent/etc). Light + unobtrusive —
    NOT a full-screen center modal, so it never blocks the page or reads as a nag. Sits below the
    incented SurveyModal backdrop (z 9900) and toasts (z 10000). Reduced-motion aware. */
 
@@ -17,7 +17,6 @@
   border: 1px solid var(--line2);
   box-shadow:
     0 16px 48px rgba(0, 0, 0, 0.5),
-    0 0 40px rgba(99, 102, 241, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
   animation: microIn 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
@@ -48,7 +47,7 @@
   font-size: var(--fs-meta);
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--indigo);
+  color: var(--accent);
   margin-bottom: 8px;
   padding-right: 22px;
 }
@@ -84,8 +83,8 @@
   transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease, transform 0.1s ease;
 }
 .choice:hover {
-  border-color: rgba(99, 102, 241, 0.5);
-  background: rgba(99, 102, 241, 0.1);
+  border-color: var(--accent-line);
+  background: var(--accent-tint);
   color: var(--white);
 }
 .choice:active {

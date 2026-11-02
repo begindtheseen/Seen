@@ -102,7 +102,7 @@ export function EmployerReputation() {
             aria-label="Your company name"
             style={{ flex: 1, minWidth: 220, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.7rem .9rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', outline: 'none' }}
           />
-          <button onClick={look} disabled={loading || !name.trim()} style={{ background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 9, padding: '.7rem 1.4rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)', color: '#fff', cursor: 'pointer', opacity: loading ? .6 : 1 }}>
+          <button onClick={look} disabled={loading || !name.trim()} style={{ background: 'var(--cta)', border: 'none', borderRadius: 9, padding: '.7rem 1.4rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)', color: '#fff', cursor: 'pointer', opacity: loading ? .6 : 1 }}>
             {loading ? 'Checking…' : 'Check my reputation →'}
           </button>
         </div>
@@ -144,7 +144,7 @@ export function EmployerReputation() {
             <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.65, margin: '0 0 .9rem', maxWidth: 520 }}>
               Candidates can read the {fpReports.toLocaleString()} applicant account{fpReports === 1 ? '' : 's'} about &ldquo;{checked}&rdquo;, but Seen doesn&apos;t grade a company or show ghost / response rates until at least {MIN_REPORTS_FOR_GRADE} real reports back it. Get Transparency Verified now so the first thing candidates see is your commitment to respond.
             </p>
-            <a href="#promote" style={{ display: 'inline-block', background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 8, padding: '.55rem 1.1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-meta)', color: '#fff', textDecoration: 'none' }}>Get Transparency Verified →</a>
+            <a href="#promote" style={{ display: 'inline-block', background: 'var(--cta)', border: 'none', borderRadius: 8, padding: '.55rem 1.1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-meta)', color: '#fff', textDecoration: 'none' }}>Get Transparency Verified →</a>
           </div>
         ) : (
           <div style={{ paddingTop: '1.4rem', borderTop: '1px solid var(--line)' }}>
@@ -152,7 +152,7 @@ export function EmployerReputation() {
             <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.65, margin: '0 0 .9rem', maxWidth: 520 }}>
               You&apos;re a blank slate — which is an opportunity. Get Transparency Verified now and you signal &ldquo;we respond&rdquo; from day one, before a single ghost report can define you.
             </p>
-            <a href="#promote" style={{ display: 'inline-block', background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 8, padding: '.55rem 1.1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-meta)', color: '#fff', textDecoration: 'none' }}>Get Transparency Verified →</a>
+            <a href="#promote" style={{ display: 'inline-block', background: 'var(--cta)', border: 'none', borderRadius: 8, padding: '.55rem 1.1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-meta)', color: '#fff', textDecoration: 'none' }}>Get Transparency Verified →</a>
           </div>
         )
       )}

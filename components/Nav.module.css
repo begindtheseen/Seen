@@ -1,7 +1,7 @@
 /* Redesigned top nav — full-width hairline bar (the global `nav{}` tag styles
    already give the fixed bar + single bottom hairline; this module only styles the
    contents). Replaces the old floating translucent `.nav-pills` container: primary
-   links are now plain text with a gradient underline for the active route.
+   links are now plain text with a flat accent underline for the active route.
    Uses the real brand tokens (--display Syne, --mono DM Mono, --body Instrument Sans,
    and the dark identity palette) declared in app/globals.css. */
 
@@ -54,8 +54,7 @@
   height: 2px;
   width: 0;
   border-radius: 2px;
-  background: linear-gradient(90deg, var(--indigo), var(--blue));
-  box-shadow: 0 0 10px rgba(99, 102, 241, 0.55);
+  background: var(--accent-strong);
   opacity: 0;
   pointer-events: none;
   transition: transform 0.45s var(--ease-out), width 0.45s var(--ease-out), opacity 0.2s ease;
@@ -159,7 +158,7 @@
   position: relative;
   transition: color 0.14s ease, background 0.14s ease, padding-left 0.22s var(--ease-out);
 }
-/* Hover: the row lights up and a small indigo tick slides in from the left edge. */
+/* Hover: the row lights up and a small accent tick slides in from the left edge. */
 .menuItem::before {
   content: "";
   position: absolute;
@@ -168,7 +167,7 @@
   width: 3px;
   height: 0;
   border-radius: 2px;
-  background: linear-gradient(180deg, var(--indigo), var(--blue));
+  background: var(--accent-strong);
   transform: translateY(-50%);
   opacity: 0;
   transition: height 0.22s var(--ease-out), opacity 0.15s ease;
@@ -208,7 +207,7 @@
   color: var(--blue);
 }
 
-/* Credits chip — subtle monospace pill (replaces the loud gradient "🪙 10 credits"). */
+/* Credits chip — subtle monospace pill (replaces the loud "🪙 10 credits" pill). */
 /* The BUTTON is the hit area (transparent, 44px tall on phones — see the phone block); the inner
    .pill is the visual. Same split for the Pro badge and the avatar: a 44×44 target never grows the
    glyph (phone audit 2026-10-23: chip 49×25, icons 32×32, avatar 32×32, menu rows 31px). */
@@ -272,7 +271,7 @@
 .proPill {
   gap: 0.34rem;
   border: 1px solid rgba(16, 185, 129, 0.4);
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.14), rgba(99, 102, 241, 0.14));
+  background: var(--good-tint);
 }
 
 /* Icon button (Saved bookmark). */
@@ -315,7 +314,7 @@
 @media (max-width: 768px) { .cmdk { display: none; } }
 
 /* Account avatar trigger. */
-/* The button is the hit area, .avatarDot the 32px gradient disc. */
+/* The button is the hit area, .avatarDot the 32px solid disc. */
 .avatar {
   display: grid;
   place-items: center;
@@ -333,7 +332,7 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--g-start) 0%, var(--g-mid) 55%, var(--g-end) 100%);
+  background: var(--cta);
   color: #fff;
   font-family: var(--body);
   font-size: var(--fs-meta);
@@ -341,7 +340,7 @@
   line-height: 1;
   transition: transform 0.3s var(--ease-spring), box-shadow 0.25s ease;
 }
-.avatar:hover .avatarDot { filter: brightness(1.08); transform: scale(1.08); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25), 0 6px 18px rgba(99, 102, 241, 0.35); }
+.avatar:hover .avatarDot { filter: brightness(1.08); transform: scale(1.08); box-shadow: 0 0 0 3px var(--accent-tint), var(--sh-raised); }
 .avatar:active .avatarDot { transform: scale(0.94); }
 
 /* Below the tablet breakpoint the primary row + More collapse into the existing
@@ -405,7 +404,7 @@ div.drawer.drawerOpen { transform: translateX(0); visibility: visible; transitio
 }
 .drawerClose svg { width: 20px; height: 20px; }
 .drawerClose:hover, .drawerClose:focus-visible { color: var(--white); background: rgba(255, 255, 255, 0.07); outline: none; }
-.drawerClose:focus-visible { box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.6); }
+.drawerClose:focus-visible { box-shadow: var(--sh-focus); }
 /* Every control in the drawer's foot is a real thumb target (≥44px). */
 .drawerCta { width: 100%; justify-content: center; min-height: 44px; font-size: var(--fs-sm); }
 .drawerGhost, .drawerDanger {

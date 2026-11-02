@@ -35,8 +35,8 @@ export function EmployerScopeGuard({ param, godview = false }: { param: string; 
 
   if (godview) {
     return (
-      <div style={chip('rgba(124,58,237,.35)', 'rgba(124,58,237,.08)')}>
-        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '.12em' }}>Admin god-view</span>
+      <div style={chip('var(--accent-line)', 'var(--accent-tint)')}>
+        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '.12em' }}>Admin god-view</span>
         <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)' }}>
           Viewing <span style={{ color: 'var(--white)', textTransform: 'capitalize' }}>{param || '—'}</span> as an admin — the same public data any visitor sees, scoped to this company.
         </span>

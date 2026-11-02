@@ -81,9 +81,9 @@
   transform-origin: left center;
   animation: benchGrow 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-.fillGood { background: linear-gradient(90deg, var(--green), color-mix(in srgb, var(--green) 70%, var(--blue))); }
-.fillWarn { background: linear-gradient(90deg, var(--amber), color-mix(in srgb, var(--amber) 80%, var(--red))); }
-.fillBad  { background: linear-gradient(90deg, var(--red), color-mix(in srgb, var(--red) 75%, var(--amber))); }
+.fillGood { background: var(--good); }
+.fillWarn { background: var(--caution); }
+.fillBad  { background: var(--bad); }
 .fillNeutral { background: var(--sub); }
 /* Industry-average tick — a bright vertical marker overlaid on the track. */
 .avgTick {

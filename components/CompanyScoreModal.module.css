@@ -68,7 +68,7 @@
   width: 46px; height: 46px;
   border-radius: 12px;
   flex-shrink: 0;
-  background: linear-gradient(135deg, var(--g-start, #3b82f6) 0%, var(--g-mid, #6366f1) 55%, var(--g-end, #8b5cf6) 100%);
+  background: var(--cta);
   color: #fff;
   font-family: var(--display);
   font-weight: 800;

@@ -145,9 +145,9 @@ const inputStyle: React.CSSProperties = {
   outline: 'none', caretColor: 'var(--blue)', marginBottom: '.75rem', boxSizing: 'border-box',
 }
 const btnPrimary: React.CSSProperties = {
-  background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)', color: '#fff', border: 'none', borderRadius: 8,
+  background: 'var(--cta)', color: '#fff', border: 'none', borderRadius: 8,
   padding: '.75rem 1.25rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem',
-  cursor: 'pointer', boxShadow: '0 0 20px rgba(59,130,246,0.3)', width: '100%',
+  cursor: 'pointer', boxShadow: 'var(--sh-control)', width: '100%',
 }
 
 const label = (text: string) => (
@@ -929,7 +929,7 @@ function ResumePageInner() {
           title="Win this application"
           crumbLabel="Résumé AI"
           sub={<>One résumé, one job — your fit score, safe rewrites, a human-sounding pass, and the strategy to get through, sharpened with Seen&apos;s data on how this company actually treats applicants.</>}
-          actions={<Link href="/resume/studio" className="tap" style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem', background: 'var(--idim)', border: '1px solid var(--imid)', color: '#c7d2fe', borderRadius: 999, padding: '.4rem .85rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', textDecoration: 'none', whiteSpace: 'nowrap' }}>✦ Résumé Studio →</Link>}
+          actions={<Link href="/resume/studio" className="tap" style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem', background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', color: 'var(--accent)', borderRadius: 999, padding: '.4rem .85rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', textDecoration: 'none', whiteSpace: 'nowrap' }}>✦ Résumé Studio →</Link>}
         />
 
         {params?.get('back') === 'tracker' && (
@@ -939,7 +939,7 @@ function ResumePageInner() {
         )}
 
         {guestGate && !isLoggedIn && (
-          <div role="status" style={{ background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.3)', borderRadius: 10, padding: '.9rem 1rem', marginBottom: '1rem' }}>
+          <div role="status" style={{ background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 10, padding: '.9rem 1rem', marginBottom: '1rem' }}>
             <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.95rem', color: 'var(--white)', marginBottom: '.25rem' }}>Make a free account to build {guestGate}</div>
             <div style={{ fontSize: '.85rem', color: 'var(--sub)', lineHeight: 1.55, marginBottom: '.6rem' }}>You start with {WELCOME_CREDITS} free AI credits, and this uses one. It takes about 30 seconds.</div>
             <Link href={signupHref({ next: '/resume' })} className="tap" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 1rem', borderRadius: 9, background: 'var(--indigo)', color: '#fff', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', textDecoration: 'none' }}>Create free account →</Link>
@@ -951,12 +951,12 @@ function ResumePageInner() {
         )}
 
         {isLoggedIn && resumeText && (
-          <div onClick={() => setShowSurvey(true)} style={{ background: 'linear-gradient(90deg, rgba(99,102,241,.1), rgba(124,58,237,.06))', border: '1px solid rgba(99,102,241,.22)', borderRadius: 10, padding: '.65rem 1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.75rem', cursor: 'pointer' }}>
+          <div onClick={() => setShowSurvey(true)} style={{ background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 10, padding: '.65rem 1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.75rem', cursor: 'pointer' }}>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', color: 'var(--indigo)', fontWeight: 600, marginBottom: '.12rem', display: 'flex', alignItems: 'center', gap: '.35rem' }}><span style={{ fontSize: 'var(--fs-70)' }}>✦</span>Earn AI credits — 60-second résumé survey</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', color: 'var(--accent)', fontWeight: 600, marginBottom: '.12rem', display: 'flex', alignItems: 'center', gap: '.35rem' }}><span style={{ fontSize: 'var(--fs-70)' }}>✦</span>Earn AI credits — 60-second résumé survey</div>
               <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--sub)', overflowWrap: 'anywhere' }}>Share what it was like applying to a company from your résumé — +2 credits</div>
             </div>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-65)', color: 'var(--indigo)', flexShrink: 0 }}>Start →</span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-65)', color: 'var(--accent)', flexShrink: 0 }}>Start →</span>
           </div>
         )}
 
@@ -1033,7 +1033,7 @@ function ResumePageInner() {
             {!analyzed ? (
               <>
                 <Card>
-                  {kicker('Before the job: fix the résumé itself', 'var(--indigo)')}
+                  {kicker('Before the job: fix the résumé itself', 'var(--accent)')}
                   <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '.95rem', marginBottom: '.3rem' }}>Résumé Studio</div>
                   <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-65)', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.8rem' }}>
                     A health score with every weak bullet pinpointed and fixed without inventing a word · a tailored version built only from your own facts · PDF, Word, text, Markdown and JSON Resume exports in three templates, each checked the way a parser reads it.
@@ -1095,7 +1095,7 @@ function ResumePageInner() {
                         ) : realBulletsOf(paid).length === 0 ? (
                           <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--amber)', lineHeight: 1.6, margin: 0 }} data-testid="hp-nothing">Your rewrite plan for this job has no rewritten bullets yet — only bullets for you to write. There is nothing for HumanProof to polish; write those bullets from real work, then come back.</p>
                         ) : (
-                          <button style={{ ...btnPrimary, background: 'linear-gradient(135deg,#10b981 0%,#3b82f6 100%)' }} onClick={runHumanProof}>Run HumanProof on {realBulletsOf(paid).length} bullet{realBulletsOf(paid).length === 1 ? '' : 's'} →</button>
+                          <button style={btnPrimary} onClick={runHumanProof}>Run HumanProof on {realBulletsOf(paid).length} bullet{realBulletsOf(paid).length === 1 ? '' : 's'} →</button>
                         )}
                       </Card>
                     )}
@@ -1106,7 +1106,7 @@ function ResumePageInner() {
                         <div style={{ fontSize: '1.5rem', marginBottom: '.5rem' }}>🔒</div>
                         <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '1rem', marginBottom: '.5rem' }}>Your application is optimized. Now make it sound real.</div>
                         <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-66)', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1.1rem' }}>Unlock HumanProof so it sounds specific &amp; natural, stays interview-defensible, and carries no unsupported claims.</p>
-                        <button onClick={() => { setUpgradeReason('pro'); setUpgradeFeature('HumanProof'); setShowUpgrade(true) }} style={{ background: 'linear-gradient(135deg,#10b981 0%,#3b82f6 100%)', color: '#fff', border: 'none', borderRadius: 10, padding: '.75rem 1.5rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', cursor: 'pointer' }}>Unlock HumanProof</button>
+                        <button onClick={() => { setUpgradeReason('pro'); setUpgradeFeature('HumanProof'); setShowUpgrade(true) }} style={{ background: 'var(--cta)', color: '#fff', border: 'none', borderRadius: 10, padding: '.75rem 1.5rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', cursor: 'pointer' }}>Unlock HumanProof</button>
                         <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--muted)', lineHeight: 1.6, margin: '.65rem 0 0' }}>{LOCK_NOTE}</p>
                       </Card>
                     )}
@@ -1210,7 +1210,7 @@ function ResumePageInner() {
                         ))}
                       </div>
                       <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', color: 'var(--muted)', lineHeight: 1.5 }}>The PDF is a complete, ATS-ready résumé built from your own text — only the résumé, none of Seen's notes · free.</div>
-                      <button type="button" onClick={openStudioForJob} style={{ marginTop: '.7rem', background: 'none', border: '1px solid var(--imid)', color: '#c7d2fe', borderRadius: 8, padding: '.5rem .85rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-64)', cursor: 'pointer', width: '100%' }}>✦ Tailor the whole résumé to this job in Résumé Studio →</button>
+                      <button type="button" onClick={openStudioForJob} style={{ marginTop: '.7rem', background: 'none', border: '1px solid var(--accent-line)', color: 'var(--accent)', borderRadius: 8, padding: '.5rem .85rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-64)', cursor: 'pointer', width: '100%' }}>✦ Tailor the whole résumé to this job in Résumé Studio →</button>
                     </Card>
 
                     <Card>
@@ -1235,9 +1235,9 @@ function ResumePageInner() {
 
                 {/* Post-win upsell */}
                 {pro === false && !upsellDismissed && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 8, padding: '.5rem .6rem .5rem .85rem', marginTop: '.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 8, padding: '.5rem .6rem .5rem .85rem', marginTop: '.5rem' }}>
                     <button onClick={() => { setUpgradeReason('generic'); setUpgradeFeature(undefined); setShowUpgrade(true) }} style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--body)', fontSize: 'var(--fs-68)', color: 'var(--sub)', lineHeight: 1.5 }}>
-                      <span style={{ color: '#a5b4fc', fontWeight: 700 }}>{PASS_AFTER_WIN}</span>
+                      <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{PASS_AFTER_WIN}</span>
                     </button>
                     <button onClick={() => setUpsellDismissed(true)} aria-label="Dismiss" style={{ background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontSize: '.85rem', lineHeight: 1, padding: '.1rem .2rem', flexShrink: 0 }}>✕</button>
                   </div>

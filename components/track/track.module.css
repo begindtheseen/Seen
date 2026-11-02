@@ -62,7 +62,7 @@
   padding: 0 var(--sp-5);
   border: none;
   border-radius: var(--r-control);
-  background: var(--cta-gradient);
+  background: var(--cta);
   color: #fff;
   font-family: var(--body);
   font-weight: 600;
@@ -73,10 +73,10 @@
   box-shadow: var(--sh-control);
   transition: background var(--dur-state) var(--ease-out), box-shadow var(--dur-state) var(--ease-out), transform var(--dur-press) var(--ease-out);
 }
-.primary:hover:not(:disabled) { background: var(--cta-gradient-hover); box-shadow: 0 10px 28px -10px rgba(124, 58, 237, .7); }
+.primary:hover:not(:disabled) { background: var(--cta-hover); box-shadow: var(--sh-raised); }
 .primary:active:not(:disabled) { transform: scale(.98); }
 .primary:disabled { background: var(--surface-2); color: var(--text-4); box-shadow: none; cursor: not-allowed; }
-.primary:focus-visible, .ghost:focus-visible, .chip:focus-visible, .link:focus-visible, .input:focus-visible { outline: 2px solid rgba(129, 140, 248, .75); outline-offset: 2px; }
+.primary:focus-visible, .ghost:focus-visible, .chip:focus-visible, .link:focus-visible, .input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .ghost {
   display: inline-flex;
@@ -227,7 +227,7 @@
   min-height: 44px;
   padding: 0 .85rem;
   border-radius: 9px;
-  background: var(--cta-gradient);
+  background: var(--cta);
   color: #fff;
   font-family: var(--body);
   font-weight: 600;

@@ -69,7 +69,7 @@ export function CompanyResultCard({ items, searched }: { items: CompanyCandidate
         <span style={{ display: 'block', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-body)', color: 'var(--white)' }}>{titleCase(c.name)}</span>
         <GradeBit c={c} />
       </span>
-      <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--indigo)', flexShrink: 0 }}>Company profile →</span>
+      <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--accent)', flexShrink: 0 }}>Company profile →</span>
     </Link>
   )
 }
