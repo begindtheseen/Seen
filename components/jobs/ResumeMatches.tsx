@@ -23,7 +23,7 @@ export default function ResumeMatches({ jobs, loading, skills, city, citySource,
   const rows = jobs.slice(0, 5)
   return (
     <section aria-label="Matched to your résumé" style={{ marginBottom: '1.25rem', paddingBottom: '1rem', borderBottom: '1px solid var(--line)' }}>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--green)', marginBottom: '.5rem', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--text-3)', marginBottom: '.5rem', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <span style={{ width: 20, height: 1.5, background: 'var(--green)', display: 'inline-block', flexShrink: 0 }} />
         Matched to your résumé
         {city && (

@@ -58,8 +58,11 @@
 .odo-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
 /* ── Scroll reveal: shorter travel, expo-out — snaps into place ──────────────── */
-.rv{opacity:0;transform:translateY(12px);transition:opacity .6s var(--ease-out),transform .6s var(--ease-out)}
-.rv.rv-in{opacity:1;transform:none}
+/* DESIGN.md §6: motion only when state changes. Marketing blocks are VISIBLE from first paint (a full-page
+   capture, reader mode, print or a fast scroll on a slow phone used to show blank space); `.rv-in` now only
+   settles a 4px drift — no opacity gate. */
+.rv{opacity:1;transform:translateY(4px);transition:transform .6s var(--ease-out)}
+.rv.rv-in{transform:none}
 
 /* ── Staggered children (dashboard sections, metric tiles, mobile drawer) ───────
    `backwards` fill only — a transform left on a wrapper would become the containing

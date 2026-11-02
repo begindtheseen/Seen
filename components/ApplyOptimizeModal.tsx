@@ -835,7 +835,7 @@ export default function ApplyOptimizeModal({
                 </div>
               )}
               <div style={{ background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 10, padding: '.75rem 1rem', marginBottom: '1rem' }}>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-52)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--accent)', fontWeight: 700, marginBottom: '.5rem' }}>What {pro === true ? 'the optimize' : OPTIMIZE_PRICE} adds — kept for 7 days</div>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-52)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--text-3)', fontWeight: 700, marginBottom: '.5rem' }}>What {pro === true ? 'the optimize' : OPTIMIZE_PRICE} adds — kept for 7 days</div>
                 {[
                   'Which of your bullets should lead each job for this posting',
                   'Number questions — your answer writes the bullet',
@@ -925,7 +925,7 @@ export default function ApplyOptimizeModal({
                           <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.55, overflowWrap: 'anywhere' }}>{b.original}</div>
                         </div>
                         <div style={{ padding: '.5rem .75rem' }}>
-                          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--green)', marginBottom: '.25rem' }}>After · {b.addresses}</div>
+                          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--text-3)', marginBottom: '.25rem' }}>After · {b.addresses}</div>
                           <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--white)', lineHeight: 1.55, fontWeight: 500, overflowWrap: 'anywhere' }}>{b.optimized}</div>
                         </div>
                       </div>

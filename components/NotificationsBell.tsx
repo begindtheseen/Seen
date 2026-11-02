@@ -106,7 +106,7 @@ export default function NotificationsBell({ uid, className }: { uid: string; cla
             <div role="dialog" aria-modal="true" aria-label="Application updates" onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 460, background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 16, padding: '1rem 1rem 1.25rem', boxShadow: '0 30px 90px rgba(0,0,0,.6)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', marginBottom: '.75rem' }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--blue)' }}>Notifications</div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--text-3)' }}>Notifications</div>
                   <div style={{ fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-lead)', color: 'var(--white)', marginTop: '.125rem' }}>Application updates</div>
                 </div>
                 <button type="button" onClick={closeModal} aria-label="Close" style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 10, width: 44, height: 44, color: 'var(--muted)', cursor: 'pointer', flexShrink: 0 }}>✕</button>

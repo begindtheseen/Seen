@@ -30,7 +30,7 @@
 .eyebrow {
   display: flex; align-items: center; gap: .5rem;
   font-family: var(--mono); font-size: var(--fs-meta); font-weight: 500; letter-spacing: var(--ls-meta); text-transform: uppercase;
-  color: var(--tone, var(--blue)); margin-bottom: .5rem;
+  color: var(--text-3); margin-bottom: .5rem; /* ink, never the accent (DESIGN.md §2) */
 }
 .eyebrow::before { content: ''; width: 22px; height: 1px; background: currentColor; opacity: 0.85; flex: none; }
 .title {

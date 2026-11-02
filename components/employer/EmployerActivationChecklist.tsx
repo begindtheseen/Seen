@@ -70,7 +70,7 @@ export default function EmployerActivationChecklist() {
 
   return (
     <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16, padding: '1.5rem', marginBottom: '1.5rem' }}>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.16em', color: 'var(--blue)', marginBottom: '.5rem' }}>Get set up</div>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.16em', color: 'var(--text-3)', marginBottom: '.5rem' }}>Get set up</div>
       <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: '0 0 .25rem' }}>
         {pending ? 'Your claim is in review' : 'Two minutes to your dashboard'}
       </h2>

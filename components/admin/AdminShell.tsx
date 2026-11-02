@@ -326,7 +326,7 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
             {/* Company lookups setup note */}
             {stats.company_lookups && !stats.company_lookups.ready && (
               <div id="admSetupNote" style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 10, padding: '1rem 1rem', marginBottom: '1rem' }}>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--amber)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '.5rem' }}>Enable company lookup tracking</div>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '.5rem' }}>Enable company lookup tracking</div>
                 <p style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '.75rem', lineHeight: 1.6 }}>Run this SQL in your Supabase SQL editor once to track which companies users are researching:</p>
                 <pre style={{ background: 'rgba(0,0,0,.35)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 6, padding: '.75rem 1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', overflowX: 'auto', lineHeight: 1.7, margin: 0 }}>
                   {`CREATE TABLE IF NOT EXISTS search_logs (

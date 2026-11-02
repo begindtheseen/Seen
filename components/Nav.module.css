@@ -347,6 +347,7 @@
    hamburger drawer (global .side-menu / .side-menu-toggle). */
 @media (max-width: 768px) {
   .primary { display: none; }
+  .topSignIn { display: none; } /* the tab bar and the drawer have Sign in; one button up top */
   /* 44×44 hit areas (phone audit 2026-10-23: chip 49×25, icons 32×32, avatar 32×32, menu rows 31px)
      without a wider bar: the boxes grow, the glyphs don't, and the gap between them goes — the
      boxes carry their own spacing. */

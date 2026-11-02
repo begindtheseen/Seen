@@ -151,7 +151,7 @@ export function NotificationsFeed({
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '.5rem', flexWrap: 'wrap' }}>
                   <span style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-ui)', fontWeight: 700, color: 'var(--white)' }}>{it.title}</span>
                   {fresh && (
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--green)', border: '1px solid rgba(16,185,129,.35)', borderRadius: 4, padding: '.125rem .25rem' }}>New</span>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--text-3)', border: '1px solid rgba(16,185,129,.35)', borderRadius: 4, padding: '.125rem .25rem' }}>New</span>
                   )}
                 </div>
                 <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-meta)', lineHeight: 1.6, margin: '.25rem 0 0' }}>{it.detail}</p>

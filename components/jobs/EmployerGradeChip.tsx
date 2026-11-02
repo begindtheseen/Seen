@@ -19,7 +19,7 @@ export default function EmployerGradeChip({ company, score, onClick, compact = f
       href={`/company/${pathSegment(String(company).toLowerCase().trim().replace(/\s+/g, '-'))}`}
       prefetch={false}
       onClick={e => { e.stopPropagation(); onClick?.(e) }}
-      title={`${name}'s Seen Grade from applicant accounts — how it treats applicants, not this posting`}
+      title="This company's Seen Grade from applicant accounts — how it treats applicants, not this posting"
       className={compact ? `${s.chip} ${s.compact}` : s.chip}
     >
       <span className={s.name}>{compact ? 'Seen Grade' : `${name} · Seen Grade`}</span>

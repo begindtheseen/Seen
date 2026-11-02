@@ -37,7 +37,7 @@ export default function EmployersPage() {
       <div style={{ ...wrap, padding: '3.5rem 1.5rem 5rem' }}>
         {/* Hero */}
         <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--blue)', marginBottom: '.75rem' }}>For employers</div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--text-3)', marginBottom: '.75rem' }}>For employers</div>
           <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.9rem,6vw,2.8rem)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', lineHeight: 1.05, margin: '0 auto 1rem', maxWidth: 640 }}>
             Hire the people who actually show up.
           </h1>

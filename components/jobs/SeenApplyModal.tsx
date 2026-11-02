@@ -212,7 +212,7 @@ export default function SeenApplyModal({ job, onClose, onApplied }: {
         <div role="dialog" aria-modal="true" aria-label={`Apply to ${job.title} at ${job.company}`} onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 460, background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 16, padding: '1.25rem 1.25rem 1.5rem', boxShadow: '0 30px 90px rgba(0,0,0,.6)' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.75rem', marginBottom: '.5rem' }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--green)' }}>Apply on Seen</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--text-3)' }}>Apply on Seen</div>
               <div style={{ fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-lead)', color: 'var(--white)', marginTop: '.25rem' }}>{job.title}</div>
               <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)' }}>{job.company}{job.location ? ` · ${job.location}` : ''}</div>
             </div>

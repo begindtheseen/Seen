@@ -86,7 +86,7 @@ export default function LivePulse() {
       <div className={styles.head}>
         <span className={styles.live}><span className={styles.dot} />Live</span>
         <span className={styles.title}>Latest applicant accounts</span>
-        {total > 0 && <span className={styles.count}>{total.toLocaleString()} compiled applicant accounts</span>}
+        {total > 0 && <span className={styles.count}>{total.toLocaleString()} applicant accounts across every company on Seen</span>}
         <Link href="/feed" className={styles.more}>Open the feed →</Link>
       </div>
       <div className={styles.rail} data-marquee>

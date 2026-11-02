@@ -9,6 +9,8 @@
 //   cta      at most one filled primary button (--cta fill) in the first viewport (§5)
 //   60/30/10 pixel share of the first viewport: dark field ≥ 55%, colour ≤ 15% (§2) — reported, failed when far off
 //   purple   no computed colour in the retired indigo/violet family (belt and braces over designRules.test.mjs)
+//   total    ≤2 filled buttons on the whole page (hero + final CTA at most); eyebrows/labels in ink; no text <12px;
+//            no emoji doing an icon's job; `small` = controls under 40px tall at phone width (reported)
 import { chromium } from 'playwright';
 import { existsSync } from 'node:fs';
 import sharp from 'sharp';
@@ -16,7 +18,8 @@ import sharp from 'sharp';
 const BASE = process.env.BASE || 'http://localhost:3100';
 const PAGES = [
   '/', '/jobs?q=cashier&loc=Phoenix%2C+AZ', '/jobs/fx-1', '/tracker', '/pricing', '/companies', '/company/amazon',
-  '/login', '/resume', '/dashboard', '/faq', '/agencies', '/report', '/employers',
+  '/login', '/resume', '/dashboard', '/faq', '/agencies', '/report', '/employers', '/feed', '/demand', '/data', '/methods',
+  '/ghost-report', '/compare', '/saved', '/profile', '/resume/studio', '/this-page-does-not-exist',
 ];
 const WIDTHS = [[390, 844, true], [1280, 800, false]];
 const CTA_FILL = 'rgb(37, 99, 235)';
@@ -57,8 +60,26 @@ for (const [w, h, mobile] of WIDTHS) {
         if (el.childNodes.length && [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) fonts.add(fam(cs.fontFamily));
         for (const p of ['color', 'backgroundColor', 'borderTopColor']) if (isPurple(cs[p])) purple.push(`${el.tagName}.${String(el.className).slice(0, 24)} ${p}=${cs[p]}`);
       }
-      const ctas = [...document.querySelectorAll('button, a, [role="button"], input[type="submit"]')].filter((el) => vis(el) && inFold(el) && getComputedStyle(el).backgroundColor === CTA_FILL).map((el) => (el.textContent || el.getAttribute('aria-label') || '').trim().slice(0, 30));
-      return { h1, fonts: [...fonts].filter((f) => !/^(serif|sans-serif|monospace|system-ui|inherit)$/.test(f)), ctas, purple: purple.slice(0, 5) };
+      const filled = [...document.querySelectorAll('button, a, [role="button"], input[type="submit"]')].filter((el) => vis(el) && getComputedStyle(el).backgroundColor === CTA_FILL);
+      const ctas = filled.filter(inFold).map((el) => (el.textContent || el.getAttribute('aria-label') || '').trim().slice(0, 30));
+      const ctasTotal = filled.length;
+      // DESIGN.md §2: eyebrows / section labels are ink. An uppercase ≤13px text with a hue and no chip background is a coloured label.
+      const hue = (c) => { const m = c && c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/); if (!m) return false; const [r, g, b] = [+m[1], +m[2], +m[3]]; return Math.max(r, g, b) - Math.min(r, g, b) > 60; };
+      const labels = []; const tiny = []; const emoji = []; let small = 0;
+      const EMOJI = /[\u{1F300}-\u{1FAFF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}]/u;
+      for (const el of document.querySelectorAll('body *')) {
+        if (!vis(el)) continue;
+        const cs = getComputedStyle(el);
+        const own = [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join('').trim();
+        if (own) {
+          const px = parseFloat(cs.fontSize);
+          if (px < 11.9) tiny.push(`${el.tagName}.${String(el.className).slice(0, 20)} ${px}px "${own.slice(0, 20)}"`);
+          if (cs.textTransform === 'uppercase' && px <= 13.5 && hue(cs.color) && cs.backgroundColor === 'rgba(0, 0, 0, 0)' && cs.borderTopStyle === 'none') labels.push(`"${own.slice(0, 24)}" ${cs.color}`);
+          if (EMOJI.test(own) && !/[♡☰✕▾✓×·→←↗]/.test(own.replace(EMOJI, ''))) emoji.push(`"${own.slice(0, 24)}"`);
+        }
+        if (/^(BUTTON|A|SELECT|INPUT)$/.test(el.tagName) && el.getBoundingClientRect().height < 40 && el.getBoundingClientRect().width > 0 && innerWidth < 500) small++;
+      }
+      return { h1, fonts: [...fonts].filter((f) => !/^(serif|sans-serif|monospace|system-ui|inherit)$/.test(f)), ctas, ctasTotal, labels: labels.slice(0, 6), tiny: tiny.slice(0, 6), emoji: emoji.slice(0, 6), small, purple: purple.slice(0, 5) };
     }, { CTA_FILL });
     // 60/30/10 — first viewport pixels: dark field / neutral ink / colour
     const png = await page.screenshot({ fullPage: false });
@@ -69,13 +90,17 @@ for (const [w, h, mobile] of WIDTHS) {
       if (mx < 48) dark++; else if (mx - mn <= 28) neutral++; else colour++;
     }
     const share = { dark: Math.round(100 * dark / n), neutral: Math.round(100 * neutral / n), colour: Math.round(100 * colour / n) };
-    const row = { page: path, w, h1: m.h1, fonts: m.fonts.join(' + '), ctas: m.ctas.length, share: `${share.dark}/${share.neutral}/${share.colour}` };
+    const row = { page: path, w, h1: m.h1, fonts: m.fonts.join(' + '), ctas: `${m.ctas.length}/${m.ctasTotal}`, labels: m.labels.length, tiny: m.tiny.length, emoji: m.emoji.length, small: m.small, share: `${share.dark}/${share.neutral}/${share.colour}` };
     rows.push(row);
     const bad = [];
     if (m.h1 !== 1) bad.push(`h1 count ${m.h1}`);
     if (m.fonts.length > 2) bad.push(`fonts: ${m.fonts.join(', ')}`);
     if (m.ctas.length > 1) bad.push(`${m.ctas.length} filled CTAs in the first viewport: ${m.ctas.join(' | ')}`);
     if (share.colour > 15 || share.dark < 55) bad.push(`60/30/10 off: dark ${share.dark}% colour ${share.colour}%`);
+    if (m.ctasTotal > 2) bad.push(`${m.ctasTotal} filled CTAs on the page (max 2: hero + final)`);
+    if (m.labels.length) bad.push(`coloured eyebrows/labels (ink only): ${m.labels.join('; ')}`);
+    if (m.tiny.length) bad.push(`text under 12px: ${m.tiny.join('; ')}`);
+    if (m.emoji.length) bad.push(`emoji as icons: ${m.emoji.join(' ')}`);
     if (m.purple.length) bad.push(`purple: ${m.purple.join('; ')}`);
     if (bad.length) fails.push(`${path} @${w}: ${bad.join(' · ')}`);
   }

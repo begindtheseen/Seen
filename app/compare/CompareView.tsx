@@ -72,7 +72,7 @@ function Verdict({ aName, a, bName, b }: { aName: string; a: GrowthScore | null;
   const anyEst = firstPartyReportCount(a) === 0 || firstPartyReportCount(b) === 0
   return (
     <div style={{ background: 'var(--raised)', border: '1px solid var(--line)', borderRadius: 12, padding: '1rem 1.25rem', margin: '1.5rem 0 0' }}>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--blue)', marginBottom: '.5rem' }}>The verdict</div>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--text-3)', marginBottom: '.5rem' }}>The verdict</div>
       <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.65, margin: 0, fontWeight: 400 }}>
         {tie
           ? `${aName} and ${bName} score evenly at ${hi}/100 on hiring transparency. Compare the ghost and response rates above to break the tie for your situation.`

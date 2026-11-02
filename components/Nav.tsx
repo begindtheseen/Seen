@@ -394,7 +394,9 @@ export default function Nav() {
 
           {!isLoggedIn && (
             <>
-              <Link href={signInHref} {...fresh} className="btn btn-ghost">Sign in</Link>
+              {/* On phones the bottom tab bar and the drawer already carry Sign in: the top bar keeps
+                  wordmark + menu + ONE button (DESIGN.md §5). */}
+              <Link href={signInHref} {...fresh} className={`btn btn-ghost ${styles.topSignIn}`}>Sign in</Link>
               {/* Primary CTA for a brand-new visitor = start as a job seeker (the default persona).
                   The employer path stays reachable via the "Employers" primary link + More menu, so
                   this no longer misdirects new seekers into employer login. */}

@@ -247,7 +247,7 @@ export function EmployerHub() {
         {/* Persistent header — kicker + scope badges + title */}
         <div className="emp-reveal" style={{ marginBottom: '1.5rem', animationDelay: '0ms' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap', marginBottom: '.5rem' }}>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--blue)' }}>Employer dashboard</span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--text-3)' }}>Employer dashboard</span>
             {godview && (
               <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--accent)', background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 7, padding: '.25rem .5rem' }}>
                 Admin god-view
@@ -281,7 +281,7 @@ export function EmployerHub() {
         {/* Scope chip (logged-in) OR public lookup (visitor / god-view) */}
         {scoped ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap', marginBottom: '1.5rem', padding: '.75rem 1rem', background: 'rgba(16,185,129,.05)', border: '1px solid rgba(16,185,129,.25)', borderRadius: 10 }}>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Viewing your company</span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Viewing your company</span>
             <span style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-ui)', fontWeight: 700, color: 'var(--white)', textTransform: 'capitalize' }}>{employerCompany}</span>
             <button className="emp-btn" onClick={() => company && load(company)} disabled={loading} style={{ marginLeft: 'auto', background: 'transparent', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem .75rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', cursor: loading ? 'default' : 'pointer' }}>
               {loading ? 'Loading…' : '↻ Refresh'}

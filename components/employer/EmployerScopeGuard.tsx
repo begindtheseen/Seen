@@ -36,7 +36,7 @@ export function EmployerScopeGuard({ param, godview = false }: { param: string; 
   if (godview) {
     return (
       <div style={chip('var(--accent-line)', 'var(--accent-tint)')}>
-        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '.12em' }}>Admin god-view</span>
+        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.12em' }}>Admin god-view</span>
         <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)' }}>
           Viewing <span style={{ color: 'var(--white)', textTransform: 'capitalize' }}>{param || '—'}</span> as an admin — the same public data any visitor sees, scoped to this company.
         </span>
@@ -49,7 +49,7 @@ export function EmployerScopeGuard({ param, godview = false }: { param: string; 
   if (ready && claimsReady && isEmployer && target && !mismatched) {
     return (
       <div style={chip('rgba(16,185,129,.3)', 'rgba(16,185,129,.06)')}>
-        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '.12em' }}>Your company</span>
+        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.12em' }}>Your company</span>
         <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)' }}>
           Signed in — showing <span style={{ color: 'var(--white)', textTransform: 'capitalize' }}>{target}</span>. This surface is scoped to your approved company.
         </span>

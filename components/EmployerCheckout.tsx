@@ -94,7 +94,7 @@ export function EmployerCheckout() {
         const isOpen = open === sku
         return (
           <div key={sku} style={{ background: 'var(--card)', border: `1.5px solid ${isOpen ? 'var(--blue)' : 'var(--line)'}`, borderRadius: 16, padding: '1.75rem' }}>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--blue)', marginBottom: '.5rem' }}>{tagline}</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--text-3)', marginBottom: '.5rem' }}>{tagline}</div>
             <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', marginBottom: '.25rem' }}>{def.name}</div>
             <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-h2)', fontWeight: 600, color: 'var(--white)' }}>{price}<span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', fontWeight: 400 }}> one-time · {def.days} days</span></div>
             <div style={{ margin: '1rem 0 1.25rem' }}>

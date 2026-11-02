@@ -253,7 +253,7 @@ export default function DocEditor({ doc, onChange, highlightId }: Props) {
           return (
             <div key={key} className={s.sec}>
               <div className={s.secHead}>
-                <input autoComplete="off" className={s.input} style={{ maxWidth: 260, fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--green)' }} value={ex.title} onChange={(e) => update((x) => { x.extra[xi].title = e.target.value })} />
+                <input autoComplete="off" className={s.input} style={{ maxWidth: 260, fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--text-3)' }} value={ex.title} onChange={(e) => update((x) => { x.extra[xi].title = e.target.value })} />
                 <div className={s.secTools}>
                   <button type="button" className={s.tiny} onClick={() => moveSection(key, -1)} aria-label="Move up">↑</button>
                   <button type="button" className={s.tiny} onClick={() => moveSection(key, 1)} aria-label="Move down">↓</button>

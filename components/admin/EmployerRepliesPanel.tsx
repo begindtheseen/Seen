@@ -96,7 +96,7 @@ export function EmployerRepliesPanel({ token }: { token: string }) {
                   </div>
                 )}
                 <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6, marginBottom: pending ? '.5rem' : 0 }}>
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textTransform: 'uppercase', letterSpacing: '.08em', marginRight: '.5rem' }}>Reply</span>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.08em', marginRight: '.5rem' }}>Reply</span>
                   {r.body}
                 </div>
 

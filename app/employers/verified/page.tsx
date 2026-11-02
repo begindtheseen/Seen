@@ -60,7 +60,7 @@ export default async function VerifiedDirectoryPage() {
 
       <div style={{ ...wrap, padding: '3.5rem 1.5rem 5rem' }}>
         <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--green)', marginBottom: '.75rem' }}>Transparency Verified</div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--text-3)', marginBottom: '.75rem' }}>Transparency Verified</div>
           <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.9rem,6vw,2.7rem)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', lineHeight: 1.05, margin: '0 auto 1rem', maxWidth: 640 }}>
             Companies that actually respond.
           </h1>
@@ -87,12 +87,12 @@ export default async function VerifiedDirectoryPage() {
                     <div style={{ width: 46, height: 46, borderRadius: 12, background: 'var(--raised)', border: '1px solid var(--line2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-h3)', color: 'var(--white)', flexShrink: 0, textTransform: 'uppercase' }}>{c.company[0] || '?'}</div>
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.company}</div>
-                      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '.08em', marginTop: '.125rem' }}>✓ Verified</div>
+                      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.08em', marginTop: '.125rem' }}>✓ Verified</div>
                     </div>
                     <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: gradeColor(c.grade), lineHeight: 1, flexShrink: 0 }}>{c.grade ?? '—'}</div>
                   </div>
                   <div style={{ display: 'flex', gap: '1.25rem' }}>
-                    <div><div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--green)' }}>{c.responseRate == null ? '—' : `${c.responseRate}%`}</div><div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.06em' }}>response</div></div>
+                    <div><div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--text-3)' }}>{c.responseRate == null ? '—' : `${c.responseRate}%`}</div><div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.06em' }}>response</div></div>
                     <div><div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--red)' }}>{c.ghostRate == null ? '—' : `${c.ghostRate}%`}</div><div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.06em' }}>ghost</div></div>
                     <div style={{ marginLeft: 'auto', alignSelf: 'flex-end' }}><div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>{c.reportCount || 0} report{c.reportCount === 1 ? '' : 's'}{c.grade == null ? ` · not graded yet (needs ${MIN_REPORTS_FOR_GRADE})` : ''}</div></div>
                   </div>

@@ -71,7 +71,7 @@ type Loaded = {
 
 const mono = (size: string, color: string): React.CSSProperties => ({ fontFamily: 'var(--mono)', fontSize: size, color })
 const card: React.CSSProperties = { background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16, padding: '1.5rem 1.75rem', marginBottom: '1.5rem' }
-const kicker: React.CSSProperties = { fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.16em', color: 'var(--blue)', marginBottom: '.5rem' }
+const kicker: React.CSSProperties = { fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.16em', color: 'var(--text-3)', marginBottom: '.5rem' }
 const h2: React.CSSProperties = { fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', margin: '0 0 .25rem', letterSpacing: '-.02em' }
 const sub: React.CSSProperties = { color: 'var(--sub)', fontSize: 'var(--fs-meta)', lineHeight: 1.6, margin: '.125rem 0 1rem' }
 

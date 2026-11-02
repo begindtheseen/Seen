@@ -3,7 +3,7 @@
 .card { background: var(--raised); border: 1px solid var(--line2); border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1.5rem; min-width: 0; }
 .pitch { display: flex; gap: 1rem; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .pitch > div { flex: 1 1 320px; min-width: 0; }
-.eyebrow { font-family: var(--mono); font-size: var(--fs-meta); text-transform: uppercase; letter-spacing: .09em; color: var(--green); margin-bottom: .25rem; }
+.eyebrow { font-family: var(--mono); font-size: var(--fs-meta); text-transform: uppercase; letter-spacing: .09em; color: var(--text-3); margin-bottom: .25rem; }
 .title { font-family: var(--display); font-size: var(--fs-lead); font-weight: 700; color: var(--white); margin: 0 0 .25rem; }
 .sub { font-size: var(--fs-sm); color: var(--muted); line-height: 1.55; margin: 0 0 .25rem; }
 .fine { font-family: var(--body); font-size: var(--fs-meta); color: var(--dim); line-height: 1.6; margin: 0; }

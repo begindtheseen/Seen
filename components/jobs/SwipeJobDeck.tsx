@@ -156,7 +156,7 @@ export default function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply,
   if (stack.length === 0) {
     return (
       <div style={{ textAlign: 'center', padding: '1.5rem 1rem', background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 14 }}>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '.5rem' }}>Deck cleared</div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '.5rem' }}>Deck cleared</div>
         <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', letterSpacing: '-.02em', marginBottom: '.25rem' }}>
           You matched {savedCount} job{savedCount !== 1 ? 's' : ''}
         </div>

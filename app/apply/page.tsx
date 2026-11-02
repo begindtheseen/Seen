@@ -157,7 +157,7 @@ function ApplyContent() {
     <div style={{ maxWidth: 460, margin: '0 auto', padding: '3rem 1.5rem 4rem', width: '100%', boxSizing: 'border-box' }}>
 
       {/* Eyebrow */}
-      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--blue)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--text-3)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: 8 }}>
         <span style={{ width: 16, height: 1, background: 'var(--blue)', display: 'inline-block' }} />
         Seen · Application Tracker
       </div>
@@ -236,7 +236,7 @@ function ApplyContent() {
         <>
           {/* Incentive strip */}
           <div style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.18)', borderRadius: 12, padding: '1rem 1rem', marginBottom: '1.25rem' }}>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--green)', fontWeight: 500, marginBottom: '.75rem' }}>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--text-3)', fontWeight: 500, marginBottom: '.75rem' }}>
               Track this application and unlock
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
@@ -347,7 +347,7 @@ function ApplyContent() {
         <>
           {insight && (
             <div style={{ background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 12, padding: '1rem 1rem', marginBottom: '1.25rem' }}>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--green)', fontWeight: 500, marginBottom: '.5rem' }}>Unlocked insight</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--text-3)', fontWeight: 500, marginBottom: '.5rem' }}>Unlocked insight</div>
               <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'rgba(255,255,255,0.85)', lineHeight: 1.7 }}>{insight}</div>
             </div>
           )}

@@ -617,7 +617,7 @@ export function ListingDisputesPanel({ token }: { token: string }) {
                 )}
                 {pcEntries.length > 0 && (
                   <div style={{ marginTop: '.25rem', padding: '.5rem .5rem', border: '1px solid var(--line2)', borderRadius: 6, background: 'rgba(59,130,246,.05)' }}>
-                    <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--blue)', marginBottom: '.25rem' }}>Proposed changes</div>
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--text-3)', marginBottom: '.25rem' }}>Proposed changes</div>
                     {pcEntries.map(([k, v]) => (
                       <div key={k} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5, wordBreak: 'break-word' }}>
                         <span style={{ color: 'var(--dim)' }}>{k}:</span> {String(v)}
@@ -1104,7 +1104,7 @@ export function MergePanel({ token, prefill }: { token: string; prefill: MergePr
             const rest = companies.slice(1)
             return (
               <div key={key} style={{ padding: '.75rem 0', borderBottom: '1px solid var(--line2)' }}>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--amber)', marginBottom: '.25rem' }}>{companies.length} entries match &quot;{key}&quot; · {auto ? 'same name (Auto-merge handles it)' : 'look-alike — your call'}</div>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--text-3)', marginBottom: '.25rem' }}>{companies.length} entries match &quot;{key}&quot; · {auto ? 'same name (Auto-merge handles it)' : 'look-alike — your call'}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '.25rem', flexWrap: 'wrap' }}>
                   <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', padding: '.25rem .5rem', borderRadius: 4, background: 'rgba(16,185,129,.12)', color: 'var(--green)', border: '1px solid rgba(16,185,129,.2)' }}>{prim.name} <span style={{ opacity: .6 }}>({prim.report_count || 0})</span></span>
                   {rest.map(c => (
