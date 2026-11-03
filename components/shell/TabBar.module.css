@@ -28,7 +28,11 @@
 .ico svg { width: 21px; height: 21px; }
 .item:active .ico { transform: scale(0.9); }
 .label {
-  font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.04em;
+  /* 12px at the default root size (the floor); only once the root passes ~18px (browser large-text) does the
+     label step down to 11px so "Dashboard" and "Companies" are not cut to "Dashboa…" (round 2). The middle
+     term is 0.75rem minus four times the root's excess over 18px — far above the max below 18px, far below
+     the min above it — so the clamp picks the floor or 11px and nothing in between. */
+  font-family: var(--mono); font-size: clamp(11px, calc(0.75rem - (1rem - 18px) * 4), var(--fs-meta)); letter-spacing: 0.04em;
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .on { color: var(--text-1); }

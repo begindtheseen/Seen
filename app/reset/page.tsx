@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { internalPath, loginHref } from '@/lib/safeHref.js'
+// The same shell as /login (card under the nav on phones, centred on desktop) — one sign-in look.
+import styles from '@/app/login/login.module.css'
 
 const inp: React.CSSProperties = {
   width: '100%',
@@ -25,7 +27,9 @@ const sub: React.CSSProperties = { fontSize: 'var(--fs-sm)', color: 'var(--sub)'
 const fine: React.CSSProperties = { fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.55, marginBottom: '1.5rem' }
 const focusOn = (e: React.FocusEvent<HTMLInputElement>) => { e.target.style.borderColor = 'var(--blue)' }
 const focusOff = (e: React.FocusEvent<HTMLInputElement>) => { e.target.style.borderColor = 'var(--line2)' }
-const cta = (busy: boolean): React.CSSProperties => ({ width: '100%', padding: '.75rem', background: 'var(--cta)', color: 'var(--text-1)', border: 'none', borderRadius: 8, fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)', cursor: busy ? 'not-allowed' : 'pointer', marginBottom: '.75rem', boxShadow: '0 0 20px rgba(59,130,246,0.3)', opacity: busy ? 0.7 : 1 })
+// The one primary on this screen: the flat CTA fill, body face (Syne is for headings), plain control shadow — the
+// same button as /login (round 2: the reset page had a glowing display-font button).
+const cta = (busy: boolean): React.CSSProperties => ({ width: '100%', minHeight: 48, padding: '.75rem', background: 'var(--cta)', color: 'var(--text-1)', border: 'none', borderRadius: 'var(--r-control)', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-ui)', cursor: busy ? 'not-allowed' : 'pointer', marginBottom: '.75rem', boxShadow: 'var(--sh-control)', opacity: busy ? 0.6 : 1 })
 
 /** The neutral answer to "send me a code" — the same words whether or not the address has an account
  *  (the raw Supabase error, "Signups not allowed for otp", told anyone which emails are registered;
@@ -183,11 +187,11 @@ export default function ResetPage() {
       </div>
     </>
   )
-  const message = msg && <div role="status" style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: ok ? 'var(--green)' : 'var(--red)', marginBottom: '.75rem', lineHeight: 1.6 }}>{msg}</div>
+  const message = msg && <div role="status" style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: ok ? 'var(--good-text)' : 'var(--bad-text)', marginBottom: '.75rem', lineHeight: 1.6 }}>{msg}</div>
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 1.5rem 1.5rem' }}>
-      <div className="rise-in" style={{ width: '100%', maxWidth: 420 }}>
+    <div className={styles.wrap}>
+      <div className={styles.card}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '2rem', justifyContent: 'center' }}>
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--blue)', display: 'inline-block' }} />
           <span style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-h3)', fontWeight: 600, color: 'var(--white)', letterSpacing: '-.02em' }}>Seen</span>
@@ -211,7 +215,7 @@ export default function ResetPage() {
               {verifying ? 'Saving...' : 'Save new password →'}
             </button>
             <div style={{ textAlign: 'center' }}>
-              <Link href="/dashboard" style={{ color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textDecoration: 'none' }}>
+              <Link href="/dashboard" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textDecoration: 'none' }}>
                 Keep my current password
               </Link>
             </div>
@@ -248,7 +252,7 @@ export default function ResetPage() {
               {sending ? 'Sending...' : 'Send code →'}
             </button>
             <div style={{ textAlign: 'center' }}>
-              <Link href={loginHref(returnTo)} style={{ color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textDecoration: 'none' }}>
+              <Link href={loginHref(returnTo)} style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textDecoration: 'none' }}>
                 Back to sign in
               </Link>
             </div>

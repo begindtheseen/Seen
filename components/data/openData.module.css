@@ -53,7 +53,13 @@
 .search:focus { border-color: var(--accent); box-shadow: var(--sh-focus); }
 .count { font-family: var(--mono); font-size: var(--fs-meta); color: var(--dim); }
 
+.tableShell { position: relative; min-width: 0; }
+/* The cue that the table scrolls sideways: a fade over its right edge (one colour to transparent), gone once the
+   last column is in view (DataTable measures scrollLeft). */
+.tableShell::after { content: ''; position: absolute; top: 1px; right: 1px; bottom: 1px; width: 56px; pointer-events: none; border-radius: 0 12px 12px 0; background: linear-gradient(90deg, transparent, var(--card)); transition: opacity var(--dur-state) ease; }
+.tableShell[data-end='true']::after { opacity: 0; }
 .tableWrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: 12px; max-width: 100%; background: var(--card); }
+.sortSel { display: none; }
 .table { width: 100%; border-collapse: collapse; min-width: 640px; font-size: var(--fs-ui); }
 .table th {
   text-align: left; font-family: var(--mono); font-size: var(--fs-meta); font-weight: 500; color: var(--dim); white-space: nowrap;
@@ -82,6 +88,32 @@
 .tag { display: inline-block; margin-left: .5rem; font-family: var(--mono); font-size: var(--fs-meta); color: var(--muted); }
 
 .grade { font-family: var(--body); font-weight: 600; font-size: var(--fs-lead); }
+
+/* ── Phone: one card per company (company · grade · hear back · ghosted · accounts); the header goes, the sort is a select. */
+@media (max-width: 480px) {
+  .sortSel {
+    display: block; flex: 1 1 100%; min-height: 44px; box-sizing: border-box; padding: 0 var(--sp-3);
+    background: var(--surface); border: 1px solid var(--line2); border-radius: var(--r-control); color: var(--text-1);
+    font-family: var(--body); font-size: var(--fs-ui);
+  }
+  .tableShell::after { display: none; }
+  .tableWrap { overflow: visible; border: 0; border-radius: 0; background: none; }
+  .table { display: block; min-width: 0; }
+  .table thead { display: none; }
+  .table tbody { display: grid; gap: var(--sp-2); }
+  .table tbody tr {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-1) var(--sp-2);
+    padding: var(--sp-3) var(--sp-4); border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card);
+  }
+  .table tbody tr:hover td { background: none; }
+  .table td { display: block; padding: 0; border: 0; white-space: normal; min-width: 0; }
+  .table td.num { text-align: left !important; }
+  .table td.colCo { grid-column: 1 / -1; min-width: 0; }
+  .table td.colU { display: none; }
+  .table td[data-l]::before { content: attr(data-l); display: block; font-family: var(--mono); font-size: var(--fs-meta); color: var(--dim); margin-bottom: 2px; }
+  .table td .tag { display: block; margin: 2px 0 0; }
+  .coLink { min-height: 32px; }
+}
 .gGood { color: var(--good-text); }
 .gMid { color: var(--caution-text); }
 .gBad { color: var(--bad-text); }

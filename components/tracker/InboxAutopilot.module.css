@@ -1,6 +1,8 @@
 /* Inbox Autopilot panel (tracker). Solid surface; every flex child can shrink (min-width:0) so a long
    address or company name never widens the page on a phone (CLAUDE.md phone-overflow rule). */
-.card { background: var(--raised); border: 1px solid var(--line2); border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1.5rem; min-width: 0; }
+.card { background: var(--surface-1); border: 1px solid var(--border-1); border-radius: var(--r-card); padding: 1rem 1.25rem; margin-bottom: 1.5rem; min-width: 0; }
+/* Switched on: a status row, not a panel — quiet padding, the list of cards is what the page is for. */
+.on { padding: .75rem 1rem; margin-bottom: 1rem; }
 /* While Autopilot is off its pitch is a promo: it sits UNDER the list (the tracker's column is a flex
    column — app/tracker .body — so `order` places it after the cards and the housekeeping row), never
    above the first application card. On a fresh account it is the one line under the empty state. */
@@ -19,21 +21,36 @@
 .fine { font-family: var(--body); font-size: var(--fs-meta); color: var(--dim); line-height: 1.6; margin: 0; }
 
 .head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
-.headL { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; min-width: 0; font-size: var(--fs-ui); color: var(--white); }
-.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px rgba(34, 197, 94, .15); flex-shrink: 0; }
-.dotOff { background: var(--dim); box-shadow: none; }
-.muted { font-family: var(--mono); font-size: var(--fs-meta); color: var(--muted); }
+.headL { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; min-width: 0; flex: 1 1 240px; font-size: var(--fs-ui); color: var(--white); }
+.muted { font-family: var(--mono); font-size: var(--fs-meta); color: var(--text-3); }
+/* Setup steps behind a native disclosure (44px summary row). */
+.setup { margin-top: .5rem; border-top: 1px solid var(--border-1); }
+.setupSum { list-style: none; cursor: pointer; display: flex; align-items: center; gap: .5rem; min-height: 44px; font-size: var(--fs-sm); font-weight: 600; color: var(--text-2); }
+.setupSum::-webkit-details-marker { display: none; }
+.setupSum > span:first-child { flex: none; }
+.setupSum > .muted { flex: 1 1 auto; min-width: 0; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chev { color: var(--text-3); flex: none; transition: transform var(--dur-state) var(--ease-out); }
+.setup[open] .chev { transform: rotate(180deg); }
+.off { margin-left: auto; }
+@media (prefers-reduced-motion: reduce) { .chev { transition: none; } }
 
 .addrRow { display: flex; align-items: center; gap: .5rem; margin-top: .75rem; flex-wrap: wrap; min-width: 0; }
-.addr, .filter, .code { font-family: var(--mono); background: var(--card); border: 1px solid var(--line2); border-radius: 7px; padding: .25rem .5rem; color: var(--white); min-width: 0; overflow-wrap: anywhere; }
+/* The status row: name · state · count, then the address with its copy button on one line (the address shrinks,
+   the button never wraps under it). */
+.on .head { gap: .5rem; }
+.on .addrRow { margin-top: 0; flex: 1 1 100%; flex-wrap: nowrap; }
+.on .addrRow .addr { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.on .addrRow > button { flex: none; }
+@media (min-width: 769px) { .on .addrRow { flex: 0 1 auto; max-width: 60%; } }
+.addr, .filter, .code { font-family: var(--mono); background: var(--surface-2); border: 1px solid var(--border-2); border-radius: var(--r-chip); padding: .25rem .5rem; color: var(--white); min-width: 0; overflow-wrap: anywhere; }
 .addr { font-size: var(--fs-meta); }
 .filter { font-size: var(--fs-meta); line-height: 1.5; flex: 1 1 260px; }
 .code { font-size: var(--fs-ui); letter-spacing: .08em; margin: 0 .5rem; }
 
-.confirm { margin-top: .75rem; padding: .75rem .75rem; border-radius: 9px; border: 1px solid rgba(34, 197, 94, .3); background: rgba(34, 197, 94, .06); font-size: var(--fs-sm); color: var(--white); line-height: 1.7; }
-.confirm a { color: var(--blue); }
+.confirm { margin-top: .75rem; padding: .75rem .75rem; border-radius: var(--r-control); border: 1px solid var(--accent-line); background: var(--accent-tint); font-size: var(--fs-sm); color: var(--white); line-height: 1.7; }
+.confirm a { color: var(--accent); }
 
-.steps { margin: .75rem 0 0; padding-left: 1.25rem; display: grid; gap: .5rem; font-size: var(--fs-meta); color: var(--muted); line-height: 1.6; }
+.steps { margin: 0 0 .5rem; padding-left: 1.25rem; display: grid; gap: .5rem; font-size: var(--fs-meta); color: var(--muted); line-height: 1.6; }
 .steps b, .steps i { color: var(--white); }
 
 .block { margin-top: .75rem; display: grid; gap: .5rem; }
@@ -45,14 +62,11 @@
 .list { list-style: none; margin: .75rem 0 0; padding: 0; display: grid; gap: .25rem; }
 .list li { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto; gap: .5rem; align-items: center; font-size: var(--fs-meta); color: var(--white); }
 .co { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.kind { font-family: var(--mono); font-size: var(--fs-meta); font-weight: 500; text-transform: uppercase; letter-spacing: .06em; border: 1px solid currentColor; border-radius: 999px; padding: .125rem .5rem; color: var(--blue); white-space: nowrap; }
-.k_interview, .k_offer { color: var(--green); }
-.k_rejection { color: var(--red); }
-.k_assessment { color: var(--amber); }
+/* What kind of email it was: a word in ink (the word says it; colour alone would not). */
+.kind { font-family: var(--mono); font-size: var(--fs-meta); font-weight: 500; text-transform: uppercase; letter-spacing: .06em; border: 1px solid var(--border-2); border-radius: 999px; padding: .125rem .5rem; color: var(--text-2); white-space: nowrap; }
 
-.foot { display: flex; gap: 1rem; margin-top: .75rem; padding-top: .75rem; border-top: 1px solid var(--line); flex-wrap: wrap; }
-.link { background: none; border: none; padding: 0; color: var(--blue); font-family: var(--mono); font-size: var(--fs-meta); cursor: pointer; }
+.foot { display: flex; gap: 1rem; align-items: center; margin-top: .5rem; padding-top: .5rem; border-top: 1px solid var(--border-1); flex-wrap: wrap; }
+.link { background: none; border: none; padding: 0; color: var(--accent); font-family: var(--mono); font-size: var(--fs-meta); cursor: pointer; min-height: 44px; }
 .link:disabled { opacity: .5; cursor: default; }
-.danger { color: var(--red); }
 .err { margin-top: .5rem; font-family: var(--mono); font-size: var(--fs-meta); color: var(--red); }
 

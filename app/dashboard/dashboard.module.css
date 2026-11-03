@@ -59,7 +59,7 @@
 .cardHead { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: .5rem; }
 .cardT, .secT { font-family: var(--display); font-weight: 800; font-size: var(--fs-lead); letter-spacing: -0.03em; color: var(--white); margin: 0; }
 .secHead { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin: 2rem 0 .75rem; }
-.link { font-family: var(--mono); font-size: var(--fs-meta); color: var(--accent); text-decoration: none; white-space: nowrap; }
+.link { display: inline-flex; align-items: center; min-height: 44px; font-family: var(--mono); font-size: var(--fs-meta); color: var(--accent); text-decoration: none; white-space: nowrap; }
 .link:hover { color: var(--text-1); }
 
 /* The one tone signal on a card is a <Badge> (components/ui) — word + icon, never colour alone. */
@@ -149,7 +149,7 @@
 .tool:hover { transform: translateY(-3px); border-color: var(--accent-line); }
 .tool .sym { margin-bottom: .75rem; }
 .tool small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.toolBody { min-width: 0; }
+.toolBody { display: block; min-width: 0; }
 /* Below the one-row width the tiles become a list: every row full width, nothing orphaned. */
 @media (max-width: 1024px) {
   .tools { grid-template-columns: minmax(0, 1fr); gap: 0.5rem; }

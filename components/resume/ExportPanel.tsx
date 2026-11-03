@@ -10,7 +10,6 @@ import s from './studio.module.css'
 import { aiHeaders } from '@/lib/aiHeaders'
 import type { ResumeDoc, AtsCheck, FormatInfo } from '@/lib/resume/types'
 import { listTemplates, renderText, renderMarkdown, formatRange } from '@/lib/resume/engine-client'
-import { scoreColor } from './HealthPanel'
 
 const FORMATS: FormatInfo[] = [
   { id: 'pdf', label: 'PDF', extension: 'pdf', templated: true, description: 'What you send. One column, real text, parses everywhere.' },
@@ -124,7 +123,7 @@ export default function ExportPanel({ doc, pro, isLoggedIn, onNeedPro, role }: P
       {ats && (
         <div className={s.card}>
           <div className={s.scoreRow}>
-            <div className={s.ring} style={{ borderColor: scoreColor(ats.score), width: 60, height: 60 }}><span className={s.ringNum} style={{ color: scoreColor(ats.score), fontSize: 'var(--fs-h3)' }}>{ats.score}</span></div>
+            <div className={s.ring} style={{ width: 60, height: 60 }}><span className={s.ringNum} style={{ fontSize: 'var(--fs-h3)' }}>{ats.score}</span></div>
             <div style={{ minWidth: 0 }}>
               <div className={s.grade}>Parser read-back · {ats.grade}</div>
               <div className={s.dim}>{ats.summary} {ats.format.toUpperCase()}{ats.template ? ` · ${ats.template}` : ''}{ats.pages ? ` · ${ats.pages} page${ats.pages === 1 ? '' : 's'}` : ''}{ats.font ? ` · ${ats.font}` : ''} · {ats.ms} ms</div>

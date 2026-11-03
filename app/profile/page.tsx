@@ -9,6 +9,8 @@ import { markIntentionalSignOut } from '@/lib/sessionExpired'
 import { offerLine } from '@/lib/pricing'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { ResumeStore } from '@/lib/stores/ResumeStore'
+import { ResumeDocStore } from '@/lib/stores/ResumeDocStore'
+import { parseResume } from '@/lib/resume/engine-client'
 import { parseResumeFile } from '@/lib/resumeUploadClient'
 import PageHeader from '@/components/shell/PageHeader'
 import Icon from '@/components/ui/Icon'
@@ -69,6 +71,12 @@ export default function ProfilePage() {
   // Already "loaded" if we have a cached copy (instant render); otherwise show a skeleton
   // for the one-time first load rather than an empty flash.
   const [loaded, setLoaded] = useState(!!_cache)
+  // The DB answer has landed (or failed) — only then may the résumé's city be offered for an empty field.
+  const [profileSettled, setProfileSettled] = useState(false)
+  // The city the résumé on file names (parsed doc → basics.location). Shown as a SUGGESTION in an empty
+  // City field with a helper line, never written until "Save changes" (coordinator 2026-11-02: Maria's
+  // Phoenix and Dev's Austin stayed blank for résumés uploaded before the upload path started filling it).
+  const [resumeCity, setResumeCity] = useState('')
 
   const isDirty = name !== initName || city !== initCity || experience !== initExperience
 
@@ -118,7 +126,7 @@ export default function ProfilePage() {
         fill(loadedProfile)
         writeProfileCache(user?.id, loadedProfile)
       }
-    }).catch(() => {}).finally(() => setLoaded(true))
+    }).catch(() => {}).finally(() => { setLoaded(true); setProfileSettled(true) })
     // Subscription status — gates the Billing section + Manage/Cancel button. get_credits is one DB
     // read; this used to call `load` (the whole tracker: six reads) for one boolean.
     _sync('get_credits').then((res) => {
@@ -133,9 +141,26 @@ export default function ProfilePage() {
   useEffect(() => {
     if (!ready || !isLoggedIn) return
     ResumeStore.load(user?.id, isLoggedIn)
-      .then(data => { if (data) setResumeMeta({ fileName: data.fileName, wordCount: data.wordCount }) })
+      .then(data => {
+        if (!data) return
+        setResumeMeta({ fileName: data.fileName, wordCount: data.wordCount })
+        // The Studio's cached server parse when it matches this text, else the same parser in the browser.
+        try {
+          const doc = ResumeDocStore.getParsed(user?.id, data.text) || parseResume(data.text, data.fileName)
+          const loc = String(doc?.basics?.location || '').trim()
+          if (loc && loc.length <= PROFILE_LIMITS.city) setResumeCity(loc)
+        } catch { /* no suggestion */ }
+      })
       .catch(() => {})
   }, [ready, isLoggedIn, user?.id])
+
+  // Offer the résumé's city once the saved profile is known to have none. It is a visible suggestion:
+  // the field differs from what is saved, so the unsaved bar appears, and nothing is written until Save.
+  useEffect(() => {
+    if (!profileSettled || !resumeCity || initCity || touched.current.city) return
+    setCity(c => c || resumeCity)
+  }, [profileSettled, resumeCity, initCity])
+  const cityFromResume = !!resumeCity && !initCity && city === resumeCity && !touched.current.city
 
   // Add / replace the résumé — the SAME canonical upload path as the Résumé-AI page
   // (parseResumeFile → /api/resume parse → ResumeStore.save), never a fork. Passing the city
@@ -359,9 +384,9 @@ export default function ProfilePage() {
               <a href="#resume" className={styles.jump}><span><Icon name="file-text" size={16} /></span>Résumé</a>
               {alertsReady && <a href="#alerts" className={styles.jump}><span><Icon name="bell" size={16} /></span>Job alerts</a>}
               <a href="#security" className={styles.jump}><span><Icon name="lock" size={16} /></span>Security</a>
-              <a href="#plan" className={styles.jump}><span>◈</span>Plan &amp; billing</a>
-              {inviteReady && <a href="#invite" className={styles.jump}><span>↗</span>Invite friends</a>}
-              <a href="#danger" className={`${styles.jump} ${styles.jumpDanger}`}><span>⚠</span>Delete account</a>
+              <a href="#plan" className={styles.jump}><span><Icon name="wallet" size={16} /></span>Plan &amp; billing</a>
+              {inviteReady && <a href="#invite" className={styles.jump}><span><Icon name="users" size={16} /></span>Invite friends</a>}
+              <a href="#danger" className={`${styles.jump} ${styles.jumpDanger}`}><span><Icon name="triangle-alert" size={16} /></span>Delete account</a>
             </div>
           </aside>
 
@@ -398,7 +423,7 @@ export default function ProfilePage() {
                       placeholder="e.g. Los Angeles, CA"
                     />
                   ) : <div className={styles.skeleton} />}
-                  <div className={styles.hint}>Auto-loads nearby listings on the Jobs page.</div>
+                  <div className={styles.hint}>{cityFromResume ? 'From your résumé — save to keep it.' : 'Auto-loads nearby listings on the Jobs page.'}</div>
                 </div>
                 <div className={styles.field}>
                   <label className={styles.label} htmlFor="pf-level">Experience level</label>
@@ -431,7 +456,7 @@ export default function ProfilePage() {
                   <div className={styles.fileIco}><Icon name="file-text" size={18} /></div>
                   <div style={{ minWidth: 0 }}>
                     <div className={styles.fileName}>{resumeMeta.fileName}</div>
-                    <div className={styles.fileMeta}>✓ {resumeMeta.wordCount.toLocaleString()} words · matched to jobs</div>
+                    <div className={styles.fileMeta}>{resumeMeta.wordCount.toLocaleString()} words · matched to jobs</div>
                   </div>
                 </div>
               )}

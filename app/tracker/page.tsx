@@ -1200,7 +1200,7 @@ function TrackerPage() {
         {/* Survey CTA — under the list (never above the first card), once an application is a week old */}
         {anyWeekOld && !showSurvey && (
           <div
-            className={s.after}
+            className={`${s.after} ${s.surveyCta}`}
             role="button"
             tabIndex={0}
             onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSurveyMode('resume'); setShowSurvey(true) } }}
@@ -1232,7 +1232,7 @@ function TrackerPage() {
           </div>
         )}
         {creditsEarned > 0 && !showSurvey && (
-          <div className={s.after} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', textAlign: 'center', marginBottom: '.75rem' }}>
+          <div className={s.after} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--good-text)', textAlign: 'center', marginBottom: '.75rem' }}>
             <Icon name="check" size={13} /> +{creditsEarned} credits earned this session
           </div>
         )}

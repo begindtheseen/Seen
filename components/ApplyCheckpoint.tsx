@@ -286,9 +286,9 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
     display: 'block',
     width: '100%',
     padding: '16px 20px',
-    background: 'rgba(16,185,129,.12)',
-    color: 'var(--green)',
-    border: '1px solid var(--green)',
+    background: 'var(--accent-tint)',
+    color: 'var(--accent)',
+    border: '1px solid var(--accent-line)',
     borderRadius: 11,
     fontFamily: 'var(--mono)',
     fontSize: 'var(--fs-ui)',
@@ -375,9 +375,9 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
     display: 'block',
     width: '100%',
     padding: '12px 20px',
-    background: 'rgba(16,185,129,.12)',
-    color: 'var(--green)',
-    border: '1px solid var(--green)',
+    background: 'var(--accent-tint)',
+    color: 'var(--accent)',
+    border: '1px solid var(--accent-line)',
     borderRadius: 11,
     fontFamily: 'var(--mono)',
     fontSize: 'var(--fs-ui)',
@@ -412,7 +412,7 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
               disabled={loading}
               data-testid="checkpoint-applied"
             >
-              {loading ? 'Saving…' : '✓ Yes, I applied today'}
+              {loading ? 'Saving…' : 'Yes, I applied today'}
             </button>
 
             <button
@@ -602,9 +602,9 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
 
             {creditEarned && (
               <div style={{
-                background: 'rgba(16,185,129,.1)', border: '1px solid rgba(16,185,129,.25)',
+                background: 'var(--good-tint)', border: '1px solid var(--good-line)',
                 borderRadius: 8, padding: '.5rem .75rem', marginBottom: '.75rem',
-                fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)',
+                fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--good-text)',
                 display: 'flex', alignItems: 'center', gap: '.5rem',
               }}>
                 +1 AI credit earned for tracking

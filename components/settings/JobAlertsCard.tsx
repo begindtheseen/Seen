@@ -191,7 +191,8 @@ export default function JobAlertsCard({ id = 'alerts', onReady }: { id?: string;
       )}
 
       <div className={p.btnRow} style={{ marginTop: '1rem' }}>
-        <button type="button" className={`${p.primary} ${s.tap}`} onClick={() => void save()} disabled={saving || !dirty}>
+        {/* Outlined: the page's one filled button is the unsaved-changes bar's "Save changes" (DESIGN.md §5). */}
+        <button type="button" className={`${p.ghost} ${s.tap}`} onClick={() => void save()} disabled={saving || !dirty}>
           {saving ? 'Saving…' : 'Save job alerts'}
         </button>
         {dirty && !saving && (

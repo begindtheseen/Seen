@@ -1,6 +1,6 @@
 /* Interview Prep on a tracker card. Solid surfaces (no glass), ≥12px text, ≥44px tap targets on phones. */
 /* Closed, the box is ONE 44px row ("Interview prep for Acme · Thu, Oct 29 →"); open, the content sits under it. */
-.box { margin-top: .75rem; border: 1px solid rgba(16, 185, 129, .35); background: rgba(16, 185, 129, .06); border-radius: 12px; padding: 0 .75rem; min-width: 0; }
+.box { margin-top: .75rem; border: 1px solid var(--border-2); background: var(--surface-1); border-radius: var(--r-card); padding: 0 .75rem; min-width: 0; }
 .head { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: .5rem; background: none; border: none; padding: .25rem 0; min-height: 44px; cursor: pointer; color: inherit; text-align: left; }
 .kicker { font-family: var(--body); font-size: var(--fs-ui); font-weight: 600; color: var(--text-1); line-height: 1.35; overflow-wrap: anywhere; }
 .when { color: var(--text-3); font-weight: 500; }
@@ -11,17 +11,17 @@
 .factDim { margin: 0; font-size: var(--fs-sm); color: var(--muted); }
 .dim { color: var(--muted); font-size: var(--fs-meta); }
 .quotes { margin-top: .125rem; font-size: var(--fs-sm); color: var(--sub); }
-.quotes summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-family: var(--mono); font-size: var(--fs-meta); color: var(--blue); }
+.quotes summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-family: var(--mono); font-size: var(--fs-meta); color: var(--accent); }
 .quote { margin: .25rem 0 .5rem; padding: .5rem .75rem; border-left: 2px solid var(--line); background: var(--raised); border-radius: 6px; font-size: var(--fs-sm); line-height: 1.5; color: var(--sub); overflow-wrap: anywhere; }
 .qsrc { display: block; margin-top: .25rem; font-family: var(--mono); font-size: var(--fs-meta); color: var(--muted); }
-.offer, .pack { margin-top: .75rem; padding-top: .75rem; border-top: 1px solid rgba(16, 185, 129, .25); }
+.offer, .pack { margin-top: .75rem; padding-top: .75rem; border-top: 1px solid var(--border-1); }
 .offerTitle { font-family: var(--body); font-weight: 600; font-size: var(--fs-lead); color: var(--white); margin-bottom: .5rem; overflow-wrap: anywhere; }
 .list { margin: 0 0 .75rem; padding-left: 1rem; font-size: var(--fs-ui); line-height: 1.6; color: var(--sub); }
 .cta { width: 100%; min-height: 48px; border: none; border-radius: 10px; background: var(--cta); color: var(--text-1); font-family: var(--body); font-weight: 600; font-size: var(--fs-body); cursor: pointer; padding: .75rem 1rem; }
 .cta:disabled { opacity: .65; cursor: default; }
 .fine { margin: .5rem 0 0; font-family: var(--mono); font-size: var(--fs-meta); color: var(--muted); text-align: center; }
 .err { margin: .5rem 0 0; font-size: var(--fs-sm); color: var(--red); }
-.link { color: var(--blue); text-decoration: none; display: inline-flex; align-items: center; min-height: 44px; }
+.link { color: var(--accent); text-decoration: none; display: inline-flex; align-items: center; min-height: 44px; }
 .block { margin-top: .75rem; }
 .label { font-family: var(--mono); font-size: var(--fs-meta); font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: .25rem; }
 .prose { margin: 0 0 .5rem; font-size: var(--fs-ui); line-height: 1.6; color: var(--white); overflow-wrap: anywhere; }
@@ -35,14 +35,14 @@
 .copy { min-height: 44px; min-width: 88px; border: 1px solid var(--line); background: var(--surface-overlay); color: var(--white); border-radius: 8px; font-family: var(--mono); font-size: var(--fs-meta); cursor: pointer; padding: 0 .75rem; }
 .dateRow { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; font-size: var(--fs-sm); color: var(--sub); }
 .date { min-height: 44px; background: var(--surface-overlay); color: var(--white); border: 1px solid var(--line); border-radius: 8px; padding: 0 .5rem; font-size: var(--fs-ui); }
-.sample { border: 1px dashed rgba(16, 185, 129, .35); border-radius: 8px; padding: .5rem .75rem; margin: 0 0 .75rem; font-size: var(--fs-ui); color: var(--white); display: flex; flex-direction: column; gap: .25rem; }
+.sample { border: 1px solid var(--border-2); background: var(--surface-2); border-radius: 8px; padding: .5rem .75rem; margin: 0 0 .75rem; font-size: var(--fs-ui); color: var(--white); display: flex; flex-direction: column; gap: .25rem; }
 .paste { display: flex; flex-direction: column; gap: .25rem; font-size: var(--fs-sm); color: var(--sub); margin: 0 0 .75rem; }
 .paste textarea { width: 100%; box-sizing: border-box; min-height: 72px; background: var(--surface-overlay); color: var(--white); border: 1px solid var(--line); border-radius: 8px; padding: .5rem .5rem; font-size: var(--fs-ui); font-family: var(--body); resize: vertical; }
 /* Just reached an interview: the card leads (owner decision 2026-10-25). */
-.lead { border-color: rgba(16, 185, 129, .7); box-shadow: 0 0 0 1px rgba(16, 185, 129, .35); }
+.lead { border-color: var(--accent-line); }
 .leadLine { margin: 0 0 .5rem; font-size: var(--fs-ui); line-height: 1.55; color: var(--white); font-weight: 600; }
 .previewQ { display: flex; flex-direction: column; gap: .125rem; padding: .25rem 0; }
-.previewA { display: flex; flex-direction: column; gap: .25rem; margin-top: .5rem; padding-top: .5rem; border-top: 1px dashed rgba(16, 185, 129, .3); }
+.previewA { display: flex; flex-direction: column; gap: .25rem; margin-top: .5rem; padding-top: .5rem; border-top: 1px solid var(--border-1); }
 .previewA .prose { margin: 0; font-size: var(--fs-sm); color: var(--sub); }
 /* The pass, offered under the prep: second and quieter. */
 .passAlt { margin-top: .75rem; padding: .75rem .75rem; border: 1px solid var(--accent-line); border-radius: 10px; display: flex; flex-direction: column; gap: .5rem; font-size: var(--fs-sm); line-height: 1.5; color: var(--sub); }
@@ -51,20 +51,20 @@
 .passBtn:disabled { opacity: .6; cursor: default; }
 
 /* Round 4: the company's own process, answers the person finishes on the card */
-.guide { padding: .5rem .75rem; border: 1px solid rgba(16, 185, 129, .3); border-radius: 8px; background: rgba(16, 185, 129, .05); display: flex; flex-direction: column; gap: .25rem; }
+.guide { padding: .5rem .75rem; border: 1px solid var(--border-2); border-radius: 8px; background: var(--surface-2); display: flex; flex-direction: column; gap: .25rem; }
 .fw { color: var(--white); font-weight: 600; }
-.chip { display: inline-block; white-space: nowrap; font-family: var(--mono); font-size: var(--fs-meta); font-weight: 500; letter-spacing: .04em; color: var(--green); border: 1px solid rgba(16, 185, 129, .45); border-radius: 999px; padding: 0 .5rem; margin-right: .5rem; vertical-align: middle; line-height: 1.5; }
+.chip { display: inline-block; white-space: nowrap; font-family: var(--mono); font-size: var(--fs-meta); font-weight: 500; letter-spacing: .04em; color: var(--accent); border: 1px solid var(--accent-line); border-radius: 999px; padding: 0 .5rem; margin-right: .5rem; vertical-align: middle; line-height: 1.5; }
 .state { display: inline-block; white-space: nowrap; margin-left: .5rem; font-family: var(--mono); font-size: var(--fs-meta); font-weight: 500; color: var(--muted); }
-.done { border-color: rgba(16, 185, 129, .5); }
-.done summary .state { color: var(--green); }
+.done { border-color: var(--border-3); }
+.done summary .state { color: var(--text-2); }
 .tag { margin: 0 0 .25rem; font-family: var(--mono); font-size: var(--fs-meta); color: var(--muted); }
 .editor { font-size: var(--fs-ui); line-height: 1.7; color: var(--white); margin: 0 0 .5rem; overflow-wrap: anywhere; }
 .given { white-space: pre-wrap; }
 .givenPre { white-space: pre-wrap; font-family: var(--mono); font-size: var(--fs-sm); }
 .ref { margin: .25rem 0 .5rem; font-size: var(--fs-sm); line-height: 1.55; color: var(--muted); overflow-wrap: anywhere; }
-.notes { margin: .5rem 0 .5rem; padding: .5rem .75rem; border-left: 2px solid var(--caution-text); background: rgba(252, 211, 77, .06); border-radius: 6px; }
-.fill { display: block; width: 100%; box-sizing: border-box; min-height: 44px; margin: .25rem 0; background: var(--surface-overlay); color: var(--white); border: 1px dashed rgba(16, 185, 129, .55); border-radius: 8px; padding: .5rem .5rem; font-size: var(--fs-ui); font-family: var(--body); line-height: 1.5; resize: vertical; }
-.fill:focus { outline: none; border-style: solid; border-color: var(--green); }
+.notes { margin: .5rem 0 .5rem; padding: .5rem .75rem; border-left: 2px solid var(--caution-text); background: var(--caution-tint); border-radius: 6px; }
+.fill { display: block; width: 100%; box-sizing: border-box; min-height: 44px; margin: .25rem 0; background: var(--surface-overlay); color: var(--white); border: 1px solid var(--border-2); border-radius: 8px; padding: .5rem .5rem; font-size: var(--fs-ui); font-family: var(--body); line-height: 1.5; resize: vertical; }
+.fill:focus { outline: none; border-color: var(--accent); box-shadow: var(--sh-focus); }
 .fill::placeholder { color: var(--muted); }
-.finished { margin: .5rem 0 .5rem; padding: .5rem .75rem; border-left: 2px solid var(--green); background: rgba(16, 185, 129, .06); border-radius: 6px; }
+.finished { margin: .5rem 0 .5rem; padding: .5rem .75rem; border-left: 2px solid var(--accent); background: var(--accent-tint); border-radius: 6px; }
 .watch { margin: .25rem 0; font-size: var(--fs-sm); line-height: 1.55; color: var(--caution-text); overflow-wrap: anywhere; }

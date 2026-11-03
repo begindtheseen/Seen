@@ -196,7 +196,11 @@ export default function CompaniesPage() {
     const evidence = (a: Company, b: Company) => firstPartyReportCount(b.score) - firstPartyReportCount(a.score) || (b.score.seen_user_report_count ?? 0) - (a.score.seen_user_report_count ?? 0)
     const key = (c: Company) => sort === 'score' ? -c.score.overall_score : sort === 'ghost' ? c.score.ghost_rate : c.score.avg_wait_days
     const within = (a: Company, b: Company) => key(a) - key(b) || evidence(a, b)
-    return ([2, 1, 0] as EvidenceTier[]).flatMap((t) => list.filter((c) => evidenceTier(c.score) === t).sort(within))
+    // Inside the Moderate tier (enough accounts, none or few from Seen users) the default board orders by
+    // evidence FIRST, then score: three 100/100 companies with 11 public accounts each no longer lead a
+    // 60-account company at 94 (round 2, 2026-11-02). The ghost / wait sorts keep their own order.
+    const byEvidence = (a: Company, b: Company) => evidence(a, b) || key(a) - key(b)
+    return ([2, 1, 0] as EvidenceTier[]).flatMap((t) => list.filter((c) => evidenceTier(c.score) === t).sort(t === 1 && sort === 'score' ? byEvidence : within))
   }, [companies, q, sort])
   // Where each lower tier begins (its heading sits before that index), or -1 when none / searching / the
   // tier above it is empty (a heading over the whole board says nothing).

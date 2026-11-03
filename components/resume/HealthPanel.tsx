@@ -21,7 +21,8 @@ const DIM_ORDER = ['impact', 'language', 'structure', 'timeline', 'length', 'ats
 const SEV_ICON: Record<string, string> = { error: '✕', warn: '⚠', info: '◦' }
 const SEV_COLOR: Record<string, string> = { error: 'var(--red)', warn: 'var(--amber)', info: 'var(--dim)' }
 
-export function scoreColor(n: number): string { return n >= 85 ? 'var(--green)' : n >= 70 ? 'var(--blue)' : n >= 50 ? 'var(--amber)' : 'var(--red)' }
+// The one toned word on the panel: the band ("strong", "needs work") — the ring, bars and labels are ink.
+function bandClass(n: number): string { return n >= 70 ? s.bandGood : n >= 50 ? s.bandCaution : s.bandBad }
 
 function bulletText(doc: ResumeDoc, bulletId?: string): string {
   if (!bulletId) return ''
@@ -50,7 +51,7 @@ function Finding({ f, doc, onJump, onApplyRewrite, onApplyVerb }: { f: HealthFin
         {fix && fix.kind === 'verbs' && (fix.options || fix.verbs || []).length > 0 && f.anchor.bulletId && (
           <div className={s.findingActions}>
             <span className={s.muted} style={{ alignSelf: 'center' }}>Lead with:</span>
-            {(fix.options || fix.verbs || []).slice(0, 5).map((v) => <button key={v} type="button" className={`${s.chip} ${s.chipGreen} ${s.chipBtn}`} onClick={() => onApplyVerb(f.anchor.bulletId!, v)}>{v}</button>)}
+            {(fix.options || fix.verbs || []).slice(0, 5).map((v) => <button key={v} type="button" className={`${s.chip} ${s.chipBtn}`} onClick={() => onApplyVerb(f.anchor.bulletId!, v)}>{v}</button>)}
           </div>
         )}
         {fix && fix.kind === 'prompt' && fix.text && <div className={s.muted} style={{ marginTop: '.25rem' }}>{fix.text}</div>}
@@ -61,16 +62,15 @@ function Finding({ f, doc, onJump, onApplyRewrite, onApplyVerb }: { f: HealthFin
 
 export default function HealthPanel({ health, doc, onJump, onApplyRewrite, onApplyVerb, onFixAll, fixAllCount }: Props) {
   const [open, setOpen] = useState<Record<string, boolean>>({})
-  const color = scoreColor(health.score)
   const dims = DIM_ORDER.filter((k) => health.dimensions[k]).map((k) => [k, health.dimensions[k]] as const)
   return (
     <div style={{ animation: 'fadeUp .3s ease both' }}>
       <div className={s.card}>
         <div className={s.scoreRow}>
-          <div className={s.ring} style={{ borderColor: color }}><span className={s.ringNum} style={{ color }}>{health.score}</span></div>
+          <div className={s.ring}><span className={s.ringNum}>{health.score}</span></div>
           <div style={{ minWidth: 0, flex: 1 }}>
             <div className={s.grade}>Résumé health · {health.grade}</div>
-            <div className={s.dim} style={{ marginTop: '.125rem' }}>{health.band} · {health.words} words{health.years != null ? ` · ${health.years} yrs experience` : ''}</div>
+            <div className={s.dim} style={{ marginTop: '.125rem' }}><span className={bandClass(health.score)}>{health.band}</span> · {health.words} words{health.years != null ? ` · ${health.years} yrs experience` : ''}</div>
           </div>
         </div>
         <p className={s.dim} style={{ marginTop: '.75rem', color: 'var(--sub)', fontSize: 'var(--fs-meta)' }}>{health.summary}</p>
@@ -87,7 +87,7 @@ export default function HealthPanel({ health, doc, onJump, onApplyRewrite, onApp
           {dims.map(([k, d]) => (
             <div key={k}>
               <div className={s.barHead}><span>{d.label}</span><span style={{ color: 'var(--white)' }}>{d.score}<span style={{ color: 'var(--muted)' }}>/100 · {d.weight} pts</span></span></div>
-              <div className={s.bar}><div className={s.barFill} style={{ width: `${Math.max(2, Math.min(100, d.score))}%`, background: scoreColor(d.score) }} /></div>
+              <div className={s.bar}><div className={s.barFill} style={{ width: `${Math.max(2, Math.min(100, d.score))}%` }} /></div>
             </div>
           ))}
         </div>
@@ -98,7 +98,7 @@ export default function HealthPanel({ health, doc, onJump, onApplyRewrite, onApp
       ) : dims.map(([k, d]) => d.findings.length ? (
         <div key={k} className={s.card}>
           <button type="button" onClick={() => setOpen((o) => ({ ...o, [k]: !(o[k] ?? d.findings.some((f) => f.severity !== 'info')) }))} style={{ background: 'none', border: 'none', padding: 0, width: '100%', textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span className={s.secTitle} style={{ color: scoreColor(d.score) }}>{d.label} · {d.findings.length}</span>
+            <span className={s.secTitle}>{d.label} · {d.findings.length}</span>
             <span className={s.muted}>{(open[k] ?? d.findings.some((f) => f.severity !== 'info')) ? '▾' : '▸'}</span>
           </button>
           {(open[k] ?? d.findings.some((f) => f.severity !== 'info')) && (

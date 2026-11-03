@@ -579,30 +579,40 @@ export default function DashboardPage() {
         <div className={styles.tools}>
           <Link href="/resume" className={`${styles.tool}`}>
             <span className={styles.sym}><Icon name="file-text" size={18} /></span>
-            <b>Résumé</b>
-            <small>{hasResume ? `${profile?.resume_file_name || 'Résumé on file'} · Scan fit →` : 'Add your résumé →'}</small>
+            <span className={styles.toolBody}>
+              <b>Résumé</b>
+              <small>{hasResume ? `${profile?.resume_file_name || 'Résumé on file'} · Scan fit →` : 'Add your résumé →'}</small>
+            </span>
           </Link>
           <Link href="/tracker" className={`${styles.tool}`}>
             <span className={styles.sym}><Icon name="list-checks" size={18} /></span>
-            <b>Applications</b>
-            <small>{dueChecks.length ? `${dueChecks.length} check-in${dueChecks.length > 1 ? 's' : ''} waiting →` : 'Manage your pipeline →'}</small>
+            <span className={styles.toolBody}>
+              <b>Applications</b>
+              <small>{dueChecks.length ? `${dueChecks.length} check-in${dueChecks.length > 1 ? 's' : ''} waiting →` : 'Manage your pipeline →'}</small>
+            </span>
           </Link>
           {inbox?.ready && (
             <Link href="/tracker#autopilot" className={`${styles.tool}`}>
               <span className={styles.sym}><Icon name="mail" size={18} /></span>
-              <b>Inbox Autopilot</b>
-              <small>{inbox.enabled ? `On · ${inbox.received_count || 0} email${inbox.received_count === 1 ? '' : 's'} read →` : 'Forward job emails — tracking fills itself →'}</small>
+              <span className={styles.toolBody}>
+                <b>Inbox Autopilot</b>
+                <small>{inbox.enabled ? `On · ${inbox.received_count || 0} email${inbox.received_count === 1 ? '' : 's'} read →` : 'Forward job emails — tracking fills itself →'}</small>
+              </span>
             </Link>
           )}
           <Link href="/companies" className={`${styles.tool}`}>
             <span className={styles.sym}><Icon name="briefcase-business" size={18} /></span>
-            <b>Company intel</b>
-            <small>See who actually responds →</small>
+            <span className={styles.toolBody}>
+              <b>Company intel</b>
+              <small>See who actually responds →</small>
+            </span>
           </Link>
           <Link href="/report" className={`${styles.tool}`}>
             <span className={styles.sym}><Icon name="megaphone" size={18} /></span>
-            <b>Report an outcome</b>
-            <small>Warn the next applicant →</small>
+            <span className={styles.toolBody}>
+              <b>Report an outcome</b>
+              <small>Warn the next applicant →</small>
+            </span>
           </Link>
         </div>
 

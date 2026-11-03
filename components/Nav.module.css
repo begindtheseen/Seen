@@ -311,7 +311,8 @@
   border: 1px solid var(--line2); border-bottom-width: 2px; border-radius: 4px; padding: .0625rem .25rem;
 }
 @media (max-width: 1024px) { .cmdkLabel { display: none; } .cmdk { padding: 0 0.5rem; } }
-@media (max-width: 768px) { .cmdk { display: none; } }
+/* Under 900px (a phone held sideways is 844) the pill ran into "More" (round 2); the palette still opens with ⌘K. */
+@media (max-width: 900px) { .cmdk { display: none; } }
 
 /* Account avatar trigger. */
 /* The button is the hit area, .avatarDot the 32px solid disc. */

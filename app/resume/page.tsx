@@ -235,7 +235,7 @@ function FitView({ out, intel, jobCompany, insights }: { out: OptimizerOutput; i
             Seen data on {jobCompany}: {Math.round((intel.ghost_rate || 0) * 100)}% ghost · {Math.round((intel.response_rate || 0) * 100)}% respond{intel.overall_score != null ? ` · grade ${Math.round(intel.overall_score)}/100` : ''}.
           </div>
         ) : (
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--green)' }}>No risk flags — clean signals for this role.</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--good-text)' }}><Icon name="circle-check" size={14} /> No risk flags — clean signals for this role.</div>
         )}
       </Card>
 
@@ -245,7 +245,7 @@ function FitView({ out, intel, jobCompany, insights }: { out: OptimizerOutput; i
           <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
             {insights.what_they_want.slice(0, 6).map((it, i) => (
               <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '.5rem', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5 }}>
-                <span style={{ color: 'var(--green)', fontSize: 'var(--fs-55)', marginTop: '.25rem', flexShrink: 0 }}>▶</span><span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{it}</span>
+                <span style={{ color: 'var(--text-3)', fontSize: 'var(--fs-55)', marginTop: '.25rem', flexShrink: 0 }}>▶</span><span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{it}</span>
               </li>
             ))}
           </ul>
@@ -261,7 +261,7 @@ function RewriteView({ out, copy, copied, onRerun, pro }: { out: PaidOptimize; c
   const guidance = (out.optimized_bullets || []).filter(b => isGuidance(b.original) || isGuidance(b.optimized))
   return (
     <div style={{ animation: 'fadeUp .3s ease both' }} className="ai-stack">
-      {out.cached && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', color: 'var(--green)' }}>No credit used — you built this plan for this job and résumé in the last 7 days.{onRerun && <> <button type="button" data-testid="resume-rerun" onClick={onRerun} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--green)', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit' }}>Re-run with the latest engine{pro === true ? '' : ` · ${OPTIMIZE_PRICE}`} →</button></>}</div>}
+      {out.cached && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', color: 'var(--text-3)' }}>No credit used — you built this plan for this job and résumé in the last 7 days.{onRerun && <> <button type="button" data-testid="resume-rerun" onClick={onRerun} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit' }}>Re-run with the latest engine{pro === true ? '' : ` · ${OPTIMIZE_PRICE}`} →</button></>}</div>}
       <PaidPlanView plan={out} />
 
       {real.length > 0 && (
@@ -271,7 +271,7 @@ function RewriteView({ out, copy, copied, onRerun, pro }: { out: PaidOptimize; c
             {real.map((b, i) => (
               <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.75rem .75rem', display: 'flex', gap: '.5rem', alignItems: 'flex-start' }}>
                 <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6, flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{b.optimized}</span>
-                <button onClick={() => copy(b.optimized, `sb${i}`)} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 6, padding: '.25rem .5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', color: copied === `sb${i}` ? 'var(--green)' : 'var(--muted)', cursor: 'pointer', flexShrink: 0 }}>{copied === `sb${i}` ? '✓' : 'copy'}</button>
+                <button onClick={() => copy(b.optimized, `sb${i}`)} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 6, padding: '.25rem .5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', color: copied === `sb${i}` ? 'var(--good-text)' : 'var(--muted)', cursor: 'pointer', flexShrink: 0 }}>{copied === `sb${i}` ? '✓' : 'copy'}</button>
               </div>
             ))}
           </div>
@@ -298,7 +298,7 @@ function RewriteView({ out, copy, copied, onRerun, pro }: { out: PaidOptimize; c
         <Card>
           {kicker('Application message')}
           <p style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.7, margin: 0, overflowWrap: 'anywhere' }}>{out.application_message}</p>
-          <button onClick={() => copy(out.application_message || '', 'msg')} style={{ marginTop: '.75rem', background: 'var(--green)', color: 'var(--ink)', border: 'none', borderRadius: 7, padding: '.5rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-70)', cursor: 'pointer' }}>{copied === 'msg' ? '✓ Copied' : 'Copy message'}</button>
+          <button type="button" className="ui-btn ui-btn--ghost ui-btn--sm" onClick={() => copy(out.application_message || '', 'msg')} style={{ marginTop: '.75rem' }}>{copied === 'msg' ? 'Copied' : 'Copy message'}</button>
         </Card>
       )}
     </div>
@@ -333,9 +333,9 @@ function CoachResultView({ d }: { d: CoachResult }) {
 }
 function ProposalResultView({ d }: { d: ProposalResult }) {
   const phases = [
-    { label: 'First 30 days', content: d.day_30, color: 'var(--blue)' },
-    { label: 'Days 31–60', content: d.day_60, color: 'var(--amber)' },
-    { label: 'Days 61–90', content: d.day_90, color: 'var(--green)' },
+    { label: 'First 30 days', content: d.day_30, color: 'var(--text-3)' },
+    { label: 'Days 31–60', content: d.day_60, color: 'var(--text-3)' },
+    { label: 'Days 61–90', content: d.day_90, color: 'var(--text-3)' },
   ]
   return (
     <div style={{ animation: 'fadeUp .3s ease both' }}>
@@ -376,17 +376,16 @@ function ResumeInput({ resumeText, setResumeText, resumeMeta, onUpload, onClear,
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.5rem', flexWrap: 'wrap', gap: '.5rem' }}>
         {label('Your resume')}
-        {!managed && <div style={{ display: 'flex', gap: '.5rem' }}>
-          <button onClick={() => fileRef.current?.click()} title="Upload is free — no AI credit used" style={{ background: 'none', border: '1px solid var(--line2)', color: 'var(--dim)', borderRadius: 6, padding: '.25rem .75rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', cursor: 'pointer' }}>Upload PDF/Word/txt · free</button>
-          {resumeText && <button onClick={onClear} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', cursor: 'pointer' }}>Clear</button>}
+        {!managed && <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
+          <button type="button" className="ui-btn ui-btn--ghost ui-btn--sm" onClick={() => fileRef.current?.click()} title="Upload is free — no AI credit used">{resumeMeta ? 'Replace file' : 'Upload PDF/Word/txt'}</button>
+          {resumeText && <button type="button" className="ui-btn ui-btn--ghost ui-btn--sm" onClick={onClear}>Clear</button>}
         </div>}
         <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,.txt,.md,text/plain" onChange={onUpload} style={{ display: 'none' }} />
       </div>
-      {resumeMeta ? (
-        <div style={{ background: 'var(--gdim)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 8, padding: '.75rem 1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-68)', color: 'var(--green)', marginBottom: '.75rem', overflowWrap: 'anywhere' }}>
-          ✓ résumé on file — {resumeMeta.fileName} · {resumeMeta.wordCount} words
-        </div>
-      ) : (
+      {/* The file itself (name · words) is shown ONCE, in "Your résumé on file" above (round 2: it read three
+          times on one screen). Here: only what uploading costs. */}
+      {!managed && <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--text-3)', marginBottom: '.75rem', lineHeight: 1.5 }}>Uploading and the fit check are free — no credit used.</div>}
+      {resumeMeta ? null : (
         <div
           onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
           onDragLeave={() => setIsDragging(false)}
@@ -942,8 +941,8 @@ function ResumePageInner() {
         />
 
         {params?.get('back') === 'tracker' && (
-          <Link href="/tracker" className="tap" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, marginBottom: '.75rem', color: 'var(--green)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-72)', textDecoration: 'none' }}>
-            {resumeText ? '✓ Résumé on file — back to your interview prep →' : '← Back to your interview prep (add your résumé first)'}
+          <Link href="/tracker" className="tap" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, marginBottom: '.75rem', color: 'var(--accent)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-72)', textDecoration: 'none' }}>
+            {resumeText ? 'Résumé on file — back to your interview prep →' : '← Back to your interview prep (add your résumé first)'}
           </Link>
         )}
 
@@ -999,9 +998,9 @@ function ResumePageInner() {
               )}
 
               {savedId && !showManual && (
-                <div style={{ background: 'var(--gdim)', border: '1px solid var(--gmid)', borderRadius: 8, padding: '.5rem .75rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-66)', color: 'var(--green)', marginBottom: '.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.5rem' }}>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>✓ {jobTitle}{jobCompany ? ' · ' + jobCompany : ''}</span>
-                  <button onClick={() => setShowManual(true)} style={{ background: 'none', border: 'none', color: 'var(--green)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', cursor: 'pointer', textDecoration: 'underline', flexShrink: 0 }}>edit</button>
+                <div style={{ background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 8, padding: '.5rem .75rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-66)', color: 'var(--text-1)', marginBottom: '.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.5rem' }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{jobTitle}{jobCompany ? ' · ' + jobCompany : ''}</span>
+                  <button onClick={() => setShowManual(true)} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', cursor: 'pointer', textDecoration: 'underline', flexShrink: 0, minHeight: 44 }}>edit</button>
                 </div>
               )}
 
@@ -1135,12 +1134,12 @@ function ResumePageInner() {
                         </Card>
                         <Card>
                           {kicker('Humanized bullets', 'var(--text-3)')}
-                          {hp.integrity?.grounded && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--green)', marginBottom: '.5rem' }}>✓ Every number kept exactly as you wrote it — nothing added.</div>}
+                          {hp.integrity?.grounded && <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--good-text)', marginBottom: '.5rem' }}><Icon name="circle-check" size={14} /> Every number kept exactly as you wrote it — nothing added.</div>}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                             {hp.package.bullets.map((b, i) => (
                               <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.75rem .75rem', display: 'flex', gap: '.5rem', alignItems: 'flex-start' }}>
                                 <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6, flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{b.humanized_text}</span>
-                                <button onClick={() => copy(b.humanized_text, `hb${i}`)} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 6, padding: '.25rem .5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', color: copied === `hb${i}` ? 'var(--green)' : 'var(--muted)', cursor: 'pointer', flexShrink: 0 }}>{copied === `hb${i}` ? '✓' : 'copy'}</button>
+                                <button onClick={() => copy(b.humanized_text, `hb${i}`)} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 6, padding: '.25rem .5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', color: copied === `hb${i}` ? 'var(--good-text)' : 'var(--muted)', cursor: 'pointer', flexShrink: 0 }}>{copied === `hb${i}` ? '✓' : 'copy'}</button>
                               </div>
                             ))}
                           </div>
@@ -1149,7 +1148,7 @@ function ResumePageInner() {
                           <Card>
                             {kicker('Humanized application message')}
                             <p style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.7, margin: 0, overflowWrap: 'anywhere' }}>{hp.package.application_message.humanized_text}</p>
-                            <button onClick={() => copy(hp.package.application_message!.humanized_text, 'hmsg')} style={{ marginTop: '.75rem', background: 'var(--green)', color: 'var(--ink)', border: 'none', borderRadius: 7, padding: '.5rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-70)', cursor: 'pointer' }}>{copied === 'hmsg' ? '✓ Copied' : 'Copy message'}</button>
+                            <button type="button" className="ui-btn ui-btn--ghost ui-btn--sm" onClick={() => copy(hp.package.application_message!.humanized_text, 'hmsg')} style={{ marginTop: '.75rem' }}>{copied === 'hmsg' ? 'Copied' : 'Copy message'}</button>
                           </Card>
                         )}
                         {confirmList().length > 0 && (
@@ -1173,7 +1172,7 @@ function ResumePageInner() {
                         {kicker(`What ${jobCompany || 'this company'} is hiring for`)}
                         {insights.what_they_want.length > 0 && (
                           <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 .75rem', display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-                            {insights.what_they_want.map((it, i) => <li key={i} style={{ display: 'flex', gap: '.5rem', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5 }}><span style={{ color: 'var(--green)', fontSize: 'var(--fs-55)', marginTop: '.25rem', flexShrink: 0 }}>▶</span><span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{it}</span></li>)}
+                            {insights.what_they_want.map((it, i) => <li key={i} style={{ display: 'flex', gap: '.5rem', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5 }}><span style={{ color: 'var(--text-3)', fontSize: 'var(--fs-55)', marginTop: '.25rem', flexShrink: 0 }}>▶</span><span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{it}</span></li>)}
                           </ul>
                         )}
                         {insights.hidden_requirements.length > 0 && (
@@ -1184,7 +1183,7 @@ function ResumePageInner() {
                             </ul>
                           </>
                         )}
-                        {insights.insider_tip && <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 7, padding: '.75rem 1rem', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6, overflowWrap: 'anywhere' }}><span style={{ color: 'var(--green)', fontWeight: 700 }}>Tip: </span>{insights.insider_tip}</div>}
+                        {insights.insider_tip && <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 7, padding: '.75rem 1rem', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6, overflowWrap: 'anywhere' }}><span style={{ color: 'var(--text-1)', fontWeight: 600 }}>Tip: </span>{insights.insider_tip}</div>}
                       </Card>
                     )}
 
@@ -1210,13 +1209,13 @@ function ResumePageInner() {
                         {finalBullets().length} bullet{finalBullets().length !== 1 ? 's' : ''}{hp ? ' (HumanProof)' : ''}{fitOut && fitOut.fit_score != null ? ` · SeenFit ${fitOut.fit_score}/100` : ''}{confirmList().length ? ` · ${confirmList().length} to confirm` : ''}
                       </div>
                       <div className="ai-btn-row" style={{ marginBottom: '.5rem' }}>
-                        <button onClick={() => copy(packageText(), 'pkg')} style={{ padding: '.75rem', background: 'var(--raised)', border: '1px solid var(--line2)', color: copied === 'pkg' ? 'var(--green)' : 'var(--sub)', borderRadius: 9, fontFamily: 'var(--mono)', fontSize: 'var(--fs-68)', cursor: 'pointer' }}>{copied === 'pkg' ? '✓ Copied' : 'Copy final package'}</button>
+                        <button onClick={() => copy(packageText(), 'pkg')} style={{ padding: '.75rem', background: 'var(--raised)', border: '1px solid var(--line2)', color: copied === 'pkg' ? 'var(--good-text)' : 'var(--sub)', borderRadius: 9, fontFamily: 'var(--mono)', fontSize: 'var(--fs-68)', cursor: 'pointer' }}>{copied === 'pkg' ? '✓ Copied' : 'Copy final package'}</button>
                         <button onClick={downloadResume} disabled={downloading} style={{ padding: '.75rem', background: 'var(--surface)', border: '1.5px solid var(--blue)', color: 'var(--blue)', borderRadius: 9, fontFamily: 'var(--mono)', fontSize: 'var(--fs-68)', fontWeight: 700, cursor: downloading ? 'not-allowed' : 'pointer', opacity: downloading ? 0.6 : 1 }}>{downloading ? 'Building…' : '⬇ Download résumé PDF'}</button>
                       </div>
                       <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '.5rem' }}>
                         {label('PDF template')}
                         {(['classic', 'engineering', 'modern'] as const).map(t => (
-                          <button key={t} type="button" onClick={() => setPdfTemplate(t)} style={{ background: pdfTemplate === t ? 'var(--gdim)' : 'none', border: `1px solid ${pdfTemplate === t ? 'var(--gmid)' : 'var(--line2)'}`, color: pdfTemplate === t ? 'var(--green)' : 'var(--dim)', borderRadius: 6, padding: '.25rem .5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', cursor: 'pointer', textTransform: 'capitalize' }}>{t}</button>
+                          <button key={t} type="button" onClick={() => setPdfTemplate(t)} style={{ background: pdfTemplate === t ? 'var(--accent-tint)' : 'none', border: `1px solid ${pdfTemplate === t ? 'var(--accent-line)' : 'var(--line2)'}`, color: pdfTemplate === t ? 'var(--text-1)' : 'var(--dim)', borderRadius: 6, padding: '.25rem .5rem', minHeight: 44, fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', cursor: 'pointer', textTransform: 'capitalize' }}>{t}</button>
                         ))}
                       </div>
                       <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', color: 'var(--muted)', lineHeight: 1.5 }}>The PDF is a complete, ATS-ready résumé built from your own text — only the résumé, none of Seen's notes · free.</div>
@@ -1226,10 +1225,10 @@ function ResumePageInner() {
                     <Card>
                       {kicker('Email me this package')}
                       <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
-                        <input autoComplete="off" type="email" value={emailAddr} onChange={e => setEmailAddr(e.target.value)} placeholder="your@email.com" style={{ flex: 1, minWidth: 160, background: 'var(--surface)', border: '1.5px solid rgba(16,185,129,0.3)', borderRadius: 8, padding: '.5rem .75rem', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-72)', outline: 'none', boxSizing: 'border-box' }} />
-                        <button onClick={emailPackage} disabled={emailState === 'sending' || emailState === 'sent' || !emailAddr.trim()} style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', color: 'var(--green)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-72)', fontWeight: 600, padding: '.5rem 1rem', borderRadius: 8, cursor: 'pointer', opacity: (emailState === 'sending' || !emailAddr.trim()) ? 0.7 : 1 }}>{emailState === 'sent' ? '✓ Sent' : emailState === 'sending' ? 'Sending…' : 'Send →'}</button>
+                        <input autoComplete="off" type="email" value={emailAddr} onChange={e => setEmailAddr(e.target.value)} placeholder="your@email.com" className="ui-input" style={{ flex: 1, minWidth: 160 }} />
+                        <button type="button" className="ui-btn ui-btn--ghost" onClick={emailPackage} disabled={emailState === 'sending' || emailState === 'sent' || !emailAddr.trim()}>{emailState === 'sent' ? 'Sent' : emailState === 'sending' ? 'Sending…' : 'Send →'}</button>
                       </div>
-                      {emailState === 'sent' && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--green)', marginTop: '.5rem' }}>✓ Check your email — the apply-tracking link is inside.</div>}
+                      {emailState === 'sent' && <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--good-text)', marginTop: '.5rem' }}><Icon name="circle-check" size={14} /> Check your email — the apply-tracking link is inside.</div>}
                     </Card>
 
                     <Card>

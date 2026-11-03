@@ -1,7 +1,10 @@
 /* The deck's height: the three action buttons must sit above the fold — and above the phone tab bar — at
    1280 and at 390 (where the sticky search bar, filters and toolbar sit above it). The card paints
    itself — no glow, no tint. */
-.deck { height: 280px; }
+.deck { height: 328px; }
+/* The posting's own first sentences about the role: four lines at desktop, three on a phone (the card is
+   shorter there so the three buttons stay above the tab bar). Round 2: the 1280 card was 60% empty. */
+.excerpt { font-family: var(--body); font-size: var(--fs-sm); color: var(--text-3); line-height: 1.55; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; }
 .actions { display: flex; justify-content: center; align-items: center; gap: var(--sp-4); margin-top: var(--sp-3); }
 .btn { width: 48px; height: 48px; border-radius: 50%; border: 1px solid var(--border-2); background: var(--surface-1); color: var(--text-2); font-family: var(--body); font-size: var(--fs-lead); cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .btn:hover { border-color: var(--border-3); color: var(--text-1); }
@@ -10,7 +13,8 @@
 .btnMain { width: 56px; height: 56px; border-color: var(--accent-line); background: var(--accent-tint); color: var(--accent); font-size: var(--fs-h3); font-weight: 700; }
 .hint { text-align: center; margin-top: var(--sp-2); font-family: var(--body); font-size: var(--fs-meta); color: var(--text-3); letter-spacing: .04em; }
 @media (max-width: 560px) {
-  .deck { height: 216px; }
+  .deck { height: 232px; }
+  .excerpt { -webkit-line-clamp: 3; }
   .actions { margin-top: var(--sp-2); }
   .btn { width: 44px; height: 44px; }
   .btnMain { width: 52px; height: 52px; }

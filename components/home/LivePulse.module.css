@@ -3,9 +3,10 @@
 .pulse { position: relative; z-index: 2; width: 100%; max-width: 1120px; margin: 0 auto; padding: 0.5rem 1.25rem 1.5rem; box-sizing: border-box; }
 
 .head { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: .75rem; font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); }
-.live { display: inline-flex; align-items: center; gap: .5rem; color: var(--good-text); font-weight: 600; }
-.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); animation: lpPing 2.2s infinite; }
-@keyframes lpPing { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55) } 70% { box-shadow: 0 0 0 7px rgba(16, 185, 129, 0) } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0) } }
+/* "Live" is a label — ink (DESIGN.md §2); the dot is the one accent, pulsing in the accent's own line colour. */
+.live { display: inline-flex; align-items: center; gap: .5rem; color: var(--text-2); font-weight: 600; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 0 var(--accent-line); animation: lpPing 2.2s infinite; }
+@keyframes lpPing { 0% { box-shadow: 0 0 0 0 var(--accent-line) } 70% { box-shadow: 0 0 0 7px transparent } 100% { box-shadow: 0 0 0 0 transparent } }
 .title { color: var(--sub); }
 .count { color: var(--dim); letter-spacing: 0.06em; text-transform: none; }
 .more { margin-left: auto; color: var(--accent); text-decoration: none; letter-spacing: 0.06em; text-transform: none; }

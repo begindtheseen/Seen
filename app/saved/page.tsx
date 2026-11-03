@@ -9,7 +9,6 @@ import { useState, useEffect, useLayoutEffect, useCallback } from 'react'
 import { useAuth } from '@/lib/auth'
 import { SavedJobsStore, SAVED_CHANGED_EVENT } from '@/lib/stores/SavedJobs'
 import { JobCache } from '@/lib/stores/JobCache'
-import { Score } from '@/lib/score'
 import type { SavedJob } from '@/lib/types'
 import PageHeader from '@/components/shell/PageHeader'
 import Link from 'next/link'
@@ -92,7 +91,6 @@ export default function SavedPage() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
             {items.map(s => {
-              const color = typeof s.score === 'number' ? Score.color(Score.risk(s.score)) : 'var(--dim)'
               // The card IS a link to the role inside Seen (it was plain text with only the external
               // "Apply ↗" as a link — audit 2026-10-24, M10). The id comes from device storage, so it
               // goes in the path through pathSegment; the posting link only as a parsed http(s) URL.
@@ -115,7 +113,7 @@ export default function SavedPage() {
                   </Link>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexShrink: 0 }}>
                     {typeof s.score === 'number' && (
-                      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-ui)', fontWeight: 500, color }}>{s.score}</div>
+                      <div title="Posting score" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-ui)', fontWeight: 600, color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums' }}>{s.score}</div>
                     )}
                     {applyHref && (
                       <a

@@ -254,7 +254,7 @@ function StudioInner() {
                 {active ? <strong>Tailored · {active.label}</strong> : <strong>Base résumé</strong>}
                 {baseMeta && !active && <span>· {baseMeta.fileName}</span>}
                 <span>· {docStats(doc).words} words</span>
-                {!active && <span style={{ color: saveState === 'saved' ? 'var(--green)' : 'var(--muted)' }}>· {saveState === 'saving' ? 'saving…' : saveState === 'saved' ? 'saved' : ''}</span>}
+                {!active && <span style={{ color: 'var(--text-3)' }}>· {saveState === 'saving' ? 'saving…' : saveState === 'saved' ? 'saved' : ''}</span>}
               </div>
               <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                 <button type="button" className={s.btn} onClick={() => fileRef.current?.click()} disabled={busy}>{busy ? 'Reading…' : 'Upload a file'}</button>

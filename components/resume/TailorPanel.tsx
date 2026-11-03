@@ -11,7 +11,6 @@ import { aiHeaders } from '@/lib/aiHeaders'
 import type { ResumeDoc, TailorPlan, TailorResponse, TailorDecision, TailorOverrides } from '@/lib/resume/types'
 import type { SavedJob } from '@/lib/types'
 import { applyTailorPlan } from '@/lib/resume/engine-client'
-import { scoreColor } from './HealthPanel'
 import { useAuth } from '@/lib/auth'
 import CreditConfirmDialog from '@/components/CreditConfirmDialog'
 import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
@@ -185,9 +184,9 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
             ) : (
               <>
                 <div className={s.beforeAfter}>
-                  <span style={{ color: scoreColor(plan.score.before) }}>{plan.score.before}</span>
+                  <span>{plan.score.before}</span>
                   <span className={s.arrow}>→</span>
-                  <span style={{ color: scoreColor(plan.score.after) }}>{plan.score.after}</span>
+                  <span>{plan.score.after}</span>
                   <span className={s.dim} style={{ fontWeight: 400, fontSize: 'var(--fs-meta)' }}>SeenFit match · {plan.job.familyLabel || plan.job.roleFamily} posting · {plan.score.requirementCount ?? plan.job.requirementCount} requirements read{plan.strategy ? ` · about ${plan.strategy.estimatedLines} lines · fits on ${Math.max(1, Math.ceil(plan.strategy.estimatedLines / LINES_PER_PAGE))} page${Math.max(1, Math.ceil(plan.strategy.estimatedLines / LINES_PER_PAGE)) === 1 ? '' : 's'}` : ''}</span>
                 </div>
                 {/* the same one-sentence why the Optimize modal and /resume show; the gate first */}
@@ -233,7 +232,7 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
                         </div>
                         <span className={`${s.chip} ${s[TIER_CLASS[d.tier]] || s.chip}`} title="How much of what this posting asks for the role covers">{TIER_LABEL[d.tier]} · {pct}% fit{tie ? ' · tie' : ''}</span>
                       </div>
-                      <div className={s.bar}><div className={s.barFill} style={{ width: `${Math.max(3, pct)}%`, background: d.tier === 'core' ? 'var(--green)' : d.tier === 'supporting' ? 'var(--blue)' : d.tier === 'context' ? 'var(--amber)' : 'var(--muted)' }} /></div>
+                      <div className={s.bar}><div className={s.barFill} style={{ width: `${Math.max(3, pct)}%` }} /></div>
                       <div className={s.muted} style={{ color: 'var(--sub)' }}>{d.reasons.slice(0, 2).join(' ')}</div>
                       {d.shared.length > 0 && <div className={s.chips}>{d.shared.slice(0, 4).map((c) => <span key={c.competency} className={`${s.chip}${c.evidenced ? ` ${s.chipGreen}` : ''}`} title={c.evidenced ? 'shown in your bullets' : 'implied by the title'}>{c.competency}{c.evidenced ? ' ✓' : ''}</span>)}</div>}
                       <div className={s.opts}>
