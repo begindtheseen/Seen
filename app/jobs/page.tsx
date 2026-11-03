@@ -25,7 +25,7 @@ import Button from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Badge'
 import Icon from '@/components/ui/Icon'
 import j from './jobs.module.css'
-import { useUrlPlace, useScrollMemory } from '@/lib/nav/urlState'
+import { useUrlPlace, useScrollMemory, afterPendingBack } from '@/lib/nav/urlState'
 import { JobCache } from '@/lib/stores/JobCache'
 import { httpHref } from '@/lib/safeHref.js'
 
@@ -398,7 +398,9 @@ export default function JobsPage() {
         job={detailJob}
         isLoggedIn={isLoggedIn}
         onClose={() => setDetailJob(null)}
-        onApply={j => { setDetailJob(null); setApplyJob(j) }}
+        // Close the drawer (one Back for its ?job= entry) and open the sheet only once that Back has landed: the
+        // drawer used to call onClose() AND this handler closed again — two Backs, and the page left /jobs (round 5).
+        onApply={j => { setDetailJob(null); afterPendingBack(() => setApplyJob(j)) }}
         onCheckCompany={co => { setDetailJob(null); setCheckCompany(co) }}
       />
     )}

@@ -41,23 +41,27 @@ export default function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply,
   const shellRef = useRef<HTMLDivElement>(null)
   const [deckH, setDeckH] = useState<number | null>(null)
   useEffect(() => {
-    const fit = () => {
+    const fit = (scrollIfShort: boolean) => {
       const el = shellRef.current
       if (!el) return
-      const top = el.getBoundingClientRect().top + window.scrollY
+      const top = el.getBoundingClientRect().top
       const tabBar = document.documentElement.classList.contains('tabbar') ? 72 : 0
       const phone = window.innerWidth <= 560
       const chrome = (phone ? 52 : 56) + (phone ? 8 : 12) + 32 // buttons + their gap + the hint line
-      const avail = window.innerHeight - (top - window.scrollY) - tabBar - chrome - 8
+      const avail = window.innerHeight - top - tabBar - chrome - 8
       const cap = phone ? 212 : 296
-      // The floor is what the card's content needs (round 4: a 150px card let the excerpt run over the footer);
-      // under it the page simply scrolls.
+      // The floor is what the card's content needs (round 4: a 150px card let the excerpt run over the footer).
       const floor = phone ? 212 : 260
-      setDeckH(Math.max(floor, Math.min(cap, Math.floor(avail))))
+      const h = Math.max(floor, Math.min(cap, Math.floor(avail)))
+      setDeckH(h)
+      // Short of room (the sort select and a radius notice above the deck push it down — round 5: buttons at
+      // 771–823 under a tab bar from 777): scroll the page so the buttons clear the tab bar. Once, on mount.
+      if (scrollIfShort && avail < h) window.scrollBy({ top: Math.ceil(h - avail), behavior: 'auto' })
     }
-    fit()
-    window.addEventListener('resize', fit)
-    return () => window.removeEventListener('resize', fit)
+    fit(true)
+    const onResize = () => fit(false)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
   }, [])
   const { isLoggedIn } = useAuth()
 

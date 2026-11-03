@@ -448,7 +448,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
                     iconRight="arrow-up-right"
                   >{seenApply ? 'Apply on their site' : preview ? 'Open posting' : 'Apply'}</Button>
                   {!seenApply && (
-                    <Button variant="secondary" data-testid="drawer-optimize-btn" onClick={() => { onClose(); onApply(job) }} title={`Optimize your résumé for this job · ${priceLabel(RESUME_OPTIMIZE_COST, pro)}`} className={d.grow}>
+                    <Button variant="secondary" data-testid="drawer-optimize-btn" onClick={() => onApply(job)} title={`Optimize your résumé for this job · ${priceLabel(RESUME_OPTIMIZE_COST, pro)}`} className={d.grow}>
                       <span className="ui-btn__stack"><span>Optimize</span><small>{shortPriceLabel(RESUME_OPTIMIZE_COST, pro)}</small></span>
                     </Button>
                   )}
