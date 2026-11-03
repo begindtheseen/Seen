@@ -82,6 +82,34 @@ Editor — comments stripped, one block per migration, and say which to run firs
   itself after an outcome; Interview Prep is collapsed to one line until tapped; `honestSalary()` hides pre-2026-10-20
   Adzuna rows' pay and sub-wage lines; Remote = location/type or a plain statement near the top of the text;
   `adaptive_pricing[enabled]=false` on every Checkout session; the fixed nav is solid when scrolled.
+- **Rounds 2–3 (2026-11-03, previews 41610a7 → 708afbd):** R2 Jules 8 "yes after 3 fixes", Dev 7, Tasha "no — close",
+  Maria 7, all NO; R3 Dev 7/7/8/6, Tasha 7/8/7/6, Maria 7/6/7/5, Jules 8/7/8/6, all NO — the deciding items were the SAME
+  across testers: three graded counts (345 / 401 / 384), the drawer's one filled button clipping to "Ap…", the swipe
+  deck under the phone tab bar, Settings dirty on load, and Optimize printing word stems ("knowledg / navigat").
+- **Round-3 root causes (fixed in 216b15d, 5e2b4c7, f1c2e0b):** the leaderboard's graded total selected no mention
+  column AND read one capped PostgREST page (1,000 rows whatever `limit` says) — every "count everything" read must
+  keyset-page (`order=id.asc&id=gt.`) and use the one gate from `lib/server/openDataRead.ts`; Apply and Optimize shared
+  one flex class (`.grow`) so the filled button had no priority — the filled button is `.main { flex:1 1 auto;
+  min-width:max-content }`; the swipe deck's CSS height assumed a fixed deck top — it now measures itself (`deckH`);
+  the résumé city was typed INTO the Settings field (dirty form) — a suggestion is a button under the field, never a
+  value; `domainOfYearsSentence` returned stems that constraints.js printed — matching uses stems, copy uses
+  `domainWordsOfYearsSentence`; the jobs pool read was unordered + capped, so widening the radius changed WHICH rows
+  filled the cap (10 mi had Tempe Walmart, 25 did not) — every pool read is ordered and the title read is separate
+  from the `search_query` stamp read (`api/jobs.pool.test.mjs`); DashMart "$2/hr" was the CLIENT parsing "$2/hour
+  premium" from the description (`isAddOn` in lib/jobs/pay.js; MIN_HOURLY is the one floor); a second report by the
+  same user on the same company within 30 days is HELD (`duplicate_user_company`) — quick_submit now answers `held`
+  and the toast says it will not change the grade (three personas "saved" Northwind reports that never appeared);
+  Pro-days `too_new` judges `applications.created_at` (added to the tracker), never the applied date — the copy says so.
+- **Durable rules added in round 3:** one `possessive()` (lib/companyNames.js) — never "Fry's's"; a legal suffix glued
+  to one slug word is the name (Labcorp, not "Lab"); the homepage LIVE strip shows graded companies only (feed rows carry
+  `graded`); micro-survey never over an editor (/resume/studio, /profile); the prep panel is collapsed on EVERY load;
+  "Not yet" promises nothing ("nothing recorded"); an unknown company page offers `name_suggest` prefix matches
+  ("Did you mean Fry's Food Stores?"); Odometer prints thousands separators; /data caps at 60 rows + Show all; the
+  tracker's current stage is a tint (one --cta fill per screen); Verdict/Optimize panels carry no green tint.
+- **Harness (round 3):** the container restarted mid-pass — resume stopped agents with SendMessage to their ids (the
+  working tree persists; fixers that had not written yet lost nothing). A checkpoint commit may exclude a fixer's
+  in-progress files; never commit a tree with that fixer's own pins red. CodeQL alert annotations are readable via the
+  PR's review threads (`pull_request_read get_review_comments`), not the check-run text.
 - **Round-1 items still owner-side:** Supabase auth email templates (`supabase/email-templates/` + README; the Management
   API token in the cloud env answers 401); confirm-email landing on prod; Stripe currency verified only by code.
 - **CodeQL:** the design commit touched 100+ files, so scanning surfaced 51 old alerts. Every data-driven link now goes
