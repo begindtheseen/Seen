@@ -133,6 +133,16 @@ Editor — comments stripped, one block per migration, and say which to run firs
   with no score row shows Track / prep only once it has accounts (the CTA flashed during the reports read and fired
   `offer_shown` on empty pages); flat posting text also splits a Title-Case sub-heading sitting mid-block after a
   sentence (`MID_SUBHEAD_RE`); completed tracker stage steps carry a ✓ (semantic colour always with a glyph).
+- **Round 6 (2521834, two-item re-check): ALL FOUR APPROVE, no conditions.** Tasha 8/8/8/7 yes (deck scrolls to 95 on
+  mount, buttons 676–728 above the 777 tab bar, a real tap advances the card; drawer Optimize: URL stays, sheet opens);
+  Dev 8/8/8/7 yes unconditional (drawer Optimize 129 ms, one Back returns to the list, from a fresh `&job=` load too);
+  Maria 8/9/9/6 yes (same, plus the credit prompt "Use 1 credit / Not now" spends nothing on Not now). Jules approved in
+  round 5. Follow-ups from their nits in 43aa697: an unseeded company page shows Track / prep only after the live read
+  (the CTA was in the server HTML under a skeleton hero for ~350 ms); the cached Optimize note names "the earlier credit".
+  Still open, reported not fixed: "team lead" Phoenix ranks Oscar Health / Jencap above Walmart for a retail résumé whose
+  `profiles.industry` is unset (the fit boost reads resume_skills / profiles.industry); the Optimize summary "9+ years"
+  beside the fit line's "10.7 years"; health rises after a rejection (a rejection counts as a reply); /feed rows that read
+  scraped and the owner-side companies (Backend, Lab, AAA, Northwind test rows).
 - **Harness (round 3):** the container restarted mid-pass — resume stopped agents with SendMessage to their ids (the
   working tree persists; fixers that had not written yet lost nothing). A checkpoint commit may exclude a fixer's
   in-progress files; never commit a tree with that fixer's own pins red. CodeQL alert annotations are readable via the
