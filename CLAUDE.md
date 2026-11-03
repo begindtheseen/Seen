@@ -121,6 +121,18 @@ Editor — comments stripped, one block per migration, and say which to run firs
   Track / prep CTAs (`nothingFound`); the Tailor summary's "most recently at" is the latest-ending role, never the
   best-ranked; a blank Tailor title is inferred from the posting (`inferJobTitle`) before the family is decided; the
   tracker shows both the held-report line and the Pro-days line; /report shows a `?company=` slug as a name.
+- **Round 5 (4c299a2, confirmation): Jules YES (9/8/8/7); Tasha NO on one item; Dev and Maria YES on one condition.**
+  Both were regressions from my round-4 fixes, found by the testers, not the audits: (1) the swipe deck's phone floor
+  equalled its cap, so the self-fit was a no-op and ✕ ↑ ♡ sat under the tab bar whenever the sort select pushed the deck
+  down — the deck now scrolls the page once on mount when the room above it is short (`window.scrollBy`), probe at 390:
+  actions end 728 < tab bar 777; (2) the drawer's Optimize tap called `onClose()` AND the page's `onApply` closed the
+  `?job=` place again — two `history.back()` in one tap, the page left /jobs with no sheet; now ONE close and the sheet
+  opens via `afterPendingBack` (lib/nav/urlState.ts). Rule: a handler that closes a URL place must be the only close in
+  the tap, and anything pushed after it waits for `afterPendingBack`. Fixed in 2521834; round 6 = two-item re-check.
+- **Also round 5:** prep "Why site reliability engineering now?" (several qualifiers before the role noun); a company page
+  with no score row shows Track / prep only once it has accounts (the CTA flashed during the reports read and fired
+  `offer_shown` on empty pages); flat posting text also splits a Title-Case sub-heading sitting mid-block after a
+  sentence (`MID_SUBHEAD_RE`); completed tracker stage steps carry a ✓ (semantic colour always with a glyph).
 - **Harness (round 3):** the container restarted mid-pass — resume stopped agents with SendMessage to their ids (the
   working tree persists; fixers that had not written yet lost nothing). A checkpoint commit may exclude a fixer's
   in-progress files; never commit a tree with that fixer's own pins red. CodeQL alert annotations are readable via the
