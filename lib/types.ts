@@ -91,6 +91,8 @@ export interface Job {
   title: string
   company: string
   location: string
+  /** Remote search: how many per-city copies of this role were collapsed onto this row (api/jobs.js). */
+  also_in?: number
   // null = UNRATED. We store a score only when it's earned from the listing's own signals;
   // a listing we can't score honestly carries null and renders an explicit "unrated" state
   // rather than a fabricated number. (Owner directive: "score for a reason or no score.")

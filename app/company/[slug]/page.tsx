@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, use, type CSSProperties, type ReactNode } from 'react'
+import { displayLocation } from '@/lib/jobs/displayLocation.js'
 import { createPortal } from 'react-dom'
 import { useAuth } from '@/lib/auth'
 import { _sync } from '@/lib/sync'
@@ -1206,7 +1207,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                           <span className={c.roleTitle}>{j.title}</span>
                           {displayPay(j) && <span className={`${c.rolePay} tnum`}>{displayPay(j)}</span>}
                         </div>
-                        <p className={c.roleMeta}>{[j.location || 'US', j.type, j.level, j.source].filter(Boolean).join(' · ')}</p>
+                        <p className={c.roleMeta}>{[j.location ? displayLocation(j.location) : 'US', j.type, j.level, j.source].filter(Boolean).join(' · ')}</p>
                         {j.url && <Button variant="secondary" size="sm" href={httpHref(j.url) ?? undefined} target="_blank" rel="noopener noreferrer" iconRight="arrow-up-right">Apply</Button>}
                       </li>
                     ))}

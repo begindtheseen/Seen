@@ -25,11 +25,12 @@
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.02),
     0 40px 120px -30px rgba(0, 0, 0, 0.9);
-  opacity: 0;
-  transform: translateY(40px) scale(0.97);
-  transition: opacity 0.9s var(--ease-out), transform 1.1s var(--ease-out);
+  transition: transform 1.1s var(--ease-out);
 }
-.windowIn { opacity: 1; transform: none; }
+/* Always visible, server render included: the rise-in is a TRANSFORM only, never opacity, so no capture of
+   the page — at any viewport, at any moment — shows a blank band where the window goes. .windowPre is added
+   after mount only while the window is still below the fold and comes off as it scrolls into view. */
+.windowPre { transform: translateY(32px); transition: none; }
 /* A soft white edge-light across the top of the window. */
 .window::before {
   content: '';

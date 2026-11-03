@@ -84,7 +84,7 @@ export default function JobCard({ job, onSaveToggle, onOpen, onCheckCompany, alr
           <h3 className={s.title}>{job.title}</h3>
           <p className={s.meta}>
             <span className={s.co}>{companyName}</span>
-            {job.location && <span className={s.place} title={job.location}><Icon name="map-pin" size={12} />{displayLocation(job.location)}</span>}
+            {job.location && <span className={s.place} title={job.location}><Icon name="map-pin" size={12} />{displayLocation(job.location)}{job.also_in ? ` · +${job.also_in} ${job.also_in === 1 ? 'city' : 'cities'}` : ''}</span>}
             {pay && <span className="tnum">{pay}</span>}
             {job.type && <span>{job.type}</span>}
           </p>

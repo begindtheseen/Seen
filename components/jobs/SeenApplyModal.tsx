@@ -7,6 +7,7 @@
 // application is also in the applicant's tracker (synced from the DB).
 
 import { useEffect, useState } from 'react'
+import { displayLocation } from '@/lib/jobs/displayLocation.js'
 import Link from 'next/link'
 import ModalPortal from '@/components/ModalPortal'
 import { useAuth } from '@/lib/auth'
@@ -214,7 +215,7 @@ export default function SeenApplyModal({ job, onClose, onApplied }: {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--text-3)' }}>Apply on Seen</div>
               <div style={{ fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-lead)', color: 'var(--white)', marginTop: '.25rem' }}>{job.title}</div>
-              <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)' }}>{job.company}{job.location ? ` · ${job.location}` : ''}</div>
+              <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)' }}>{job.company}{job.location ? ` · ${displayLocation(job.location)}` : ''}</div>
             </div>
             <button type="button" onClick={onClose} aria-label="Close" style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, width: 32, height: 32, color: 'var(--muted)', cursor: 'pointer', flexShrink: 0 }}>✕</button>
           </div>

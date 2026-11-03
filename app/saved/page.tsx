@@ -14,6 +14,7 @@ import PageHeader from '@/components/shell/PageHeader'
 import Link from 'next/link'
 import { pathSegment, httpHref } from '@/lib/safeHref.js'
 import { displayCompanyName } from '@/lib/companyDisplay'
+import { displayLocation } from '@/lib/jobs/displayLocation.js'
 import { useScrollMemory } from '@/lib/nav/urlState'
 import Icon from '@/components/ui/Icon'
 import Button from '@/components/ui/Button'
@@ -107,7 +108,7 @@ export default function SavedPage() {
                   <Link href={href} prefetch={false} onClick={() => prime(s)} data-testid="saved-open" style={{ flex: 1, minWidth: 0, minHeight: 44, padding: '.5rem 0', textDecoration: 'none', color: 'inherit', display: 'block' }}>
                     <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-ui)', fontWeight: 600, color: 'var(--white)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.role || 'Job'}</div>
                     <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginTop: '.125rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {company}{s.location ? ` · ${s.location}` : ''}
+                      {company}{displayLocation(s.location) ? ` · ${displayLocation(s.location)}` : ''}
                     </div>
                     <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.25rem' }}>{savedAgo(s.saved_at)} · <span style={{ color: 'var(--accent)' }}>Open in Seen →</span></div>
                   </Link>

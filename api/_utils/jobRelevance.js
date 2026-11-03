@@ -13,6 +13,9 @@
 //  - looksLikeCompany: detect a company-name search so it returns that company's
 //    listings rather than keyword-matched roles.
 
+import { stripTitleLocation } from '../../lib/jobs/groupListings.js';
+import { detectRoleFamily } from '../../lib/application-intelligence/roleOntology.js';
+
 const STOP = new Set(['the', 'a', 'an', 'and', 'or', 'of', 'for', 'in', 'at', 'to', 'jobs', 'job', 'near', 'me', 'remote', 'hiring', 'careers', 'role', 'roles', 'position', 'positions', 'opening', 'openings']);
 
 // Single words that are too generic to establish relevance on their own. A synonym that
@@ -229,15 +232,88 @@ export function seniorityPenalty(title, query) {
   return pen;
 }
 
+// ── Who is searching ──────────────────────────────────────────────────────────────────────────
+// The signed-in person's résumé, reduced to what a ranking can use: the role families its titles
+// belong to (roleOntology) and ONE industry bucket (the same five the jobs page's industry filter uses).
+// "team lead · Phoenix" for a retail lead opened with an insurer's underwriting team lead and a lab's
+// patient-services team lead above Walmart's member team lead — every title matched equally and the
+// posting score decided (round 3, 2026-11-03). A row in the person's own family or industry now ranks
+// above an equal title match elsewhere; it never makes an unrelated row relevant (isRelevant is unchanged).
+const INDUSTRY_PATTERNS = {
+  tech: /engineer|developer|software|programmer|\bdev\b|devops|\bdata\b|front[- ]?end|back[- ]?end|full[- ]?stack|cloud|cyber|\bqa\b|machine learning|\bml\b|\bai\b|\bsre\b|architect|sysadmin|database|analytics|technolog/gi,
+  healthcare: /nurs|\brn\b|\blpn\b|\bcna\b|doctor|physician|health|medical|\bmedic\b|pharmac|clinic|caregiv|therap|dental|patient|hospital|\baide\b|phlebot|radiolog|surgical|behavioral|laborator/gi,
+  retail: /retail|\bstores?\b|\bshop\b|cashier|sales assoc|merchandis|stock(?:er|ing| assoc)?|\bfood\b|restaurant|barista|\bserver\b|\bcook\b|kitchen|\bchef\b|\bcrew\b|team member|\bmembers?\b|\bclub\b|host(?:ess)?|bartend|\bdeli\b|grocery|caf[eé]\b|coffee|dishwash|busser|shift (?:lead|superv|manager)|key\s?holder|hospitality|catering|concession|drive[- ]?thru|cafeteria|dietary|line cook|\bguests?\b|\bassociates\b/gi,
+  logistics: /driver|warehouse|logistic|supply chain|\bdelivery\b|courier|forklift|\bloader\b|\bpicker\b|\bpacker\b|shipping|receiving|\bfreight\b|dispatch|fulfil?lment|distribution|material handler|\bcdl\b|\btruck\b/gi,
+  finance: /financ|accounting|accountant|bookkeep|\banalyst\b|banker|\bbank\b|insurance|insurer|teller|underwrit|actuar|\baudit|\btax\b|payroll|\bcredit\b|investment|\bloan\b|mortgage|controller|billing|brokerage/gi,
+};
+const FAMILY_INDUSTRY = {
+  retail: 'retail', food_service: 'retail', hospitality: 'retail', customer_service: 'retail',
+  clinical: 'healthcare', healthcare_support: 'healthcare',
+  warehouse: 'logistics', delivery_logistics: 'logistics',
+  software_engineering: 'tech', data_analytics: 'tech',
+  finance_accounting: 'finance',
+};
+const FUNCTION_INDUSTRY = { engineering: 'tech', data: 'tech', finance: 'finance' };
+export const INDUSTRIES = Object.keys(INDUSTRY_PATTERNS);
+
+/** The industry bucket a listing reads as (title, employer, the first 800 chars of the posting), or null. */
+export function industryOf(job) {
+  const hay = `${job?.title || ''} ${job?.company || ''} ${String(job?.description || '').slice(0, 800)}`.toLowerCase();
+  let best = null, bestN = 0, tie = false;
+  for (const [ind, re] of Object.entries(INDUSTRY_PATTERNS)) {
+    const n = (hay.match(re) || []).length;
+    if (n > bestN) { best = ind; bestN = n; tie = false; } else if (n === bestN && n > 0) tie = true;
+  }
+  return tie ? null : best;
+}
+
+/**
+ * The searcher's fit, from the résumé signal Seen already stores (resume_skills: top_titles, function)
+ * and the profile's industry: { families: string[], industry: string|null }. Null when nothing is known.
+ * @param {{ top_titles?: string[], function?: string|null, industry?: string|null }} signal
+ */
+export function searchFitFromSignal(signal = {}) {
+  const titles = (Array.isArray(signal?.top_titles) ? signal.top_titles : []).map((t) => String(t || '').trim()).filter(Boolean).slice(0, 5);
+  const families = [];
+  for (const t of titles) {
+    const fam = detectRoleFamily(t, '').family;
+    if (fam && fam !== 'general' && !families.includes(fam)) families.push(fam);
+  }
+  let industry = String(signal?.industry || '').toLowerCase().trim();
+  if (!INDUSTRY_PATTERNS[industry]) industry = families.map((f) => FAMILY_INDUSTRY[f]).find(Boolean) || FUNCTION_INDUSTRY[String(signal?.function || '').toLowerCase()] || null;
+  if (!families.length && !industry) return null;
+  return { families, industry };
+}
+
+/** +8 when the listing's role family is one of the searcher's; else +6 when its industry is theirs; else 0. */
+export function fitBoost(job, fit) {
+  if (!fit || !job) return 0;
+  if (fit.families && fit.families.length) {
+    const fam = detectRoleFamily(String(job.title || ''), String(job.description || '').slice(0, 800)).family;
+    if (fam && fam !== 'general' && fit.families.includes(fam)) return 8;
+  }
+  if (fit.industry && industryOf(job) === fit.industry) return 6;
+  return 0;
+}
+
+// How much of the title the query IS. "Team Lead" (nothing else) is a tighter match than "IT Operations
+// Team Lead (Fulfillment Centres)": +6 for a bare title, one less per extra title word, floor 0. Only
+// when every query word is in the title; a title's trailing location clause is not counted.
+export function titleTightness(title, tokens) {
+  const own = tokenize(stripTitleLocation(title)).length;
+  return Math.max(0, 6 - Math.max(0, own - tokens.length));
+}
+
 // Relevance score of a listing for a query — used for RANKING. Tiers, highest first:
-//   full query phrase in the title (+30) > every query token in the title (+12 each) >
-//   a true-synonym / role-family phrase in the title (+12) > provenance (+6) > company (+8) >
+//   full query phrase in the title (+30) > every query token in the title (+12 each, +10 when all, up to
+//   +6 for a title that is little more than the query) > a true-synonym / role-family phrase in the
+//   title (+12) > the searcher's own family (+8) or industry (+6) > provenance (+6) > company (+8) >
 //   description (+3 per token, a weak tiebreak only). A company-name search adds +60.
 // Then the seniority penalty: for a query that names no seniority, Director/Architect/Senior/
 // Manager titles rank below plain-role titles (floored at 1 so a relevant row never scores 0).
 // Returns 0 when nothing matches. A description-only hit ranks but does NOT make a listing
 // relevant (see isRelevant).
-export function relevanceScore(job, query, { synonyms = [], canonical = '' } = {}) {
+export function relevanceScore(job, query, { synonyms = [], canonical = '', fit = null } = {}) {
   const tokens = tokenize(query);
   if (!tokens.length) return 1; // empty query: everything is "related"
   const title = String(job.title || '').toLowerCase();
@@ -255,12 +331,16 @@ export function relevanceScore(job, query, { synonyms = [], canonical = '' } = {
   }
   // Every token in the title (not just some) is a stronger match than a scatter.
   if (tokens.length > 1 && titleHits === tokens.length) score += 10;
+  // A title that is little more than the query outranks one that buries it.
+  if (titleHits === tokens.length) score += titleTightness(title, tokens);
   // Phrase bonus: the full query appears verbatim in the title.
   if (qNorm && title.includes(qNorm)) score += 30;
   // True-synonym title match (e.g. "budtender" → a "Cannabis Dispensary Associate").
   for (const syn of effectiveSynonyms(query, synonyms)) {
     if (titleHasSynonym(title, syn)) score += 12;
   }
+  // The searcher's own family or industry leads among equal title matches.
+  if (fit && score > 0) score += fitBoost(job, fit);
   // Provenance: fetched by our own aggregation FOR this query. A moderate boost — below a title
   // hit, so title matches still rank first, but enough to lift a genuine role a title-only bar missed.
   if (_provenanceMatch(job, query, canonical)) score += 6;
@@ -359,10 +439,10 @@ export function looksLikeCompany(query, knownCompanies) {
 // Filter to GENUINELY related listings (strict title/synonym bar) and rank by relevance,
 // then quality score. `synonyms` are the query's expansion terms (canonical + related)
 // used as true-synonym signals — matched as title phrases, never scattered as loose tokens.
-export function filterAndRank(jobs, query, { synonyms = [], canonical = '' } = {}) {
+export function filterAndRank(jobs, query, { synonyms = [], canonical = '', fit = null } = {}) {
   const hasQuery = tokenize(query).length > 0;
   const scored = (jobs || [])
-    .map((j) => ({ j, r: relevanceScore(j, query, { synonyms, canonical }) }))
+    .map((j) => ({ j, r: relevanceScore(j, query, { synonyms, canonical, fit }) }))
     .filter((x) => !hasQuery || isRelevant(x.j, query, { synonyms, canonical }));
   scored.sort((a, b) => (b.r - a.r) || ((b.j.score || 0) - (a.j.score || 0)));
   return scored.map((x) => x.j);
