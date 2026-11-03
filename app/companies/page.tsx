@@ -214,15 +214,25 @@ export default function CompaniesPage() {
       const i = filtered.findIndex((c) => evidenceTier(c.score) === t)
       return i > 0 ? i : -1
     }
-    return { capped: start(1), thin: start(0) }
+    // The second evidence band inside the Moderate tier (fewer than 20 applicant accounts): a heading says why a
+    // D with 26 accounts sits above an A+ with 11 (round 3: "ranked by Seen Grade" read as broken).
+    const bandStart = (() => {
+      if (q || sort !== 'score') return -1
+      const i = filtered.findIndex((c) => evidenceTier(c.score) === 1 && firstPartyReportCount(c.score) < 20)
+      const first = filtered.findIndex((c) => evidenceTier(c.score) === 1)
+      return i > 0 && first >= 0 && i > first ? i : -1
+    })()
+    return { capped: start(1), thin: start(0), band: bandStart }
   }, [filtered, q])
 
   function lookUp(e: React.FormEvent) {
     e.preventDefault()
     if (!q) return
     replaceParam('q', q) // the typing debounce may not have written it yet; Back should find it
-    // An exact board match opens its page; anything else is looked up (and researched) by name.
-    router.push(`/company/${slugOf(q)}`)
+    // The best board match opens its page ("Fry's" → Fry's Food Stores, not an empty /company/fry's — round 3);
+    // anything else is looked up (and researched) by name.
+    const hit = filtered.find((c) => c.name.toLowerCase() === q.toLowerCase()) || filtered[0]
+    router.push(`/company/${slugOf(hit ? hit.name : q)}`)
   }
 
   return (
@@ -232,7 +242,7 @@ export default function CompaniesPage() {
           eyebrow="Transparency rankings"
           title="Company scoreboard"
           crumbLabel="Companies"
-          sub={<>Ranked by Seen Grade: who answers applicants, who ghosts them, and how long they take. A company is graded once it has at least one real applicant account (sent to Seen or posted publicly) and {MIN_REPORTS_FOR_GRADE} in total (an online mention counts half).</>}
+          sub={<>Ranked by evidence, then Seen Grade: companies with 20+ applicant accounts lead, each group best grade first. A company is graded once it has at least one real applicant account (sent to Seen or posted publicly) and {MIN_REPORTS_FOR_GRADE} in total (an online mention counts half).</>}
         />
 
         {/* One box, like the hero's: the field and its button share a border; the button sits inside. */}
@@ -295,7 +305,11 @@ export default function CompaniesPage() {
                 </li>
               ) : tierStart.capped >= 0 && i === tierStart.capped ? (
                 <li key="capped-divider" className={s.divider}>
-                  Moderate confidence · fewer than {MIN_SEEN_REPORTS_FOR_HIGH_CONFIDENCE} reports from Seen users — most evidence is public posts
+                  Moderate confidence · fewer than {MIN_SEEN_REPORTS_FOR_HIGH_CONFIDENCE} reports from Seen users — most evidence is public posts{tierStart.band > i ? ' · 20+ applicant accounts first' : ''}
+                </li>
+              ) : tierStart.band >= 0 && i === tierStart.band ? (
+                <li key="band-divider" className={s.divider}>
+                  Fewer than 20 applicant accounts · best grade first
                 </li>
               ) : null
               return (

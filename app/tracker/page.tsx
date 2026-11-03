@@ -700,7 +700,14 @@ function TrackerPage() {
           body: JSON.stringify({ action: 'quick_submit', company: origApp.company, outcome, role: origApp.role, city: origApp.location || '', ...(appId ? { application_id: appId } : {}) }),
         })
           .then(res => (res.ok ? res.json() : null))
-          .then((d: { reward?: Parameters<typeof showReportReward>[0] } | null) => { if (d?.reward) showReportReward(d.reward) })
+          .then((d: { reward?: Parameters<typeof showReportReward>[0]; held?: boolean } | null) => {
+            if (!d) return
+            // A second report on the same company within 30 days is held (anti-gaming): it is saved for the
+            // record but never counted, so the company page will not show it (round 3: "Report saved" ×3, page unchanged).
+            if (d.held) { showToast(`Saved to your tracker. Seen already counts a report from you for ${origApp.company} this month, so this one won't change its grade.`); return }
+            if (d.reward) showReportReward(d.reward)
+            else showToast(`Report saved — it counts toward ${origApp.company}’s grade.`)
+          })
           .catch(() => {})
       }).catch(() => {})
     }

@@ -60,6 +60,11 @@ export default function DataTable({ rows }: { rows: TableRow[] }) {
     return list
   }, [rows, q, sort])
 
+  // 401 rows as phone cards made a 65,840px page (round 3): the first 60 render, one button shows the rest.
+  const [showAll, setShowAll] = useState(false)
+  const ROW_CAP = 60
+  const visible = showAll || shown.length <= ROW_CAP ? shown : shown.slice(0, ROW_CAP)
+
   const onSort = (key: Key, first: 'asc' | 'desc') =>
     setSort((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: first }))
 
@@ -134,7 +139,7 @@ export default function DataTable({ rows }: { rows: TableRow[] }) {
             </tr>
           </thead>
           <tbody>
-            {shown.map((r) => (
+            {visible.map((r) => (
               <tr key={r.p}>
                 <td className={styles.colCo}>
                   <Link href={r.p} prefetch={false} className={styles.coLink}>{r.c}</Link>
@@ -155,6 +160,11 @@ export default function DataTable({ rows }: { rows: TableRow[] }) {
         {shown.length === 0 && <p className={styles.p} style={{ padding: '1rem' }}>No graded company matches “{q}”. Its page may still have reports: <Link href={`/companies`} prefetch={false}>search all companies</Link>.</p>}
       </div>
       </div>
+      {visible.length < shown.length && (
+        <button type="button" className={styles.showAll} onClick={() => setShowAll(true)}>
+          Show all {shown.length.toLocaleString('en-US')} companies
+        </button>
+      )}
     </div>
   )
 }

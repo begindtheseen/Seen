@@ -175,3 +175,7 @@
   .jump:hover, .primary:hover { transform: none; }
 }
 
+
+/* The résumé-city suggestion under the field: a text button in the accent, 44px tall tap box. */
+.suggest { background: none; border: 0; padding: var(--sp-2) 0; margin: 0; font: inherit; font-weight: 600; color: var(--accent); cursor: pointer; min-height: 44px; }
+.suggest:hover { text-decoration: underline; }

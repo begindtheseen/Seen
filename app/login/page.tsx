@@ -577,7 +577,7 @@ function LoginContent() {
 
         {/* ── STEP: SIGN IN ── */}
         {step === 'signin' && (
-          <div data-testid="signin-step">
+          <form data-testid="signin-step" onSubmit={e => { e.preventDefault(); if (!loading && !coolingDown) void doSignIn() }}>
             {/* "Welcome back" only for someone who WAS signed in here (an expired session). A guest sent
                 here by a link has never had an account (conversion audit 2026-10-24). */}
             <h1 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', margin: '0 0 .25rem' }}>{expiredNotice ? 'Welcome back' : 'Sign in'}</h1>
@@ -619,7 +619,7 @@ function LoginContent() {
                 Create a free account →
               </button>
             </div>
-          </div>
+          </form>
         )}
 
       </div>

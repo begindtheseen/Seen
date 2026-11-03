@@ -19,7 +19,7 @@ import { feedRowPasses } from '../lib/reports/feedFilter.js';
 import { enqueueCompanyEnrichment } from '../lib/server/enrichmentQueue.js';
 import { rewardReport } from '../lib/server/growthRewards.js';
 import { isVercelCron } from '../lib/server/cronAuth.js';
-import { ilikeExact, ilikeContains, ilikeWords, inList } from '../lib/server/pgrest.js';
+import { ilikeExact, ilikeContains, ilikeWords, ilikePrefix, inList } from '../lib/server/pgrest.js';
 
 // Actions that existed only to call a model API — Reddit import classification and company web
 // research — were removed with the owner's decision (2026-10-26) that Seen uses no model API.
@@ -263,6 +263,30 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, benchmark });
   }
 
+  // ── Name suggestions for an unknown company page: companies Seen knows (by listings or reports) whose
+  //    name starts with what was typed — "Fry's" → Fry's Food Stores (round 3: Enter on the scoreboard
+  //    landed on an empty /company/fry's while /company/fry's-food-stores had 54 posts). Read-only, public.
+  if (body.action === 'name_suggest') {
+    if (await applyRateLimit(req, res, 'company-score')) return;
+    const q = String(body.query || '').slice(0, 80).trim();
+    if (q.length < 2 || !SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(200).json({ ok: true, names: [] });
+    setPublicCache(res, 'score');
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/companies?select=name&name=ilike.${ilikePrefix(q)}&order=name.asc&limit=40`, { headers: hdrsBase });
+      const rows = r.ok ? await r.json() : [];
+      const seen = new Set([q.toLowerCase()]);
+      const names = [];
+      for (const row of Array.isArray(rows) ? rows : []) {
+        const n = String(row?.name || '').trim();
+        const k = n.toLowerCase();
+        if (!n || seen.has(k) || k.length > 60) continue;
+        seen.add(k); names.push(n);
+        if (names.length >= 3) break;
+      }
+      return res.status(200).json({ ok: true, names });
+    } catch { return res.status(200).json({ ok: true, names: [] }); }
+  }
+
   // ── Company-score: merged from api/company-score.js ─────────────────────────
   if (body.action === 'company_score' || body.action === 'resolve' || body.name) {
     if (await applyRateLimit(req, res, 'company-score')) return;
@@ -322,11 +346,34 @@ export default async function handler(req, res) {
       // read leaves the split unknown (null) — cards then show no split, never a wrong one.
       // How many companies are graded in all (the board shows the top 150): the same gate over every
       // candidate row, small columns only. /companies said "150 graded" while /data said 401 (round 2).
-      const gradedTotalP = fetch(`${SUPABASE_URL}/rest/v1/company_scores?select=company_name,overall_score,report_count,first_party_report_count&first_party_report_count=gte.1&limit=5000`, { headers: hdrsBase })
-        .then(async (x) => (x.ok ? (await x.json()).filter((c) => isGradeable(c)).length : null)).catch(() => null);
+      // Round 3: this read selected no mention column, so `isGradeable` (mentions count half) passed
+      // 345 rows while /data (lib/server/openDataRead.ts) counted 401 over the same table. Same gate,
+      // same columns, newest row per name — the one definition of "graded".
+      const gradedGate = encodeURIComponent('(first_party_report_count.gte.1,and(first_party_report_count.is.null,data_source.eq.reports))');
+      // PostgREST caps a page at 1,000 rows whatever `limit` says (that cap is what made 345): keyset pages over id.
+      const gradedCols = `id,company_name,created_at,overall_score,report_count,first_party_report_count,web_report_count,data_source${await mentionSel(SUPABASE_URL, hdrsBase)}`;
+      const gradedTotalP = (async () => {
+        const newest = new Map();
+        let last = null;
+        for (let page = 0; page < 40; page++) {
+          const x = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?select=${gradedCols}&or=${gradedGate}&order=id.asc&limit=1000${last ? `&id=gt.${encodeURIComponent(last)}` : ''}`, { headers: hdrsBase });
+          if (!x.ok) return null;
+          const rows = await x.json();
+          if (!Array.isArray(rows)) return null;
+          for (const row of rows) {
+            const k = String(row?.company_name || '').toLowerCase().trim();
+            if (!k) continue;
+            const prev = newest.get(k);
+            if (!prev || Date.parse(row.created_at || '') > Date.parse(prev.created_at || '')) newest.set(k, row);
+          }
+          if (rows.length < 1000) break;
+          last = String(rows[rows.length - 1].id);
+        }
+        return [...newest.values()].filter((c) => isGradeable(c)).length;
+      })().catch(() => null);
       const [r, seenRes] = await Promise.all([
         fetch(
-          `${SUPABASE_URL}/rest/v1/company_scores?select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,waste_score,report_count,first_party_report_count${await mentionSel(SUPABASE_URL, hdrsBase)},web_report_count,data_source,data_quality,verification_status,industry&first_party_report_count=gte.1&order=${order}&limit=150`,
+          `${SUPABASE_URL}/rest/v1/company_scores?select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,waste_score,report_count,first_party_report_count${await mentionSel(SUPABASE_URL, hdrsBase)},web_report_count,data_source,data_quality,verification_status,industry&or=${gradedGate}&order=${order}&limit=150`,
           { headers: hdrsBase }
         ),
         fetch(`${SUPABASE_URL}/rest/v1/${seenUserReportsPath()}`, { headers: hdrsBase }).catch(() => null),
@@ -460,7 +507,10 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Submit failed' });
       }
       const reward = await reportReward(uid, body.application_id);
-      return res.status(200).json({ ok: true, submitted: true, ...(reward ? { reward } : {}) });
+      // A second report by the same person on the same company within 30 days is HELD (anti-gaming,
+      // `duplicate_user_company`): it is saved but never counted, so the page says so instead of "saved"
+      // while the company page never shows it (round 3: three personas reported Northwind twice).
+      return res.status(200).json({ ok: true, submitted: true, held: !!trust.review, held_reason: trust.review ? trust.reason : null, ...(reward ? { reward } : {}) });
     } catch(err) {
       logError('reports/quick_submit', err.message);
       return res.status(500).json({ error: 'Internal error' });
@@ -678,6 +728,18 @@ export default async function handler(req, res) {
         page.push({ ...row, source: classifyPlatform(row.platform, row.trust_reason) });
         if (page.length >= safeLimit) break;
       }
+      // Whether each row's company is graded (the homepage strip shows graded companies only — a
+      // test company's report and a substring "company" were scrolling across it, round 3). One read
+      // for the page's names; a failed read leaves `graded` unknown (null), never wrong.
+      try {
+        const names = [...new Set(page.map((r) => String(r.company_name || '').toLowerCase().trim()).filter(Boolean))];
+        if (names.length) {
+          const inList = names.map((n) => `"${n.replace(/"/g, '')}"`).join(',');
+          const g = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?select=company_name,overall_score,report_count,first_party_report_count,web_report_count,data_source${await mentionSel(SUPABASE_URL, hdrsBase)}&company_name=in.(${encodeURIComponent(inList)})&limit=${names.length * 3}`, { headers: hdrsBase });
+          const gradedNames = new Set(g.ok ? (await g.json()).filter((c) => isGradeable(c)).map((c) => String(c.company_name || '').toLowerCase().trim()) : []);
+          for (const r of page) r.graded = g.ok ? gradedNames.has(String(r.company_name || '').toLowerCase().trim()) : null;
+        }
+      } catch { /* graded stays undefined */ }
 
       // Content-Range: 0-19/1234 — the corpus size (an upper bound on what the rules let through).
       const contentRange = r.headers.get('content-range') || '';

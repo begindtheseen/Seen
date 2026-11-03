@@ -43,7 +43,7 @@ export default function EmployersPage() {
       {/* Shared employer chrome — logo→home, organized menu, sign out, mobile drawer (EmployerNav.tsx) */}
       <EmployerNav />
 
-      <div style={{ ...wrap, padding: '3.5rem 1.5rem 5rem' }}>
+      <div style={{ ...wrap, padding: '7rem 1.5rem 5rem' }}>
         {/* Hero. No "For employers" eyebrow: the nav wordmark already says it, and on a phone the two sat
             one above the other. */}
         <div style={{ textAlign: 'center', marginBottom: '3rem' }}>

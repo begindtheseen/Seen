@@ -13,7 +13,7 @@
 @media (max-width: 480px) { .head { grid-template-columns: 40px minmax(0, 1fr) auto; gap: var(--sp-3); padding: var(--sp-4); border-radius: var(--r-card); } .logo { width: 40px !important; height: 40px !important; } }
 .logo { width: 52px; height: 52px; border-radius: var(--r-control); background: var(--surface-2); border: 1px solid var(--border-2); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: var(--fs-h3); color: var(--text-1); }
 .headText { min-width: 0; }
-.title { margin: 0; font-family: var(--display); font-weight: 700; font-size: var(--fs-xl); line-height: var(--lh-snug); letter-spacing: var(--ls-heading); color: var(--text-1); overflow-wrap: anywhere; text-wrap: balance; }
+.title { margin: 0; font-family: var(--display); font-weight: 700; font-size: var(--fs-xl); line-height: var(--lh-snug); letter-spacing: var(--ls-heading); color: var(--text-1); overflow-wrap: anywhere; text-wrap: pretty; }
 .meta { margin: var(--sp-2) 0 0; display: flex; flex-wrap: wrap; gap: 2px var(--sp-3); align-items: center; font-size: var(--fs-sm); color: var(--text-3); }
 .co { color: var(--text-2); font-weight: 600; }
 .place { display: inline-flex; align-items: center; gap: 4px; }
@@ -64,7 +64,8 @@
 .inlineActions { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: 0 0 var(--sp-4); }
 .check { flex: 0 1 auto; min-width: 0; max-width: 44%; }
 .footRow { max-width: var(--w-narrow); margin: 0 auto; display: flex; gap: var(--sp-2); align-items: stretch; }
-.grow { flex: 2 1 0; min-width: 0; } /* the one filled button takes the row's width first; its label never ellipsises */
+.grow { flex: 1 1 0; min-width: 0; } /* a secondary action gives way */
+.main { flex: 1 1 auto; min-width: max-content; } /* the one filled button keeps its whole label (round 3: "Ap…") */
 .iconBtn { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; width: 44px; min-height: 44px; border-radius: var(--r-control); border: 1px solid var(--border-2); background: transparent; color: var(--text-3); cursor: pointer; }
 .iconBtn:hover { color: var(--text-1); border-color: var(--border-3); }
 .iconBtn[data-on="1"] { color: var(--bad-text); border-color: var(--bad-line); background: var(--bad-tint); }

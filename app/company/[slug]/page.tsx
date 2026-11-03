@@ -28,7 +28,7 @@ import ListingSignals from '@/components/ListingSignals'
 import WarnFriendShare from '@/components/growth/WarnFriendShare'
 import TrackCta from '@/components/company/TrackCta'
 import { warnFriendText } from '@/lib/growthCopy.js'
-import { gradeLetter, displayCompanyName, displayPlatform, isResolvedOutcome, lastUpdatedLabel } from '@/lib/companyDisplay'
+import { gradeLetter, displayCompanyName, displayPlatform, isResolvedOutcome, lastUpdatedLabel, possessive } from '@/lib/companyDisplay'
 import { buildCompanySummary, reportsProvenanceLine, MIN_REPORTS_FOR_RATES, type CompanySummary } from '@/lib/companyPageSummary'
 import { feedRowVerdict } from '@/lib/reports/feedFilter.js'
 import { looksLikeBotOrLinkText, trimToSentence } from '@/lib/reports/excerptText.js'
@@ -38,7 +38,7 @@ import { reportCardOutcome } from '@/lib/reportCardOutcome'
 import { splitWebReviews, webResearchNote } from '@/lib/webReviewQuotes'
 import { replyTiming, REPORT_WHEN_YOU_HEAR } from '@/lib/replyTiming'
 import { useCompanySeed } from '@/components/CompanySeed'
-import { httpHref } from '@/lib/safeHref.js'
+import { httpHref, pathSegment } from '@/lib/safeHref.js'
 import { replaceParam, readParam, useScrollMemory } from '@/lib/nav/urlState'
 import { useBack } from '@/lib/nav/backTrail'
 
@@ -699,6 +699,17 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   // out of the index; the layout's companyRobots (lib/companyMeta.ts) already says noindex server-side
   // for an ungraded name. React 19 hoists the <meta> into <head>.
   const unknown = !loading && !error && noData && hasListings === false && !reportsLoading && reports.length === 0
+  // Names Seen does know that start with this one ("Fry's" → Fry's Food Stores), offered on the empty state.
+  const [alsoKnown, setAlsoKnown] = useState<string[]>([])
+  useEffect(() => {
+    if (!unknown || !companyName) return
+    let live = true
+    fetch('/api/reports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'name_suggest', query: companyName }) })
+      .then(r => (r.ok ? r.json() : null))
+      .then((d: { names?: string[] } | null) => { if (live && Array.isArray(d?.names)) setAlsoKnown(d!.names!.filter(n => typeof n === 'string')) })
+      .catch(() => {})
+    return () => { live = false }
+  }, [unknown, companyName])
   if (unknown) {
     return (
       <div className="page-full">
@@ -707,6 +718,13 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
           <Icon name="circle-help" size={40} className={c.missingIcon} />
           <h1 className={c.missingTitle}>{displayName}</h1>
           <p className={c.missingText}>Seen has no applicant accounts for this company yet.</p>
+          {alsoKnown.length > 0 && (
+            <p className={c.missingText}>
+              Did you mean {alsoKnown.map((n, i) => (
+                <span key={n}>{i > 0 ? (i === alsoKnown.length - 1 ? ' or ' : ', ') : ''}<a href={`/company/${pathSegment(n.trim().toLowerCase().replace(/\s+/g, '-'))}`} className={c.textLink}>{displayCompanyName(n)}</a></span>
+              ))}?
+            </p>
+          )}
           <div className={c.missingActions}>
             <Button variant="secondary" href={reportHref} iconRight="arrow-right">Report an outcome</Button>
           </div>
@@ -829,7 +847,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               <div className={c.stats}>{[0, 1, 2, 3].map(i => <div key={i} className="sk" style={{ height: 92, borderRadius: 'var(--r-card)' }} />)}</div>
             </div>
           ) : error ? (
-            <LoadError what={`${displayName}'s hiring data`} detail="Seen could not be reached. The grade, rates and accounts below are hidden until it loads — nothing here is a verdict yet." onRetry={() => setReloadKey(k => k + 1)} />
+            <LoadError what={`${possessive(displayName)} hiring data`} detail="Seen could not be reached. The grade, rates and accounts below are hidden until it loads — nothing here is a verdict yet." onRetry={() => setReloadKey(k => k + 1)} />
           ) : score && !graded ? (
             /* Below the bar: no letter, score or rates — just what Seen actually holds. */
             <div className={c.gradeRow} role="status">

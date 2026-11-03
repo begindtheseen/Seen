@@ -133,3 +133,7 @@
 
 /* Short names ("IBM") still get a 44px-wide tap box. */
 .coLink { min-width: 44px; }
+
+/* "Show all N companies" under the capped table: outlined, full width on phones, 44px tall. */
+.showAll { display: block; width: 100%; max-width: 320px; margin: var(--sp-4) auto 0; min-height: 44px; padding: var(--sp-2) var(--sp-4); border-radius: var(--r-control); border: 1px solid var(--border-2); background: var(--surface-1); color: var(--text-1); font: inherit; font-weight: 600; cursor: pointer; }
+.showAll:hover { border-color: var(--border-3); }

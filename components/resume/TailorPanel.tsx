@@ -111,7 +111,15 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
         setState('idle'); return
       }
       // A posting that states no requirements is refused free, before the credit gate (api/resume.js) — say so in words.
-      if (res.status === 422 && data.error === 'no_requirements') { setError('This posting lists no requirements to tailor against. Paste the full posting — the responsibilities and requirements — and run again. No credit was used.'); setState('idle'); return }
+      if (res.status === 422 && data.error === 'no_requirements') {
+        // a long paste is a full posting: the fault is what Seen could read from it, never the paste
+        const n = Number((data as { requirement_count?: number }).requirement_count) || 0
+        const fullPaste = job.description.trim().length >= 600
+        setError(fullPaste
+          ? `Seen could read only ${n === 0 ? 'no requirements' : `${n} requirement${n === 1 ? '' : 's'}`} from this posting — too few to tailor against. Check that the requirements section is in the paste and add the job title, then run again. No credit was used.`
+          : 'This text lists no requirements to tailor against. Paste the full posting — the responsibilities and requirements — and run again. No credit was used.')
+        setState('idle'); return
+      }
       if (!res.ok || !data.plan) { setError(data.error || 'Could not tailor this résumé. Try again.'); setState('error'); return }
       window.dispatchEvent(new Event('seen:credits-updated'))
       setNote((data as { no_gain?: boolean; note?: string }).no_gain ? ((data as { note?: string }).note || 'This posting already scores as high as your résumé goes — no credit was used.') : '')
@@ -169,7 +177,8 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
         <span className={s.label}>Job description</span>
         <textarea autoComplete="off" className={`${s.input} ${s.area}`} rows={5} value={job.description} onChange={(e) => { setJob({ ...job, description: e.target.value }); if (previewLink || error) { setPreviewLink(''); setError('') } }} placeholder="Paste the posting — requirements, responsibilities, the lot." />
         <div className={s.opts} style={{ marginTop: '.5rem', justifyContent: 'flex-end' }}>
-          <button type="button" className={s.btnPrimary} onClick={run} disabled={state === 'loading'}>
+          {/* one filled button per screen: once a plan is on screen, "Use this version" is it and a re-run is outlined */}
+          <button type="button" className={plan ? s.btnOutline : s.btnPrimary} onClick={run} disabled={state === 'loading'}>
             {state === 'loading' ? 'Optimizing…' : plan ? 'Re-run for this job →' : 'Optimize for this job →'}<span style={{ marginLeft: '.5rem', fontSize: 'var(--fs-meta)', opacity: .7, fontFamily: 'var(--mono)', fontWeight: 400 }}>· {priceLabel(RESUME_OPTIMIZE_COST, pro)}</span>
           </button>
         </div>

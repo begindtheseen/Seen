@@ -59,7 +59,7 @@ export function VerdictCard({ verdict, title = 'SeenFit match', note, cached }: 
   // the sentence starts with the number; show it once, in the circle
   const why = verdict.sentence.replace(/^\d+ — /, '')
   return (
-    <div data-testid="verdict" style={{ background: 'var(--gdim)', border: '1px solid var(--line)', borderRadius: 12, padding: '1rem 1rem' }}>
+    <div data-testid="verdict" style={{ background: 'var(--surface-1)', border: '1px solid var(--border-2)', borderRadius: 12, padding: '1rem 1rem' }}>
       {verdict.gate && (
         <div data-testid="verdict-gate" style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-start', marginBottom: '.75rem', color: 'var(--amber)', fontSize: 'var(--fs-72)', lineHeight: 1.5, fontWeight: 600 }}>
           <span aria-hidden style={{ flexShrink: 0 }}>⚠</span><span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{verdict.gate}</span>
@@ -86,7 +86,7 @@ export function WhyYouMatch({ matched, limit = 6 }: { matched: RequirementRow[];
   if (!rows.length) return null
   return (
     <div>
-      <div style={{ ...kicker, color: 'var(--green)' }}>Why you match</div>
+      <div style={{ ...kicker, color: 'var(--text-3)' }}>Why you match</div>
       <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
         {rows.map((m, i) => (
           <li key={i} style={{ display: 'flex', gap: '.5rem', fontSize: 'var(--fs-72)', color: 'var(--sub)', lineHeight: 1.5 }}>

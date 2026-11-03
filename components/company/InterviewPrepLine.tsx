@@ -7,6 +7,7 @@
 // card, never stacked with another ask.
 
 import { useEffect, useRef } from 'react'
+import { possessive } from '@/lib/companyDisplay'
 import Link from 'next/link'
 import { cleanCompany } from '@/lib/signupIntent.js'
 import { funnelEvent } from '@/lib/funnel'
@@ -34,7 +35,7 @@ export default function InterviewPrepLine({ company }: { company: string }) {
       <Link href={prepTrackHref(company)} onClick={() => funnelEvent('offer_clicked', { surface: 'company_page', sku: 'interview', company })} style={{ color: 'var(--accent)', fontWeight: 600, display: 'inline-block', padding: '.75rem 0', margin: '-.75rem 0' }}>
         Get your prep
       </Link>
-      {' '}— questions for the role, answers from your résumé, and what applicants report about {company}&apos;s interviews.
+      {' '}— questions for the role, answers from your résumé, and what applicants report about {possessive(company)} interviews.
     </p>
   )
 }

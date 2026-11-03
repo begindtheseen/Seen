@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { possessive } from '@/lib/companyDisplay'
 import { pageMetadata } from '@/lib/seo'
 import Link from 'next/link'
 import {
@@ -73,7 +74,7 @@ export async function generateMetadata(
     const title = `Does ${name} Ghost Applicants? (${reported ? 'Real Data' : 'Hiring Data'}, ${new Date().getFullYear()})`
     const description = ghostPct != null
       ? (reported
-          ? `${name} ghosts roughly ${ghostPct}% of applicants based on real reported outcomes. See ${name}'s response rate, average wait time, and what Reddit says before you apply.`
+          ? `${name} ghosts roughly ${ghostPct}% of applicants based on real reported outcomes. See ${possessive(name)} response rate, average wait time, and what Reddit says before you apply.`
           : `Seen estimates ${name} ghosts roughly ${ghostPct}% of applicants, from aggregated public hiring data — no applicant accounts yet. See the estimate and add your own experience.`)
       : `Does ${name} ghost applicants? See real reported hiring outcomes, response rates, and wait times — and add your own experience.`
     return {
@@ -85,7 +86,7 @@ export async function generateMetadata(
     }
   }
   const title = `${name} Hiring Process: Stages, Wait Time & Ghost Rate`
-  const description = `How ${name}'s hiring process works — stages, average wait time${ghostPct != null ? `, and a ${ghostPct}% ${reported ? '' : 'estimated '}ghost rate` : ''} — ${reported ? 'from real applicant accounts' : 'estimated from aggregated public hiring data'}. What to expect before you apply.`
+  const description = `How ${possessive(name)} hiring process works — stages, average wait time${ghostPct != null ? `, and a ${ghostPct}% ${reported ? '' : 'estimated '}ghost rate` : ''} — ${reported ? 'from real applicant accounts' : 'estimated from aggregated public hiring data'}. What to expect before you apply.`
   return {
     ...pageMetadata({
       title, description, path: url, ogTitle: title, type: 'article',
@@ -145,7 +146,7 @@ function CTAs({ name, cslug }: { name: string; cslug: string }) {
   return (
     <div style={{ display: 'flex', gap: '.75rem', flexWrap: 'wrap', margin: '2.5rem 0 0' }}>
       <Link href={`/company/${cslug}`} className="btn" style={{ background: 'var(--cta)', color: 'var(--text-1)', padding: '.75rem 1.25rem', fontWeight: 700 }}>
-        See {name}&apos;s full hiring report →
+        See {possessive(name)} full hiring report →
       </Link>
       <Link href={`/tracker?add=1&company=${encodeURIComponent(name)}`} className="btn btn-ghost" style={{ padding: '.75rem 1.25rem' }}>
         Track your application
@@ -204,23 +205,23 @@ export default async function FaqSlugPage({ params }: { params: Promise<{ slug: 
   // FAQ JSON-LD (real Q&A) so this can win a rich result and be cited by AI answer engines.
   const faqQa: { q: string; a: string }[] = [
     {
-      q: isGhost ? `Does ${name} ghost applicants?` : `How long does ${name}'s hiring process take?`,
+      q: isGhost ? `Does ${name} ghost applicants?` : `How long does ${possessive(name)} hiring process take?`,
       a: graded && ghostPct != null
         ? (reported
             ? (isGhost
                 ? `${name} ghosts about ${ghostPct}% of applicants based on reported outcomes${respPct != null ? `, and responds to roughly ${respPct}%` : ''}.`
-                : `${name}'s reported average wait is ${wait != null ? `about ${wait} days` : 'variable'}, with a ${ghostPct}% ghost rate.`)
+                : `${possessive(name)} reported average wait is ${wait != null ? `about ${wait} days` : 'variable'}, with a ${ghostPct}% ghost rate.`)
             : (isGhost
                 ? `Seen has no applicant accounts for ${name} yet. Its estimate from aggregated public hiring data is a ghost rate of about ${ghostPct}%${respPct != null ? ` and a response rate of roughly ${respPct}%` : ''}.`
                 : `Seen has no applicant accounts for ${name} yet. Its estimate from aggregated public hiring data is an average wait of ${wait != null ? `about ${wait} days` : 'unknown length'}, with a ${ghostPct}% ghost rate.`))
         : fp > 0 ? notEnough : `We don't have enough verified reports for ${name} yet. Reported outcomes update this answer in real time.`,
     },
     {
-      q: `What is ${name}'s Seen Grade?`,
+      q: `What is ${possessive(name)} Seen Grade?`,
       a: graded ? `${name} has a Seen Grade of ${graded.overall_score}/100 (${riskLabel(graded.risk_level).toLowerCase()}). Higher is more transparent.` : fp > 0 ? notEnough : `${name} doesn't have a Seen Grade yet — be the first to report.`,
     },
     {
-      q: `Is ${name}'s ghost rate a verified fact?`,
+      q: `Is ${possessive(name)} ghost rate a verified fact?`,
       a: `No. Seen scores are aggregated community signals from applicant accounts, not verified facts. Treat them as a directional signal, not a verdict.`,
     },
   ]
@@ -244,20 +245,20 @@ export default async function FaqSlugPage({ params }: { params: Promise<{ slug: 
         {graded ? <DataPanel name={name} s={graded} /> : (
           <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderLeft: '3px solid var(--blue)', borderRadius: 12, padding: '1.25rem 1.25rem', margin: '0 0 1.75rem' }}>
             <div style={{ fontFamily: 'var(--body)', fontWeight: 600, color: 'var(--white)', marginBottom: '.5rem' }}>{fp > 0 ? `${name} is not graded yet (${Math.min(fp, MIN_REPORTS_FOR_GRADE)} of ${MIN_REPORTS_FOR_GRADE} applicant accounts)` : `No reports yet for ${name}`}</div>
-            <p style={{ ...S.p, margin: 0 }}>{fp > 0 ? `Read the ${fp} applicant account${fp === 1 ? '' : 's'} on ${name}'s page — and add yours so it can be graded fairly.` : `Be the first to report how ${name} treated your application. Your report becomes the data the next applicant searches for tonight.`}</p>
+            <p style={{ ...S.p, margin: 0 }}>{fp > 0 ? `Read the ${fp} applicant account${fp === 1 ? '' : 's'} on ${possessive(name)} page — and add yours so it can be graded fairly.` : `Be the first to report how ${name} treated your application. Your report becomes the data the next applicant searches for tonight.`}</p>
           </div>
         )}
 
-        <h2 style={S.h2}>{isGhost ? `Why applicants think ${name} ghosts them` : `What ${name}'s hiring process looks like`}</h2>
+        <h2 style={S.h2}>{isGhost ? `Why applicants think ${name} ghosts them` : `What ${possessive(name)} hiring process looks like`}</h2>
         <p style={S.p}>
           {isGhost
-            ? `"Ghosting" means applying and never hearing back — no rejection, no update, nothing. ${s && respPct != null ? `${name}'s ${reported ? 'reported' : 'estimated'} response rate is ${respPct}%, so a meaningful share of applicants never get a reply.` : `Reported response data for ${name} is still thin — every new report makes the signal sharper.`} Common reasons: roles filled internally, listings left open after closing, or high applicant volume that outpaces recruiting capacity.`
-            : `${s?.summary ? s.summary : `Seen does not have a written summary of ${name}'s hiring process yet.`} ${wait != null ? `${reported ? 'Reported' : 'Estimated'} average time to first response is about ${wait} days.` : ''} ${s?.avg_rounds ? (reported ? `Applicants report roughly ${Math.round(s.avg_rounds)} interview round(s).` : `Public hiring data suggests roughly ${Math.round(s.avg_rounds)} interview round(s).`) : ''}`}
+            ? `"Ghosting" means applying and never hearing back — no rejection, no update, nothing. ${s && respPct != null ? `${possessive(name)} ${reported ? 'reported' : 'estimated'} response rate is ${respPct}%, so a meaningful share of applicants never get a reply.` : `Reported response data for ${name} is still thin — every new report makes the signal sharper.`} Common reasons: roles filled internally, listings left open after closing, or high applicant volume that outpaces recruiting capacity.`
+            : `${s?.summary ? s.summary : `Seen does not have a written summary of ${possessive(name)} hiring process yet.`} ${wait != null ? `${reported ? 'Reported' : 'Estimated'} average time to first response is about ${wait} days.` : ''} ${s?.avg_rounds ? (reported ? `Applicants report roughly ${Math.round(s.avg_rounds)} interview round(s).` : `Public hiring data suggests roughly ${Math.round(s.avg_rounds)} interview round(s).`) : ''}`}
         </p>
 
         <h2 style={S.h2}>What you can do before you apply</h2>
         <p style={S.p}>
-          Check {name}&apos;s full hiring report for the latest grade, the city-by-city breakdown, and recent applicant accounts. If you&apos;ve already applied, track it so you know exactly when to follow up — and report what happened so the data stays honest for everyone after you.
+          Check {possessive(name)} full hiring report for the latest grade, the city-by-city breakdown, and recent applicant accounts. If you&apos;ve already applied, track it so you know exactly when to follow up — and report what happened so the data stays honest for everyone after you.
         </p>
 
         <CTAs name={name} cslug={cslug} />

@@ -241,8 +241,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--green);
-  box-shadow: 0 0 8px rgba(16, 185, 129, 0.7);
+  background: var(--accent);
   flex-shrink: 0;
 }
 /* Out-of-credits: still subtle, just semantic red. */

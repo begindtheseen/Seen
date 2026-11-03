@@ -16,6 +16,7 @@
 // This card only renders on ACTIVE applications at an interview stage (app/tracker/page.tsx).
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { possessive } from '@/lib/companyDisplay'
 import Link from 'next/link'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { signupHref } from '@/lib/signupIntent.js'
@@ -72,7 +73,7 @@ const INTRO_KEY = '__intro__'
 const THANKS_KEY = '__thankyou__'
 const FOLLOW_KEY = '__followup__'
 /** "Ross Stores'" and "Amazon's" (round 4, Maria: "Ross Stores's"). */
-const poss = (name: string) => (/s$/i.test(name.trim()) ? `${name.trim()}’` : `${name.trim()}’s`)
+const poss = (name: string) => possessive(name)
 
 // One read per company + role per page view, shared by every card that names it.
 const recordCache = new Map<string, Promise<RecordData | null>>()
@@ -157,7 +158,9 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
   // Closed until the person opens it; remembered per application for this tab. `lead` (just reached an
   // interview) brings the one-line row into view but never opens it by itself.
   const [open, setOpenState] = useState(false)
-  useEffect(() => { if (readOpen(appId)) setOpenState(true) }, [appId])
+  // Round 3: the remembered open state came back on every later load and kept the floating + hidden
+  // until "Hide" — a prep is one line until tapped (CLAUDE.md rule), so a reload starts collapsed.
+  useEffect(() => { void readOpen; setOpenState(false) }, [appId])
   const setOpen = useCallback((next: boolean) => { setOpenState(next); writeOpen(appId, next) }, [appId])
   const [pack, setPack] = useState<Pack | null>(null)
   const [state, setState] = useState<'idle' | 'building' | 'need_resume' | 'error'>('idle')
@@ -353,7 +356,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
 
       {open && (
         <div className={s.inner}>
-          {lead && !pack && <p className={s.leadLine} data-testid="prep-lead">They called you in. Here is what Seen knows about {company}&apos;s interviews, and a first look at your prep.</p>}
+          {lead && !pack && <p className={s.leadLine} data-testid="prep-lead">They called you in. Here is what Seen knows about {poss(company)} interviews, and a first look at your prep.</p>}
           {/* FREE — Seen's own data, for everyone */}
           <div className={s.facts}>
             {guide && (

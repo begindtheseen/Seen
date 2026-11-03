@@ -155,9 +155,9 @@ const btnGhost: React.CSSProperties = {
 
 const btnGreen: React.CSSProperties = {
   width: '100%', padding: '.75rem 1rem',
-  background: 'var(--good-tint)',
-  color: 'var(--green)', border: '1.5px solid rgba(16,185,129,.45)',
-  borderRadius: 10, fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)',
+  background: 'var(--accent-tint)',
+  color: 'var(--accent)', border: '1px solid var(--accent-line)',
+  borderRadius: 10, fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-ui)', minHeight: 44,
   cursor: 'pointer',
 }
 
@@ -374,6 +374,24 @@ export default function ApplyOptimizeModal({
   // construction on the server; the keyword list is one keyword identity (keywordKey).
   const gaps = uniqueKeywords((result?.unsupported_requirements || []).filter(m => !m.matched && !m.soft).map(m => m.surface)).slice(0, 8)
   const wordingNotes = (result?.wording_notes || []).slice(0, 3)
+  // What a credit bought when no bullet of theirs was rewritten (Maria, round 3: a charged result that said
+  // only "no bullet of yours was rewritten" and asked her to write one). The engine rewrites a bullet
+  // only by replacing a duty phrase with a verb and never invents words, so verb-led bullets stay as they
+  // are — the paid work is then the plan below, and the note names it.
+  const paidWork = (() => {
+    if (!result) return ''
+    const parts: string[] = []
+    const n = (k: number, one: string, many: string) => k === 1 ? `1 ${one}` : `${k} ${many}`
+    if ((result.rewrite_plan || []).length) parts.push(n(result.rewrite_plan!.length, 'wording proposal', 'wording proposals'))
+    if ((result.reorder || []).length) parts.push(n(result.reorder!.length, 'line to move up', 'lines to move up'))
+    if ((result.questions || []).length) parts.push(n(result.questions!.length, 'number question', 'number questions'))
+    if (result.availability) parts.push('an availability line')
+    if (result.summary) parts.push((result.summary as { kept?: boolean }).kept ? 'your summary checked' : 'a summary from your own facts')
+    return parts.length ? parts.join(', ') : ''
+  })()
+  const noRewriteNote = paidWork
+    ? `your bullets already lead with a verb, so none was rewritten — this credit bought ${paidWork} below`
+    : 'your bullets already lead with a verb and name every requirement we could match, so none was rewritten'
   const fitScore = result?.verdict ? result.verdict.score : (result?._seenfit_score ?? null)
 
   async function runOptimize(resumeOverride?: string, fresh = false) {
@@ -675,7 +693,7 @@ export default function ApplyOptimizeModal({
             {job.apply_url && (
               <a href={httpHref(job.apply_url) ?? undefined} target="_blank" rel="noopener noreferrer" data-testid="modal-posting-link"
                 onClick={() => trackApplyClick(job)}
-                style={{ display: 'inline-block', marginTop: '.25rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', textDecoration: 'none' }}>
+                style={{ display: 'inline-block', marginTop: '.25rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--accent)', textDecoration: 'none' }}>
                 Open the job posting ↗
               </a>
             )}
@@ -890,7 +908,7 @@ export default function ApplyOptimizeModal({
               {/* ONE verdict (score or none, band, one sentence; the hard gate first). */}
               {result.verdict && (
                 <VerdictCard verdict={result.verdict} cached={!!result.cached}
-                  note={hpState === 'done' && (hp?.package?.bullets?.length || 0) > 0 ? 'your rewritten bullets, checked for your own voice' : realBullets.length > 0 ? 'grounded in your real résumé — nothing invented' : 'no bullet of yours was rewritten for this job'} />
+                  note={hpState === 'done' && (hp?.package?.bullets?.length || 0) > 0 ? 'your rewritten bullets, checked for your own voice' : realBullets.length > 0 ? 'grounded in your real résumé — nothing invented' : noRewriteNote} />
               )}
 
               {/* Why you match — from the matched requirements and their evidence (E7). */}
@@ -938,7 +956,7 @@ export default function ApplyOptimizeModal({
               {/* Add-before-using (clearly marked — never presented as a confirmed rewrite) */}
               {guidanceItems.length > 0 && (
                 <div>
-                  <div style={{ ...kicker, color: 'var(--amber)' }}>Needs a real detail from you — add only if true</div>
+                  <div style={{ ...kicker, color: 'var(--amber)' }}>The posting asks for these and your résumé does not show them — only you can write that bullet</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                     {guidanceItems.map((g, i) => (
                       <div key={i} style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, padding: '.5rem .75rem', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5, overflowWrap: 'anywhere' }}>
@@ -1030,9 +1048,9 @@ export default function ApplyOptimizeModal({
 
               {/* Post-win ledger line — the REAL balance, the real reset, then the upsell. */}
               {result.cached && (
-                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', color: 'var(--green)', lineHeight: 1.5 }}>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', color: 'var(--text-2)', lineHeight: 1.5 }}>
                   No credit used — you optimized this job with this résumé in the last 7 days. {pro === true ? 'Re-running is unlimited with Pro.' : `A new résumé, a new posting or a re-run costs ${OPTIMIZE_PRICE}.`}
-                  {' '}<button type="button" data-testid="modal-rerun" onClick={() => { void runOptimize(undefined, true) }} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--green)', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit' }}>Re-run with the latest engine →</button>
+                  {' '}<button type="button" data-testid="modal-rerun" onClick={() => { void runOptimize(undefined, true) }} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit' }}>Re-run with the latest engine →</button>
                 </div>
               )}
               {pro === false && !upsellDismissed && result.charged && (

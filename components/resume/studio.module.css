@@ -7,6 +7,9 @@
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 .btnPrimary { background: var(--cta); color: var(--text-1); border: none; border-radius: var(--r-control); padding: .75rem 1rem; font-family: var(--body); font-weight: 600; font-size: .82rem; cursor: pointer; box-shadow: var(--sh-control); }
 .btnPrimary:disabled { opacity: .55; cursor: not-allowed; box-shadow: none; }
+.btnOutline { background: none; color: var(--text-1); border: 1px solid var(--border-2); border-radius: var(--r-control); padding: .75rem 1rem; font-family: var(--body); font-weight: 600; font-size: .82rem; cursor: pointer; min-height: 44px; }
+.btnOutline:hover { border-color: var(--border-3); }
+.btnOutline:disabled { opacity: .55; cursor: not-allowed; }
 .btnGreen { background: var(--cta); color: var(--text-1); border: none; border-radius: var(--r-control); padding: .5rem 1rem; font-family: var(--body); font-weight: 600; font-size: var(--fs-ui); cursor: pointer; min-height: 44px; }
 .btnGreen:disabled { opacity: .55; cursor: not-allowed; }
 .btnDanger { color: var(--red); border-color: rgba(239, 68, 68, .3); }

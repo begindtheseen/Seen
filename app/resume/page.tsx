@@ -20,6 +20,7 @@ import { LOCK_NOTE, PASS_AFTER_WIN } from '@/lib/pricing'
 import { signupHref } from '@/lib/signupIntent.js'
 import dynamic from 'next/dynamic'
 import { VerdictCard, WhyYouMatch, MissingList, Checklist, PaidPlanView, type Verdict, type ConstraintRow, type PaidPlan } from '@/components/optimizer/Verdict'
+import rs from './resume.module.css'
 import CreditConfirmDialog from '@/components/CreditConfirmDialog'
 import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
 import { RESUME_OPTIMIZE_COST, creditCostLabel, priceLabel, MAX_RESUMES_PRO } from '@/lib/creditRules'
@@ -264,6 +265,14 @@ function RewriteView({ out, copy, copied, onRerun, pro }: { out: PaidOptimize; c
       {out.cached && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', color: 'var(--text-3)' }}>No credit used — you built this plan for this job and résumé in the last 7 days.{onRerun && <> <button type="button" data-testid="resume-rerun" onClick={onRerun} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit' }}>Re-run with the latest engine{pro === true ? '' : ` · ${OPTIMIZE_PRICE}`} →</button></>}</div>}
       <PaidPlanView plan={out} />
 
+      {/* a charged result never leaves "what did I pay for" open (Maria, round 3): the engine rewrites a bullet
+          only by replacing a duty phrase with a verb and invents nothing, so verb-led bullets stay as written */}
+      {real.length === 0 && (
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--text-3)', lineHeight: 1.6 }} data-testid="rewrite-none">
+          None of your bullets was rewritten — each already leads with a verb, and Seen never rewrites a bullet by adding words you did not write. This credit bought the plan above{guidance.length ? ' and the list below of what the posting asks for that your résumé does not show' : ''}.
+        </div>
+      )}
+
       {real.length > 0 && (
         <Card>
           {kicker('Safe improvements to your own bullets', 'var(--text-3)')}
@@ -280,9 +289,9 @@ function RewriteView({ out, copy, copied, onRerun, pro }: { out: PaidOptimize; c
 
       {guidance.length > 0 && (
         <Card>
-          {kicker('⚠ Needs a real detail from you — add only if true', 'var(--amber)')}
+          {kicker('⚠ The posting asks for these and your résumé does not show them — only you can write that bullet', 'var(--amber)')}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-            {guidance.map((g, i) => <div key={i} style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, padding: '.5rem .75rem', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6, overflowWrap: 'anywhere' }}>Write a bullet for <strong style={{ color: 'var(--white)' }}>{g.addresses}</strong> — only if it reflects real work, with a real number.</div>)}
+            {guidance.map((g, i) => <div key={i} style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, padding: '.5rem .75rem', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6, overflowWrap: 'anywhere' }}>The posting asks for <strong style={{ color: 'var(--white)' }}>{g.addresses}</strong> and your résumé does not show it — only you can write that bullet, and only if it reflects real work, with a real number.</div>)}
           </div>
         </Card>
       )}
@@ -1053,7 +1062,7 @@ function ResumePageInner() {
               </>
             ) : (
               <>
-                <div className="ai-tabs" role="tablist">
+                <div className={`ai-tabs ${rs.tabs}`} role="tablist">
                   {tabs.map(t => (
                     <button key={t.id} role="tab" aria-selected={tab === t.id} className={`ai-tab${tab === t.id ? ' active' : ''}`} onClick={() => { selectTab(t.id); setError('') }}>{t.label}</button>
                   ))}
@@ -1206,7 +1215,8 @@ function ResumePageInner() {
                     <Card>
                       {kicker('Your final package')}
                       <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.75rem' }}>
-                        {finalBullets().length} bullet{finalBullets().length !== 1 ? 's' : ''}{hp ? ' (HumanProof)' : ''}{fitOut && fitOut.fit_score != null ? ` · SeenFit ${fitOut.fit_score}/100` : ''}{confirmList().length ? ` · ${confirmList().length} to confirm` : ''}
+                        {/* "0 bullets" read as a broken count (Maria, round 3): say what happened instead */}
+                        {finalBullets().length ? `${finalBullets().length} bullet${finalBullets().length !== 1 ? 's' : ''}${hp ? ' (HumanProof)' : ''}` : 'No bullets rewritten — your bullets already lead with a verb'}{fitOut && fitOut.fit_score != null ? ` · SeenFit ${fitOut.fit_score}/100` : ''}{confirmList().length ? ` · ${confirmList().length} to confirm` : ''}
                       </div>
                       <div className="ai-btn-row" style={{ marginBottom: '.5rem' }}>
                         <button onClick={() => copy(packageText(), 'pkg')} style={{ padding: '.75rem', background: 'var(--raised)', border: '1px solid var(--line2)', color: copied === 'pkg' ? 'var(--good-text)' : 'var(--sub)', borderRadius: 9, fontFamily: 'var(--mono)', fontSize: 'var(--fs-68)', cursor: 'pointer' }}>{copied === 'pkg' ? '✓ Copied' : 'Copy final package'}</button>

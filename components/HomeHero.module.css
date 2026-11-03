@@ -26,8 +26,8 @@
   font-weight: 500;
   letter-spacing: var(--ls-meta);
   text-transform: uppercase;
-  color: var(--accent);
-  border: 1px solid var(--accent-line);
+  color: var(--text-3);
+  border: 1px solid var(--border-2);
   background: var(--accent-tint);
   padding: .5rem .75rem;
   border-radius: 999px;

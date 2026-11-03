@@ -154,13 +154,11 @@ export default function ProfilePage() {
       .catch(() => {})
   }, [ready, isLoggedIn, user?.id])
 
-  // Offer the résumé's city once the saved profile is known to have none. It is a visible suggestion:
-  // the field differs from what is saved, so the unsaved bar appears, and nothing is written until Save.
-  useEffect(() => {
-    if (!profileSettled || !resumeCity || initCity || touched.current.city) return
-    setCity(c => c || resumeCity)
-  }, [profileSettled, resumeCity, initCity])
-  const cityFromResume = !!resumeCity && !initCity && city === resumeCity && !touched.current.city
+  // Offer the résumé's city once the saved profile is known to have none — as a one-tap suggestion
+  // UNDER the field, never typed into it (round 3: a prefilled city made the form "unsaved" on load, and
+  // the Discard / Save bar sat over the first field before anyone touched anything).
+  const citySuggestion = profileSettled && !!resumeCity && !initCity && !city && !touched.current.city ? resumeCity : ''
+  const takeCitySuggestion = () => { touched.current.city = true; setCity(resumeCity) }
 
   // Add / replace the résumé — the SAME canonical upload path as the Résumé-AI page
   // (parseResumeFile → /api/resume parse → ResumeStore.save), never a fork. Passing the city
@@ -373,7 +371,7 @@ export default function ProfilePage() {
             <div className={styles.me}>
               <div className={styles.avatar}>{initial}</div>
               <div className={styles.meT}>
-                <div className={styles.meName}>{name || 'Your name'}</div>
+                <div className={styles.meName}>{name || 'No name yet'}</div>
                 <div className={styles.meMail}>{user?.email}</div>
                 <span className={`${styles.plan} ${isPro ? styles.planPro : styles.planFree}`}>{isPro ? '★ Seen Pro' : 'Free plan'}</span>
               </div>
@@ -423,7 +421,11 @@ export default function ProfilePage() {
                       placeholder="e.g. Los Angeles, CA"
                     />
                   ) : <div className={styles.skeleton} />}
-                  <div className={styles.hint}>{cityFromResume ? 'From your résumé — save to keep it.' : 'Auto-loads nearby listings on the Jobs page.'}</div>
+                  <div className={styles.hint}>
+                    {citySuggestion
+                      ? <>Your résumé says <button type="button" className={styles.suggest} onClick={takeCitySuggestion}>Use {citySuggestion}</button></>
+                      : 'Auto-loads nearby listings on the Jobs page.'}
+                  </div>
                 </div>
                 <div className={styles.field}>
                   <label className={styles.label} htmlFor="pf-level">Experience level</label>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, Suspense } from 'react'
+import { displayCompanyName } from '@/lib/companyDisplay'
 import { useSearchParams } from 'next/navigation'
 import { AppStore, isDbId } from '@/lib/stores/AppStore'
 import { showReportReward } from '@/lib/rewardNotice'
@@ -552,7 +553,7 @@ function ReportPage() {
               <div key={r.id} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.75rem 1rem', marginBottom: '.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
                 <div>
                   <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', fontWeight: 500 }}>{outcomeLabel(r.outcome)}</div>
-                  {r.company_name && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', marginTop: '.125rem' }}>@ {r.company_name}</div>}
+                  {r.company_name && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', marginTop: '.125rem' }}>@ {displayCompanyName(r.company_name)}</div>}
                   {r.role && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.125rem' }}>{r.role}</div>}
                   {(() => {
                     const badge = reportSourceBadge(r.platform, null, r.trust_reason)

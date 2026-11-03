@@ -794,7 +794,7 @@ details[open] .dt-chev{transform:rotate(180deg)}
 
 /* ── Swipe card deck (resume-matched jobs) ── */
 .swipe-deck{position:relative;height:340px;touch-action:none;user-select:none;}
-.swipe-card{position:absolute;inset:0;border-radius:16px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);padding:1rem 1.25rem;cursor:grab;box-shadow:0 8px 32px rgba(0,0,0,.4),inset 0 1.5px 0 rgba(255,255,255,.12);backdrop-filter:blur(24px);transition:none;will-change:transform;}
+.swipe-card{position:absolute;inset:0;overflow:hidden;border-radius:16px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);padding:1rem 1.25rem;cursor:grab;box-shadow:0 8px 32px rgba(0,0,0,.4),inset 0 1.5px 0 rgba(255,255,255,.12);backdrop-filter:blur(24px);transition:none;will-change:transform;}
 .swipe-card:active{cursor:grabbing;}
 .swipe-card.snap-back{transition:transform .35s cubic-bezier(.34,1.56,.64,1);}
 
@@ -1103,7 +1103,7 @@ details[open] .dt-chev{transform:rotate(180deg)}
 .ai-tabs{display:flex;gap:.5rem;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:.125rem;margin-bottom:1rem}
 .ai-tabs::-webkit-scrollbar{display:none}
 .ai-tab{flex:0 0 auto;white-space:nowrap;background:none;border:1.5px solid var(--line2);color:var(--sub);border-radius:8px;padding:.5rem .75rem;font-family:var(--mono);font-size:var(--fs-meta);cursor:pointer;transition:all .15s}
-.ai-tab.active{border-color:var(--green);color:var(--green);background:var(--good-tint);font-weight:600}
+.ai-tab.active{border-color:var(--accent-line);color:var(--accent);background:var(--accent-tint);font-weight:600}
 .ai-card{background:var(--surface);border:1px solid var(--line2);border-radius:12px;padding:1rem;min-width:0}
 /* Bottom padding that clears the iOS home indicator inside scrollable modal bodies. */
 .ai-safe-bottom{padding-bottom:calc(1.1rem + env(safe-area-inset-bottom))}

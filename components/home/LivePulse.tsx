@@ -13,7 +13,7 @@ import styles from './LivePulse.module.css'
 import Icon, { type IconName } from '@/components/ui/Icon'
 import { displayCompanyName } from '@/lib/companyDisplay'
 
-type Row = { id: string; company_name?: string; role?: string; outcome: string; created_at: string }
+type Row = { id: string; company_name?: string; role?: string; outcome: string; created_at: string; graded?: boolean | null }
 
 const OUTCOME: Record<string, { icon: IconName; label: string; cls: string }> = {
   ghosted: { icon: 'ghost', label: 'ghosted', cls: 'red' },
@@ -56,6 +56,9 @@ export default function LivePulse({ totals = null }: { totals?: { reports: numbe
         const seen = new Set<string>()
         setRows(d.reports.filter(r => {
           if (!r.company_name || !OUTCOME[r.outcome]) return false
+          // Graded companies only (the server says which): a test company's report or a word stored as a
+          // company ("Backend") never scrolls across the homepage (round 3).
+          if (r.graded === false) return false
           const k = r.company_name.toLowerCase().trim()
           if (seen.has(k)) return false
           seen.add(k)

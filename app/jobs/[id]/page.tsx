@@ -586,7 +586,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             <Button variant="secondary" disabled className={d.grow}>Position filled</Button>
           ) : <>
             {takesSeenApply(job) && (
-              <Button variant="primary" onClick={() => setShowSeenApply(true)} className={d.grow} iconRight="arrow-right">Apply on Seen</Button>
+              <Button variant="primary" onClick={() => setShowSeenApply(true)} className={d.main} iconRight="arrow-right">Apply on Seen</Button>
             )}
             {/* "Apply" is FREE: it opens the posting, then the tracker checkpoint offers to log it. */}
             {postingHref && job.apply_mode !== 'seen'
@@ -598,7 +598,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                     rel="noopener noreferrer"
                     data-testid="detail-apply-link"
                     onClick={() => { trackApplyClick(job); setCheckpointAuto(false); setShowCheckpoint(true) }}
-                    className={d.grow}
+                    className={takesSeenApply(job) ? d.grow : d.main}
                     iconRight="arrow-up-right"
                   >
                     {takesSeenApply(job) ? 'Apply on their site' : preview ? 'Open posting' : 'Apply'}

@@ -41,8 +41,9 @@ export default function Odometer({ value, prefix, suffix, start = true, delay = 
   }, [start, delay])
 
   const n = Math.max(0, Math.round(Number.isFinite(value) ? value : 0))
-  const digits = String(n).padStart(Math.max(1, minDigits), '0').split('')
-  const text = `${prefix ?? ''}${n}${suffix ?? ''}`
+  // Grouped like every other figure on the page ("1,823"); the comma is drawn as a static glyph, not a reel.
+  const digits = String(n).padStart(Math.max(1, minDigits), '0').replace(/\B(?=(\d{3})+(?!\d))/g, ',').split('')
+  const text = `${prefix ?? ''}${n.toLocaleString('en-US')}${suffix ?? ''}`
 
   // The reels and the prefix/suffix are drawn by CSS (app/motion.css `.odo-r::before`, `.odo-s::before`),
   // so the page TEXT holds only the real value: crawlers and copy-paste read "12%", never
@@ -52,9 +53,11 @@ export default function Odometer({ value, prefix, suffix, start = true, delay = 
       <span className="odo-sr">{text}</span>
       {prefix ? <span className="odo-s" data-t={prefix} aria-hidden="true" /> : null}
       {digits.map((d, c) => (
-        <span key={`${digits.length}-${c}`} className="odo-d" aria-hidden="true">
-          <span className="odo-r" style={{ '--n': armed ? Number(d) : 0, '--c': c } as CSSProperties} />
-        </span>
+        d === ','
+          ? <span key={`${digits.length}-${c}`} className="odo-s" data-t="," aria-hidden="true" />
+          : <span key={`${digits.length}-${c}`} className="odo-d" aria-hidden="true">
+              <span className="odo-r" style={{ '--n': armed ? Number(d) : 0, '--c': c } as CSSProperties} />
+            </span>
       ))}
       {suffix ? <span className="odo-s" data-t={suffix} aria-hidden="true" /> : null}
     </span>

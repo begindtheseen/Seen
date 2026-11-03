@@ -1,6 +1,7 @@
 'use client'
 
 import { whenLabel } from '@/lib/interviewTime'
+import { displayCompanyName, possessive } from '@/lib/companyDisplay'
 import { pathSegment, slugSegment, loginHref } from '@/lib/safeHref.js'
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -74,7 +75,8 @@ function calcJobSearchHealth(apps: Application[]) {
 function localRecentCompanies(): Array<{ name: string; slug: string }> {
   try {
     const raw = localStorage.getItem('seen_recent_cos')
-    if (raw) return (JSON.parse(raw) as Array<{ name: string; slug: string }>).filter(c => c && c.name && c.slug)
+    // The stored name is the slug's lowercase; the chip shows the display casing (round 3: "fry's food stores").
+    if (raw) return (JSON.parse(raw) as Array<{ name: string; slug: string }>).filter(c => c && c.name && c.slug).map(c => ({ ...c, name: displayCompanyName(c.name) }))
   } catch {}
   return []
 }
@@ -239,7 +241,7 @@ export default function DashboardPage() {
   const staleApps = sortApplications(active.filter(a => windowOf(a).past), 'oldest', new Set())
   const staleSub = (a: Application) => windowOf(a).reference
     ? `Past the ${REFERENCE_WINDOW_DAYS}-day reference window — Seen has no response-time data for ${a.company} yet.`
-    : `Past ${a.company}'s usual response window (~${Math.round(coScores[a.company.toLowerCase()]!.avg_wait_days)} days).`
+    : `Past ${possessive(a.company)} usual response window (~${Math.round(coScores[a.company.toLowerCase()]!.avg_wait_days)} days).`
   const alertCount = staleApps.length + surges.length
   const allEvents = EventStore.get()
 
@@ -343,7 +345,7 @@ export default function DashboardPage() {
     ? { t: 'Your score unlocks soon.', s: healthUnlockLine(apps.length), badge: 'Getting started', tone: 'neutral' as BadgeTone }
     : !healthReal
       ? { t: 'Too early to call.', s: `Your score appears once ${HEALTH_MIN_OUTCOMES} applications have a real outcome (hired, rejected or ghosted) — ${health.terminal} so far.`, badge: 'Early days', tone: 'neutral' as BadgeTone }
-      : health.score >= 75
+      : health.score >= 75 && health.ghostRate < 40
         ? { t: "You're getting noticed.", s: `${health.interviewRate}% of your applications reached an interview and ${health.responseRate}% got a reply. Keep doing what works.`, badge: 'Strong', tone: 'good' as BadgeTone }
         : health.score >= 55
           ? { t: "You're on track.", s: `${health.responseRate}% of your applications got a reply. A follow-up on the quiet ones could tip it.`, badge: 'Mixed', tone: 'caution' as BadgeTone }

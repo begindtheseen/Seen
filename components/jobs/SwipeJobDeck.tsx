@@ -35,6 +35,27 @@ export default function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply,
   const deltaYRef = useRef(0)
   const hasMoved = useRef(false)
   const cardRef = useRef<HTMLDivElement>(null)
+  // The deck fits the space it has: card + buttons end above the phone tab bar whatever sits above the deck
+  // (round 3: with the sticky search bar, filters and toolbar the buttons landed at y 771–823 under a tab bar
+  // from 777, and the page had nothing to scroll). Measured on mount and on resize; the CSS height is the cap.
+  const shellRef = useRef<HTMLDivElement>(null)
+  const [deckH, setDeckH] = useState<number | null>(null)
+  useEffect(() => {
+    const fit = () => {
+      const el = shellRef.current
+      if (!el) return
+      const top = el.getBoundingClientRect().top + window.scrollY
+      const tabBar = document.documentElement.classList.contains('tabbar') ? 72 : 0
+      const phone = window.innerWidth <= 560
+      const chrome = (phone ? 52 : 56) + (phone ? 8 : 12) + 32 // buttons + their gap + the hint line
+      const avail = window.innerHeight - (top - window.scrollY) - tabBar - chrome - 8
+      const cap = phone ? 212 : 296
+      setDeckH(Math.max(150, Math.min(cap, Math.floor(avail))))
+    }
+    fit()
+    window.addEventListener('resize', fit)
+    return () => window.removeEventListener('resize', fit)
+  }, [])
   const { isLoggedIn } = useAuth()
 
   // Keep stack in sync when jobs prop changes (e.g. initial load)
@@ -201,8 +222,8 @@ export default function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply,
   const surface = { background: 'var(--surface-1)', border: '1px solid var(--border-2)', boxShadow: 'var(--sh-raised)' }
 
   return (
-  <div>
-    <div className={`swipe-deck ${m.deck}`} aria-label="Swipe job cards — drag right to save, left to pass">
+  <div ref={shellRef}>
+    <div className={`swipe-deck ${m.deck}`} style={deckH ? { height: deckH } : undefined} aria-label="Swipe job cards — drag right to save, left to pass">
       {/* Third peek card */}
       {thirdJob && (
         <div className="swipe-peek" style={{ transform: 'scale(0.92) translateY(16px)', transformOrigin: 'bottom center', zIndex: 1 }} />

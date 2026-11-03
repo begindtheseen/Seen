@@ -231,15 +231,19 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
 
   const closeBtnStyle: React.CSSProperties = {
     position: 'absolute',
-    top: 16,
-    right: 20,
+    top: 8,
+    right: 8,
     background: 'none',
     border: 'none',
     color: 'var(--dim)',
     fontSize: 'var(--fs-h3)',
     lineHeight: 1,
     cursor: 'pointer',
-    padding: 4,
+    width: 44,
+    height: 44,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     zIndex: 1,
   }
 
@@ -259,9 +263,9 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
   }
 
   const headingStyle: React.CSSProperties = {
-    fontFamily: 'var(--display)',
-    fontSize: 'var(--fs-xl)',
-    fontWeight: 800,
+    fontFamily: 'var(--body)',
+    fontSize: 'var(--fs-h3)',
+    fontWeight: 600,
     color: 'var(--white)',
     lineHeight: 1.15,
     marginBottom: 8,
@@ -348,7 +352,7 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
   }
 
   const confirmedCheckStyle: React.CSSProperties = {
-    fontFamily: 'var(--display)',
+    fontFamily: 'var(--body)',
     fontSize: 'var(--fs-fig-m)',
     fontWeight: 800,
     color: 'var(--green)',
@@ -396,7 +400,7 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
       style={backdropStyle}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div ref={sheetRef} style={sheetStyle} role="dialog" aria-modal="true" aria-label={step === 'main' ? `Did you apply to ${job.company}?` : 'Application tracking'}>
+      <div ref={sheetRef} style={sheetStyle} role="dialog" aria-modal="true" data-apply-checkpoint="1" aria-label={step === 'main' ? `Did you apply to ${job.company}?` : 'Application tracking'}>
         {/* ── MAIN ── */}
         {step === 'main' && (
           <div style={innerStyle}>
@@ -426,7 +430,7 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
 
             <button
               style={secondaryBtnStyle}
-              onClick={() => { saveSkipReason(companyName, job.title, 'not yet', 'not_yet'); showToast(`Okay — we'll remind you to check back on ${companyName}.`); onClose() }}
+              onClick={() => { saveSkipReason(companyName, job.title, 'not yet', 'not_yet'); showToast(`Okay — nothing recorded. Come back when you've applied to ${companyName}.`); onClose() }}
             >
               Not yet
             </button>
@@ -524,7 +528,7 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
                   onClick={() => {
                     saveSkipReason(companyName, job.title, reason, 'not_yet')
                     // One tap finishes it (round 1: Did you apply? → What's holding you back? → Got it. was three stacked popups).
-                    showToast(`Got it — we'll remind you about ${companyName}.`)
+                    showToast(`Got it — nothing recorded for ${companyName}.`)
                     onClose()
                   }}
                 >
@@ -546,7 +550,7 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
               lineHeight: 1.6,
               marginBottom: 24,
             }}>
-              We&apos;ll remind you to check back on {companyName} — {job.title}.
+              Nothing was recorded for {companyName} — {job.title}. Come back when you&apos;ve applied.
             </div>
             <button style={closeFullBtnStyle} onClick={onClose}>
               Close

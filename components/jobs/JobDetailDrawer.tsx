@@ -116,7 +116,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
   // Esc closes the drawer, like the backdrop and ✕ (the Seen-apply modal on top handles its own).
   useEffect(() => {
     if (seenApplyOpen) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !document.querySelector('[data-apply-checkpoint]')) onClose() }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose, seenApplyOpen])
@@ -432,7 +432,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
           <Button variant="ghost" size="sm" onClick={() => onCheckCompany(job.company)} icon="building-2" className={w.check}>Check {companyName}</Button>
           <div className={d.footRow}>
             <button type="button" onClick={toggleSave} aria-label={saved ? 'Remove from saved' : 'Save'} aria-pressed={saved} className={d.iconBtn} data-on={saved ? '1' : '0'}><Icon name="heart" size={18} /></button>
-            {seenApply && <Button variant="primary" onClick={() => setSeenApplyOpen(true)} className={d.grow} iconRight="arrow-right">Apply on Seen</Button>}
+            {seenApply && <Button variant="primary" onClick={() => setSeenApplyOpen(true)} className={d.main} iconRight="arrow-right">Apply on Seen</Button>}
             {externalApply
               ? <>
                   {/* FREE: opens the posting in a new tab, then the tracker checkpoint asks "Did you apply?" —
@@ -444,7 +444,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
                     rel="noopener noreferrer"
                     data-testid="drawer-apply-link"
                     onClick={applyExternal}
-                    className={d.grow}
+                    className={seenApply ? d.grow : d.main}
                     iconRight="arrow-up-right"
                   >{seenApply ? 'Apply on their site' : preview ? 'Open posting' : 'Apply'}</Button>
                   {!seenApply && (
