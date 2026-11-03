@@ -704,9 +704,9 @@ function TrackerPage() {
             if (!d) return
             // A second report on the same company within 30 days is held (anti-gaming): it is saved for the
             // record but never counted, so the company page will not show it (round 3: "Report saved" ×3, page unchanged).
-            if (d.held) { showToast(`Saved to your tracker. Seen already counts a report from you for ${origApp.company} this month, so this one won't change its grade.`); return }
+            if (d.held) showToast(`Saved to your tracker. Seen already counts a report from you for ${origApp.company} this month, so this one won't change its grade.`)
+            else if (!d.reward) showToast(`Report saved — it counts toward ${origApp.company}’s grade.`)
             if (d.reward) showReportReward(d.reward)
-            else showToast(`Report saved — it counts toward ${origApp.company}’s grade.`)
           })
           .catch(() => {})
       }).catch(() => {})

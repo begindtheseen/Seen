@@ -348,7 +348,7 @@ export default function DashboardPage() {
       : health.score >= 75 && health.ghostRate < 40
         ? { t: "You're getting noticed.", s: `${health.interviewRate}% of your applications reached an interview and ${health.responseRate}% got a reply. Keep doing what works.`, badge: 'Strong', tone: 'good' as BadgeTone }
         : health.score >= 55
-          ? { t: "You're on track.", s: `${health.responseRate}% of your applications got a reply. A follow-up on the quiet ones could tip it.`, badge: 'Mixed', tone: 'caution' as BadgeTone }
+          ? { t: "You're on track.", s: `${health.responseRate}% of your applications got a reply. A follow-up on the quiet ones could tip it.`, badge: 'On track', tone: 'caution' as BadgeTone }
           : { t: 'Room to improve.', s: `${health.ghostRate}% of your applications went silent. Check a company's ghost rate before applying and tailor your résumé.`, badge: 'Needs attention', tone: 'bad' as BadgeTone }
   const signalCount = alertCount + (surveyInsight ? 1 : 0)
   // A fresh account (nothing tracked, and not because the load failed): the empty health / pipeline / signals

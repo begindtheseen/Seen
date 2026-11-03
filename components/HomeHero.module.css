@@ -28,7 +28,7 @@
   text-transform: uppercase;
   color: var(--text-3);
   border: 1px solid var(--border-2);
-  background: var(--accent-tint);
+  background: var(--surface-1);
   padding: .5rem .75rem;
   border-radius: 999px;
 }

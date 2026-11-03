@@ -1108,12 +1108,12 @@ function ResumePageInner() {
                         {!paid ? (
                           <>
                             <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--amber)', lineHeight: 1.6, marginBottom: '.75rem' }} data-testid="hp-needs-plan">HumanProof works on the bullets your rewrite plan improves — build the plan first.</p>
-                            <button style={btnPrimary} onClick={() => selectTab('rewrite')}>Go to the rewrite plan →</button>
+                            <button style={btnOutlined} onClick={() => selectTab('rewrite')}>Go to the rewrite plan →</button>
                           </>
                         ) : realBulletsOf(paid).length === 0 ? (
                           <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--amber)', lineHeight: 1.6, margin: 0 }} data-testid="hp-nothing">Your rewrite plan for this job has no rewritten bullets yet — only bullets for you to write. There is nothing for HumanProof to polish; write those bullets from real work, then come back.</p>
                         ) : (
-                          <button style={btnPrimary} onClick={runHumanProof}>Run HumanProof on {realBulletsOf(paid).length} bullet{realBulletsOf(paid).length === 1 ? '' : 's'} →</button>
+                          <button style={btnOutlined} onClick={runHumanProof}>Run HumanProof on {realBulletsOf(paid).length} bullet{realBulletsOf(paid).length === 1 ? '' : 's'} →</button>
                         )}
                       </Card>
                     )}

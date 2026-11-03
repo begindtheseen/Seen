@@ -96,7 +96,7 @@ export default async function DataPage() {
       <div className={styles.wrap}>
         <PageHeader
           size="lg"
-          eyebrow={`Open data · ${LICENSE_NAME} · updated hourly`}
+          eyebrow={`Open data · ${LICENSE_NAME} · snapshot of ${d.asOfLabel}`}
           title={DATASET_NAME}
           crumbLabel="Open data"
           sub={datasetSummary(d)}

@@ -703,14 +703,23 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   // Names Seen does know that start with this one ("Fry's" → Fry's Food Stores), offered on the empty state.
   const [alsoKnown, setAlsoKnown] = useState<string[]>([])
   useEffect(() => {
-    if (!unknown || !companyName) return
+    if (!(unknown || nothingFound) || !companyName) return
     let live = true
     fetch('/api/reports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'name_suggest', query: companyName }) })
       .then(r => (r.ok ? r.json() : null))
       .then((d: { names?: string[] } | null) => { if (live && Array.isArray(d?.names)) setAlsoKnown(d!.names!.filter(n => typeof n === 'string')) })
       .catch(() => {})
     return () => { live = false }
-  }, [unknown, companyName])
+  }, [unknown, nothingFound, companyName])
+  // "Did you mean Fry's Food Stores?" — on the empty state and on a page with listings but no accounts (round 4: the
+  // board's lookup landed on /company/fry's, a full page with Track and prep buttons and no way to the real page).
+  const didYouMean = alsoKnown.length > 0 ? (
+    <p className={c.fine}>
+      Did you mean {alsoKnown.map((n, i) => (
+        <span key={n}>{i > 0 ? (i === alsoKnown.length - 1 ? ' or ' : ', ') : ''}<a href={`/company/${pathSegment(n.trim().toLowerCase().replace(/\s+/g, '-'))}`} className={c.textLink}>{displayCompanyName(n)}</a></span>
+      ))}?
+    </p>
+  ) : null
   if (unknown) {
     return (
       <div className="page-full">
@@ -719,13 +728,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
           <Icon name="circle-help" size={40} className={c.missingIcon} />
           <h1 className={c.missingTitle}>{displayName}</h1>
           <p className={c.missingText}>Seen has no applicant accounts for this company yet.</p>
-          {alsoKnown.length > 0 && (
-            <p className={c.missingText}>
-              Did you mean {alsoKnown.map((n, i) => (
-                <span key={n}>{i > 0 ? (i === alsoKnown.length - 1 ? ' or ' : ', ') : ''}<a href={`/company/${pathSegment(n.trim().toLowerCase().replace(/\s+/g, '-'))}`} className={c.textLink}>{displayCompanyName(n)}</a></span>
-              ))}?
-            </p>
-          )}
+          {didYouMean}
           <div className={c.missingActions}>
             <Button variant="secondary" href={reportHref} iconRight="arrow-right">Report an outcome</Button>
           </div>
@@ -862,6 +865,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                     : `No applicant accounts for ${displayName} yet. A grade appears once there are ${MIN_REPORTS_FOR_GRADE}.`}
                 </p>
                 {nothingFound && <EnrichmentNotice companyName={companyName} enrichment={enrichment} />}
+                {nothingFound && didYouMean}
                 <div className={c.meta}>
                   <Button variant="secondary" size="sm" href={reportHref} icon="plus">Add yours to help grade it</Button>
                   <a href="/methods" className={c.textLink}>How grades work</a>
@@ -919,13 +923,14 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
             <div role="status">
               <p className={c.fine}>No applicant accounts for {displayName} yet — a grade appears once there are {MIN_REPORTS_FOR_GRADE}.</p>
               {nothingFound && <EnrichmentNotice companyName={companyName} enrichment={enrichment} />}
+              {nothingFound && didYouMean}
             </div>
           )}
         </section>
 
         {/* The ONE primary action: "Applied here? Track it." Rendered from the first paint (its size does not
             depend on the score), so it never mounts late and pushes the page down (CLS, audit #11). */}
-        {!error && companyName && (
+        {!error && companyName && !nothingFound && (
           <div className={c.track}>
             <TrackCta company={displayName} slug={slug} responsePct={sum.ratesShown ? sum.responsePct : null} />
           </div>

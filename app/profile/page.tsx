@@ -18,7 +18,7 @@ import InviteCard from '@/components/growth/InviteCard'
 import JobAlertsCard from '@/components/settings/JobAlertsCard'
 import DangerConfirmDialog from '@/components/DangerConfirmDialog'
 import DeleteAccountDialog from '@/components/profile/DeleteAccountDialog'
-import { PROFILE_LIMITS, PROFILE_NAME_REQUIRED, clampProfileField } from '@/lib/profileLimits.js'
+import { PROFILE_LIMITS, clampProfileField } from '@/lib/profileLimits.js'
 import { loginHref } from '@/lib/safeHref.js'
 import styles from './profile.module.css'
 import { formatPacific } from '@/lib/time/pacific.js'
@@ -226,10 +226,11 @@ export default function ProfilePage() {
     // of saving one: signup requires a name and the dashboard greets by it (audit 2026-10-24, P1).
     const cleanName = clampProfileField('name', name)
     const cleanCity = clampProfileField('city', city)
-    if (!cleanName) { setSaveMsg(PROFILE_NAME_REQUIRED); setSaveMsgOk(false); return }
+    // A blank name (the email-prefix placeholder is shown as none) must not block saving the city or level
+    // (round 4: "Use Phoenix, AZ" → Save changes sent nothing). The name is sent only when there is one.
     setSaving(true)
     setSaveMsg('')
-    const result = await _sync('save_profile', { profile: { name: cleanName, city: cleanCity, experience } }) as { ok?: boolean; error?: string } | null
+    const result = await _sync('save_profile', { profile: { ...(cleanName ? { name: cleanName } : {}), city: cleanCity, experience } }) as { ok?: boolean; error?: string } | null
     if (!result || result.ok === false) {
       setSaveMsg(result?.error || 'Save failed — please try again.')
       setSaveMsgOk(false)

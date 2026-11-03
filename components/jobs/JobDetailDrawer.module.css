@@ -17,5 +17,5 @@
 .foot { flex-shrink: 0; display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4) calc(var(--sp-3) + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--border-2); background: var(--surface-overlay); }
 .check { align-self: flex-start; }
 @media (prefers-reduced-motion: reduce) { .scrim, .panel { transition: none; } }
-.grow { flex: 1 1 0; min-width: 0; } /* the secondary (Optimize) gives way */
+.grow { flex: 1 1 auto; min-width: 0; } /* the secondary (Optimize) gives way */
 .main { flex: 1 1 auto; min-width: max-content; } /* the one filled button keeps its whole label (round 3: "Ap…" at 390 and 1280) */

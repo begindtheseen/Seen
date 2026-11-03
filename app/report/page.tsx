@@ -150,7 +150,9 @@ function ReportPage() {
       // EXPLICIT URL params win over any tracker guess. Job pages and company pages link
       // here with ?company=&role=&outcome= — ignoring them prefilled the form with a
       // DIFFERENT company from the user's tracker, one click away from a wrong-company report.
-      const urlCompany = searchParams?.get('company') || ''
+      // A slug ("northwind-test-labs" from a company page link) is shown as the name it stands for (round 4).
+      const rawCompany = searchParams?.get('company') || ''
+      const urlCompany = /^[a-z0-9]+(?:-[a-z0-9']+)+$/.test(rawCompany) ? displayCompanyName(rawCompany.replace(/-/g, ' ')) : rawCompany
       const urlRole = searchParams?.get('role') || ''
       const urlOutcomeRaw = (searchParams?.get('outcome') || '').toLowerCase()
       // Map caller vocab onto the form's outcome union ('human' = a person responded).

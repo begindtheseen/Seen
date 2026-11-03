@@ -50,7 +50,10 @@ export default function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply,
       const chrome = (phone ? 52 : 56) + (phone ? 8 : 12) + 32 // buttons + their gap + the hint line
       const avail = window.innerHeight - (top - window.scrollY) - tabBar - chrome - 8
       const cap = phone ? 212 : 296
-      setDeckH(Math.max(150, Math.min(cap, Math.floor(avail))))
+      // The floor is what the card's content needs (round 4: a 150px card let the excerpt run over the footer);
+      // under it the page simply scrolls.
+      const floor = phone ? 212 : 260
+      setDeckH(Math.max(floor, Math.min(cap, Math.floor(avail))))
     }
     fit()
     window.addEventListener('resize', fit)
