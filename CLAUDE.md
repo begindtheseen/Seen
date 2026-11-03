@@ -106,6 +106,21 @@ Editor — comments stripped, one block per migration, and say which to run firs
   "Not yet" promises nothing ("nothing recorded"); an unknown company page offers `name_suggest` prefix matches
   ("Did you mean Fry's Food Stores?"); Odometer prints thousands separators; /data caps at 60 rows + Show all; the
   tracker's current stage is a tint (one --cta fill per screen); Verdict/Optimize panels carry no green tint.
+- **Round 4 (f1c2e0b, dpl_CTWkRdSkRoDcWibwMH4GdoNvXyF1): ALL FOUR APPROVED.** Tasha 8/8/8/7 YES (both clipped controls
+  fixed); Jules 9/8/8/6 YES (every count agrees, system holds on 62 captures); Maria 8/7/8/6 YES (paid Optimize reads as
+  words and says what the credit bought); Dev 8/7/8/6 yes-conditional (counts agree everywhere; condition = the blank-title
+  Tailor summary stating "most recently at H-E-B Digital", a 2018–2020 role). Regressions my fixes introduced, fixed in
+  4c299a2: the Optimize button clipped once Apply kept max-content (`.grow` basis 0 → `1 1 auto`); the swipe deck's
+  self-fit floor was 150px and the excerpt ran over the footer (floor 212/260); Settings "Save changes" sent nothing when
+  the name was blank (the email-prefix name is shown as none, and saveProfile refused a blank name — the name is now
+  optional in the save); the Optimize sheet opened on a cached pre-fix result (CACHE_VERSION = ENGINE_VERSION — bump
+  `lib/optimizer/types.js` whenever requirement wording changes); the flat-text splitter glued "Key Responsibilities CRM
+  Platform & Database Management Keep…" (heading / Title-Case sub-heading / imperative duty line are three blocks). Round
+  5 (4c299a2) is a confirmation round.
+- **Rules from round 4:** a company page with listings but no accounts shows "Did you mean …" (`name_suggest`) and NO
+  Track / prep CTAs (`nothingFound`); the Tailor summary's "most recently at" is the latest-ending role, never the
+  best-ranked; a blank Tailor title is inferred from the posting (`inferJobTitle`) before the family is decided; the
+  tracker shows both the held-report line and the Pro-days line; /report shows a `?company=` slug as a name.
 - **Harness (round 3):** the container restarted mid-pass — resume stopped agents with SendMessage to their ids (the
   working tree persists; fixers that had not written yet lost nothing). A checkpoint commit may exclude a fixer's
   in-progress files; never commit a tree with that fixer's own pins red. CodeQL alert annotations are readable via the
