@@ -199,7 +199,11 @@ export default function CompaniesPage() {
     // Inside the Moderate tier (enough accounts, none or few from Seen users) the default board orders by
     // evidence FIRST, then score: three 100/100 companies with 11 public accounts each no longer lead a
     // 60-account company at 94 (round 2, 2026-11-02). The ghost / wait sorts keep their own order.
-    const byEvidence = (a: Company, b: Company) => evidence(a, b) || key(a) - key(b)
+    // Evidence BANDS, then the chosen sort: ≥20 applicant accounts first, then 10–19 — so three 100/100 companies
+    // with 11 accounts each do not lead, while a D-grade company with 26 accounts does not outrank an A with 23
+    // (ordering purely by evidence put Amazon at 65/100 in 4th place on a board "ranked by Seen Grade").
+    const band = (c: Company) => (firstPartyReportCount(c.score) >= 20 ? 0 : 1)
+    const byEvidence = (a: Company, b: Company) => band(a) - band(b) || key(a) - key(b) || evidence(a, b)
     return ([2, 1, 0] as EvidenceTier[]).flatMap((t) => list.filter((c) => evidenceTier(c.score) === t).sort(t === 1 && sort === 'score' ? byEvidence : within))
   }, [companies, q, sort])
   // Where each lower tier begins (its heading sits before that index), or -1 when none / searching / the
