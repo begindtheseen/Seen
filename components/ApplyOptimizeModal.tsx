@@ -390,7 +390,7 @@ export default function ApplyOptimizeModal({
     return parts.length ? parts.join(', ') : ''
   })()
   const noRewriteNote = paidWork
-    ? `your bullets already lead with a verb, so none was rewritten — this credit bought ${paidWork} below`
+    ? `your bullets already lead with a verb, so none was rewritten — ${result?.cached ? 'the earlier credit' : 'this credit'} bought ${paidWork} below`
     : 'your bullets already lead with a verb and name every requirement we could match, so none was rewritten'
   const fitScore = result?.verdict ? result.verdict.score : (result?._seenfit_score ?? null)
 

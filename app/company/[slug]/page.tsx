@@ -930,7 +930,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
 
         {/* The ONE primary action: "Applied here? Track it." Rendered from the first paint (its size does not
             depend on the score), so it never mounts late and pushes the page down (CLS, audit #11). */}
-        {!error && companyName && !nothingFound && !(noData && reports.length === 0) && (
+        {!error && companyName && !nothingFound && !(noData && reports.length === 0) && (seed || !loading) && (
           <div className={c.track}>
             <TrackCta company={displayName} slug={slug} responsePct={sum.ratesShown ? sum.responsePct : null} />
           </div>
