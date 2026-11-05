@@ -29,6 +29,8 @@ globalThis.fetch = async (url, opts = {}) => {
   if (u.pathname === '/rest/v1/feature_flags') return json([{ status: 'fully_on' }]);
   // one graded company for the one-score test (a low process grade moves the fit score)
   if (u.pathname === '/rest/v1/company_scores') return json(/gradedco/i.test(u.search) ? [{ overall_score: 20, report_count: 40, first_party_report_count: 40, web_report_count: 0, data_source: 'reports' }] : []);
+  // The Pro read (resolveProAccess → ai_credits row): a Pro account has pro_until in the future.
+  if (u.pathname === '/rest/v1/ai_credits') return json(state.pro ? [{ user_id: 'x', pro_until: new Date(Date.now() + 864e5).toISOString() }] : []);
   if (u.pathname === '/rest/v1/rpc/consume_credit') {
     // a Pro account is never charged (consume_credit answers 999 and pro:true)
     if (state.pro) return json([{ status: 'ok', balance: 999, pro: true }]);

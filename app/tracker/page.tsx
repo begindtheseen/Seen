@@ -11,11 +11,9 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { listingHref } from '@/lib/listingHref.js'
 import OutcomeCard from '@/components/OutcomeCard'
-import RoundsPrompt from '@/components/RoundsPrompt'
 import { firstPartyReportCount } from '@/lib/server/reportCounts'
 import { isGradeableScore } from '@/lib/gradeGate'
 import { gradeLetter } from '@/lib/companyDisplay'
-import ModalPortal from '@/components/ModalPortal'
 import WithdrawModal from '@/components/WithdrawModal'
 import PageHeader from '@/components/shell/PageHeader'
 import GuestTracker, { GuestTrackerShell } from '@/components/tracker/GuestTracker'
@@ -133,7 +131,7 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
   const watch = isActive && !PREP_STAGES.includes(app.stage) ? ghostWatch(days, intel) : null
   const listing = listingHref(app)
   // 40px hit area without growing the row (negative vertical margin).
-  const linkStyle = { fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', minHeight: 40, padding: '0 .4rem', margin: '-8px -.4rem' } as const
+  const linkStyle = { fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', minHeight: 40, padding: '0 .5rem', margin: '-8px -.5rem' } as const
   // "Next check-in Oct 30 — did they respond?" — while a check is due the card asks it instead; a check
   // put off with "Later" says when it comes back ("We'll ask again Oct 25 — …", audit 3 M6).
   const next = isActive && !check ? EventStore.nextCheck(app) : null
@@ -173,7 +171,7 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
             const last = fromEmail[fromEmail.length - 1]
             const label: Record<string, string> = { application_submitted: 'confirmation', interview_received: 'interview invite', assessment_received: 'assessment', rejected: 'rejection', offer_received: 'offer' }
             return (
-              <div title="Updated from an email you forwarded to Seen" style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem', marginTop: '.25rem', marginLeft: app.seenApply && app.employerStage ? '.35rem' : 0, fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--blue)', border: '1px solid currentColor', borderRadius: 999, padding: '.12rem .5rem' }}>
+              <div title="Updated from an email you forwarded to Seen" style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem', marginTop: '.25rem', marginLeft: app.seenApply && app.employerStage ? '.35rem' : 0, fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-3)', border: '1px solid currentColor', borderRadius: 999, padding: '.125rem .5rem' }}>
                 <Icon name="mail" size={13} /> From email: {label[String(last.type)] || 'update'}
               </div>
             )
@@ -184,11 +182,11 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
             <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: app.score >= 70 ? 'var(--green)' : app.score >= 40 ? 'var(--amber)' : 'var(--red)', fontWeight: 500 }}>{app.score}</span>
           )}
           {ghostRate != null && ghostRate > 0.3 && !PREP_STAGES.includes(app.stage) && (
-            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: ghostRate > 0.55 ? 'var(--red)' : 'var(--amber)', background: ghostRate > 0.55 ? 'rgba(239,68,68,.08)' : 'rgba(245,158,11,.08)', border: `1px solid ${ghostRate > 0.55 ? 'rgba(239,68,68,.2)' : 'rgba(245,158,11,.2)'}`, borderRadius: 4, padding: '.1rem .3rem', marginTop: '.1rem' }}>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: ghostRate > 0.55 ? 'var(--red)' : 'var(--amber)', background: ghostRate > 0.55 ? 'rgba(239,68,68,.08)' : 'rgba(245,158,11,.08)', border: `1px solid ${ghostRate > 0.55 ? 'rgba(239,68,68,.2)' : 'rgba(245,158,11,.2)'}`, borderRadius: 4, padding: '.125rem .25rem', marginTop: '.125rem' }}>
               <Icon name={ghostRate > 0.55 ? 'ghost' : 'triangle-alert'} size={12} /> {Math.round(ghostRate * 100)}% ghost
             </span>
           )}
-          <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', background: 'var(--raised)', border: '1px solid var(--line)', borderRadius: 4, padding: '.1rem .35rem' }}>Day {days}</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', background: 'var(--raised)', border: '1px solid var(--line)', borderRadius: 4, padding: '.125rem .25rem' }}>Day {days}</span>
           {sync === 'saving' && <span className={`${s.sync} ${s.syncSaving}`} role="status">Saving…</span>}
           {sync === 'unsynced' && (
             <button type="button" className={`${s.sync} ${s.syncOff}`} onClick={e => { e.stopPropagation(); onRetry(app.id) }} title="This change is saved on this device but has not reached your account yet. Tap to send it again.">
@@ -224,7 +222,7 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
       {/* Ghost Watch — time-aware verdict from this company's real Seen data */}
       {watch && (
         <div style={{
-          marginTop: '.55rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', lineHeight: 1.6, borderRadius: 7, padding: '.45rem .7rem',
+          marginTop: '.5rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', lineHeight: 1.6, borderRadius: 7, padding: '.5rem .75rem',
           color: watch.tone === 'danger' ? 'var(--red)' : watch.tone === 'warn' ? 'var(--amber)' : 'var(--muted)',
           background: watch.tone === 'danger' ? 'rgba(239,68,68,.07)' : watch.tone === 'warn' ? 'rgba(245,158,11,.06)' : 'var(--raised)',
           border: `1px solid ${watch.tone === 'danger' ? 'rgba(239,68,68,.2)' : watch.tone === 'warn' ? 'rgba(245,158,11,.2)' : 'var(--line)'}`,
@@ -241,7 +239,7 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
       )}
 
       {/* Meta row */}
-      <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', marginTop: '.5rem', alignItems: 'center', minHeight: 24 }}>
+      <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginTop: '.5rem', alignItems: 'center', minHeight: 24 }}>
         <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>Applied {fmt(app.appliedAt)}</span>
         {app.platform && <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>via {app.platform}</span>}
         {listing && (listing.internal
@@ -253,7 +251,7 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
       {/* The employer edited the listing after this application went in — dated so the applicant
           knows the posting they read may have changed. */}
       {app.listingEditedAt && Date.parse(app.listingEditedAt) > app.appliedAt && (
-        <div style={{ marginTop: '.45rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--amber)' }}>
+        <div style={{ marginTop: '.5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--amber)' }}>
           <Icon name="pencil" size={13} /> Listing edited by the employer {fmt(Date.parse(app.listingEditedAt))} — after you applied
         </div>
       )}
@@ -261,10 +259,10 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
       {/* Messages on an Apply-on-Seen application: from the employer (interview time, a number to
           call, …) and the applicant's own withdrawal note. Stored once, on the employer's copy. */}
       {!!app.messages?.length && (
-        <div style={{ marginTop: '.7rem', display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+        <div style={{ marginTop: '.75rem', display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
           {app.messages.map((m, i) => (
-            <div key={i} style={{ borderRadius: 9, padding: '.5rem .7rem', background: m.from === 'employer' ? 'rgba(59,130,246,.08)' : 'var(--raised)', border: `1px solid ${m.from === 'employer' ? 'rgba(59,130,246,.25)' : 'var(--line)'}` }}>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: m.from === 'employer' ? 'var(--blue)' : 'var(--muted)', marginBottom: '.2rem' }}>
+            <div key={i} style={{ borderRadius: 9, padding: '.5rem .75rem', background: m.from === 'employer' ? 'rgba(59,130,246,.08)' : 'var(--raised)', border: `1px solid ${m.from === 'employer' ? 'rgba(59,130,246,.25)' : 'var(--line)'}` }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: m.from === 'employer' ? 'var(--blue)' : 'var(--muted)', marginBottom: '.25rem' }}>
                 {m.from === 'employer' ? app.company : m.withdrawal ? 'You · withdrew' : 'You'} · {fmt(Date.parse(m.at))}
               </div>
               {m.text
@@ -310,7 +308,7 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
           {app.status !== 'withdrawn' && (
             <button
               type="button"
-              className={`${s.act} ${s.actPrimary}`}
+              className={s.act}
               onClick={() => onShare(app)}
             >
               <Icon name="image" size={15} />Share outcome card
@@ -348,19 +346,19 @@ function CheckIn({ check, onAnswer, onSnooze, ghostRate, avgWaitDays }: {
   if (checkType === 'response_check') {
     answers.push({ icon: 'circle-check', label: 'Got a response', data: { got_response: true, response_type: 'unknown', days_to_response: daysElapsed }, tone: 'good' })
     answers.push({ icon: 'calendar', label: 'Interview', data: { got_response: true, response_type: 'interview', days_to_response: daysElapsed }, tone: 'good' })
-    answers.push({ label: '⏳ Not yet', data: { got_response: false, not_yet: true }, tone: 'neutral' })
+    answers.push({ icon: 'hourglass', label: 'Not yet', data: { got_response: false, not_yet: true }, tone: 'neutral' })
     answers.push({ icon: 'circle-x', label: 'Rejected', data: { got_response: true, response_type: 'rejection', days_to_response: daysElapsed } })
     answers.push({ icon: 'ghost', label: 'Ghosted', data: { got_response: false, response_type: 'ghosted', days_to_response: daysElapsed } })
     answers.push({ icon: 'undo-2', label: 'I withdrew', data: { got_response: false, response_type: 'withdrew', withdrew: true, days_to_response: daysElapsed } })
   } else if (checkType === 'interview_check') {
     answers.push({ icon: 'circle-check', label: 'Had an interview', data: { had_interview: true, interview_type: 'interview' }, tone: 'good' })
     answers.push({ icon: 'phone', label: 'Phone screen', data: { had_interview: true, interview_type: 'phone_screen' }, tone: 'good' })
-    answers.push({ label: '⏳ Not yet', data: { had_interview: false, ended: false, not_yet: true }, tone: 'neutral' })
+    answers.push({ icon: 'hourglass', label: 'Not yet', data: { had_interview: false, ended: false, not_yet: true }, tone: 'neutral' })
     answers.push({ icon: 'circle-x', label: 'Rejected', data: { had_interview: false, ended: true, outcome: 'rejected' } })
     answers.push({ icon: 'undo-2', label: 'I withdrew', data: { had_interview: false, ended: true, outcome: 'withdrew', withdrew: true } })
   } else {
     answers.push({ icon: 'trophy', label: 'Got an offer', data: { outcome: 'offer' }, tone: 'good' })
-    answers.push({ label: '⏳ Still waiting', data: { outcome: 'active' }, tone: 'neutral' })
+    answers.push({ icon: 'hourglass', label: 'Still waiting', data: { outcome: 'active' }, tone: 'neutral' })
     answers.push({ icon: 'circle-x', label: 'Rejected', data: { outcome: 'rejected' } })
     answers.push({ icon: 'ghost', label: 'Ghosted', data: { outcome: 'ghosted' } })
     answers.push({ icon: 'undo-2', label: 'I withdrew', data: { outcome: 'withdrew', withdrew: true } })
@@ -372,7 +370,7 @@ function CheckIn({ check, onAnswer, onSnooze, ghostRate, avgWaitDays }: {
       <div className="app-check-head">
         {/* The milestone, not the card's age: "Day 30 check-in · day 31" (audit 3 M7). */}
         <span className="app-check-tag"><span className="app-check-dot" />{checkLabel(check)}</span>
-        <button type="button" className="app-check-later" style={{ minHeight: 44, minWidth: 44, margin: '-.6rem -.3rem -.6rem 0' }} onClick={() => onSnooze(app.id, checkType)} title="Ask me again tomorrow">Later</button>
+        <button type="button" className="app-check-later" style={{ minHeight: 44, minWidth: 44, margin: '-.5rem -.25rem -.5rem 0' }} onClick={() => onSnooze(app.id, checkType)} title="Ask me again tomorrow">Later</button>
       </div>
       <div className="app-check-q">{q}</div>
       {showGhost && (
@@ -403,8 +401,10 @@ function TrackerPage() {
   // The account's rows could not be read: show the error + Retry and this device's local copy, never
   // "0 TOTAL · No applications yet" (R-1).
   const [loadFailed, setLoadFailed] = useState(false)
+  // The outcome card opens ONLY from the finished card's "Share outcome card" button — never by itself
+  // after an outcome is recorded (share cards are retired as a growth lever, owner 2026-10-24; phone
+  // round 2026-11-02: a full-screen share sheet opened over a rejection just logged).
   const [outcomeApp, setOutcomeApp] = useState<Application | null>(null)
-  const [roundsApp, setRoundsApp] = useState<Application | null>(null)
   const [showManual, setShowManual] = useState(false)
   const [showSurvey, setShowSurvey] = useState(false)
   // Survey source: prefer the résumé-based survey (asks about the user's past employers from
@@ -556,11 +556,13 @@ function TrackerPage() {
     const at = sortApplications(data, 'attention', due).findIndex(a => a.id === id)
     setFilterText(''); setSortMode('attention')
     if (at >= 0) setVisible(v => Math.max(v, Math.ceil((at + 1) / PAGE_SIZE) * PAGE_SIZE))
-    setTimeout(() => {
+    let tries = 0
+    const find = () => {
       const el = document.getElementById(`app_${id}`)
-      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }) }
-      setTimeout(() => setHighlightId(''), 2800)
-    }, 300)
+      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => setHighlightId(''), 2800); return }
+      if (++tries < 40) setTimeout(find, 100) // up to 4 s for the list to render on a slow phone
+    }
+    setTimeout(find, 300)
   }, [setExpandedId])
 
   const loadApps = useCallback(async () => {
@@ -591,6 +593,24 @@ function TrackerPage() {
   // For the purchase-return effect, which can finish before or after the list load.
   const appsRef = useRef<Application[]>([]); appsRef.current = apps
   const revealRef = useRef(reveal); revealRef.current = reveal
+
+  // The phone "+" hides while the list scrolls down (reading) and returns on scroll up / near the top.
+  const [fabTucked, setFabTucked] = useState(false)
+  useEffect(() => {
+    let last = window.scrollY
+    let settle: ReturnType<typeof setTimeout> | null = null
+    const onScroll = () => {
+      const y = window.scrollY
+      if (settle) clearTimeout(settle)
+      // Comes back the moment the scroll pauses (round 1: it stayed hidden until the very top on a phone).
+      settle = setTimeout(() => setFabTucked(false), 900)
+      if (Math.abs(y - last) < 8) return
+      setFabTucked(y > last && y > 120)
+      last = y
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => { window.removeEventListener('scroll', onScroll); if (settle) clearTimeout(settle) }
+  }, [])
 
   // Back to the tracker lands where the list was scrolled — unless the URL names a card to jump to.
   const [deepLinked] = useState(() => typeof window !== 'undefined' && (/[?&](app|prep|new)=/.test(window.location.search) || window.location.hash.startsWith('#app_')))
@@ -680,16 +700,16 @@ function TrackerPage() {
           body: JSON.stringify({ action: 'quick_submit', company: origApp.company, outcome, role: origApp.role, city: origApp.location || '', ...(appId ? { application_id: appId } : {}) }),
         })
           .then(res => (res.ok ? res.json() : null))
-          .then((d: { reward?: Parameters<typeof showReportReward>[0] } | null) => { if (d?.reward) showReportReward(d.reward) })
+          .then((d: { reward?: Parameters<typeof showReportReward>[0]; held?: boolean } | null) => {
+            if (!d) return
+            // A second report on the same company within 30 days is held (anti-gaming): it is saved for the
+            // record but never counted, so the company page will not show it (round 3: "Report saved" ×3, page unchanged).
+            if (d.held) showToast(`Saved to your tracker. Seen already counts a report from you for ${origApp.company} this month, so this one won't change its grade.`)
+            else if (!d.reward) showToast(`Report saved — it counts toward ${origApp.company}’s grade.`)
+            if (d.reward) showReportReward(d.reward)
+          })
           .catch(() => {})
       }).catch(() => {})
-    }
-    if (changes.status && ['hired', 'ghosted', 'rejected'].includes(changes.status)) {
-      const app = after.find(a => a.id === id)
-      if (app) {
-        setOutcomeApp(app)
-        if (changes.status === 'hired') setRoundsApp(app)
-      }
     }
     return r
   }
@@ -753,7 +773,7 @@ function TrackerPage() {
           body: avgWait
             ? `You reached the interview stage at ${app.company} in ${days} days. Applicants there wait about ${avgWait} days just for a first response. Your interview prep is on the card.`
             : `You reached the interview stage at ${app.company} in ${days} days. Your interview prep is on the card — see what happened to others who interviewed there.`,
-          color: 'rgba(99,102,241,0.12)',
+          color: 'var(--accent-tint)',
         })
       } else if (rt !== 'withdrew') {
         const avgWait = score?.avg_wait_days || null
@@ -772,7 +792,7 @@ function TrackerPage() {
         setUpdateInsight({
           title: 'Interview stage confirmed',
           body: `You\'re in the interview stage at ${app.company} after ${days} days. Most applications never get this far. Your interview prep is on the card.`,
-          color: 'rgba(99,102,241,0.12)',
+          color: 'var(--accent-tint)',
         })
       }
     } else if (checkType === 'outcome_check') {
@@ -815,12 +835,9 @@ function TrackerPage() {
     else if (r.status === 'failed') showToast('Saved on this device — it didn’t reach your account yet. Tap “Not synced · Retry” on the card.')
   }
 
-  // Route a terminal tracked app to the report page pre-loaded for one-click card creation.
-  // /report reads app_id + auto=1 and prefills + renders the OutcomeCard inline from real
-  // tracker data (no re-typing). This is the tracker→report→share virality loop.
-  const handleShare = (app: Application) => {
-    router.push(`/report?app_id=${encodeURIComponent(app.id)}&auto=1`)
-  }
+  // "Share outcome card" on a finished card: the card's own outcome sheet, here, on request only. (It used
+  // to route to /report?auto=1, which filed the outcome a second time on the way to the same card.)
+  const handleShare = (app: Application) => setOutcomeApp(app)
 
   // A check-in answer is DATA ON THE APPLICATION (H3): a check_answered marker plus whatever it means
   // for the stage/status, in ONE update_application call — so the next device knows it was answered
@@ -969,16 +986,6 @@ function TrackerPage() {
         otherGrades={Object.entries(companyScores).filter(([k]) => k !== outcomeApp.company.toLowerCase().trim()).map(([, v]) => gradeLetter(v.overall_score))}
       />
     )}
-    {roundsApp && !outcomeApp && (
-      <RoundsPrompt
-        app={roundsApp}
-        onSubmit={(rounds, notes) => {
-          EventStore.add({ appId: roundsApp.id, type: 'rounds_reported', data: { rounds, notes } })
-          setRoundsApp(null)
-        }}
-        onSkip={() => setRoundsApp(null)}
-      />
-    )}
     <div className="page-full">
       <div className={s.body} style={{ maxWidth: 1000, margin: '0 auto', padding: '2.5rem 1rem', width: '100%', boxSizing: 'border-box' }}>
 
@@ -989,7 +996,7 @@ function TrackerPage() {
           eyebrow="Application tracker"
           title="My applications"
           sub="Your applications sync to your account. Seen checks in with you at day 7, 14 and 30."
-          actions={<button type="button" className={`${s.act} ${s.actPrimary} ${s.deskOnly}`} onClick={() => setShowManual(true)}>+ Track application</button>}
+          actions={apps.length > 0 ? <button type="button" className={`${s.act} ${s.actPrimary} ${s.deskOnly}`} onClick={() => setShowManual(true)}>+ Track application</button> : undefined}
         />
 
         {loadFailed && (
@@ -1003,7 +1010,9 @@ function TrackerPage() {
           </div>
         )}
 
-        {/* Inbox Autopilot — forwarded job emails keep these cards up to date (hidden until it is live) */}
+        {/* Inbox Autopilot — forwarded job emails keep these cards up to date (hidden until it is live). Its
+            working panel sits up here; while it is off, the promo sits UNDER the list (one line on a fresh
+            account): nothing promotional above the first application card (phone round 2026-11-02). */}
         <InboxAutopilot apps={apps} token={token} onAppsChanged={loadApps} status={inboxStatus} />
 
         {/* Stats — tiles on wide screens; one line on phones so the cards come first */}
@@ -1014,9 +1023,9 @@ function TrackerPage() {
             {withdrawn.length > 0 && <><span className={s.sep}>·</span><b>{withdrawn.length}</b> withdrawn</>}
           </div>
         )}
-        {/* Hidden when the account could not be read and this device holds nothing: a row of zeros under an
-            error block would still read as "you have no applications" (R-1). */}
-        {!(loadFailed && apps.length === 0) && (
+        {/* Only once there is a list: a row of zeros is not information, and under a failed load it would
+            still read as "you have no applications" (R-1). */}
+        {apps.length > 0 && (
         <div className={`${s.statTiles} ${s.deskOnly}`}>
           {[
             { label: 'Total', n: apps.length },
@@ -1037,7 +1046,7 @@ function TrackerPage() {
         {/* Funnel visualization — needs enough applications to mean anything */}
         {apps.length >= 5 && (
           <div className={s.after} style={{ marginBottom: '1.5rem', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 12, padding: '1rem 1.25rem' }}>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.09em', color: 'var(--dim)', marginBottom: '.85rem' }}>Application Funnel</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.09em', color: 'var(--dim)', marginBottom: '.75rem' }}>Application Funnel</div>
             <div className="funnel">
               {(() => {
                 const stageLevel = (s: string) => ['Applied', 'Viewed', 'Phone Screen', 'Interview', 'Final Round', 'Offer'].indexOf(s)
@@ -1048,7 +1057,7 @@ function TrackerPage() {
                 const interviewed = apps.filter(a => stageLevel(a.stage) >= 3 || a.status === 'hired').length
                 return [
                   { label: 'Applied', n: apps.length, color: 'var(--blue)' },
-                  { label: 'Screened', n: screened, color: '#6366f1' },
+                  { label: 'Screened', n: screened, color: 'var(--accent)' },
                   { label: 'Interview', n: interviewed, color: 'var(--amber)' },
                   { label: 'Hired', n: hired.length, color: 'var(--green)' },
                 ].map(s => (
@@ -1081,12 +1090,12 @@ function TrackerPage() {
           })
           if (!atRisk.length) return null
           return (
-            <div style={{ marginBottom: '1.25rem', background: 'rgba(239,68,68,.05)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 12, padding: '1rem 1.1rem' }}>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.09em', color: 'var(--red)', marginBottom: '.65rem', display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+            <div style={{ marginBottom: '1.25rem', background: 'rgba(239,68,68,.05)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 12, padding: '1rem 1rem' }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.09em', color: 'var(--red)', marginBottom: '.75rem', display: 'flex', alignItems: 'center', gap: '.5rem' }}>
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--red)', display: 'inline-block' }} />
                 {atRisk.length} application{atRisk.length > 1 ? 's' : ''} at ghost risk
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                 {atRisk.slice(0, 3).map(a => {
                   const score = companyScores[a.company.toLowerCase().trim()]!
                   const days = getDaysSince(a.appliedAt)
@@ -1116,12 +1125,12 @@ function TrackerPage() {
 
         {/* Update insight — shown after answering a check card */}
         {updateInsight && (
-          <div style={{ marginBottom: '1.25rem', background: updateInsight.color, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '1rem 1.1rem', animation: 'fadeUp .3s ease backwards', display: 'flex', gap: '.85rem', alignItems: 'flex-start' }}>
+          <div style={{ marginBottom: '1.25rem', background: updateInsight.color, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '1rem 1rem', animation: 'fadeUp .3s ease backwards', display: 'flex', gap: '.75rem', alignItems: 'flex-start' }}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--white)', marginBottom: '.3rem' }}>{updateInsight.title}</div>
+              <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--white)', marginBottom: '.25rem' }}>{updateInsight.title}</div>
               <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.7 }}>{updateInsight.body}</div>
             </div>
-            <button type="button" aria-label="Dismiss" onClick={() => setUpdateInsight(null)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 'var(--fs-meta)', minWidth: 44, minHeight: 44, margin: '-.6rem -.6rem -.6rem 0', flexShrink: 0 }}>✕</button>
+            <button type="button" aria-label="Dismiss" onClick={() => setUpdateInsight(null)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 'var(--fs-meta)', minWidth: 44, minHeight: 44, margin: '-.5rem -.5rem -.5rem 0', flexShrink: 0 }}>✕</button>
           </div>
         )}
 
@@ -1140,56 +1149,17 @@ function TrackerPage() {
           </button>
         )}
 
-        {/* Empty state — both ways in: track one yourself, or Apply on a job. Never shown for a failed load. */}
+        {/* Empty state — the whole screen on a fresh account: one sentence, the page's ONE filled button, a
+            text link to the other way in (Apply on a job). Never shown for a failed load. */}
         {apps.length === 0 && !loadFailed && (
-          <div className={s.empty}>
+          <div className={`${s.empty} ${s.emptyCard}`} data-testid="tracker-empty">
             <div className={s.emptyIcon}><Icon name="list-checks" size={28} /></div>
             <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', marginBottom: '.5rem' }}>No applications yet</div>
             <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.6, maxWidth: 420, margin: '0 auto' }}>Add one you already sent, or hit Apply on a job here and it lands on this list by itself.</div>
             <div className={s.emptyBtns}>
               <button type="button" className={`${s.act} ${s.actPrimary}`} onClick={() => setShowManual(true)}>+ Track application</button>
-              <Link href="/jobs" className={s.act}>Browse jobs →</Link>
             </div>
-          </div>
-        )}
-
-        {/* Survey CTA — once at least one application is a week old there is something to report */}
-        {anyWeekOld && !showSurvey && (
-          <div
-            className={s.after}
-            role="button"
-            tabIndex={0}
-            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSurveyMode('resume'); setShowSurvey(true) } }}
-            onClick={() => { setSurveyMode('resume'); setShowSurvey(true) }}
-            style={{
-              background: 'linear-gradient(90deg, rgba(99,102,241,.1), rgba(124,58,237,.06))',
-              border: '1px solid rgba(99,102,241,.22)',
-              borderRadius: 10,
-              padding: '.65rem 1rem',
-              marginBottom: '.75rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '.75rem',
-              cursor: 'pointer',
-              transition: 'background .15s',
-            }}
-          >
-            <div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--indigo)', fontWeight: 500, marginBottom: '.12rem', display: 'flex', alignItems: 'center', gap: '.35rem' }}>
-                <Icon name="sparkles" size={13} />
-                {creditsEarned > 0 ? `You earned ${creditsEarned} credit${creditsEarned !== 1 ? 's' : ''} — keep going` : 'Earn up to 5 credits today'}
-              </div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)' }}>
-                Share what happened with your applications — 90 sec, helps future job seekers
-              </div>
-            </div>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--indigo)', flexShrink: 0 }}>Start →</span>
-          </div>
-        )}
-        {creditsEarned > 0 && !showSurvey && (
-          <div className={s.after} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', textAlign: 'center', marginBottom: '.65rem' }}>
-            <Icon name="check" size={13} /> +{creditsEarned} credits earned this session
+            <Link href="/jobs" className={s.textLink}>Browse jobs →</Link>
           </div>
         )}
 
@@ -1222,7 +1192,7 @@ function TrackerPage() {
         {apps.length > 0 && (
           <div id="trackerList" style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
             {pageApps.map(app => (
-              <div key={app.id} style={highlightId === app.id ? { borderRadius: 12, boxShadow: '0 0 0 2px var(--green), 0 0 30px rgba(16,185,129,0.3)', transition: 'box-shadow 2.5s ease' } : undefined}>
+              <div key={app.id} style={highlightId === app.id ? { borderRadius: 12, boxShadow: '0 0 0 2px var(--green)', transition: 'box-shadow 2.5s ease' } : undefined}>
                 <AppCard app={app} expanded={expandedId === app.id} setExpanded={open => setExpandedId(open ? app.id : '')} onUpdate={handleUpdate} onEdit={a => { setEditNotice(''); setEditing(a) }} onRemove={handleRemove} onShare={handleShare} onReload={loadApps} intel={companyScores[app.company.toLowerCase().trim()]} check={checkByApp.get(app.id)} onAnswer={handleCheckAnswer} onSnooze={handleSnooze} sync={syncOf(app)} onRetry={handleRetry} isPro={isPro} autoPrep={prepReturn === app.id && isPro} leadPrep={leadPrepId === app.id} onSchedule={handleSchedule} />
               </div>
             ))}
@@ -1232,6 +1202,46 @@ function TrackerPage() {
           <button type="button" className={`${s.act} ${s.more}`} onClick={() => setVisible(v => v + PAGE_SIZE)}>
             Show {Math.min(PAGE_SIZE, shownApps.length - pageApps.length)} more <span className={s.moreN}>· {shownApps.length - pageApps.length} not shown</span>
           </button>
+        )}
+
+        {/* Survey CTA — under the list (never above the first card), once an application is a week old */}
+        {anyWeekOld && !showSurvey && (
+          <div
+            className={`${s.after} ${s.surveyCta}`}
+            role="button"
+            tabIndex={0}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSurveyMode('resume'); setShowSurvey(true) } }}
+            onClick={() => { setSurveyMode('resume'); setShowSurvey(true) }}
+            style={{
+              background: 'var(--accent-tint)',
+              border: '1px solid var(--accent-line)',
+              borderRadius: 10,
+              padding: '.75rem 1rem',
+              marginBottom: '.75rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '.75rem',
+              cursor: 'pointer',
+              transition: 'background .15s',
+            }}
+          >
+            <div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--accent)', fontWeight: 500, marginBottom: '.125rem', display: 'flex', alignItems: 'center', gap: '.25rem' }}>
+                <Icon name="sparkles" size={13} />
+                {creditsEarned > 0 ? `You earned ${creditsEarned} credit${creditsEarned !== 1 ? 's' : ''} — keep going` : 'Earn up to 5 credits today'}
+              </div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)' }}>
+                Share what happened with your applications — 90 sec, helps future job seekers
+              </div>
+            </div>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--accent)', flexShrink: 0 }}>Start →</span>
+          </div>
+        )}
+        {creditsEarned > 0 && !showSurvey && (
+          <div className={s.after} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--good-text)', textAlign: 'center', marginBottom: '.75rem' }}>
+            <Icon name="check" size={13} /> +{creditsEarned} credits earned this session
+          </div>
         )}
 
         {/* Housekeeping — under the list, out of the way of it; only once there is a list (≥2 cards). */}
@@ -1246,9 +1256,11 @@ function TrackerPage() {
 
       </div>
     </div>
-    {/* Phones: "+ Track application" floats above the tab bar so it is always one tap away */}
+    {/* Phones: a round "+" above the tab bar — tucked away while scrolling down so it never sits on a
+        card's words, back on the first scroll up (owner 2026-11-01: "this button overlaps everything"). */}
+    {apps.length > 0 && <div className={s.fabSpace} aria-hidden />}
     {apps.length > 0 && !showManual && !editing && !expandedId && prepOpen === 0 && (
-      <button type="button" className={s.fab} onClick={() => setShowManual(true)} aria-label="Track application">+ Track application</button>
+      <button type="button" className={`${s.fab}${fabTucked ? ' ' + s.fabTucked : ''}`} onClick={() => setShowManual(true)} aria-label="Track application" title="Track application"><Icon name="plus" size={24} /></button>
     )}
     {showSurvey && surveyMode === 'resume' && (
       <ResumeSurveyModal

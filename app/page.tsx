@@ -1,6 +1,7 @@
 import HomeHero from '@/components/HomeHero'
 import LandingMarketingSections from '@/components/LandingMarketingSections'
 import LivePulse from '@/components/home/LivePulse'
+import { getOpenDataset } from '@/lib/server/openDataRead'
 import { jsonLdHtml } from '@/lib/jsonLd'
 import { siteOrganization } from '@/lib/siteIdentity'
 
@@ -30,7 +31,11 @@ const HOME_JSON_LD = {
   ],
 }
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  // ONE number for "applicant accounts" across the site: the open dataset's totals, the same ones /data prints
+  // (round 1: the homepage, /data and the ghost report each showed a different total for the same noun).
+  const ds = await getOpenDataset().catch(() => null)
+  const totals = ds ? { reports: ds.totals.reports, companies: ds.totals.companies } : null
   return (
     <div className="lp2">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(HOME_JSON_LD) }} />
@@ -45,7 +50,7 @@ export default function LandingPage() {
       <HomeHero />
 
       {/* Live pulse: the newest real applicant accounts gliding by (components/home/LivePulse) */}
-      <LivePulse />
+      <LivePulse totals={totals} />
 
       {/* Value · How it works · Final CTA.
           NOTE: no page-local footer here — the global <Footer /> from app/layout.tsx

@@ -152,17 +152,19 @@ async function employerRoute(req, res, { db, body, uid }) {
       return res.status(409).json({ error: 'This company has already been claimed. Contact us if this is a mistake.', reason: 'company_taken' });
     }
 
-    // Instant approval when the signup email's domain belongs to the company (brandon@acme.com
-    // claiming "Acme"): Supabase already proved they control that mailbox — strong enough evidence
-    // of employment to skip the manual admin queue. Everything else falls through to 'pending'.
-    const autoApprove = emailDomainMatchesCompany(prof?.email, rawName);
-    const nowIso = new Date().toISOString();
+    // Every claim waits for an admin (security audit 2026-11-01). Auto-approval by email domain was
+    // takeover-grade: it read profiles.email (which the account can edit) and matched by substring
+    // ("walmart-careers.com" → Walmart, "target.dev" → Target), and an approved claim hands over that
+    // company's listings and its applicants' résumés. The admin now sees the VERIFIED sign-in email and
+    // a hint when its domain looks like the company's — the decision is a person's.
+    const verified = await verifiedAuthEmail(uid);
+    const domainHint = verified && emailDomainMatchesCompany(verified, rawName);
     const insertRow = {
       user_id: uid,
       company_name: canonical,
       company_display_name: rawName,
-      status: autoApprove ? 'approved' : 'pending',
-      ...(autoApprove ? { reviewed_at: nowIso, reviewed_by: 'auto:domain-match', note: 'Auto-approved — verified company email domain.' } : {}),
+      status: 'pending',
+      ...(domainHint ? { note: `Hint: verified sign-in email ${verified} looks like ${rawName}'s domain — confirm it is the company's real domain.` } : {}),
     };
 
     const insRes = await db('employer_company_claims', {
@@ -181,14 +183,22 @@ async function employerRoute(req, res, { db, body, uid }) {
     }
     const claim = (await insRes.json())[0] || null;
     broadcastActivity('claim'); // admin bell ping (an approved claim still shows in the admin log)
-    if (autoApprove && prof?.email) {
-      // Best-effort — never let a mail hiccup fail an approved claim.
-      await sendClaimApprovedEmail({ to: prof.email, company: rawName, auto: true }).catch(() => {});
-    }
-    return res.status(200).json({ ok: true, claim, auto_approved: autoApprove, claims: await listClaimsForUser(db, uid) });
+    return res.status(200).json({ ok: true, claim, auto_approved: false, claims: await listClaimsForUser(db, uid) });
   }
 
   return res.status(400).json({ error: 'Unknown action' });
+}
+
+/** The account's sign-in email when Supabase has confirmed it, else null. */
+async function verifiedAuthEmail(uid) {
+  const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_KEY;
+  if (!url || !key || !uid) return null;
+  try {
+    const r = await fetch(`${url}/auth/v1/admin/users/${encodeURIComponent(uid)}`, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
+    if (!r.ok) return null;
+    const u = await r.json();
+    return u && u.email && u.email_confirmed_at ? String(u.email) : null;
+  } catch { return null; }
 }
 
 async function listClaimsForUser(db, uid) {
@@ -266,8 +276,7 @@ async function adminRoute(req, res, { db, body, adminToken }) {
     // email by the claim's user_id (the PATCH representation doesn't carry it).
     if (action === 'approve' && updated?.user_id) {
       try {
-        const pr = await db(`profiles?id=eq.${encodeURIComponent(updated.user_id)}&select=email&limit=1`);
-        const email = pr.ok ? (await pr.json())[0]?.email : null;
+        const email = await verifiedAuthEmail(updated.user_id); // never the editable profiles.email
         if (email) await sendClaimApprovedEmail({ to: email, company: updated.company_display_name || updated.company_name, auto: false });
       } catch { /* best-effort */ }
     }
@@ -294,9 +303,12 @@ async function attachEmployerEmails(db, claims) {
     const r = await db(`profiles?id=in.(${inList})&select=id,email,name`);
     const rows = r.ok ? await r.json() : [];
     const byId = new Map(rows.map(p => [p.id, p]));
+    // The sign-in email (verified by Supabase), never profiles.email, which the account can edit.
+    const verified = new Map(await Promise.all(ids.map(async id => [id, await verifiedAuthEmail(id)])));
     return claims.map(c => ({
       ...c,
-      email: byId.get(c.user_id)?.email || null,
+      email: verified.get(c.user_id) || null,
+      email_verified: !!verified.get(c.user_id),
       employer_name: byId.get(c.user_id)?.name || null,
     }));
   } catch {

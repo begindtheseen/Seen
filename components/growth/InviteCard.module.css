@@ -1,19 +1,19 @@
 /* Invite card. Solid surface, 44px controls, nothing under 12px, grid tracks that may shrink. */
 .card {
   margin-top: 1.25rem;
-  padding: 1.1rem 1.15rem;
+  padding: 1rem 1.25rem;
   border: 1px solid var(--line2);
   border-radius: 16px;
-  background: #0e111c;
+  background: var(--surface-overlay);
   min-width: 0;
 }
-.head { display: flex; flex-direction: column; gap: .3rem; min-width: 0; }
+.head { display: flex; flex-direction: column; gap: .25rem; min-width: 0; }
 .eyebrow {
   font-family: var(--mono);
   font-size: var(--fs-meta);
   letter-spacing: .12em;
   text-transform: uppercase;
-  color: #a5a8cf;
+  color: var(--text-3);
 }
 .title {
   margin: 0;
@@ -21,27 +21,27 @@
   font-weight: 800;
   font-size: var(--fs-lead);
   letter-spacing: -.02em;
-  color: var(--white, #fff);
+  color: var(--white);
 }
 .lead { margin: 0; font-family: var(--body); font-size: var(--fs-ui); line-height: 1.55; color: var(--sub, rgba(255,255,255,.72)); }
 .linkRow {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: .6rem;
+  gap: .5rem;
   align-items: center;
-  margin-top: .9rem;
+  margin-top: 1rem;
 }
 .link {
   display: flex;
   align-items: center;
   min-height: 44px;
-  padding: 0 .8rem;
+  padding: 0 .75rem;
   border-radius: 10px;
   border: 1px solid var(--line2);
-  background: #080a12;
+  background: var(--surface-1);
   font-family: var(--mono);
   font-size: var(--fs-sm);
-  color: #e5e7eb;
+  color: var(--text-2);
   overflow-wrap: anywhere;
   min-width: 0;
 }
@@ -56,28 +56,30 @@
   cursor: pointer;
   white-space: nowrap;
 }
-.primary { border: 1px solid rgba(59,130,246,.6); background: var(--blue, #3b82f6); color: #fff; }
-.ghost { border: 1px solid var(--line2); background: transparent; color: #e5e7eb; }
-.primary:focus-visible, .ghost:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+/* Outlined ink: the dashboard's and Settings' one filled button is elsewhere (DESIGN.md §5), and white on
+   var(--blue) was 3.5:1. */
+.primary { border: 1px solid var(--border-2); background: var(--surface-2); color: var(--text-1); }
+.ghost { border: 1px solid var(--line2); background: transparent; color: var(--text-2); }
+.primary:focus-visible, .ghost:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .note { margin: .5rem 0 0; font-family: var(--body); font-size: var(--fs-sm); color: var(--sub, rgba(255,255,255,.72)); }
 .stats {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: .6rem;
-  margin-top: .9rem;
+  gap: .5rem;
+  margin-top: 1rem;
 }
 .stat {
   display: flex;
   flex-direction: column;
   gap: .25rem;
-  padding: .7rem .8rem;
+  padding: .75rem .75rem;
   border-radius: 12px;
   border: 1px solid var(--line2);
   min-width: 0;
 }
-.stat b { font-family: var(--body); font-size: var(--fs-ui); font-weight: 600; color: #f3f4f6; overflow-wrap: anywhere; }
+.stat b { font-family: var(--body); font-size: var(--fs-ui); font-weight: 600; color: var(--text-1); overflow-wrap: anywhere; }
 .stat small { font-family: var(--body); font-size: var(--fs-meta); line-height: 1.45; color: var(--sub, rgba(255,255,255,.66)); overflow-wrap: anywhere; }
-.fine { margin: .8rem 0 0; font-family: var(--body); font-size: var(--fs-meta); line-height: 1.5; color: var(--muted, rgba(255,255,255,.55)); }
+.fine { margin: .75rem 0 0; font-family: var(--body); font-size: var(--fs-meta); line-height: 1.5; color: var(--muted, rgba(255,255,255,.55)); }
 @media (max-width: 560px) {
   .linkRow { grid-template-columns: minmax(0, 1fr); }
   .btns > * { flex: 1 1 0; }

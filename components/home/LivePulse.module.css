@@ -2,14 +2,15 @@
 
 .pulse { position: relative; z-index: 2; width: 100%; max-width: 1120px; margin: 0 auto; padding: 0.5rem 1.25rem 1.5rem; box-sizing: border-box; }
 
-.head { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.7rem; font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); }
-.live { display: inline-flex; align-items: center; gap: 0.4rem; color: #6ee7b7; font-weight: 600; }
-.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); animation: lpPing 2.2s infinite; }
-@keyframes lpPing { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55) } 70% { box-shadow: 0 0 0 7px rgba(16, 185, 129, 0) } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0) } }
+.head { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: .75rem; font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); }
+/* "Live" is a label — ink (DESIGN.md §2); the dot is the one accent, pulsing in the accent's own line colour. */
+.live { display: inline-flex; align-items: center; gap: .5rem; color: var(--text-2); font-weight: 600; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 0 var(--accent-line); animation: lpPing 2.2s infinite; }
+@keyframes lpPing { 0% { box-shadow: 0 0 0 0 var(--accent-line) } 70% { box-shadow: 0 0 0 7px transparent } 100% { box-shadow: 0 0 0 0 transparent } }
 .title { color: var(--sub); }
 .count { color: var(--dim); letter-spacing: 0.06em; text-transform: none; }
-.more { margin-left: auto; color: #a5b4fc; text-decoration: none; letter-spacing: 0.06em; text-transform: none; }
-.more:hover { color: #c7d2fe; }
+.more { margin-left: auto; color: var(--accent); text-decoration: none; letter-spacing: 0.06em; text-transform: none; }
+.more:hover { color: var(--white); }
 
 .rail {
   overflow: hidden; width: 100%;
@@ -26,14 +27,14 @@
 
 .chip {
   display: inline-flex; align-items: center; gap: 0.5rem; white-space: nowrap;
-  padding: 0.5rem 0.8rem 0.5rem 0.6rem; border-radius: 999px;
+  padding: 0.5rem .75rem 0.5rem .5rem; border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.09); background: rgba(255, 255, 255, 0.03);
   color: var(--sub); font-size: var(--fs-meta); text-decoration: none;
   max-width: calc(100vw - 2.5rem); min-width: 0; box-sizing: border-box;
   transition: border-color 0.18s ease, background 0.18s ease, transform 0.3s var(--ease-spring);
 }
 .chip b, .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.chip:hover { border-color: rgba(129, 140, 248, 0.45); background: rgba(99, 102, 241, 0.1); transform: translateY(-2px); }
+.chip:hover { border-color: var(--accent-line); background: var(--accent-tint); transform: translateY(-2px); }
 .chip b { color: var(--white); font-weight: 600; }
 .ico { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; font-size: var(--fs-meta); background: rgba(255, 255, 255, 0.05); }
 .what { max-width: 26ch; overflow: hidden; text-overflow: ellipsis; }

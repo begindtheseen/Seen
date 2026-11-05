@@ -72,7 +72,7 @@ export default function CheckinEmailAsk({ company, plan, next, inviteWaiting = f
     return (
       <div data-testid="checkin-sent" aria-live="polite">
         <p className={s.ok}>Check your email.</p>
-        <p className={s.sub} style={{ marginBottom: '.3rem' }}>
+        <p className={s.sub} style={{ marginBottom: '.25rem' }}>
           We sent a link to <strong style={{ color: 'var(--white)' }}>{email.trim()}</strong>. Tap it to turn on your {co} check-ins. It brings you back here.
         </p>
         <div className={s.actions}>
@@ -84,10 +84,10 @@ export default function CheckinEmailAsk({ company, plan, next, inviteWaiting = f
 
   return (
     <div data-testid="checkin-ask">
-      <p className={s.sub} style={{ color: 'var(--text)', marginBottom: '.35rem', fontWeight: 600 }}>
+      <p className={s.sub} style={{ color: 'var(--text)', marginBottom: '.25rem', fontWeight: 600 }}>
         Keep this on your phone too — just your email.
       </p>
-      <ul className={s.small} style={{ margin: '0 0 .6rem', paddingLeft: '1.1rem', lineHeight: 1.6 }}>
+      <ul className={s.small} style={{ margin: '0 0 .5rem', paddingLeft: '1rem', lineHeight: 1.6 }}>
         <li>Your tracker follows you to any device.</li>
         <li>{first ? <>A check-in on {shortDay(first.at)}</> : <>Email check-ins</>} so {co} can&apos;t quietly drop off your list.</li>
         <li>If {co} calls you in, Seen shows what happened to others who interviewed there and when to follow up.</li>

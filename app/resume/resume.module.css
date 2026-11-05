@@ -1,0 +1,14 @@
+/* /resume — page-local overrides of the shared .ai-tabs strip (app/globals.css paints the active tab green;
+   the one signal colour is the accent, and five tabs must fit a 390px screen without a page scroll). */
+.tabs {
+  flex-wrap: wrap;
+  overflow: visible;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
+}
+.tabs :global(.ai-tab) { flex: 0 1 auto; min-height: 44px; }
+.tabs :global(.ai-tab.active) {
+  border-color: var(--accent-line);
+  color: var(--accent);
+  background: var(--accent-tint);
+}

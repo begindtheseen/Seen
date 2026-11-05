@@ -140,7 +140,7 @@ export default function HomeHero() {
       <section className={styles.hero}>
         <span className={`${styles.eyebrow} ${styles.stage} ${styles.d1}`}>
           <span className={styles.pulse} />
-          Real hiring outcomes from real applicants
+          Real applicant outcomes
         </span>
 
         {/* Kinetic headline: each word rises from behind its own clip, 42ms apart. */}
@@ -152,6 +152,8 @@ export default function HomeHero() {
           Check any company&apos;s ghost rate before you spend an hour applying. Then track every
           application in one place that tells you when to follow up and when to move on.
         </p>
+        {/* The footer's best line, up where it is read (owner 2026-11-01). */}
+        <p className={`${styles.origin} ${styles.stage} ${styles.d3}`}>Built in California by a job seeker who got ghosted too.</p>
 
         <form
           className={`${styles.search} ${styles.stage} ${styles.d4}`}

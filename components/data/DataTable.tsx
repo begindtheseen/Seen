@@ -4,7 +4,7 @@
 // no-JS readers get every row in the HTML); search and sort only re-order what is already there.
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import styles from './openData.module.css'
 import { gradeTone } from '@/lib/ui/tone.js'
 
@@ -60,8 +60,28 @@ export default function DataTable({ rows }: { rows: TableRow[] }) {
     return list
   }, [rows, q, sort])
 
+  // 401 rows as phone cards made a 65,840px page (round 3): the first 60 render, one button shows the rest.
+  const [showAll, setShowAll] = useState(false)
+  const ROW_CAP = 60
+  const visible = showAll || shown.length <= ROW_CAP ? shown : shown.slice(0, ROW_CAP)
+
   const onSort = (key: Key, first: 'asc' | 'desc') =>
     setSort((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: first }))
+
+  // The table is wider than a phone and scrolls inside its box; a right-edge fade says so until the last
+  // column is in view (round 2: 716px of table at 390 with no cue). Under 480px the rows become cards.
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const [atEnd, setAtEnd] = useState(true)
+  const measure = () => {
+    const el = wrapRef.current
+    if (!el) return
+    setAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 2)
+  }
+  useEffect(() => {
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [shown.length])
 
   return (
     <div>
@@ -79,8 +99,24 @@ export default function DataTable({ rows }: { rows: TableRow[] }) {
         <span className={styles.count} aria-live="polite">
           {shown.length === rows.length ? `${rows.length.toLocaleString('en-US')} companies` : `${shown.length.toLocaleString('en-US')} of ${rows.length.toLocaleString('en-US')} companies`}
         </span>
+        {/* Phones show the rows as cards (no header to tap), so the sort lives in one select there. */}
+        <select
+          className={styles.sortSel}
+          aria-label="Sort companies by"
+          value={`${sort.key}:${sort.dir}`}
+          onChange={(e) => { const [key, dir] = e.target.value.split(':') as [Key, 'asc' | 'desc']; setSort({ key, dir }) }}
+        >
+          <option value="n:desc">Most applicant accounts</option>
+          <option value="s:desc">Highest grade</option>
+          <option value="s:asc">Lowest grade</option>
+          <option value="r:desc">Hear back most</option>
+          <option value="gh:desc">Never hear back most</option>
+          <option value="u:desc">Recently updated</option>
+          <option value="c:asc">Company A–Z</option>
+        </select>
       </div>
-      <div className={styles.tableWrap} role="region" aria-label="Employer response rates" tabIndex={0}>
+      <div className={styles.tableShell} data-end={atEnd ? 'true' : 'false'}>
+      <div className={styles.tableWrap} role="region" aria-label="Employer response rates" tabIndex={0} ref={wrapRef} onScroll={measure}>
         <table className={styles.table}>
           <thead>
             <tr>
@@ -103,26 +139,32 @@ export default function DataTable({ rows }: { rows: TableRow[] }) {
             </tr>
           </thead>
           <tbody>
-            {shown.map((r) => (
+            {visible.map((r) => (
               <tr key={r.p}>
                 <td className={styles.colCo}>
                   <Link href={r.p} prefetch={false} className={styles.coLink}>{r.c}</Link>
                   {r.a && <span className={styles.tag}>agency</span>}
                 </td>
-                <td className={styles.num}><span className={`${styles.grade} ${gradeClass(r.s)}`}>{r.g}</span> <span className={styles.dash}>{r.s}</span></td>
-                <td className={styles.num}>{r.r == null ? <span className={styles.dash} title="Too few applicant accounts for a rate">n/a</span> : `${r.r}%`}</td>
-                <td className={styles.num}>{r.gh == null ? <span className={styles.dash} title="Too few applicant accounts for a rate">n/a</span> : `${r.gh}%`}</td>
-                <td className={styles.num}>
+                <td className={styles.num} data-l="Grade"><span className={`${styles.grade} ${gradeClass(r.s)}`}>{r.g}</span> <span className={styles.dash}>{r.s}</span></td>
+                <td className={styles.num} data-l="Hear back">{r.r == null ? <span className={styles.dash} title="Too few applicant accounts for a rate">n/a</span> : `${r.r}%`}</td>
+                <td className={styles.num} data-l="Ghosted">{r.gh == null ? <span className={styles.dash} title="Too few applicant accounts for a rate">n/a</span> : `${r.gh}%`}</td>
+                <td className={styles.num} data-l="Accounts">
                   {r.n.toLocaleString('en-US')}
                   {r.pub != null && r.pub > 0 && <span className={styles.tag} title="Found in public posts (Reddit threads, review sites)">{r.pub === r.n ? 'all public posts' : `${r.pub.toLocaleString('en-US')} public`}</span>}
                 </td>
-                <td className={styles.num}>{r.u ?? <span className={styles.dash}>n/a</span>}</td>
+                <td className={`${styles.num} ${styles.colU}`} data-l="Updated">{r.u ?? <span className={styles.dash}>n/a</span>}</td>
               </tr>
             ))}
           </tbody>
         </table>
         {shown.length === 0 && <p className={styles.p} style={{ padding: '1rem' }}>No graded company matches “{q}”. Its page may still have reports: <Link href={`/companies`} prefetch={false}>search all companies</Link>.</p>}
       </div>
+      </div>
+      {visible.length < shown.length && (
+        <button type="button" className={styles.showAll} onClick={() => setShowAll(true)}>
+          Show all {shown.length.toLocaleString('en-US')} companies
+        </button>
+      )}
     </div>
   )
 }

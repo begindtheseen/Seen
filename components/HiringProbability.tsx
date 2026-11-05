@@ -64,7 +64,7 @@ export default function HiringProbability({ responseRate, ghostRate, overallScor
   if (compact) {
     if (tooFew) return null
     return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: '.45rem', marginTop: '.3rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginTop: '.25rem' }}>
         <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', flexShrink: 0 }}>Response chance</span>
         <div style={{ flex: 1, height: 3, background: 'rgba(255,255,255,.08)', borderRadius: 2, overflow: 'hidden' }}>
           <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 2 }} />
@@ -76,8 +76,8 @@ export default function HiringProbability({ responseRate, ghostRate, overallScor
 
   if (tooFew && !personalized) {
     return (
-      <div style={{ background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.15)', borderRadius: 9, padding: '.65rem .85rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.35rem', gap: '.6rem' }}>
+      <div style={{ background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 9, padding: '.75rem .75rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.25rem', gap: '.5rem' }}>
           <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Response chance</span>
           <span style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-body)', fontWeight: 600, color: 'var(--muted)', lineHeight: 1 }}>Too few reports</span>
         </div>
@@ -96,12 +96,12 @@ export default function HiringProbability({ responseRate, ghostRate, overallScor
     : (givenContext || `${oddsPhrase(responseVerdict(prob))} · ${basis}`)
 
   return (
-    <div style={{ background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.15)', borderRadius: 9, padding: '.65rem .85rem' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.35rem' }}>
+    <div style={{ background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 9, padding: '.75rem .75rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.25rem' }}>
         <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.08em' }}>{personalized ? 'Estimated response chance' : 'Response chance'}</span>
         <span style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color, lineHeight: 1 }}>{pct}%</span>
       </div>
-      <div style={{ height: 4, background: 'rgba(255,255,255,.07)', borderRadius: 2, overflow: 'hidden', marginBottom: '.3rem' }}>
+      <div style={{ height: 4, background: 'rgba(255,255,255,.07)', borderRadius: 2, overflow: 'hidden', marginBottom: '.25rem' }}>
         <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 2, transition: 'width .8s ease' }} />
       </div>
       <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>{context}</div>

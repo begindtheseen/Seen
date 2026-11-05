@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import Icon from '@/components/ui/Icon'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import ModalPortal from '@/components/ModalPortal'
@@ -150,16 +151,16 @@ export default function ResumeSurveyModal({ onClose, onCreditsEarned, onExhauste
 
   // ── Styles (mirrors components/SurveyModal.tsx) ──────────────────────────────
   const backdrop: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.92)', zIndex: 9900, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }
-  const modal: React.CSSProperties = { maxWidth: 420, width: '100%', background: 'var(--surface)', borderRadius: 18, border: '1px solid rgba(99,102,241,.3)', boxShadow: '0 0 80px rgba(99,102,241,.25)', overflow: 'hidden', position: 'relative' }
+  const modal: React.CSSProperties = { maxWidth: 420, width: '100%', background: 'var(--surface)', borderRadius: 18, border: '1px solid var(--accent-line)', boxShadow: 'var(--sh-overlay)', overflow: 'hidden', position: 'relative' }
   const pad: React.CSSProperties = { padding: '28px 24px' }
-  const close: React.CSSProperties = { position: 'absolute', top: 14, right: 16, background: 'none', border: 'none', color: 'var(--muted)', fontSize: 20, cursor: 'pointer', lineHeight: 1, padding: 4, zIndex: 1 }
-  const avatar: React.CSSProperties = { width: 56, height: 56, borderRadius: 14, background: 'linear-gradient(135deg, rgba(99,102,241,.3), rgba(99,102,241,.1))', border: '1px solid rgba(99,102,241,.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, fontFamily: 'var(--display)', fontWeight: 700, color: 'var(--indigo)', flexShrink: 0 }
-  const primaryBtn: React.CSSProperties = { width: '100%', padding: '13px 20px', background: 'var(--indigo)', color: '#fff', border: 'none', borderRadius: 10, fontSize: 15, fontFamily: 'var(--body)', fontWeight: 600, cursor: 'pointer', marginTop: 20 }
-  const secondaryBtn: React.CSSProperties = { width: '100%', padding: '11px 20px', background: 'none', color: 'var(--sub)', border: '1px solid var(--line)', borderRadius: 10, fontSize: 14, fontFamily: 'var(--body)', cursor: 'pointer', marginTop: 10 }
-  const track: React.CSSProperties = { height: 4, background: 'var(--line)', borderRadius: 2, overflow: 'hidden', marginBottom: 22 }
-  const fill: React.CSSProperties = { height: '100%', width: `${progress}%`, background: 'linear-gradient(90deg, var(--indigo), #818cf8)', borderRadius: 2, transition: 'width .4s cubic-bezier(.4,0,.2,1)' }
+  const close: React.CSSProperties = { position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', color: 'var(--muted)', fontSize: 'var(--fs-h3)', cursor: 'pointer', lineHeight: 1, padding: 4, zIndex: 1 }
+  const avatar: React.CSSProperties = { width: 56, height: 56, borderRadius: 14, background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--fs-xl)', fontFamily: 'var(--display)', fontWeight: 700, color: 'var(--accent)', flexShrink: 0 }
+  const primaryBtn: React.CSSProperties = { width: '100%', padding: '12px 20px', background: 'var(--cta)', color: 'var(--text-1)', border: 'none', borderRadius: 10, fontSize: 'var(--fs-body)', fontFamily: 'var(--body)', fontWeight: 600, cursor: 'pointer', marginTop: 20 }
+  const secondaryBtn: React.CSSProperties = { width: '100%', padding: '12px 20px', background: 'none', color: 'var(--sub)', border: '1px solid var(--line)', borderRadius: 10, fontSize: 'var(--fs-ui)', fontFamily: 'var(--body)', cursor: 'pointer', marginTop: 12 }
+  const track: React.CSSProperties = { height: 4, background: 'var(--line)', borderRadius: 2, overflow: 'hidden', marginBottom: 24 }
+  const fill: React.CSSProperties = { height: '100%', width: `${progress}%`, background: 'var(--accent-strong)', borderRadius: 2, transition: 'width .4s cubic-bezier(.4,0,.2,1)' }
   const popOuter: React.CSSProperties = { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.5)', zIndex: 10, pointerEvents: 'none' }
-  const popInner: React.CSSProperties = { background: 'var(--card)', border: '1px solid rgba(99,102,241,.4)', borderRadius: 14, padding: '18px 32px', textAlign: 'center', animation: popVisible ? 'rsPopIn .35s cubic-bezier(.34,1.56,.64,1) forwards' : 'rsPopOut .3s ease forwards', boxShadow: '0 0 40px rgba(99,102,241,.3)' }
+  const popInner: React.CSSProperties = { background: 'var(--card)', border: '1px solid var(--accent-line)', borderRadius: 14, padding: '20px 32px', textAlign: 'center', animation: popVisible ? 'rsPopIn .35s cubic-bezier(.34,1.56,.64,1) forwards' : 'rsPopOut .3s ease forwards', boxShadow: 'var(--sh-raised)' }
 
   const q = survey?.questions[qIndex]
 
@@ -170,8 +171,8 @@ export default function ResumeSurveyModal({ onClose, onCreditsEarned, onExhauste
         @keyframes rsPopOut { from { opacity:1; transform:scale(1);} to { opacity:0; transform:scale(.8);} }
         @keyframes rsFade { from { opacity:0; transform:translateY(10px);} to { opacity:1; transform:translateY(0);} }
         .rs-opt { display:block; width:100%; padding:11px 14px; text-align:left; background:var(--card); border:1px solid var(--line); border-radius:9px; font-family:var(--body); font-size:var(--fs-ui); color:var(--white); cursor:pointer; margin-bottom:8px; transition:border-color .15s, background .15s; line-height:1.4; }
-        .rs-opt:hover { border-color:rgba(99,102,241,.5); background:rgba(99,102,241,.07); }
-        .rs-opt.sel { border-color:var(--indigo); background:rgba(99,102,241,.14); color:#c7d2fe; }
+        .rs-opt:hover { border-color:var(--accent-line); background:var(--accent-tint); }
+        .rs-opt.sel { border-color:var(--accent); background:var(--accent-tint); color:var(--white); }
         .rs-anim { animation: rsFade .25s ease forwards; }
       `}</style>
 
@@ -183,16 +184,16 @@ export default function ResumeSurveyModal({ onClose, onCreditsEarned, onExhauste
           {phase === 'credit-pop' && (
             <div style={popOuter}>
               <div style={popInner}>
-                <div style={{ fontSize: 40, marginBottom: 4 }}>✦</div>
-                <div style={{ fontSize: 28, fontFamily: 'var(--body)', fontWeight: 600, color: '#a5b4fc', lineHeight: 1 }}>+{awarded}</div>
-                <div style={{ fontSize: 13, color: 'var(--sub)', fontFamily: 'var(--mono)', marginTop: 4 }}>credits earned</div>
+                <div style={{ fontSize: 'var(--fs-fig-m)', marginBottom: 4 }}>✦</div>
+                <div style={{ fontSize: 'var(--fs-fig)', fontFamily: 'var(--body)', fontWeight: 600, color: 'var(--accent)', lineHeight: 1 }}>+{awarded}</div>
+                <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--sub)', fontFamily: 'var(--mono)', marginTop: 4 }}>credits earned</div>
               </div>
             </div>
           )}
 
           {phase === 'loading' && (
             <div style={{ ...pad, textAlign: 'center', padding: '48px 24px' }}>
-              <div style={{ fontSize: 13, fontFamily: 'var(--mono)', color: 'var(--muted)', letterSpacing: '.08em' }}>
+              <div style={{ fontSize: 'var(--fs-sm)', fontFamily: 'var(--mono)', color: 'var(--muted)', letterSpacing: '.08em' }}>
                 {submitting ? 'saving your intel…' : 'reading your résumé…'}
               </div>
             </div>
@@ -200,37 +201,37 @@ export default function ResumeSurveyModal({ onClose, onCreditsEarned, onExhauste
 
           {phase === 'intro' && survey && (
             <div style={pad} className="rs-anim">
-              <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 18 }}>
+              <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: 20 }}>
                 <div style={avatar}>{companyLetter}</div>
                 <div>
-                  <div style={{ fontSize: 20, fontFamily: 'var(--body)', fontWeight: 600, color: 'var(--white)', lineHeight: 1.2 }}>{survey.company}</div>
-                  {survey.role && <div style={{ fontSize: 13, color: 'var(--sub)', fontFamily: 'var(--mono)', marginTop: 2 }}>{survey.role}</div>}
+                  <div style={{ fontSize: 'var(--fs-h3)', fontFamily: 'var(--body)', fontWeight: 600, color: 'var(--white)', lineHeight: 1.2 }}>{survey.company}</div>
+                  {survey.role && <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--sub)', fontFamily: 'var(--mono)', marginTop: 2 }}>{survey.role}</div>}
                 </div>
               </div>
 
-              <div style={{ fontSize: 12, fontFamily: 'var(--mono)', color: 'var(--indigo)', marginBottom: 14 }}>
+              <div style={{ fontSize: 'var(--fs-meta)', fontFamily: 'var(--mono)', color: 'var(--accent)', marginBottom: 16 }}>
                 ✦ We spotted {survey.company} on your résumé.
               </div>
 
-              <div style={{ background: 'rgba(99,102,241,.07)', border: '1px solid rgba(99,102,241,.18)', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: 'var(--sub)', fontFamily: 'var(--body)', lineHeight: 1.5 }}>
-                Tell us what it was like applying to <strong style={{ color: 'var(--white)' }}>{survey.company}</strong>. Your answers become real hiring intel future applicants can see — and you earn <strong style={{ color: '#a5b4fc' }}>AI credits</strong> for it.
+              <div style={{ background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 10, padding: '12px 16px', fontSize: 'var(--fs-sm)', color: 'var(--sub)', fontFamily: 'var(--body)', lineHeight: 1.5 }}>
+                Tell us what it was like applying to <strong style={{ color: 'var(--white)' }}>{survey.company}</strong>. Your answers become real hiring intel future applicants can see — and you earn <strong style={{ color: 'var(--accent)' }}>AI credits</strong> for it.
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center', margin: '18px 0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center', margin: '20px 0' }}>
                 {[
                   { v: String(survey.questions.length), l: 'questions' },
                   { v: '60s', l: 'to finish' },
                   { v: '+2', l: 'credits' },
                 ].map(({ v, l }) => (
                   <div key={l}>
-                    <div style={{ fontSize: 24, fontFamily: 'var(--body)', fontWeight: 600, color: 'var(--indigo)', lineHeight: 1 }}>{v}</div>
-                    <div style={{ fontSize: 12, fontFamily: 'var(--mono)', color: 'var(--muted)', marginTop: 3 }}>{l}</div>
+                    <div style={{ fontSize: 'var(--fs-xl)', fontFamily: 'var(--body)', fontWeight: 600, color: 'var(--accent)', lineHeight: 1 }}>{v}</div>
+                    <div style={{ fontSize: 'var(--fs-meta)', fontFamily: 'var(--mono)', color: 'var(--muted)', marginTop: 4 }}>{l}</div>
                   </div>
                 ))}
               </div>
 
               <button style={primaryBtn} onClick={() => setPhase('question')}>Start earning →</button>
-              <p style={{ fontSize: 12, color: 'var(--muted)', fontFamily: 'var(--body)', lineHeight: 1.5, marginTop: 8, textAlign: 'center' }}>
+              <p style={{ fontSize: 'var(--fs-meta)', color: 'var(--muted)', fontFamily: 'var(--body)', lineHeight: 1.5, marginTop: 8, textAlign: 'center' }}>
                 The more data we have, the more valuable every company score becomes.
               </p>
             </div>
@@ -239,12 +240,12 @@ export default function ResumeSurveyModal({ onClose, onCreditsEarned, onExhauste
           {phase === 'question' && q && survey && (
             <div style={pad} className="rs-anim">
               <div style={track}><div style={fill} /></div>
-              <div style={{ fontSize: 12, fontFamily: 'var(--mono)', color: 'var(--muted)', marginBottom: 6, display: 'flex', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: 'var(--fs-meta)', fontFamily: 'var(--mono)', color: 'var(--muted)', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
                 <span>Question {qIndex + 1} of {survey.questions.length}</span>
-                <span style={{ color: 'var(--indigo)' }}>✦ {creditsLeft} left today</span>
+                <span style={{ color: 'var(--accent)' }}>✦ {creditsLeft} left today</span>
               </div>
-              <div style={{ fontSize: 12, fontFamily: 'var(--mono)', color: 'var(--indigo)', marginBottom: 10, opacity: .75 }}>{survey.company}</div>
-              <div style={{ fontSize: 17, fontFamily: 'var(--body)', fontWeight: 600, color: 'var(--white)', lineHeight: 1.35, marginBottom: 18 }}>{q.text}</div>
+              <div style={{ fontSize: 'var(--fs-meta)', fontFamily: 'var(--mono)', color: 'var(--accent)', marginBottom: 12, opacity: .75 }}>{survey.company}</div>
+              <div style={{ fontSize: 'var(--fs-lead)', fontFamily: 'var(--body)', fontWeight: 600, color: 'var(--white)', lineHeight: 1.35, marginBottom: 20 }}>{q.text}</div>
               <div style={{ marginBottom: 4 }}>
                 {q.options.map(opt => (
                   <button key={opt} className={`rs-opt${selected === opt ? ' sel' : ''}`} onClick={() => setSelected(opt)}>{opt}</button>
@@ -262,15 +263,15 @@ export default function ResumeSurveyModal({ onClose, onCreditsEarned, onExhauste
 
           {phase === 'done' && (
             <div style={{ ...pad, textAlign: 'center' }} className="rs-anim">
-              <div style={{ fontSize: 56, marginBottom: 12, lineHeight: 1 }}>✦</div>
-              <div style={{ fontSize: 28, fontFamily: 'var(--body)', fontWeight: 600, color: 'var(--white)', marginBottom: 6 }}>
+              <div style={{ fontSize: 'var(--fs-fig-l)', marginBottom: 12, lineHeight: 1 }}>✦</div>
+              <div style={{ fontSize: 'var(--fs-fig)', fontFamily: 'var(--body)', fontWeight: 600, color: 'var(--white)', marginBottom: 8 }}>
                 {awarded > 0 ? `You earned ${awarded} credit${awarded !== 1 ? 's' : ''}!` : 'Intel recorded'}
               </div>
-              <div style={{ fontSize: 14, fontFamily: 'var(--mono)', color: 'var(--sub)', marginBottom: 18 }}>Balance: {balance} credits</div>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 20, background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.25)', color: 'var(--green)', fontSize: 13, fontFamily: 'var(--mono)', fontWeight: 500, marginBottom: 20 }}>
+              <div style={{ fontSize: 'var(--fs-ui)', fontFamily: 'var(--mono)', color: 'var(--sub)', marginBottom: 20 }}>Balance: {balance} credits</div>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '4px 12px', borderRadius: 20, background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.25)', color: 'var(--green)', fontSize: 'var(--fs-sm)', fontFamily: 'var(--mono)', fontWeight: 500, marginBottom: 20 }}>
                 ✓ You're a Seen contributor
               </div>
-              <div style={{ fontSize: 13, color: 'var(--sub)', fontFamily: 'var(--body)', lineHeight: 1.55, marginBottom: 22, padding: '0 8px' }}>
+              <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--sub)', fontFamily: 'var(--body)', lineHeight: 1.55, marginBottom: 24, padding: '0 8px' }}>
                 Your intel is live — <strong style={{ color: 'var(--white)' }}>{survey?.company}</strong> applicants will see this data.
               </div>
               <button style={primaryBtn} onClick={loadSurvey}>Survey another company →</button>
@@ -290,22 +291,22 @@ export default function ResumeSurveyModal({ onClose, onCreditsEarned, onExhauste
               {(noneReason === 'no_resume' || noneReason === 'no_employment') && (
                 <button
                   onClick={() => { onClose(); router.push('/resume') }}
-                  style={{ display: 'block', width: '100%', background: 'var(--indigo)', border: 'none', color: '#fff', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-ui)', borderRadius: 10, padding: '.7rem 1.25rem', cursor: 'pointer', marginBottom: '.6rem' }}
+                  style={{ display: 'block', width: '100%', background: 'var(--cta)', border: 'none', color: 'var(--text-1)', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-ui)', borderRadius: 10, padding: '.75rem 1.25rem', cursor: 'pointer', marginBottom: '.5rem' }}
                 >
                   Upload your résumé →
                 </button>
               )}
-              <button onClick={onClose} style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', borderRadius: 8, padding: '.6rem 1.25rem', cursor: 'pointer' }}>Close</button>
+              <button onClick={onClose} style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', borderRadius: 8, padding: '.5rem 1.25rem', cursor: 'pointer' }}>Close</button>
             </div>
           )}
 
           {phase === 'error' && (
             <div style={{ padding: '2rem 1.5rem', textAlign: 'center' }}>
-              <div style={{ fontSize: 'var(--fs-h2)', marginBottom: '1rem' }}>⚠️</div>
+              <div style={{ fontSize: 'var(--fs-h2)', marginBottom: '1rem' }}><Icon name="triangle-alert" /></div>
               <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-body)', fontWeight: 600, color: 'var(--white)', marginBottom: '.5rem' }}>Something went wrong</div>
               <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1.5rem' }}>Tap retry to try again.</div>
-              <button onClick={loadSurvey} style={{ background: 'var(--indigo)', border: 'none', color: '#fff', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', borderRadius: 8, padding: '.6rem 1.25rem', cursor: 'pointer', marginBottom: '0.5rem', width: '100%' }}>Retry →</button>
-              <button onClick={onClose} style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', borderRadius: 8, padding: '.6rem 1.25rem', cursor: 'pointer', width: '100%' }}>Close</button>
+              <button onClick={loadSurvey} style={{ background: 'var(--cta)', border: 'none', color: 'var(--text-1)', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', borderRadius: 8, padding: '.5rem 1.25rem', cursor: 'pointer', marginBottom: '0.5rem', width: '100%' }}>Retry →</button>
+              <button onClick={onClose} style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', borderRadius: 8, padding: '.5rem 1.25rem', cursor: 'pointer', width: '100%' }}>Close</button>
             </div>
           )}
         </div>

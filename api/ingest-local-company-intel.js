@@ -4,6 +4,7 @@ import { classifyApplicantAccount, REPORT_OUTCOME } from '../lib/reports/applica
 import { excludedSource } from '../lib/reports/excludedSources.js';
 import { redditPlatform } from '../lib/reports/platformLabel.js';
 import { resolveOrCreateCompany, recomputeCompanyScoreFromReports, writeReport } from './_utils/reportWrite.js';
+import { ilikeExact } from '../lib/server/pgrest.js';
 
 const headersFor = key => ({ apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' });
 
@@ -66,7 +67,7 @@ export default async function handler(req, res) {
       const name = encodeURIComponent(item.company.toLowerCase());
       const [score, job] = await Promise.all([
         fetch(`${url}/rest/v1/company_scores?company_name=eq.${name}&select=company_name&limit=1`, { headers: hdrs }),
-        fetch(`${url}/rest/v1/jobs?company=ilike.${encodeURIComponent(item.company)}&select=id&limit=1`, { headers: hdrs }),
+        fetch(`${url}/rest/v1/jobs?company=ilike.${ilikeExact(item.company)}&select=id&limit=1`, { headers: hdrs }),
       ]);
       const known = (score.ok && (await score.json()).length) || (job.ok && (await job.json()).length);
       if (!known) { metrics.rejected++; note(`unknown company: ${item.company}`); return; }

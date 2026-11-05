@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { pacificParts } from '@/lib/time/pacific.js';
+import Icon, { type IconName } from '@/components/ui/Icon'
 
 // Renders the derived employer feed. The server component owns the fetch + derivation
 // (lib/server/employerNotifications.js); this component owns presentation and two client-only
@@ -69,12 +70,12 @@ function relTime(iso: string | null, nowMs: number): string {
   return `${mo}mo ago`
 }
 
-const KIND_META: Record<FeedItem['kind'], { icon: string; color: string; ring: string; label: string }> = {
-  posting_expired: { icon: '🛑', color: 'var(--red)', ring: 'rgba(239,68,68,.28)', label: 'Dropped off' },
-  posting_stale: { icon: '⏳', color: 'var(--amber)', ring: 'rgba(245,158,11,.28)', label: 'Dropping off soon' },
-  posting_nearing_stale: { icon: '⏳', color: 'var(--amber)', ring: 'rgba(245,158,11,.22)', label: 'Aging off' },
-  posting_expiring: { icon: '📅', color: 'var(--amber)', ring: 'rgba(245,158,11,.25)', label: 'Expiring — repost' },
-  new_applicants: { icon: '👥', color: 'var(--blue)', ring: 'rgba(59,130,246,.26)', label: 'New applicants' },
+const KIND_META: Record<FeedItem['kind'], { icon: IconName; color: string; ring: string; label: string }> = {
+  posting_expired: { icon: 'circle-x', color: 'var(--red)', ring: 'rgba(239,68,68,.28)', label: 'Dropped off' },
+  posting_stale: { icon: 'hourglass', color: 'var(--amber)', ring: 'rgba(245,158,11,.28)', label: 'Dropping off soon' },
+  posting_nearing_stale: { icon: 'hourglass', color: 'var(--amber)', ring: 'rgba(245,158,11,.22)', label: 'Aging off' },
+  posting_expiring: { icon: 'calendar', color: 'var(--amber)', ring: 'rgba(245,158,11,.25)', label: 'Expiring — repost' },
+  new_applicants: { icon: 'users', color: 'var(--blue)', ring: 'rgba(59,130,246,.26)', label: 'New applicants' },
 }
 
 const STORAGE_PREFIX = 'seen:employer-notifs:lastvisit:'
@@ -114,20 +115,20 @@ export function NotificationsFeed({
   return (
     <div>
       {/* Summary strip */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.5rem', marginBottom: '1.4rem', alignItems: 'center' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.5rem', marginBottom: '1.5rem', alignItems: 'center' }}>
         <SummaryPill n={summary.postingsExpired} label="dropped off" color="var(--red)" />
         <SummaryPill n={summary.postingsStale} label="dropping off soon" color="var(--amber)" />
         <SummaryPill n={summary.postingsNearingStale} label="aging off" color="var(--amber)" />
         <SummaryPill n={summary.newApplicants} label={`new applicant${summary.newApplicants === 1 ? '' : 's'}`} color="var(--blue)" />
         {mounted && lastVisit != null && newCount > 0 && (
-          <span style={{ marginLeft: 'auto', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', border: '1px solid rgba(16,185,129,.3)', borderRadius: 999, padding: '.28rem .7rem' }}>
+          <span style={{ marginLeft: 'auto', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', border: '1px solid rgba(16,185,129,.3)', borderRadius: 999, padding: '.25rem .75rem' }}>
             {newCount} new since your last visit
           </span>
         )}
       </div>
 
       {/* Feed */}
-      <div style={{ display: 'grid', gap: '.7rem' }}>
+      <div style={{ display: 'grid', gap: '.75rem' }}>
         {items.map((it) => {
           const meta = KIND_META[it.kind]
           const fresh = isNew(it)
@@ -137,36 +138,36 @@ export function NotificationsFeed({
               key={it.id}
               style={{
                 display: 'flex',
-                gap: '.9rem',
+                gap: '1rem',
                 alignItems: 'flex-start',
                 background: 'var(--card)',
                 border: `1px solid ${fresh ? meta.ring : 'var(--line)'}`,
                 borderLeft: `3px solid ${meta.color}`,
                 borderRadius: 12,
-                padding: '1rem 1.15rem',
+                padding: '1rem 1.25rem',
               }}
             >
-              <span style={{ fontSize: 'var(--fs-lead)', lineHeight: 1.2, flexShrink: 0 }} aria-hidden>{meta.icon}</span>
+              <span style={{ color: meta.color, display: 'inline-flex', flexShrink: 0 }} aria-hidden><Icon name={meta.icon} size={18} /></span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '.6rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '.5rem', flexWrap: 'wrap' }}>
                   <span style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-ui)', fontWeight: 700, color: 'var(--white)' }}>{it.title}</span>
                   {fresh && (
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--green)', border: '1px solid rgba(16,185,129,.35)', borderRadius: 4, padding: '.1rem .35rem' }}>New</span>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--text-3)', border: '1px solid rgba(16,185,129,.35)', borderRadius: 4, padding: '.125rem .25rem' }}>New</span>
                   )}
                 </div>
-                <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-meta)', lineHeight: 1.6, margin: '.3rem 0 0' }}>{it.detail}</p>
+                <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-meta)', lineHeight: 1.6, margin: '.25rem 0 0' }}>{it.detail}</p>
                 {/* Actionable, not just informational: reposting/first-party posting is the one
                     thing an employer can actually DO about listing decay. Deep-links to the
                     dashboard's add-a-listing form prefilled from this listing. */}
                 {it.action && it.jobId && (
                   <a
                     href={`/employers/dashboard?prefill=${encodeURIComponent(it.jobId)}`}
-                    style={{ display: 'inline-block', marginTop: '.55rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, color: 'var(--white)', border: '1px solid var(--line2)', borderRadius: 6, padding: '.3rem .7rem', textDecoration: 'none' }}
+                    style={{ display: 'inline-block', marginTop: '.5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, color: 'var(--white)', border: '1px solid var(--line2)', borderRadius: 6, padding: '.25rem .75rem', textDecoration: 'none' }}
                   >
                     {it.action === 'repost' ? '↻ Repost this listing →' : '＋ Post this role yourself →'}
                   </a>
                 )}
-                <div style={{ display: 'flex', gap: '.7rem', marginTop: '.5rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '.75rem', marginTop: '.5rem', flexWrap: 'wrap' }}>
                   <span
                     style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.08em', color: meta.color }}
                   >
@@ -185,7 +186,7 @@ export function NotificationsFeed({
       </div>
 
       {/* Honest footnote on the mechanism + the delivery follow-up */}
-      <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.7, marginTop: '1.6rem' }}>
+      <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.7, marginTop: '1.5rem' }}>
         Computed live from your listings on Seen. Postings go stale after {thresholds.STALE_AFTER_DAYS} days without being seen on their source and expire after {thresholds.EXPIRE_AFTER_DAYS}; applicant counts cover the last {thresholds.APPLICANT_WINDOW_DAYS} days. Email and push delivery of these updates are coming next.
       </p>
     </div>
@@ -194,7 +195,7 @@ export function NotificationsFeed({
 
 function SummaryPill({ n, label, color }: { n: number; label: string; color: string }) {
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: '.35rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 999, padding: '.3rem .75rem' }}>
+    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: '.25rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 999, padding: '.25rem .75rem' }}>
       <b style={{ color, fontFamily: 'var(--display)', fontSize: 'var(--fs-sm)' }}>{n}</b> {label}
     </span>
   )

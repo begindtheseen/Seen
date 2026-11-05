@@ -16,6 +16,7 @@
 // This card only renders on ACTIVE applications at an interview stage (app/tracker/page.tsx).
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { possessive } from '@/lib/companyDisplay'
 import Link from 'next/link'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { signupHref } from '@/lib/signupIntent.js'
@@ -72,7 +73,7 @@ const INTRO_KEY = '__intro__'
 const THANKS_KEY = '__thankyou__'
 const FOLLOW_KEY = '__followup__'
 /** "Ross Stores'" and "Amazon's" (round 4, Maria: "Ross Stores's"). */
-const poss = (name: string) => (/s$/i.test(name.trim()) ? `${name.trim()}’` : `${name.trim()}’s`)
+const poss = (name: string) => possessive(name)
 
 // One read per company + role per page view, shared by every card that names it.
 const recordCache = new Map<string, Promise<RecordData | null>>()
@@ -115,6 +116,12 @@ const money = (p: Pay) => p.unit === 'hour'
 // device — round 4: all four personas lost it); this device keeps a copy as a backstop for a stash that failed.
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const postingKey = (appId: string) => `seen_prep_posting_${appId}`
+// Whether this application's prep is open is this tab's choice (phone round 2026-11-02: a card that reached
+// an interview grew to ~1,500px by itself). Closed by default; a tap opens it; a reload keeps the choice.
+// sessionStorage, swept on sign-out with the other per-person keys (lib/sessionLocalKeys.js).
+const openKey = (appId: string) => `seen_prep_open_${appId}`
+const readOpen = (appId: string): boolean => { try { return sessionStorage.getItem(openKey(appId)) === '1' } catch { return false } }
+const writeOpen = (appId: string, open: boolean) => { try { if (open) sessionStorage.setItem(openKey(appId), '1'); else sessionStorage.removeItem(openKey(appId)) } catch { /* private mode */ } }
 const stashPosting = (appId: string, text: string) => { try { if (text.trim()) localStorage.setItem(postingKey(appId), text.slice(0, 6000)); else localStorage.removeItem(postingKey(appId)) } catch { /* private mode */ } }
 const takePosting = (appId: string): string => { try { const v = localStorage.getItem(postingKey(appId)) || ''; return v } catch { return '' } }
 const dropPosting = (appId: string) => { try { localStorage.removeItem(postingKey(appId)) } catch { /* ignore */ } }
@@ -148,7 +155,13 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
   onSchedule: (iso: string) => void
 }) {
   const [data, setData] = useState<RecordData | null>(null)
-  const [open, setOpen] = useState(true)
+  // Closed until the person opens it; remembered per application for this tab. `lead` (just reached an
+  // interview) brings the one-line row into view but never opens it by itself.
+  const [open, setOpenState] = useState(false)
+  // Round 3: the remembered open state came back on every later load and kept the floating + hidden
+  // until "Hide" — a prep is one line until tapped (CLAUDE.md rule), so a reload starts collapsed.
+  useEffect(() => { void readOpen; setOpenState(false) }, [appId])
+  const setOpen = useCallback((next: boolean) => { setOpenState(next); writeOpen(appId, next) }, [appId])
   const [pack, setPack] = useState<Pack | null>(null)
   const [state, setState] = useState<'idle' | 'building' | 'need_resume' | 'error'>('idle')
   const [err, setErr] = useState('')
@@ -219,11 +232,11 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
     if (preview && preview.questions.length) funnelEvent('prep_preview_shown', { surface: 'tracker_prep', company, once: appId })
   }, [preview, appId, company])
 
-  // Reached an interview a moment ago: open and bring the prep into view (the moment the offer is for).
+  // Reached an interview a moment ago: bring the prep's row into view (the moment the offer is for). It
+  // stays one line until tapped — the card's own update buttons were what the person came for.
   const boxRef = useRef<HTMLElement>(null)
   useEffect(() => {
     if (!lead) return
-    setOpen(true)
     const t = setTimeout(() => boxRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 450)
     return () => clearTimeout(t)
   }, [lead])
@@ -259,11 +272,12 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
   useEffect(() => {
     if ((autoBuild || pending) && isPro && !pack && !built.current) {
       built.current = true
+      setOpen(true)
       const kept = postingRef.current || takePosting(appId)
       if (kept && !postingRef.current) setPostingBoth(kept)
       void build({ jobText: kept })
     }
-  }, [autoBuild, pending, isPro, pack, appId, build])
+  }, [autoBuild, pending, isPro, pack, appId, build, setOpen])
 
   // Both products come back to THIS card with the prep building (api/stripe.js success_url ?prep=<id>). The
   // posting goes to the server first so any device, any browser, builds with it.
@@ -334,14 +348,15 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
 
   return (
     <section ref={boxRef} className={`${s.box}${lead ? ` ${s.lead}` : ''}`} onClick={e => e.stopPropagation()} aria-label={`Interview prep for ${company}`} data-testid="interview-prep">
-      <button type="button" className={s.head} aria-expanded={open} onClick={() => setOpen(!open)}>
-        <span className={s.kicker}>Interview at {company}</span>
-        <span className={s.toggle}>{open ? 'Hide' : 'Show'}</span>
+      {/* One line closed ("Interview prep for Acme · Thu, Oct 29 →"); the same line with "Hide" open. */}
+      <button type="button" className={s.head} aria-expanded={open} onClick={() => setOpen(!open)} data-testid="prep-toggle">
+        <span className={s.kicker}>Interview prep for {company}{interviewAt ? <span className={s.when}> · {day(interviewAt)}</span> : null}</span>
+        <span className={s.toggle}>{open ? 'Hide' : '→'}</span>
       </button>
 
       {open && (
-        <>
-          {lead && !pack && <p className={s.leadLine} data-testid="prep-lead">They called you in. Here is what Seen knows about {company}&apos;s interviews, and a first look at your prep.</p>}
+        <div className={s.inner}>
+          {lead && !pack && <p className={s.leadLine} data-testid="prep-lead">They called you in. Here is what Seen knows about {poss(company)} interviews, and a first look at your prep.</p>}
           {/* FREE — Seen's own data, for everyone */}
           <div className={s.facts}>
             {guide && (
@@ -415,7 +430,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
                   <span className={s.why}>{sample.why}</span>
                 </div>
               )}
-              <div className={s.label} style={{ marginTop: '.2rem' }}>The full prep</div>
+              <div className={s.label} style={{ marginTop: '.25rem' }}>The full prep</div>
               <ul className={s.list}>
                 {guide ? <li>{guide.questions} questions {guide.company} is known for{guide.framework ? `, each tied to ${guide.framework.name}` : ''}, plus the ones for {role ? `${article(role)} ${role}` : 'this role'}</li> : <li>Likely questions for {role ? `${article(role)} ${role}` : 'this role'}, and what each one checks</li>}
                 <li>Answers built from <b>your</b> résumé — no invented jobs or numbers. You finish each one in your own words on the card, and it stays yours</li>
@@ -458,7 +473,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
               {(err || checkout.error) && <p className={s.err} role="alert">{err || checkout.error}</p>}
             </div>
           )}
-        </>
+        </div>
       )}
     </section>
   )
@@ -536,7 +551,7 @@ function AnswerEditor({ a, company, values, notes, onSave, defaultOpen, title, t
       {!!notes?.length && (
         <div className={s.notes}>
           <div className={s.label}>Your words from before the rebuild</div>
-          <p className={s.dim} style={{ margin: '0 0 .3rem' }}>This answer changed when the posting changed, so what you typed is kept here for you to reuse — not shown as finished.</p>
+          <p className={s.dim} style={{ margin: '0 0 .25rem' }}>This answer changed when the posting changed, so what you typed is kept here for you to reuse — not shown as finished.</p>
           {notes.map((t, i) => <p key={i} className={s.prose}>{t}</p>)}
           <CopyBtn text={notes.join('\n')} />
         </div>
@@ -602,7 +617,7 @@ function PackView({ pack, company, fu, onFill, onRebuild, building }: { pack: Pa
       )}
       <div className={s.block}>
         <div className={s.label}>Your answers · {done}/{pack.answers.filter(a => !a.exercise).length} finished</div>
-        <p className={s.dim} style={{ margin: '0 0 .45rem' }}>Every answer starts from your résumé or the posting. Type the part only you know into each blank, and the finished answer is yours — saved here, on every device.</p>
+        <p className={s.dim} style={{ margin: '0 0 .5rem' }}>Every answer starts from your résumé or the posting. Type the part only you know into each blank, and the finished answer is yours — saved here, on every device.</p>
         {pack.answers.map((a, i) => (
           <AnswerEditor key={a.q} a={a} company={company} values={fills[a.q] || []} notes={notes[a.q]} onSave={(vals, urgent) => onFill(a.q, vals, urgent)} defaultOpen={i === 0} />
         ))}
@@ -610,7 +625,7 @@ function PackView({ pack, company, fu, onFill, onRebuild, building }: { pack: Pa
           <div className={s.notes}>
             <div className={s.label}>Your words for questions no longer on the card</div>
             {orphanNotes.map(([q, vals]) => (
-              <div key={q} style={{ marginBottom: '.4rem' }}><b className={s.prose}>{q}</b>{vals.map((t, i) => <p key={i} className={s.prose}>{t}</p>)}<CopyBtn text={vals.join('\n')} /></div>
+              <div key={q} style={{ marginBottom: '.5rem' }}><b className={s.prose}>{q}</b>{vals.map((t, i) => <p key={i} className={s.prose}>{t}</p>)}<CopyBtn text={vals.join('\n')} /></div>
             ))}
           </div>
         )}

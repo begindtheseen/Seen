@@ -3,6 +3,7 @@ import { logError } from '../lib/server/errlog.js';
 import { geocodeLocation, haversineMiles } from '../lib/server/geo.js';
 import { computeCityDemand, normalizeCityLabel } from '../lib/server/demandFromCorpus.js';
 import { isVercelCron } from '../lib/server/cronAuth.js';
+import { ilikePrefix } from '../lib/server/pgrest.js';
 
 // /api/demand — Demand data hub.
 //
@@ -109,7 +110,7 @@ async function handleCityGet(req, res) {
   try {
     const cityWord = label.split(',')[0].trim();
     const r = await fetch(
-      `${SUPABASE_URL}/rest/v1/demand_data?city=ilike.${encodeURIComponent(cityWord)}*&select=*&order=di.desc&limit=24`,
+      `${SUPABASE_URL}/rest/v1/demand_data?city=ilike.${ilikePrefix(cityWord)}&select=*&order=di.desc&limit=24`,
       { headers: hdrs },
     );
     const rows = r.ok ? await r.json() : [];

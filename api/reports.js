@@ -19,6 +19,7 @@ import { feedRowPasses } from '../lib/reports/feedFilter.js';
 import { enqueueCompanyEnrichment } from '../lib/server/enrichmentQueue.js';
 import { rewardReport } from '../lib/server/growthRewards.js';
 import { isVercelCron } from '../lib/server/cronAuth.js';
+import { ilikeExact, ilikeContains, ilikeWords, ilikePrefix, inList } from '../lib/server/pgrest.js';
 
 // Actions that existed only to call a model API — Reddit import classification and company web
 // research — were removed with the owner's decision (2026-10-26) that Seen uses no model API.
@@ -262,6 +263,30 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, benchmark });
   }
 
+  // ── Name suggestions for an unknown company page: companies Seen knows (by listings or reports) whose
+  //    name starts with what was typed — "Fry's" → Fry's Food Stores (round 3: Enter on the scoreboard
+  //    landed on an empty /company/fry's while /company/fry's-food-stores had 54 posts). Read-only, public.
+  if (body.action === 'name_suggest') {
+    if (await applyRateLimit(req, res, 'company-score')) return;
+    const q = String(body.query || '').slice(0, 80).trim();
+    if (q.length < 2 || !SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(200).json({ ok: true, names: [] });
+    setPublicCache(res, 'score');
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/companies?select=name&name=ilike.${ilikePrefix(q)}&order=name.asc&limit=40`, { headers: hdrsBase });
+      const rows = r.ok ? await r.json() : [];
+      const seen = new Set([q.toLowerCase()]);
+      const names = [];
+      for (const row of Array.isArray(rows) ? rows : []) {
+        const n = String(row?.name || '').trim();
+        const k = n.toLowerCase();
+        if (!n || seen.has(k) || k.length > 60) continue;
+        seen.add(k); names.push(n);
+        if (names.length >= 3) break;
+      }
+      return res.status(200).json({ ok: true, names });
+    } catch { return res.status(200).json({ ok: true, names: [] }); }
+  }
+
   // ── Company-score: merged from api/company-score.js ─────────────────────────
   if (body.action === 'company_score' || body.action === 'resolve' || body.name) {
     if (await applyRateLimit(req, res, 'company-score')) return;
@@ -277,9 +302,8 @@ export default async function handler(req, res) {
     if (!names.length) return res.status(200).json({ ok: true, surges: [] });
     try {
       const since = encodeURIComponent(new Date(Date.now() - 7 * 86400000).toISOString());
-      const inList = names.map(n => `"${n.replace(/"/g, '')}"`).join(',');
       const r = await fetch(
-        `${SUPABASE_URL}/rest/v1/reports?select=company_name&outcome=eq.ghosted&created_at=gte.${since}&company_name=in.(${encodeURIComponent(inList)})&${SCORABLE_REPORTS_FILTER}&limit=1000`,
+        `${SUPABASE_URL}/rest/v1/reports?select=company_name&outcome=eq.ghosted&created_at=gte.${since}&company_name=in.${inList(names)}&${SCORABLE_REPORTS_FILTER}&limit=1000`,
         { headers: hdrsBase }
       );
       const rows = r.ok ? await r.json() : [];
@@ -292,8 +316,7 @@ export default async function handler(req, res) {
       const grades = {};
       if (surging.length) {
         try {
-          const gl = surging.map(n => `"${n.replace(/"/g, '')}"`).join(',');
-          const gr = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?select=company_name,overall_score,ghost_rate,report_count,first_party_report_count,data_source&company_name=in.(${encodeURIComponent(gl)})&limit=40`, { headers: hdrsBase });
+          const gr = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?select=company_name,overall_score,ghost_rate,report_count,first_party_report_count,data_source&company_name=in.${inList(surging)}&limit=40`, { headers: hdrsBase });
           for (const g of (gr.ok ? await gr.json() : [])) {
             const k = String(g.company_name || '').toLowerCase().trim();
             const gradeable = isGradeable(g);
@@ -321,9 +344,36 @@ export default async function handler(req, res) {
       // In parallel: the Seen-user reports (one small read), so every card can say how many of its
       // applicant accounts were filed with Seen and how many are public posts (audit #3). A failed
       // read leaves the split unknown (null) — cards then show no split, never a wrong one.
+      // How many companies are graded in all (the board shows the top 150): the same gate over every
+      // candidate row, small columns only. /companies said "150 graded" while /data said 401 (round 2).
+      // Round 3: this read selected no mention column, so `isGradeable` (mentions count half) passed
+      // 345 rows while /data (lib/server/openDataRead.ts) counted 401 over the same table. Same gate,
+      // same columns, newest row per name — the one definition of "graded".
+      const gradedGate = encodeURIComponent('(first_party_report_count.gte.1,and(first_party_report_count.is.null,data_source.eq.reports))');
+      // PostgREST caps a page at 1,000 rows whatever `limit` says (that cap is what made 345): keyset pages over id.
+      const gradedCols = `id,company_name,created_at,overall_score,report_count,first_party_report_count,web_report_count,data_source${await mentionSel(SUPABASE_URL, hdrsBase)}`;
+      const gradedTotalP = (async () => {
+        const newest = new Map();
+        let last = null;
+        for (let page = 0; page < 40; page++) {
+          const x = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?select=${gradedCols}&or=${gradedGate}&order=id.asc&limit=1000${last ? `&id=gt.${encodeURIComponent(last)}` : ''}`, { headers: hdrsBase });
+          if (!x.ok) return null;
+          const rows = await x.json();
+          if (!Array.isArray(rows)) return null;
+          for (const row of rows) {
+            const k = String(row?.company_name || '').toLowerCase().trim();
+            if (!k) continue;
+            const prev = newest.get(k);
+            if (!prev || Date.parse(row.created_at || '') > Date.parse(prev.created_at || '')) newest.set(k, row);
+          }
+          if (rows.length < 1000) break;
+          last = String(rows[rows.length - 1].id);
+        }
+        return [...newest.values()].filter((c) => isGradeable(c)).length;
+      })().catch(() => null);
       const [r, seenRes] = await Promise.all([
         fetch(
-          `${SUPABASE_URL}/rest/v1/company_scores?select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,waste_score,report_count,first_party_report_count${await mentionSel(SUPABASE_URL, hdrsBase)},web_report_count,data_source,data_quality,verification_status,industry&first_party_report_count=gte.1&order=${order}&limit=150`,
+          `${SUPABASE_URL}/rest/v1/company_scores?select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,waste_score,report_count,first_party_report_count${await mentionSel(SUPABASE_URL, hdrsBase)},web_report_count,data_source,data_quality,verification_status,industry&or=${gradedGate}&order=${order}&limit=150`,
           { headers: hdrsBase }
         ),
         fetch(`${SUPABASE_URL}/rest/v1/${seenUserReportsPath()}`, { headers: hdrsBase }).catch(() => null),
@@ -360,7 +410,7 @@ export default async function handler(req, res) {
       // Identical for every visitor and only changes when the score cron runs — let the
       // CDN serve it so a popular leaderboard page doesn't hit the DB on every load.
       setPublicCache(res, 'leaderboard');
-      return res.status(200).json({ ok: true, companies });
+      return res.status(200).json({ ok: true, companies, graded_total: await gradedTotalP });
     } catch(e) { return res.status(200).json({ companies: [] }); }
   }
 
@@ -433,7 +483,7 @@ export default async function handler(req, res) {
       const safeCity    = city ? String(city).slice(0,  80).replace(/[<>`\\]/g, '').trim() : '';
       if (!safeCompany) return res.status(400).json({ error: 'company required' });
       // Same anti-Sybil down-weighting as the full submit path (dedup + per-account daily cap).
-      const trust = await assessSubmitTrust(SUPABASE_URL, hdrsBase, uid, `company_name=ilike.${encodeURIComponent(safeCompany)}`);
+      const trust = await assessSubmitTrust(SUPABASE_URL, hdrsBase, uid, `company_name=ilike.${ilikeExact(safeCompany)}`);
       // reports has no `city` column (city lives on company_locations via location_id, like the
       // full `submit` path) — sending one made PostgREST reject every quick submit that named a city.
       // Location is best-effort: a lookup failure must never block the outcome itself.
@@ -457,7 +507,10 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Submit failed' });
       }
       const reward = await reportReward(uid, body.application_id);
-      return res.status(200).json({ ok: true, submitted: true, ...(reward ? { reward } : {}) });
+      // A second report by the same person on the same company within 30 days is HELD (anti-gaming,
+      // `duplicate_user_company`): it is saved but never counted, so the page says so instead of "saved"
+      // while the company page never shows it (round 3: three personas reported Northwind twice).
+      return res.status(200).json({ ok: true, submitted: true, held: !!trust.review, held_reason: trust.review ? trust.reason : null, ...(reward ? { reward } : {}) });
     } catch(err) {
       logError('reports/quick_submit', err.message);
       return res.status(500).json({ error: 'Internal error' });
@@ -490,15 +543,15 @@ export default async function handler(req, res) {
       const coNorm = normalize(safeCo);
 
       // Resolve / create the company record (same path as `submit`).
-      const coWord = encodeURIComponent(safeCo.split(/\s+/)[0]);
-      const coSearch = await fetch(`${SUPABASE_URL}/rest/v1/companies?name=ilike.*${coWord}*&select=id,name&limit=20`, { headers: hdrs });
+      const coWord = ilikeContains(safeCo.split(/\s+/)[0]);
+      const coSearch = await fetch(`${SUPABASE_URL}/rest/v1/companies?name=ilike.${coWord}&select=id,name&limit=20`, { headers: hdrs });
       const coRows = coSearch.ok ? await coSearch.json() : [];
       let cid = (coRows || []).find(c => normalize(c.name) === coNorm)?.id || (coRows || []).find(c => c.name.toLowerCase() === safeCo.toLowerCase())?.id || null;
       if (!cid) {
         const insRes = await fetch(`${SUPABASE_URL}/rest/v1/companies`, { method: 'POST', headers: hdrs, body: JSON.stringify({ name: safeCo, logo_letter: safeCo[0]?.toUpperCase() || '?' }) });
         if (insRes.ok) { const insRows = await insRes.json(); cid = Array.isArray(insRows) ? insRows[0]?.id : insRows?.id; }
         if (!cid) {
-          const retry = await fetch(`${SUPABASE_URL}/rest/v1/companies?name=ilike.${encodeURIComponent(safeCo)}&select=id&limit=1`, { headers: hdrs });
+          const retry = await fetch(`${SUPABASE_URL}/rest/v1/companies?name=ilike.${ilikeExact(safeCo)}&select=id&limit=1`, { headers: hdrs });
           if (retry.ok) { const r = await retry.json(); cid = r?.[0]?.id || null; }
         }
       }
@@ -507,7 +560,7 @@ export default async function handler(req, res) {
       // Resolve / create the location record when we have one.
       let lid = null;
       if (safeLoc) {
-        const locSearch = await fetch(`${SUPABASE_URL}/rest/v1/company_locations?company_id=eq.${cid}&city=ilike.${encodeURIComponent(safeLoc)}&select=id&limit=1`, { headers: hdrs });
+        const locSearch = await fetch(`${SUPABASE_URL}/rest/v1/company_locations?company_id=eq.${cid}&city=ilike.${ilikeExact(safeLoc)}&select=id&limit=1`, { headers: hdrs });
         const locRows = locSearch.ok ? await locSearch.json() : [];
         lid = locRows?.[0]?.id || null;
         if (!lid) {
@@ -579,11 +632,10 @@ export default async function handler(req, res) {
       if (!Array.isArray(names) || !names.length) return res.json({ ok: true, scores: {} });
       const nameList = names.slice(0, 50).map(n => String(n).toLowerCase().trim()).filter(Boolean);
       if (!nameList.length) return res.json({ ok: true, scores: {} });
-      // Strip quotes/backslashes before wrapping — otherwise a crafted name could break out
-      // of the quoted PostgREST CSV value and alter which rows match (filter injection).
-      const inFilter = nameList.map(n => `"${n.replace(/["\\]/g, '')}"`).join(',');
+      // Quoted AND URL-encoded (lib/server/pgrest.js): a raw `&` or `%22` in a name used to add
+      // parameters to this service-key read.
       const r = await fetch(
-        `${SUPABASE_URL}/rest/v1/company_scores?company_name=in.(${inFilter})&select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,waste_score,report_count,first_party_report_count${await mentionSel(SUPABASE_URL, hdrsBase)},web_report_count,data_source&limit=50`,
+        `${SUPABASE_URL}/rest/v1/company_scores?company_name=in.${inList(nameList)}&select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,waste_score,report_count,first_party_report_count${await mentionSel(SUPABASE_URL, hdrsBase)},web_report_count,data_source&limit=50`,
         { headers: hdrsBase }
       );
       const rows = r.ok ? await r.json() : [];
@@ -676,6 +728,18 @@ export default async function handler(req, res) {
         page.push({ ...row, source: classifyPlatform(row.platform, row.trust_reason) });
         if (page.length >= safeLimit) break;
       }
+      // Whether each row's company is graded (the homepage strip shows graded companies only — a
+      // test company's report and a substring "company" were scrolling across it, round 3). One read
+      // for the page's names; a failed read leaves `graded` unknown (null), never wrong.
+      try {
+        const names = [...new Set(page.map((r) => String(r.company_name || '').toLowerCase().trim()).filter(Boolean))];
+        if (names.length) {
+          const inList = names.map((n) => `"${n.replace(/"/g, '')}"`).join(',');
+          const g = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?select=company_name,overall_score,report_count,first_party_report_count,web_report_count,data_source${await mentionSel(SUPABASE_URL, hdrsBase)}&company_name=in.(${encodeURIComponent(inList)})&limit=${names.length * 3}`, { headers: hdrsBase });
+          const gradedNames = new Set(g.ok ? (await g.json()).filter((c) => isGradeable(c)).map((c) => String(c.company_name || '').toLowerCase().trim()) : []);
+          for (const r of page) r.graded = g.ok ? gradedNames.has(String(r.company_name || '').toLowerCase().trim()) : null;
+        }
+      } catch { /* graded stays undefined */ }
 
       // Content-Range: 0-19/1234 — the corpus size (an upper bound on what the rules let through).
       const contentRange = r.headers.get('content-range') || '';
@@ -712,8 +776,8 @@ export default async function handler(req, res) {
     const normalize = n => n ? n.trim().toLowerCase().replace(/[\s,]+(inc\.?|llc\.?|corp\.?|ltd\.?|co\.|plc\.?|group|holdings|enterprises|solutions|technologies)\.?$/i, '').trim() : '';
     const coNorm = normalize(safeCo);
 
-    const coWord = encodeURIComponent(safeCo.split(/\s+/)[0]);
-    const coSearch = await fetch(`${SUPABASE_URL}/rest/v1/companies?name=ilike.*${coWord}*&select=id,name&limit=20`, { headers: hdrs });
+    const coWord = ilikeContains(safeCo.split(/\s+/)[0]);
+    const coSearch = await fetch(`${SUPABASE_URL}/rest/v1/companies?name=ilike.${coWord}&select=id,name&limit=20`, { headers: hdrs });
     const coRows = coSearch.ok ? await coSearch.json() : [];
     let cid = (coRows || []).find(c => normalize(c.name) === coNorm)?.id || (coRows || []).find(c => c.name.toLowerCase() === safeCo.toLowerCase())?.id || null;
 
@@ -721,7 +785,7 @@ export default async function handler(req, res) {
       const insRes = await fetch(`${SUPABASE_URL}/rest/v1/companies`, { method: 'POST', headers: hdrs, body: JSON.stringify({ name: safeCo, logo_letter: safeCo[0]?.toUpperCase() || '?' }) });
       if (insRes.ok) { const insRows = await insRes.json(); cid = Array.isArray(insRows) ? insRows[0]?.id : insRows?.id; }
       if (!cid) {
-        const retry = await fetch(`${SUPABASE_URL}/rest/v1/companies?name=ilike.${encodeURIComponent(safeCo)}&select=id&limit=1`, { headers: hdrs });
+        const retry = await fetch(`${SUPABASE_URL}/rest/v1/companies?name=ilike.${ilikeExact(safeCo)}&select=id&limit=1`, { headers: hdrs });
         if (retry.ok) { const r = await retry.json(); cid = r?.[0]?.id || null; }
       }
     }
@@ -729,7 +793,7 @@ export default async function handler(req, res) {
 
     let lid = null;
     if (safeLoc) {
-      const locSearch = await fetch(`${SUPABASE_URL}/rest/v1/company_locations?company_id=eq.${cid}&city=ilike.${encodeURIComponent(safeLoc)}&select=id&limit=1`, { headers: hdrs });
+      const locSearch = await fetch(`${SUPABASE_URL}/rest/v1/company_locations?company_id=eq.${cid}&city=ilike.${ilikeExact(safeLoc)}&select=id&limit=1`, { headers: hdrs });
       const locRows = locSearch.ok ? await locSearch.json() : [];
       lid = locRows?.[0]?.id || null;
       if (!lid) {
@@ -792,7 +856,7 @@ export default async function handler(req, res) {
     const keysFor = async (company) => {
       const k = String(company).toLowerCase().trim();
       if (heldKeys.has(k)) return heldKeys.get(k);
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${encodeURIComponent(k)}&select=company_name,outcome,platform,role,report_text&limit=5000`, { headers: hdrsBase });
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${ilikeExact(k)}&select=company_name,outcome,platform,role,report_text&limit=5000`, { headers: hdrsBase });
       if (!r.ok) throw new Error(`duplicate check failed (${r.status})`);
       const set = new Set(((await r.json()) || []).map(reportDupKey).filter(Boolean));
       heldKeys.set(k, set);
@@ -807,7 +871,7 @@ export default async function handler(req, res) {
         const weight = SOURCE_WEIGHTS[src] || 0.3;
 
         // Resolve company id
-        const coR = await fetch(`${SUPABASE_URL}/rest/v1/companies?name=ilike.${encodeURIComponent(String(rpt.company).slice(0,120))}&select=id&limit=1`, { headers: hdrsBase });
+        const coR = await fetch(`${SUPABASE_URL}/rest/v1/companies?name=ilike.${ilikeExact(String(rpt.company).slice(0,120))}&select=id&limit=1`, { headers: hdrsBase });
         const coRows = coR.ok ? await coR.json() : [];
         let cid = coRows?.[0]?.id || null;
         if (!cid) {
@@ -873,7 +937,7 @@ export default async function handler(req, res) {
     // (SpaceX 106, Tesla 207 on 2026-10-20) silently lost its OLDEST reports from the page.
     // Wildcards only BETWEEN tokens (so "Towne Park LLC" / "coca-cola" still match); every row is
     // then checked with sameCompany. Held rows (anti-gaming needs_review) are not public.
-    const nameEnc = encodeURIComponent(`*${canonical.replace(/[\s-]+/g, '*')}*`);
+    const nameEnc = ilikeWords(canonical, { contains: true });
     const url = `${SUPABASE_URL}/rest/v1/reports`
       + `?company_name=ilike.${nameEnc}`
       + `&needs_review=not.is.true`
@@ -959,7 +1023,7 @@ async function checkLocation(location) {
 async function fetchCompanyStats(name, supabaseUrl, dbHeaders) {
   if (!supabaseUrl || !dbHeaders?.apikey) return null;
   try {
-    const enc = encodeURIComponent(name);
+    const enc = ilikeExact(name);
     const [scoresRes, reportsRes] = await Promise.all([
       fetch(`${supabaseUrl}/rest/v1/company_scores?company_name=ilike.${enc}&select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,avg_rounds,waste_score,report_count,data_quality,data_source,first_party_report_count${await mentionSel(supabaseUrl, dbHeaders)},web_report_count,web_reviews&order=created_at.desc&limit=1`, { headers: dbHeaders }),
       // Same corpus as the score (employee reviews and anti-gaming holds excluded), so this count can't
@@ -1071,7 +1135,7 @@ function _rowToScoreRaw(row) {
 // exact ilike misses it. Fallback pattern: wildcard between tokens ("coca*cola"), still
 // anchored at both ends so it can't over-match unrelated companies.
 function _fuzzyNamePattern(name) {
-  return encodeURIComponent(String(name).toLowerCase().trim().replace(/[\s-]+/g, '*'));
+  return ilikeWords(String(name).toLowerCase());
 }
 
 // Group report rows by trust class and carry each class's mean wait_days / rounds, so fusion
@@ -1100,7 +1164,7 @@ export function sourcesFromGroups(byType) {
 async function _fuseWithReports(name, web, SUPABASE_URL, dbH) {
   if (!SUPABASE_URL || !dbH) return null;
   try {
-    const enc = encodeURIComponent(String(name).toLowerCase().trim());
+    const enc = ilikeExact(String(name).toLowerCase().trim());
     // Every report counts at its trust weight; only the anti-gaming holds wait for an admin
     // (lib/server/reportCounts.js SCORABLE_REPORTS_FILTER — the same corpus the stored recompute uses).
     let r = await fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${enc}&${SCORABLE_REPORTS_FILTER}&select=outcome,platform,trust_reason,wait_days,rounds&limit=2000`, { headers: dbH });
@@ -1161,8 +1225,8 @@ async function handleCompanyScore(req, res, body) {
     const qWord = q.split(/\s+/)[0];
     try {
       const [aliasRes, scoresRes] = await Promise.all([
-        fetch(`${SUPABASE_URL}/rest/v1/company_aliases?alias=ilike.${encodeURIComponent(q)}&select=canonical,alias&limit=3`, { headers: dbH }),
-        fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=ilike.*${encodeURIComponent(qWord)}*&select=company_name,overall_score,ghost_rate,report_count,first_party_report_count${await mentionSel(SUPABASE_URL, dbH)},data_source,data_quality,verification_status&order=report_count.desc&limit=8`, { headers: dbH }),
+        fetch(`${SUPABASE_URL}/rest/v1/company_aliases?alias=ilike.${ilikeExact(q)}&select=canonical,alias&limit=3`, { headers: dbH }),
+        fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=ilike.${ilikeContains(qWord)}&select=company_name,overall_score,ghost_rate,report_count,first_party_report_count${await mentionSel(SUPABASE_URL, dbH)},data_source,data_quality,verification_status&order=report_count.desc&limit=8`, { headers: dbH }),
       ]);
       const aliases = aliasRes.ok ? await aliasRes.json() : [];
       const scores = scoresRes.ok ? await scoresRes.json() : [];
@@ -1186,7 +1250,7 @@ async function handleCompanyScore(req, res, body) {
 
   if (!force_refresh && SUPABASE_URL && SUPABASE_SERVICE_KEY) {
     try {
-      const nameEnc = encodeURIComponent(name.toLowerCase().trim());
+      const nameEnc = ilikeExact(name.toLowerCase().trim());
       // In parallel with the cache read: how many reports the score SHOULD be built from right now.
       const livePath = scorableResolvedCountPath(name);
       const liveCountP = livePath

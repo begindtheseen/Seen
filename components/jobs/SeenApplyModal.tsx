@@ -7,10 +7,14 @@
 // application is also in the applicant's tracker (synced from the DB).
 
 import { useEffect, useState } from 'react'
+import { displayLocation } from '@/lib/jobs/displayLocation.js'
 import Link from 'next/link'
 import ModalPortal from '@/components/ModalPortal'
 import { useAuth } from '@/lib/auth'
 import { AppStore } from '@/lib/stores/AppStore'
+import ResumePicker from '@/components/resume/ResumePicker'
+import type { SavedResume } from '@/lib/resumeLibrary'
+import { chooseResumeId } from '@/lib/resumeChoice.js'
 
 const MAX_BYTES = 3 * 1024 * 1024
 
@@ -19,7 +23,7 @@ type Status = {
   accepts_seen?: boolean
   company?: string | null
   already_applied?: { at: string } | null
-  prefill?: { name: string; email: string; has_saved_resume: boolean; saved_resume_file_name: string | null }
+  prefill?: { name: string; email: string; has_saved_resume: boolean; saved_resume_file_name: string | null; resumes?: SavedResume[] | null }
 }
 
 export default function SeenApplyModal({ job, onClose, onApplied }: {
@@ -35,6 +39,8 @@ export default function SeenApplyModal({ job, onClose, onApplied }: {
   const [phone, setPhone] = useState('')
   const [note, setNote] = useState('')
   const [source, setSource] = useState<'saved' | 'upload'>('upload')
+  // Several saved résumés: which one to send (the default unless the person picks another).
+  const [resumeId, setResumeId] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [consent, setConsent] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -67,6 +73,7 @@ export default function SeenApplyModal({ job, onClose, onApplied }: {
           setName(d.prefill.name || '')
           setEmail(d.prefill.email || '')
           if (d.prefill.has_saved_resume) setSource('saved')
+          if (d.prefill.resumes && d.prefill.resumes.length > 1) setResumeId(chooseResumeId({ ready: true, resumes: d.prefill.resumes }, null))
         }
       } catch { if (!cancelled) setLoadErr('Could not load the application form') }
     })()
@@ -95,7 +102,7 @@ export default function SeenApplyModal({ job, onClose, onApplied }: {
         headers: { 'Content-Type': 'application/json', ...(t ? { Authorization: `Bearer ${t}` } : {}) },
         body: JSON.stringify({
           action: 'seen_apply', job_id: job.id, name, email, phone, note,
-          resume_source: source, file_base64, file_name: file?.name, mime_type: file?.type, consent,
+          resume_source: source, ...(source === 'saved' && resumeId ? { resume_id: resumeId } : {}), file_base64, file_name: file?.name, mime_type: file?.type, consent,
         }),
       })
       const d = await r.json().catch(() => ({})) as { ok?: boolean; error?: string; reason?: string }
@@ -114,8 +121,8 @@ export default function SeenApplyModal({ job, onClose, onApplied }: {
     }
   }
 
-  const label: React.CSSProperties = { display: 'block', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--muted)', margin: '.75rem 0 .3rem' }
-  const input: React.CSSProperties = { width: '100%', boxSizing: 'border-box', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 8, padding: '.6rem .75rem', color: 'var(--white)', fontFamily: 'var(--body)', fontSize: 'var(--fs-ui)', outline: 'none' }
+  const label: React.CSSProperties = { display: 'block', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--muted)', margin: '.75rem 0 .25rem' }
+  const input: React.CSSProperties = { width: '100%', boxSizing: 'border-box', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem .75rem', color: 'var(--white)', fontFamily: 'var(--body)', fontSize: 'var(--fs-ui)', outline: 'none' }
   const primary: React.CSSProperties = { width: '100%', background: 'var(--green)', color: 'var(--ink)', border: 'none', borderRadius: 9, padding: '.75rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)', cursor: busy ? 'wait' : 'pointer', opacity: busy ? .7 : 1, marginTop: '1rem' }
 
   let content: React.ReactNode
@@ -138,7 +145,7 @@ export default function SeenApplyModal({ job, onClose, onApplied }: {
   } else if (done) {
     content = (
       <>
-        <div style={{ fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-lead)', color: 'var(--green)', marginBottom: '.4rem' }}>✓ Application sent</div>
+        <div style={{ fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-lead)', color: 'var(--green)', marginBottom: '.5rem' }}>✓ Application sent</div>
         <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-ui)', lineHeight: 1.6, margin: '0 0 1rem' }}>{job.company} has your application. It’s in your tracker — we’ll check in if you don’t hear back.</p>
         <Link href="/tracker" style={{ ...primary, display: 'block', textAlign: 'center', textDecoration: 'none' }}>Open my tracker →</Link>
       </>
@@ -152,6 +159,7 @@ export default function SeenApplyModal({ job, onClose, onApplied }: {
     )
   } else {
     const hasSaved = !!status.prefill?.has_saved_resume
+    const savedList = status.prefill?.resumes && status.prefill.resumes.length > 1 ? { ready: true, pro: false, max: 0, resumes: status.prefill.resumes } : null
     content = (
       <>
         <label style={label} htmlFor="sa-name">Full name</label>
@@ -163,10 +171,13 @@ export default function SeenApplyModal({ job, onClose, onApplied }: {
 
         <span style={label}>Résumé</span>
         {hasSaved && (
-          <label style={{ display: 'flex', gap: '.5rem', alignItems: 'center', fontSize: 'var(--fs-sm)', color: 'var(--sub)', marginBottom: '.35rem', cursor: 'pointer' }}>
+          <label style={{ display: 'flex', gap: '.5rem', alignItems: 'center', fontSize: 'var(--fs-sm)', color: 'var(--sub)', marginBottom: '.25rem', cursor: 'pointer' }}>
             <input type="radio" name="sa-src" checked={source === 'saved'} onChange={() => setSource('saved')} />
-            Use my résumé on Seen{status.prefill?.saved_resume_file_name ? ` (${status.prefill.saved_resume_file_name})` : ''}
+            {savedList ? 'Use one of my résumés on Seen' : <>Use my résumé on Seen{status.prefill?.saved_resume_file_name ? ` (${status.prefill.saved_resume_file_name})` : ''}</>}
           </label>
+        )}
+        {hasSaved && savedList && source === 'saved' && (
+          <ResumePicker list={savedList} selectedId={resumeId} onPick={r => setResumeId(r.id)} />
         )}
         <label style={{ display: 'flex', gap: '.5rem', alignItems: 'center', fontSize: 'var(--fs-sm)', color: 'var(--sub)', cursor: 'pointer' }}>
           {hasSaved && <input type="radio" name="sa-src" checked={source === 'upload'} onChange={() => setSource('upload')} />}
@@ -177,20 +188,20 @@ export default function SeenApplyModal({ job, onClose, onApplied }: {
             type="file"
             accept=".pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
             onChange={e => setFile(e.target.files?.[0] || null)}
-            style={{ marginTop: '.45rem', fontSize: 'var(--fs-meta)', color: 'var(--sub)' }}
+            style={{ marginTop: '.5rem', fontSize: 'var(--fs-meta)', color: 'var(--sub)' }}
           />
         )}
-        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.3rem' }}>PDF, Word or text · up to 3 MB</div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.25rem' }}>PDF, Word or text · up to 3 MB</div>
 
         <label style={label} htmlFor="sa-note">Note to {job.company} (optional)</label>
         <textarea autoComplete="off" id="sa-note" style={{ ...input, minHeight: 80, resize: 'vertical' }} maxLength={2000} value={note} onChange={e => setNote(e.target.value)} />
 
-        <label style={{ display: 'flex', gap: '.55rem', alignItems: 'flex-start', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5, marginTop: '.85rem', cursor: 'pointer' }}>
-          <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} style={{ marginTop: '.2rem' }} />
+        <label style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-start', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.5, marginTop: '.75rem', cursor: 'pointer' }}>
+          <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} style={{ marginTop: '.25rem' }} />
           <span>Your name, email, résumé and note will be shared with {job.company}.</span>
         </label>
 
-        {err && <div role="alert" style={{ color: 'var(--red)', fontSize: 'var(--fs-meta)', marginTop: '.6rem' }}>{err}</div>}
+        {err && <div role="alert" style={{ color: 'var(--red)', fontSize: 'var(--fs-meta)', marginTop: '.5rem' }}>{err}</div>}
         <button type="button" onClick={submit} disabled={busy} style={primary}>{busy ? 'Sending…' : `Send application to ${job.company}`}</button>
       </>
     )
@@ -199,12 +210,12 @@ export default function SeenApplyModal({ job, onClose, onApplied }: {
   return (
     <ModalPortal onBack={onClose}>
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(2,4,10,.90)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '6vh 1rem', overflowY: 'auto' }}>
-        <div role="dialog" aria-modal="true" aria-label={`Apply to ${job.title} at ${job.company}`} onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 460, background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 16, padding: '1.25rem 1.25rem 1.4rem', boxShadow: '0 30px 90px rgba(0,0,0,.6)' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.75rem', marginBottom: '.4rem' }}>
+        <div role="dialog" aria-modal="true" aria-label={`Apply to ${job.title} at ${job.company}`} onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 460, background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 16, padding: '1.25rem 1.25rem 1.5rem', boxShadow: '0 30px 90px rgba(0,0,0,.6)' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.75rem', marginBottom: '.5rem' }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--green)' }}>Apply on Seen</div>
-              <div style={{ fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-lead)', color: 'var(--white)', marginTop: '.2rem' }}>{job.title}</div>
-              <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)' }}>{job.company}{job.location ? ` · ${job.location}` : ''}</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--text-3)' }}>Apply on Seen</div>
+              <div style={{ fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-lead)', color: 'var(--white)', marginTop: '.25rem' }}>{job.title}</div>
+              <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)' }}>{job.company}{job.location ? ` · ${displayLocation(job.location)}` : ''}</div>
             </div>
             <button type="button" onClick={onClose} aria-label="Close" style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, width: 32, height: 32, color: 'var(--muted)', cursor: 'pointer', flexShrink: 0 }}>✕</button>
           </div>

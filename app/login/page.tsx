@@ -60,7 +60,7 @@ function fieldStyle(focused: boolean) {
     background: 'var(--surface)',
     border: `1.5px solid ${focused ? 'var(--blue)' : 'var(--line2)'}`,
     borderRadius: 8,
-    padding: '.72rem 1rem',
+    padding: '.75rem 1rem',
     color: 'var(--white)',
     fontFamily: 'var(--body)',
     fontSize: 'var(--fs-ui)',
@@ -390,10 +390,10 @@ function LoginContent() {
   const destLabel = signupType === 'employer' ? 'your employer dashboard' : nextLabel(explicitReturn, intent.company)
 
   const btnStyle: React.CSSProperties = {
-    // The one primary on this screen: the CTA gradient, body face at a loaded weight (Syne is for headings).
-    width: '100%', minHeight: 48, padding: '.85rem',
-    background: 'var(--cta-gradient)',
-    color: '#fff', border: 'none', borderRadius: 'var(--r-control)',
+    // The one primary on this screen: the flat CTA fill, body face at a loaded weight (Syne is for headings).
+    width: '100%', minHeight: 48, padding: '.75rem',
+    background: 'var(--cta)',
+    color: 'var(--text-1)', border: 'none', borderRadius: 'var(--r-control)',
     fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-ui)',
     cursor: loading ? 'not-allowed' : 'pointer', marginBottom: '.75rem',
     boxShadow: 'var(--sh-control)', opacity: loading ? 0.6 : 1,
@@ -421,7 +421,7 @@ function LoginContent() {
   )
 
   const label = (text: string, htmlFor?: string) => (
-    <label htmlFor={htmlFor} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase' as const, letterSpacing: '.08em', color: 'var(--dim)', display: 'block', marginBottom: '.35rem' }}>
+    <label htmlFor={htmlFor} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase' as const, letterSpacing: '.08em', color: 'var(--dim)', display: 'block', marginBottom: '.25rem' }}>
       {text}
     </label>
   )
@@ -432,7 +432,7 @@ function LoginContent() {
       <div className={styles.card}>
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '2rem', justifyContent: 'center' }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--blue)', boxShadow: '0 0 10px rgba(59,130,246,0.6)', display: 'inline-block' }} />
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--blue)', display: 'inline-block' }} />
           <span style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-h3)', fontWeight: 600, color: 'var(--white)', letterSpacing: '-.02em' }}>Seen</span>
         </div>
 
@@ -443,13 +443,13 @@ function LoginContent() {
             moment it appears (audit 2026-10-24: the message sat outside the empty role="alert"). */}
         <div role="alert" aria-live="assertive" aria-atomic="true">
           {error && (
-            <div data-testid="login-error" style={{ background: 'var(--rdim)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '.72rem 1rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--red)', marginBottom: '1rem', textAlign: 'center', lineHeight: 1.6 }}>
+            <div data-testid="login-error" style={{ background: 'var(--rdim)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '.75rem 1rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--red)', marginBottom: '1rem', textAlign: 'center', lineHeight: 1.6 }}>
               {coolingDown ? `Too many attempts — try again in ${cooldownLeft}s. Forgot it? Use “Forgot password?” below.` : error}
             </div>
           )}
           {/* Correct password, unconfirmed address (M1): the fix is the link, not a new password. */}
           {unconfirmedEmail && step === 'signin' && (
-            <div data-testid="login-unconfirmed" style={{ background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.72rem 1rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '1rem', textAlign: 'left', lineHeight: 1.65 }}>
+            <div data-testid="login-unconfirmed" style={{ background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.75rem 1rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '1rem', textAlign: 'left', lineHeight: 1.65 }}>
               Confirm your email first — we sent the link to <strong style={{ color: 'var(--white)' }}>{unconfirmedEmail}</strong>. Open it on any device, then sign in here.{' '}
               <button type="button" className={styles.linkBtn} onClick={() => resendVerification(unconfirmedEmail)} style={{ fontSize: 'inherit' }}>Resend the link →</button>
             </div>
@@ -461,30 +461,30 @@ function LoginContent() {
           <div data-testid="signup-step">
             {signupType === 'employer' ? (
               <>
-                <h1 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', margin: '0 0 .2rem' }}>Create your employer account</h1>
-                <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--sub)', fontWeight: 400, marginBottom: '.6rem' }}>Then claim your company on the employers page. Free.</div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.6rem', flexWrap: 'wrap', background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.55rem .8rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '1.25rem' }}>
+                <h1 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', margin: '0 0 .25rem' }}>Create your employer account</h1>
+                <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--sub)', fontWeight: 400, marginBottom: '.5rem' }}>Then claim your company on the employers page. Free.</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.5rem', flexWrap: 'wrap', background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.5rem .75rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '1.25rem' }}>
                   <span><Icon name="briefcase-business" size={14} /> Employer account · a work email at your company&apos;s domain gets your claim approved instantly</span>
                   <button type="button" className={styles.linkBtn} onClick={() => { setSignupType('seeker'); clearError() }} style={{ fontSize: 'var(--fs-meta)' }}>Not an employer?</button>
                 </div>
               </>
             ) : (
               <>
-                <h1 data-testid="signup-title" style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', margin: '0 0 .3rem' }}>{headline.title}</h1>
-                <div data-testid="signup-sub" style={{ fontSize: 'var(--fs-ui)', color: 'var(--sub)', fontWeight: 400, lineHeight: 1.55, marginBottom: '1.35rem' }}>{headline.sub}</div>
+                <h1 data-testid="signup-title" style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', margin: '0 0 .25rem' }}>{headline.title}</h1>
+                <div data-testid="signup-sub" style={{ fontSize: 'var(--fs-ui)', color: 'var(--sub)', fontWeight: 400, lineHeight: 1.55, marginBottom: '1.25rem' }}>{headline.sub}</div>
               </>
             )}
             {!EMPLOYER_SIGNUP_ENABLED && cameAsEmployer && (
-              <div style={{ background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.6rem .85rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '1.1rem', textAlign: 'center', lineHeight: 1.55 }}>
+              <div style={{ background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.5rem .75rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '1rem', textAlign: 'center', lineHeight: 1.55 }}>
                 Employer signups are currently closed. You can still create a job seeker account below.
               </div>
             )}
             <form onSubmit={e => { e.preventDefault(); void createAccount() }}>
-              <div style={{ marginBottom: '.85rem' }}>
+              <div style={{ marginBottom: '.75rem' }}>
                 {label('Email', 'su-email')}
                 <input id="su-email" type="email" autoComplete="email" inputMode="email" placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} style={fieldStyle(focused === 'email')} onFocus={() => setFocused('email')} onBlur={() => setFocused(null)} />
               </div>
-              <div style={{ marginBottom: '1.1rem' }}>
+              <div style={{ marginBottom: '1rem' }}>
                 {label('Password', 'su-pw')}
                 {pwField('su-pw', { autoComplete: 'new-password', placeholder: 'At least 8 characters', onEnter: createAccount })}
                 <div style={{ height: 3, background: 'var(--line2)', borderRadius: 2, overflow: 'hidden', marginTop: '.5rem' }}>
@@ -499,7 +499,7 @@ function LoginContent() {
                 {loading ? 'Creating account...' : 'Create account →'}
               </button>
             </form>
-            <button type="button" onClick={() => void sendLink()} disabled={loading} data-testid="signup-link" style={{ width: '100%', minHeight: 44, padding: '.65rem', background: 'none', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, fontFamily: 'var(--body)', fontSize: 'var(--fs-ui)', cursor: 'pointer', marginBottom: '.75rem' }}>
+            <button type="button" onClick={() => void sendLink()} disabled={loading} data-testid="signup-link" style={{ width: '100%', minHeight: 44, padding: '.75rem', background: 'none', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, fontFamily: 'var(--body)', fontSize: 'var(--fs-ui)', cursor: 'pointer', marginBottom: '.75rem' }}>
               No password? Email me a sign-in link
             </button>
             <div style={{ textAlign: 'center', fontSize: 'var(--fs-sm)', color: 'var(--muted)' }}>
@@ -527,7 +527,7 @@ function LoginContent() {
               We sent a sign-in link to<br />
               <strong style={{ color: 'var(--white)' }}>{verifyEmail}</strong>
             </div>
-            <div style={{ background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.85rem 1rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', marginBottom: '1rem', lineHeight: 1.65, textAlign: 'left' }}>
+            <div style={{ background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.75rem 1rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', marginBottom: '1rem', lineHeight: 1.65, textAlign: 'left' }}>
               <Icon name="check" size={13} /> Open the link in your email<br />
               <Icon name="check" size={13} /> It signs you in and opens {destLabel}<br />
               <Icon name="check" size={13} /> No password needed
@@ -552,7 +552,7 @@ function LoginContent() {
               We sent a verification link to<br />
               <strong style={{ color: 'var(--white)' }}>{verifyEmail}</strong>
             </div>
-            <div style={{ background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.85rem 1rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', marginBottom: '1rem', lineHeight: 1.65, textAlign: 'left' }}>
+            <div style={{ background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.75rem 1rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', marginBottom: '1rem', lineHeight: 1.65, textAlign: 'left' }}>
               <Icon name="check" size={13} /> Open the link in your email<br />
               <Icon name="check" size={13} /> It signs you in and opens {destLabel}<br />
               <Icon name="check" size={13} /> Left this tab open? It moves on by itself
@@ -561,7 +561,7 @@ function LoginContent() {
             <button style={btnStyle} onClick={checkVerification} disabled={loading}>
               {loading ? 'Checking...' : 'I verified my email →'}
             </button>
-            <button type="button" onClick={() => resendVerification(verifyEmail)} style={{ width: '100%', minHeight: 44, padding: '.65rem', background: 'none', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', cursor: 'pointer', marginBottom: '.5rem' }}>
+            <button type="button" onClick={() => resendVerification(verifyEmail)} style={{ width: '100%', minHeight: 44, padding: '.75rem', background: 'none', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', cursor: 'pointer', marginBottom: '.5rem' }}>
               Resend verification email
             </button>
             <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '.25rem 1.25rem' }}>
@@ -577,12 +577,12 @@ function LoginContent() {
 
         {/* ── STEP: SIGN IN ── */}
         {step === 'signin' && (
-          <div data-testid="signin-step">
+          <form data-testid="signin-step" onSubmit={e => { e.preventDefault(); if (!loading && !coolingDown) void doSignIn() }}>
             {/* "Welcome back" only for someone who WAS signed in here (an expired session). A guest sent
                 here by a link has never had an account (conversion audit 2026-10-24). */}
-            <h1 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', margin: '0 0 .2rem' }}>{expiredNotice ? 'Welcome back' : 'Sign in'}</h1>
+            <h1 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', margin: '0 0 .25rem' }}>{expiredNotice ? 'Welcome back' : 'Sign in'}</h1>
             <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--sub)', fontWeight: 400, marginBottom: '1.5rem' }}>{expiredNotice ? 'Sign in to pick up where you left off.' : 'Use the email you signed up with.'}</div>
-            <div style={{ marginBottom: '.85rem' }}>
+            <div style={{ marginBottom: '.75rem' }}>
               {label('Email', 'si-email')}
               <input id="si-email" type="email" autoComplete="email" inputMode="email" placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} style={fieldStyle(focused === 'siEmail')} onFocus={() => setFocused('siEmail')} onBlur={() => setFocused(null)} />
             </div>
@@ -610,7 +610,7 @@ function LoginContent() {
                 <button type="button" className={`${styles.linkBtn} ${styles.linkDim}`} onClick={() => resendVerification()} style={{ fontSize: 'inherit' }}>Resend the confirmation link</button>
               </div>
             )}
-            <button type="button" onClick={() => void sendLink()} disabled={loading} data-testid="signin-link" style={{ width: '100%', minHeight: 44, padding: '.65rem', background: 'none', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, fontFamily: 'var(--body)', fontSize: 'var(--fs-ui)', cursor: 'pointer', marginBottom: '.75rem' }}>
+            <button type="button" onClick={() => void sendLink()} disabled={loading} data-testid="signin-link" style={{ width: '100%', minHeight: 44, padding: '.75rem', background: 'none', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, fontFamily: 'var(--body)', fontSize: 'var(--fs-ui)', cursor: 'pointer', marginBottom: '.75rem' }}>
               Email me a sign-in link instead
             </button>
             <div style={{ textAlign: 'center', fontSize: 'var(--fs-sm)', color: 'var(--muted)' }}>
@@ -619,7 +619,7 @@ function LoginContent() {
                 Create a free account →
               </button>
             </div>
-          </div>
+          </form>
         )}
 
       </div>

@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth'
 import FillListingPanel, { DeclineMessagePicker } from './FillListingPanel'
 import { declineTemplates } from '@/lib/server/seenApply.js'
 import ModalPortal from '@/components/ModalPortal'
+import { httpHref } from '@/lib/safeHref.js'
 
 // Manage your listings — the LOGIN-SCOPED listings manager (POST /api/employer-listings).
 //
@@ -71,12 +72,12 @@ type Dispute = {
 
 const mono = (size: string, color: string): React.CSSProperties => ({ fontFamily: 'var(--mono)', fontSize: size, color })
 const card: React.CSSProperties = { background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16, padding: '1.5rem', marginBottom: 0 }
-const kicker: React.CSSProperties = { ...mono('.55rem', 'var(--blue)'), textTransform: 'uppercase', letterSpacing: '.16em', marginBottom: '.5rem' }
-const h2: React.CSSProperties = { fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', margin: '0 0 .4rem', letterSpacing: '-.02em' }
-const bodyText: React.CSSProperties = { color: 'var(--sub)', fontSize: 'var(--fs-ui)', lineHeight: 1.7, margin: '0 0 1.4rem', maxWidth: 560 }
-const primaryBtn: React.CSSProperties = { background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 9, padding: '.7rem 1.4rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)', color: '#fff', cursor: 'pointer' }
-const ghostBtn: React.CSSProperties = { background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem 1rem', ...mono('.62rem', 'var(--white)'), cursor: 'pointer' }
-const inputStyle: React.CSSProperties = { flex: 1, minWidth: 200, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.7rem .9rem', ...mono('.75rem', 'var(--white)'), outline: 'none', boxSizing: 'border-box' }
+const kicker: React.CSSProperties = { ...mono('var(--fs-meta)', 'var(--blue)'), textTransform: 'uppercase', letterSpacing: '.16em', marginBottom: '.5rem' }
+const h2: React.CSSProperties = { fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', margin: '0 0 .5rem', letterSpacing: '-.02em' }
+const bodyText: React.CSSProperties = { color: 'var(--sub)', fontSize: 'var(--fs-ui)', lineHeight: 1.7, margin: '0 0 1.5rem', maxWidth: 560 }
+const primaryBtn: React.CSSProperties = { background: 'var(--cta)', border: 'none', borderRadius: 10, padding: '.75rem 1.5rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', color: 'var(--text-1)', cursor: 'pointer' }
+const ghostBtn: React.CSSProperties = { background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem 1rem', ...mono('var(--fs-meta)', 'var(--white)'), cursor: 'pointer' }
+const inputStyle: React.CSSProperties = { flex: 1, minWidth: 200, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.75rem 1rem', ...mono('var(--fs-meta)', 'var(--white)'), outline: 'none', boxSizing: 'border-box' }
 
 // Origin badge — aggregated (gray) / imported (blue) / posted-by-you (green).
 const ORIGIN_META: Record<Origin, { label: string; color: string }> = {
@@ -110,7 +111,7 @@ function fmtDate(iso: string | null) {
 }
 
 export function EmployerListingsManager() {
-  const { ready, isLoggedIn, isEmployer, employerCompany, claimsReady, token } = useAuth()
+  const { ready, isLoggedIn, isEmployer, claimsReady, token } = useAuth()
 
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -344,7 +345,7 @@ export function EmployerListingsManager() {
     return (
       <div style={card}>
         <div style={kicker}>Manage your listings</div>
-        <div style={mono('.7rem', 'var(--dim)')}>Loading your listings…</div>
+        <div style={mono('var(--fs-meta)', 'var(--dim)')}>Loading your listings…</div>
       </div>
     )
   }
@@ -370,11 +371,11 @@ export function EmployerListingsManager() {
         </div>
       </div>
 
-      {err && <div style={{ ...mono('.62rem', 'var(--red)'), marginBottom: '1rem' }}>{err}</div>}
+      {err && <div style={{ ...mono('var(--fs-meta)', 'var(--red)'), marginBottom: '1rem' }}>{err}</div>}
 
       {/* Summary row */}
       {summary && (
-        <div style={{ display: 'flex', gap: '1.6rem', flexWrap: 'wrap', padding: '1rem 0 1.3rem', borderBottom: '1px solid var(--line)' }}>
+        <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', padding: '1rem 0 1.25rem', borderBottom: '1px solid var(--line)' }}>
           <Stat value={summary.total} label="total listings" color="var(--white)" />
           <Stat value={summary.active} label="active" color="var(--green)" />
           <Stat value={summary.employerPosted} label="posted by you" color="var(--blue)" />
@@ -389,9 +390,9 @@ export function EmployerListingsManager() {
 
       {/* Listings */}
       {listings.length === 0 ? (
-        <div style={{ padding: '1.6rem 0 .4rem', textAlign: 'center' }}>
-          <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', marginBottom: '.35rem' }}>No listings matched to {company || 'your company'} yet.</div>
-          <p style={{ ...mono('.6rem', 'var(--muted)'), lineHeight: 1.6, margin: 0 }}>
+        <div style={{ padding: '1.5rem 0 .5rem', textAlign: 'center' }}>
+          <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', marginBottom: '.25rem' }}>No listings matched to {company || 'your company'} yet.</div>
+          <p style={{ ...mono('var(--fs-meta)', 'var(--muted)'), lineHeight: 1.6, margin: 0 }}>
             When Seen indexes a listing for your company — or you post one above — it appears here.
           </p>
         </div>
@@ -400,93 +401,93 @@ export function EmployerListingsManager() {
           {visibleListings.map(l => {
             const om = ORIGIN_META[l.origin] || ORIGIN_META.aggregated
             return (
-              <div key={l.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', padding: '.95rem 0', borderBottom: '1px solid var(--line)' }}>
+              <div key={l.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', padding: '1rem 0', borderBottom: '1px solid var(--line)' }}>
                 <div style={{ flex: 1, minWidth: 220 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
                     <span style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-ui)', fontWeight: 700, color: l.removed ? 'var(--muted)' : 'var(--white)', textDecoration: l.removed ? 'line-through' : 'none' }}>{l.title}</span>
-                    <span style={{ ...mono('.5rem', om.color), textTransform: 'uppercase', letterSpacing: '.08em', border: `1px solid ${om.color}`, borderRadius: 5, padding: '.1rem .4rem' }}>{om.label}</span>
+                    <span style={{ ...mono('var(--fs-meta)', om.color), textTransform: 'uppercase', letterSpacing: '.08em', border: `1px solid ${om.color}`, borderRadius: 5, padding: '.125rem .5rem' }}>{om.label}</span>
                     {l.removed ? (
-                      <span style={{ ...mono('.5rem', 'var(--red)'), textTransform: 'uppercase', letterSpacing: '.06em', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.4)', borderRadius: 999, padding: '.1rem .45rem' }}>Deleted by admin</span>
+                      <span style={{ ...mono('var(--fs-meta)', 'var(--red)'), textTransform: 'uppercase', letterSpacing: '.06em', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.4)', borderRadius: 999, padding: '.125rem .5rem' }}>Deleted by admin</span>
                     ) : (
-                      <span style={{ ...mono('.5rem', availColor(l.availability_status)), textTransform: 'uppercase', letterSpacing: '.06em', background: 'var(--raised)', border: `1px solid ${availColor(l.availability_status)}`, borderRadius: 999, padding: '.1rem .45rem' }}>{l.availability_status}</span>
+                      <span style={{ ...mono('var(--fs-meta)', availColor(l.availability_status)), textTransform: 'uppercase', letterSpacing: '.06em', background: 'var(--raised)', border: `1px solid ${availColor(l.availability_status)}`, borderRadius: 999, padding: '.125rem .5rem' }}>{l.availability_status}</span>
                     )}
                     {l.removed && (
-                      <button onClick={() => setWhyOpen(w => ({ ...w, [String(l.id)]: !w[String(l.id)] }))} style={{ background: 'none', border: 'none', cursor: 'pointer', ...mono('.55rem', 'var(--blue)'), textDecoration: 'underline', padding: 0 }}>
+                      <button onClick={() => setWhyOpen(w => ({ ...w, [String(l.id)]: !w[String(l.id)] }))} style={{ background: 'none', border: 'none', cursor: 'pointer', ...mono('var(--fs-meta)', 'var(--blue)'), textDecoration: 'underline', padding: 0 }}>
                         {whyOpen[String(l.id)] ? 'hide' : 'view why'}
                       </button>
                     )}
                   </div>
-                  <div style={{ ...mono('.56rem', 'var(--dim)'), marginTop: '.3rem', display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+                  <div style={{ ...mono('var(--fs-meta)', 'var(--dim)'), marginTop: '.25rem', display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
                     {l.location && <span>{l.location}</span>}
                     {l.source && <span>· {l.source}</span>}
                     {l.created_at && <span>· posted {fmtDate(l.created_at)}</span>}
                     {l.edited_at && <span style={{ color: 'var(--amber)' }}>· edited {fmtDate(l.edited_at)}</span>}
                     {l.status === 'filled' && <span style={{ color: 'var(--green)' }}>· filled</span>}
                     {!l.removed && l.expires_at && <span>· expires {fmtDate(l.expires_at)}</span>}
-                    {l.apply_url && l.apply_mode !== 'seen' && <>· <a href={l.apply_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--blue)', textDecoration: 'none' }}>Apply link ↗</a></>}
+                    {l.apply_url && l.apply_mode !== 'seen' && <>· <a href={httpHref(l.apply_url) ?? undefined} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--blue)', textDecoration: 'none' }}>Apply link ↗</a></>}
                     {seenApplyAvailable && l.is_employer_posted && <span>· {APPLY_MODE_LABEL[l.apply_mode || 'external']}</span>}
                   </div>
                   {l.removed && whyOpen[String(l.id)] && (
-                    <div style={{ marginTop: '.5rem', padding: '.6rem .8rem', background: 'rgba(239,68,68,.05)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8 }}>
-                      <div style={{ ...mono('.58rem', 'var(--white)'), fontWeight: 700 }}>{l.removed.reasonLabel}{l.removed.at ? ` · ${fmtDate(l.removed.at)}` : ''}</div>
-                      {l.removed.disputeId && <div style={{ ...mono('.55rem', 'var(--sub)'), marginTop: '.25rem' }}>Via dispute <span style={{ color: 'var(--blue)' }}>#{l.removed.disputeId}</span>{l.removed.disputeKind ? ` (${KIND_LABEL[l.removed.disputeKind] || l.removed.disputeKind})` : ''}</div>}
-                      {l.removed.note && <div style={{ ...mono('.55rem', 'var(--sub)'), marginTop: '.25rem', lineHeight: 1.5 }}>Admin note: {l.removed.note}</div>}
-                      <div style={{ ...mono('.52rem', 'var(--muted)'), marginTop: '.35rem', lineHeight: 1.5 }}>Think this was a mistake? Repost the role or contact support to appeal.</div>
+                    <div style={{ marginTop: '.5rem', padding: '.5rem .75rem', background: 'rgba(239,68,68,.05)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8 }}>
+                      <div style={{ ...mono('var(--fs-meta)', 'var(--white)'), fontWeight: 700 }}>{l.removed.reasonLabel}{l.removed.at ? ` · ${fmtDate(l.removed.at)}` : ''}</div>
+                      {l.removed.disputeId && <div style={{ ...mono('var(--fs-meta)', 'var(--sub)'), marginTop: '.25rem' }}>Via dispute <span style={{ color: 'var(--blue)' }}>#{l.removed.disputeId}</span>{l.removed.disputeKind ? ` (${KIND_LABEL[l.removed.disputeKind] || l.removed.disputeKind})` : ''}</div>}
+                      {l.removed.note && <div style={{ ...mono('var(--fs-meta)', 'var(--sub)'), marginTop: '.25rem', lineHeight: 1.5 }}>Admin note: {l.removed.note}</div>}
+                      <div style={{ ...mono('var(--fs-meta)', 'var(--muted)'), marginTop: '.25rem', lineHeight: 1.5 }}>Think this was a mistake? Repost the role or contact support to appeal.</div>
                     </div>
                   )}
                   {claimFor === l.id && (
-                    <div style={{ marginTop: '.6rem', padding: '.75rem .85rem', background: 'rgba(16,185,129,.05)', border: '1px solid rgba(16,185,129,.3)', borderRadius: 10 }}>
+                    <div style={{ marginTop: '.5rem', padding: '.75rem .75rem', background: 'rgba(16,185,129,.05)', border: '1px solid rgba(16,185,129,.3)', borderRadius: 10 }}>
                       <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 'var(--fs-ui)', color: 'var(--white)' }}>Take applications for this listing on Seen</div>
-                      <div style={{ ...mono('.56rem', 'var(--sub)'), lineHeight: 1.6, margin: '.3rem 0 .6rem' }}>
+                      <div style={{ ...mono('var(--fs-meta)', 'var(--sub)'), lineHeight: 1.6, margin: '.25rem 0 .5rem' }}>
                         It becomes yours to manage: applications come to your Seen inbox, you can edit or close it, and it shows ahead of aggregated listings in search. Anyone who saved or tracked it keeps the same link.
                       </div>
-                      <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap', marginBottom: '.6rem' }}>
+                      <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginBottom: '.5rem' }}>
                         {([['seen', 'On Seen only', 'Résumés come to your inbox'], ...(l.apply_url ? [['both', 'Seen + original link', 'Candidates choose']] : [])] as [ApplyMode, string, string][]).map(([m, t, sub]) => (
                           <button key={m} type="button" aria-pressed={claimMode === m} onClick={() => setClaimMode(m)}
-                            style={{ flex: '1 1 140px', textAlign: 'left', background: claimMode === m ? 'rgba(16,185,129,.1)' : 'var(--card)', border: `1px solid ${claimMode === m ? 'var(--green)' : 'var(--line2)'}`, borderRadius: 9, padding: '.5rem .65rem', cursor: 'pointer' }}>
+                            style={{ flex: '1 1 140px', textAlign: 'left', background: claimMode === m ? 'rgba(16,185,129,.1)' : 'var(--card)', border: `1px solid ${claimMode === m ? 'var(--green)' : 'var(--line2)'}`, borderRadius: 9, padding: '.5rem .75rem', cursor: 'pointer' }}>
                             <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 'var(--fs-meta)', color: claimMode === m ? 'var(--green)' : 'var(--white)' }}>{t}</div>
-                            <div style={{ ...mono('.52rem', 'var(--muted)'), marginTop: '.1rem' }}>{sub}</div>
+                            <div style={{ ...mono('var(--fs-meta)', 'var(--muted)'), marginTop: '.125rem' }}>{sub}</div>
                           </button>
                         ))}
                       </div>
-                      <div style={{ display: 'flex', gap: '.4rem' }}>
-                        <button onClick={() => claimListing(l)} disabled={claiming} style={{ ...ghostBtn, ...mono('.62rem', 'var(--ink)'), background: 'var(--green)', border: 'none', fontWeight: 700, opacity: claiming ? .6 : 1 }}>{claiming ? 'Switching…' : 'Switch to Seen applications'}</button>
-                        <button onClick={() => setClaimFor(null)} disabled={claiming} style={{ ...ghostBtn, ...mono('.62rem', 'var(--muted)') }}>Cancel</button>
+                      <div style={{ display: 'flex', gap: '.5rem' }}>
+                        <button onClick={() => claimListing(l)} disabled={claiming} style={{ ...ghostBtn, ...mono('var(--fs-meta)', 'var(--ink)'), background: 'var(--green)', border: 'none', fontWeight: 700, opacity: claiming ? .6 : 1 }}>{claiming ? 'Switching…' : 'Switch to Seen applications'}</button>
+                        <button onClick={() => setClaimFor(null)} disabled={claiming} style={{ ...ghostBtn, ...mono('var(--fs-meta)', 'var(--muted)') }}>Cancel</button>
                       </div>
                     </div>
                   )}
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '.35rem', flexShrink: 0 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '.25rem', flexShrink: 0 }}>
                   <div style={{ textAlign: 'right' }}>
                     <span style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: l.applications ? 'var(--white)' : 'var(--muted)', lineHeight: 1 }}>{l.applications}</span>
-                    <span style={{ ...mono('.5rem', 'var(--dim)'), marginLeft: '.35rem' }}>application{l.applications === 1 ? '' : 's'}</span>
+                    <span style={{ ...mono('var(--fs-meta)', 'var(--dim)'), marginLeft: '.25rem' }}>application{l.applications === 1 ? '' : 's'}</span>
                   </div>
                   {seenApplyAvailable && l.is_employer_posted && (l.apply_mode === 'seen' || l.apply_mode === 'both' || (l.seen_applications?.total || 0) > 0) && (
-                    <button onClick={() => setInboxFor(l)} style={{ ...ghostBtn, padding: '.35rem .8rem', ...mono('.6rem', (l.seen_applications?.new || 0) > 0 ? 'var(--green)' : 'var(--sub)'), borderColor: (l.seen_applications?.new || 0) > 0 ? 'var(--green)' : undefined }}>
+                    <button onClick={() => setInboxFor(l)} style={{ ...ghostBtn, padding: '.25rem .75rem', ...mono('var(--fs-meta)', (l.seen_applications?.new || 0) > 0 ? 'var(--green)' : 'var(--sub)'), borderColor: (l.seen_applications?.new || 0) > 0 ? 'var(--green)' : undefined }}>
                       Applications on Seen · {l.seen_applications?.total || 0}{(l.seen_applications?.new || 0) > 0 ? ` (${l.seen_applications?.new} new)` : ''}
                     </button>
                   )}
                   {l.removed ? (
                     // Already taken down by an admin — nothing to act on; "view why" is on the left.
-                    <span style={{ ...mono('.55rem', 'var(--muted)') }}>Removed</span>
+                    <span style={{ ...mono('var(--fs-meta)', 'var(--muted)') }}>Removed</span>
                   ) : l.is_employer_posted ? (
                     // Your OWN posted listing — delete it directly (no admin dispute needed).
-                    <div style={{ display: 'flex', gap: '.35rem' }}>
+                    <div style={{ display: 'flex', gap: '.25rem' }}>
                       {listingEditsAvailable && l.availability_status !== 'expired' && (
-                        <button onClick={() => startEdit(l)} disabled={editLoadingId === l.id} style={{ ...ghostBtn, padding: '.35rem .8rem', ...mono('.6rem', 'var(--blue)'), opacity: editLoadingId === l.id ? .6 : 1 }}>{editLoadingId === l.id ? 'Opening…' : 'Edit'}</button>
+                        <button onClick={() => startEdit(l)} disabled={editLoadingId === l.id} style={{ ...ghostBtn, padding: '.25rem .75rem', ...mono('var(--fs-meta)', 'var(--blue)'), opacity: editLoadingId === l.id ? .6 : 1 }}>{editLoadingId === l.id ? 'Opening…' : 'Edit'}</button>
                       )}
-                      <button onClick={() => removeListing(l.id, l.seen_applications?.total || 0)} disabled={deletingId === l.id} style={{ ...ghostBtn, padding: '.35rem .8rem', ...mono('.6rem', 'var(--red)'), borderColor: 'rgba(239,68,68,.45)', opacity: deletingId === l.id ? .6 : 1 }}>{deletingId === l.id ? 'Deleting…' : 'Delete'}</button>
+                      <button onClick={() => removeListing(l.id, l.seen_applications?.total || 0)} disabled={deletingId === l.id} style={{ ...ghostBtn, padding: '.25rem .75rem', ...mono('var(--fs-meta)', 'var(--red)'), borderColor: 'rgba(239,68,68,.45)', opacity: deletingId === l.id ? .6 : 1 }}>{deletingId === l.id ? 'Deleting…' : 'Delete'}</button>
                     </div>
                   ) : l.openDispute ? (
-                    <span style={{ ...mono('.55rem', 'var(--amber)'), border: '1px solid rgba(245,158,11,.4)', background: 'rgba(245,158,11,.08)', borderRadius: 6, padding: '.25rem .55rem' }}>
+                    <span style={{ ...mono('var(--fs-meta)', 'var(--amber)'), border: '1px solid rgba(245,158,11,.4)', background: 'rgba(245,158,11,.08)', borderRadius: 6, padding: '.25rem .5rem' }}>
                       Dispute pending{l.openDispute.kind ? ` · ${KIND_LABEL[l.openDispute.kind] || l.openDispute.kind}` : ''}
                     </span>
                   ) : (
-                    <div style={{ display: 'flex', gap: '.35rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <div style={{ display: 'flex', gap: '.25rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                       {seenApplyAvailable && l.availability_status !== 'expired' && (
-                        <button onClick={() => { setClaimFor(claimFor === l.id ? null : l.id); setClaimMode('seen') }} style={{ ...ghostBtn, padding: '.35rem .8rem', ...mono('.6rem', 'var(--green)'), borderColor: 'rgba(16,185,129,.45)' }}>Take applications on Seen</button>
+                        <button onClick={() => { setClaimFor(claimFor === l.id ? null : l.id); setClaimMode('seen') }} style={{ ...ghostBtn, padding: '.25rem .75rem', ...mono('var(--fs-meta)', 'var(--green)'), borderColor: 'rgba(16,185,129,.45)' }}>Take applications on Seen</button>
                       )}
-                      <button onClick={() => setDisputeFor(l)} style={{ ...ghostBtn, padding: '.35rem .8rem', ...mono('.6rem', 'var(--sub)') }}>Dispute</button>
+                      <button onClick={() => setDisputeFor(l)} style={{ ...ghostBtn, padding: '.25rem .75rem', ...mono('var(--fs-meta)', 'var(--sub)') }}>Dispute</button>
                     </div>
                   )}
                 </div>
@@ -496,7 +497,7 @@ export function EmployerListingsManager() {
           {(hiddenCount > 0 || showAll) && sortedListings.length > VISIBLE_CAP && (
             <button
               onClick={() => setShowAll(v => !v)}
-              style={{ ...ghostBtn, alignSelf: 'flex-start', marginTop: '.9rem', padding: '.45rem 1rem', ...mono('.62rem', 'var(--sub)') }}
+              style={{ ...ghostBtn, alignSelf: 'flex-start', marginTop: '1rem', padding: '.5rem 1rem', ...mono('var(--fs-meta)', 'var(--sub)') }}
             >
               {showAll ? '↑ Show fewer' : `↓ Show all ${sortedListings.length} listings`}
             </button>
@@ -506,19 +507,19 @@ export function EmployerListingsManager() {
 
       {/* Your disputes strip */}
       {disputes.length > 0 && (
-        <div style={{ marginTop: '1.6rem' }}>
-          <div style={{ ...mono('.55rem', 'var(--sub)'), textTransform: 'uppercase', letterSpacing: '.12em', marginBottom: '.7rem' }}>Your disputes</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
+        <div style={{ marginTop: '1.5rem' }}>
+          <div style={{ ...mono('var(--fs-meta)', 'var(--sub)'), textTransform: 'uppercase', letterSpacing: '.12em', marginBottom: '.75rem' }}>Your disputes</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
             {disputes.map(d => (
-              <div key={d.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '.7rem', flexWrap: 'wrap', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 10, padding: '.7rem .9rem' }}>
-                <span style={{ ...mono('.5rem', disputeStatusColor(d.status)), textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 700, border: `1px solid ${disputeStatusColor(d.status)}`, borderRadius: 5, padding: '.12rem .4rem', flexShrink: 0 }}>{d.status}</span>
+              <div key={d.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '.75rem', flexWrap: 'wrap', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 10, padding: '.75rem 1rem' }}>
+                <span style={{ ...mono('var(--fs-meta)', disputeStatusColor(d.status)), textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 700, border: `1px solid ${disputeStatusColor(d.status)}`, borderRadius: 5, padding: '.125rem .5rem', flexShrink: 0 }}>{d.status}</span>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   {/* The dispute number — the same reference the admin verdict + your notification carry. */}
-                  <div style={mono('.62rem', 'var(--white)')}><span style={{ color: 'var(--blue)', fontWeight: 700 }}>#{d.id}</span> · {KIND_LABEL[d.kind] || d.kind}</div>
-                  <div style={{ ...mono('.58rem', 'var(--sub)'), lineHeight: 1.5, marginTop: '.15rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{d.detail}</div>
-                  {d.admin_note && <div style={{ ...mono('.56rem', 'var(--muted)'), marginTop: '.2rem' }}>Admin note: {d.admin_note}</div>}
+                  <div style={mono('var(--fs-meta)', 'var(--white)')}><span style={{ color: 'var(--blue)', fontWeight: 700 }}>#{d.id}</span> · {KIND_LABEL[d.kind] || d.kind}</div>
+                  <div style={{ ...mono('var(--fs-meta)', 'var(--sub)'), lineHeight: 1.5, marginTop: '.125rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{d.detail}</div>
+                  {d.admin_note && <div style={{ ...mono('var(--fs-meta)', 'var(--muted)'), marginTop: '.25rem' }}>Admin note: {d.admin_note}</div>}
                 </div>
-                {d.created_at && <span style={{ ...mono('.52rem', 'var(--dim)'), flexShrink: 0 }}>{fmtDate(d.created_at)}</span>}
+                {d.created_at && <span style={{ ...mono('var(--fs-meta)', 'var(--dim)'), flexShrink: 0 }}>{fmtDate(d.created_at)}</span>}
               </div>
             ))}
           </div>
@@ -544,9 +545,9 @@ export function EmployerListingsManager() {
 
 function Stat({ value, label, color }: { value: number; label: string; color: string }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '.2rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '.25rem' }}>
       <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color, lineHeight: 1 }}>{value.toLocaleString()}</div>
-      <div style={mono('.52rem', 'var(--dim)')}>{label}</div>
+      <div style={mono('var(--fs-meta)', 'var(--dim)')}>{label}</div>
     </div>
   )
 }
@@ -618,7 +619,7 @@ function AddListingForm({ token, onCreated, onCancel, initial, editId, seenApply
     }
   }
 
-  const label: React.CSSProperties = { ...mono('.55rem', 'var(--sub)'), textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '.3rem', display: 'block' }
+  const label: React.CSSProperties = { ...mono('var(--fs-meta)', 'var(--sub)'), textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '.25rem', display: 'block' }
   const field: React.CSSProperties = { ...inputStyle, width: '100%', minWidth: 0 }
 
   async function submit() {
@@ -653,10 +654,10 @@ function AddListingForm({ token, onCreated, onCancel, initial, editId, seenApply
   }
 
   return (
-    <div style={{ background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 12, padding: '1.2rem', margin: '1.3rem 0' }}>
-      <div style={{ ...mono('.55rem', 'var(--blue)'), textTransform: 'uppercase', letterSpacing: '.12em', marginBottom: isEdit ? '.4rem' : '.9rem' }}>{isEdit ? 'Edit listing' : 'Add a listing'}</div>
+    <div style={{ background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 12, padding: '1.25rem', margin: '1.25rem 0' }}>
+      <div style={{ ...mono('var(--fs-meta)', 'var(--blue)'), textTransform: 'uppercase', letterSpacing: '.12em', marginBottom: isEdit ? '.4rem' : '.9rem' }}>{isEdit ? 'Edit listing' : 'Add a listing'}</div>
       {isEdit && (
-        <div style={{ ...mono('.58rem', 'var(--sub)'), lineHeight: 1.6, marginBottom: '.9rem' }}>
+        <div style={{ ...mono('var(--fs-meta)', 'var(--sub)'), lineHeight: 1.6, marginBottom: '1rem' }}>
           Changes go live right away. The listing shows the date you edited it, and anyone who applied before the edit sees it on their tracker.
         </div>
       )}
@@ -666,14 +667,14 @@ function AddListingForm({ token, onCreated, onCancel, initial, editId, seenApply
           <input autoComplete="off" value={importUrl} onChange={e => setImportUrl(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') importFromLink() }} placeholder="https://boards.greenhouse.io/yourco/jobs/123" style={{ ...field, flex: '1 1 240px', width: 'auto' }} />
           <button onClick={importFromLink} disabled={importing} style={{ ...ghostBtn, opacity: importing ? .6 : 1 }}>{importing ? 'Reading…' : 'Import'}</button>
         </div>
-        <div style={{ ...mono('.55rem', 'var(--dim)'), marginTop: '.4rem', lineHeight: 1.6 }}>
+        <div style={{ ...mono('var(--fs-meta)', 'var(--dim)'), marginTop: '.5rem', lineHeight: 1.6 }}>
           We fill in the form below from the listing — you review it before anything is posted. Applicants are sent to the original link. Listings you post or import on Seen show ahead of aggregated listings in matching searches.
         </div>
         {importNote && (
-          <div style={{ ...mono('.6rem', importNote.tone === 'err' ? 'var(--red)' : importNote.tone === 'warn' ? 'var(--amber)' : 'var(--green)'), marginTop: '.55rem', lineHeight: 1.6 }}>{importNote.text}</div>
+          <div style={{ ...mono('var(--fs-meta)', importNote.tone === 'err' ? 'var(--red)' : importNote.tone === 'warn' ? 'var(--amber)' : 'var(--green)'), marginTop: '.5rem', lineHeight: 1.6 }}>{importNote.text}</div>
         )}
       </div>}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '.9rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '1rem' }}>
         <div>
           <label style={label}>Title *</label>
           <input autoComplete="off" value={title} onChange={e => setTitle(e.target.value)} placeholder="Senior Product Designer" style={field} />
@@ -688,9 +689,9 @@ function AddListingForm({ token, onCreated, onCancel, initial, editId, seenApply
                 ['both', 'Both', 'Candidates choose'],
               ] as [ApplyMode, string, string][]).map(([m, t, sub]) => (
                 <button key={m} type="button" onClick={() => setApplyMode(m)} aria-pressed={applyMode === m}
-                  style={{ flex: '1 1 150px', textAlign: 'left', background: applyMode === m ? 'rgba(16,185,129,.08)' : 'var(--card)', border: `1px solid ${applyMode === m ? 'var(--green)' : 'var(--line2)'}`, borderRadius: 9, padding: '.55rem .7rem', cursor: 'pointer' }}>
+                  style={{ flex: '1 1 150px', textAlign: 'left', background: applyMode === m ? 'rgba(16,185,129,.08)' : 'var(--card)', border: `1px solid ${applyMode === m ? 'var(--green)' : 'var(--line2)'}`, borderRadius: 9, padding: '.5rem .75rem', cursor: 'pointer' }}>
                   <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 'var(--fs-sm)', color: applyMode === m ? 'var(--green)' : 'var(--white)' }}>{t}</div>
-                  <div style={{ ...mono('.52rem', 'var(--muted)'), marginTop: '.15rem', lineHeight: 1.4 }}>{sub}</div>
+                  <div style={{ ...mono('var(--fs-meta)', 'var(--muted)'), marginTop: '.125rem', lineHeight: 1.4 }}>{sub}</div>
                 </button>
               ))}
             </div>
@@ -722,8 +723,8 @@ function AddListingForm({ token, onCreated, onCancel, initial, editId, seenApply
           <textarea autoComplete="off" value={description} onChange={e => setDescription(e.target.value)} rows={3} placeholder="What the role is and who it's for." style={{ ...field, resize: 'vertical' }} />
         </div>
       </div>
-      {err && <div style={{ ...mono('.62rem', 'var(--red)'), marginTop: '.8rem' }}>{err}</div>}
-      <div style={{ display: 'flex', gap: '.6rem', marginTop: '1rem' }}>
+      {err && <div style={{ ...mono('var(--fs-meta)', 'var(--red)'), marginTop: '.75rem' }}>{err}</div>}
+      <div style={{ display: 'flex', gap: '.5rem', marginTop: '1rem' }}>
         <button onClick={submit} disabled={busy} style={{ ...primaryBtn, opacity: busy ? .6 : 1 }}>{busy ? (isEdit ? 'Saving…' : 'Posting…') : (isEdit ? 'Save changes' : 'Post listing →')}</button>
         {onCancel && <button onClick={onCancel} disabled={busy} style={ghostBtn}>Cancel</button>}
       </div>
@@ -739,7 +740,7 @@ function DisputeModal({ listing, token, onClose, onSubmitted, defaultKind }: { l
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
 
-  const label: React.CSSProperties = { ...mono('.55rem', 'var(--sub)'), textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '.3rem', display: 'block' }
+  const label: React.CSSProperties = { ...mono('var(--fs-meta)', 'var(--sub)'), textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '.25rem', display: 'block' }
   const field: React.CSSProperties = { ...inputStyle, width: '100%', minWidth: 0 }
 
   async function submit() {
@@ -776,19 +777,19 @@ function DisputeModal({ listing, token, onClose, onSubmitted, defaultKind }: { l
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(2,4,10,.92)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '4vh 1rem', overflowY: 'auto' }}>
       {/* SOLID surface — var(--card) is a translucent 3%-white raised tint (fine layered over a
           solid bg, but see-through as a floating panel), so the modal uses an opaque background. */}
-      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 560, background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 16, padding: '1.6rem', boxShadow: '0 24px 70px rgba(0,0,0,.7)' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', marginBottom: '.3rem' }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 560, background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 16, padding: '1.5rem', boxShadow: '0 24px 70px rgba(0,0,0,.7)' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', marginBottom: '.25rem' }}>
           <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em' }}>Dispute a listing</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--dim)', fontSize: 'var(--fs-lead)', cursor: 'pointer', lineHeight: 1 }}>✕</button>
         </div>
-        <div style={{ ...mono('.6rem', 'var(--sub)'), marginBottom: '1.1rem' }}>{listing.title}</div>
+        <div style={{ ...mono('var(--fs-meta)', 'var(--sub)'), marginBottom: '1rem' }}>{listing.title}</div>
 
         <label style={label}>What&apos;s the issue?</label>
-        <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
           {KIND_OPTIONS.map(o => {
             const active = kind === o.value
             return (
-              <button key={o.value} onClick={() => setKind(o.value)} style={{ ...mono('.6rem', active ? 'var(--white)' : 'var(--sub)'), padding: '.35rem .7rem', borderRadius: 7, border: `1px solid ${active ? 'var(--white)' : 'var(--line2)'}`, background: active ? 'rgba(255,255,255,.06)' : 'transparent', cursor: 'pointer' }}>{o.label}</button>
+              <button key={o.value} onClick={() => setKind(o.value)} style={{ ...mono('var(--fs-meta)', active ? 'var(--white)' : 'var(--sub)'), padding: '.25rem .75rem', borderRadius: 7, border: `1px solid ${active ? 'var(--white)' : 'var(--line2)'}`, background: active ? 'rgba(255,255,255,.06)' : 'transparent', cursor: 'pointer' }}>{o.label}</button>
             )
           })}
         </div>
@@ -798,8 +799,8 @@ function DisputeModal({ listing, token, onClose, onSubmitted, defaultKind }: { l
 
         {kind === 'edit' && (
           <div style={{ borderTop: '1px solid var(--line)', paddingTop: '1rem', marginBottom: '1rem' }}>
-            <div style={{ ...mono('.55rem', 'var(--blue)'), textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '.8rem' }}>Proposed changes (optional)</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: '.8rem' }}>
+            <div style={{ ...mono('var(--fs-meta)', 'var(--blue)'), textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '.75rem' }}>Proposed changes (optional)</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: '.75rem' }}>
               <div><label style={label}>New title</label><input autoComplete="off" value={pc.title || ''} onChange={e => setPc(p => ({ ...p, title: e.target.value }))} style={field} /></div>
               <div><label style={label}>New location</label><input autoComplete="off" value={pc.location || ''} onChange={e => setPc(p => ({ ...p, location: e.target.value }))} style={field} /></div>
               <div><label style={label}>New salary</label><input autoComplete="off" value={pc.salary || ''} onChange={e => setPc(p => ({ ...p, salary: e.target.value }))} style={field} /></div>
@@ -809,12 +810,12 @@ function DisputeModal({ listing, token, onClose, onSubmitted, defaultKind }: { l
           </div>
         )}
 
-        <div style={{ ...mono('.56rem', 'var(--muted)'), lineHeight: 1.6, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 8, padding: '.6rem .8rem', marginBottom: '1rem' }}>
+        <div style={{ ...mono('var(--fs-meta)', 'var(--muted)'), lineHeight: 1.6, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem .75rem', marginBottom: '1rem' }}>
           An admin reviews every dispute — nothing changes until it&apos;s approved.
         </div>
 
-        {err && <div style={{ ...mono('.62rem', 'var(--red)'), marginBottom: '.8rem' }}>{err}</div>}
-        <div style={{ display: 'flex', gap: '.6rem', justifyContent: 'flex-end' }}>
+        {err && <div style={{ ...mono('var(--fs-meta)', 'var(--red)'), marginBottom: '.75rem' }}>{err}</div>}
+        <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'flex-end' }}>
           <button onClick={onClose} style={ghostBtn}>Cancel</button>
           <button onClick={submit} disabled={busy} style={{ ...primaryBtn, opacity: busy ? .6 : 1 }}>{busy ? 'Submitting…' : 'Submit dispute →'}</button>
         </div>
@@ -948,42 +949,42 @@ function ApplicationsInbox({ listing, token, onClose, canClose }: { listing: Lis
   return (
     <ModalPortal>
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(2,4,10,.92)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '4vh 1rem', overflowY: 'auto' }}>
-        <div role="dialog" aria-modal="true" aria-label={`Applications for ${listing.title}`} onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 640, background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 16, padding: '1.2rem 1.2rem 1.4rem' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.75rem', marginBottom: '.9rem' }}>
+        <div role="dialog" aria-modal="true" aria-label={`Applications for ${listing.title}`} onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 640, background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 16, padding: '1.25rem 1.25rem 1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.75rem', marginBottom: '1rem' }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ ...mono('.55rem', 'var(--green)'), textTransform: 'uppercase', letterSpacing: '.1em' }}>Applications on Seen</div>
-              <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-lead)', color: 'var(--white)', marginTop: '.2rem' }}>{listing.title}</div>
+              <div style={{ ...mono('var(--fs-meta)', 'var(--green)'), textTransform: 'uppercase', letterSpacing: '.1em' }}>Applications on Seen</div>
+              <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-lead)', color: 'var(--white)', marginTop: '.25rem' }}>{listing.title}</div>
             </div>
             <button type="button" onClick={onClose} aria-label="Close" style={{ ...ghostBtn, width: 32, height: 32, padding: 0 }}>✕</button>
           </div>
-          {err && <div role="alert" style={{ ...mono('.62rem', 'var(--red)'), marginBottom: '.7rem' }}>{err}</div>}
-          {synced && <div role="status" style={{ ...mono('.62rem', 'var(--green)'), marginBottom: '.7rem' }}>✓ {synced}</div>}
-          {closedNote && <div role="status" style={{ ...mono('.62rem', 'var(--green)'), marginBottom: '.7rem', lineHeight: 1.6 }}>✓ {closedNote}</div>}
+          {err && <div role="alert" style={{ ...mono('var(--fs-meta)', 'var(--red)'), marginBottom: '.75rem' }}>{err}</div>}
+          {synced && <div role="status" style={{ ...mono('var(--fs-meta)', 'var(--green)'), marginBottom: '.75rem' }}>✓ {synced}</div>}
+          {closedNote && <div role="status" style={{ ...mono('var(--fs-meta)', 'var(--green)'), marginBottom: '.75rem', lineHeight: 1.6 }}>✓ {closedNote}</div>}
           {pending?.status === 'hired' && (
-            <div id="inbox-status-prompt" style={{ background: 'var(--raised)', border: '1px solid rgba(16,185,129,.45)', borderRadius: 11, padding: '.85rem .9rem', marginBottom: '.8rem' }}>
-              <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-body)', color: 'var(--white)' }}>Mark {pending.app.name} as hired 🎉</div>
-              <div style={{ ...mono('.6rem', 'var(--sub)'), lineHeight: 1.6, margin: '.3rem 0 .75rem' }}>
+            <div id="inbox-status-prompt" style={{ background: 'var(--raised)', border: '1px solid rgba(16,185,129,.45)', borderRadius: 11, padding: '.75rem 1rem', marginBottom: '.75rem' }}>
+              <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-body)', color: 'var(--white)' }}>Mark {pending.app.name} as hired</div>
+              <div style={{ ...mono('var(--fs-meta)', 'var(--sub)'), lineHeight: 1.6, margin: '.25rem 0 .75rem' }}>
                 Is the role filled? You can close the listing now and send everyone still waiting a decline message — you’ll confirm everyone you hired and choose the message first.
               </div>
-              <div style={{ display: 'flex', gap: '.45rem', flexWrap: 'wrap' }}>
-                <button type="button" onClick={() => { const a = pending.app; setPending(null); setFillFrom(a.id); setFilling(true) }} style={{ ...ghostBtn, ...mono('.62rem', 'var(--ink)'), background: 'var(--green)', border: 'none', fontWeight: 700 }}>Yes — close listing & decline the rest →</button>
-                <button type="button" onClick={() => { const a = pending.app; setPending(null); setStatus(a, 'hired') }} style={{ ...ghostBtn, ...mono('.62rem', 'var(--white)') }}>Just mark {pending.app.name} hired</button>
-                <button type="button" onClick={() => setPending(null)} style={{ ...ghostBtn, ...mono('.62rem', 'var(--muted)') }}>Cancel</button>
+              <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+                <button type="button" onClick={() => { const a = pending.app; setPending(null); setFillFrom(a.id); setFilling(true) }} style={{ ...ghostBtn, ...mono('var(--fs-meta)', 'var(--ink)'), background: 'var(--green)', border: 'none', fontWeight: 700 }}>Yes — close listing & decline the rest →</button>
+                <button type="button" onClick={() => { const a = pending.app; setPending(null); setStatus(a, 'hired') }} style={{ ...ghostBtn, ...mono('var(--fs-meta)', 'var(--white)') }}>Just mark {pending.app.name} hired</button>
+                <button type="button" onClick={() => setPending(null)} style={{ ...ghostBtn, ...mono('var(--fs-meta)', 'var(--muted)') }}>Cancel</button>
               </div>
             </div>
           )}
           {pending?.status === 'rejected' && (
-            <div id="inbox-status-prompt" style={{ background: 'var(--raised)', border: '1px solid rgba(239,68,68,.35)', borderRadius: 11, padding: '.85rem .9rem', marginBottom: '.8rem' }}>
-              <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-body)', color: 'var(--white)', marginBottom: '.55rem' }}>Not moving forward with {pending.app.name}</div>
+            <div id="inbox-status-prompt" style={{ background: 'var(--raised)', border: '1px solid rgba(239,68,68,.35)', borderRadius: 11, padding: '.75rem 1rem', marginBottom: '.75rem' }}>
+              <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-body)', color: 'var(--white)', marginBottom: '.5rem' }}>Not moving forward with {pending.app.name}</div>
               <DeclineMessagePicker templates={declineTemplates({ title: listing.title, company: listing.company }, 'single')} value={declineText} onChange={setDeclineText} allowNone />
-              <div style={{ display: 'flex', gap: '.45rem', flexWrap: 'wrap', marginTop: '.75rem' }}>
-                <button type="button" onClick={() => { const a = pending.app; const m = declineText.trim(); setPending(null); setStatus(a, 'rejected', m || undefined) }} style={{ ...ghostBtn, ...mono('.62rem', '#fff'), background: 'var(--red)', border: 'none', fontWeight: 700 }}>{declineText.trim() ? 'Decline & send message' : 'Decline without a message'}</button>
-                <button type="button" onClick={() => setPending(null)} style={{ ...ghostBtn, ...mono('.62rem', 'var(--muted)') }}>Cancel</button>
+              <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginTop: '.75rem' }}>
+                <button type="button" onClick={() => { const a = pending.app; const m = declineText.trim(); setPending(null); setStatus(a, 'rejected', m || undefined) }} style={{ ...ghostBtn, ...mono('var(--fs-meta)', 'var(--text-1)'), background: 'var(--red)', border: 'none', fontWeight: 700 }}>{declineText.trim() ? 'Decline & send message' : 'Decline without a message'}</button>
+                <button type="button" onClick={() => setPending(null)} style={{ ...ghostBtn, ...mono('var(--fs-meta)', 'var(--muted)') }}>Cancel</button>
               </div>
             </div>
           )}
           {canClose && !closedNote && apps && !filling && !pending && (
-            <button type="button" onClick={() => { setFilling(true); setErr('') }} style={{ ...ghostBtn, width: '100%', marginBottom: '.8rem', padding: '.6rem .9rem', ...mono('.64rem', 'var(--green)'), borderColor: 'rgba(16,185,129,.5)', background: 'rgba(16,185,129,.06)' }}>
+            <button type="button" onClick={() => { setFilling(true); setErr('') }} style={{ ...ghostBtn, width: '100%', marginBottom: '.75rem', padding: '.5rem 1rem', ...mono('var(--fs-meta)', 'var(--green)'), borderColor: 'rgba(16,185,129,.5)', background: 'rgba(16,185,129,.06)' }}>
               ✓ We hired — close this listing and let everyone else know
             </button>
           )}
@@ -1001,17 +1002,17 @@ function ApplicationsInbox({ listing, token, onClose, canClose }: { listing: Lis
               }}
             />
           )}
-          {apps === null && !err && <div style={mono('.62rem', 'var(--muted)')}>Loading…</div>}
+          {apps === null && !err && <div style={mono('var(--fs-meta)', 'var(--muted)')}>Loading…</div>}
           {apps && apps.length === 0 && (
-            <div style={{ ...mono('.62rem', 'var(--muted)'), lineHeight: 1.6 }}>No applications yet. When a candidate applies on Seen, their résumé, contact details and note show up here — and we email you.</div>
+            <div style={{ ...mono('var(--fs-meta)', 'var(--muted)'), lineHeight: 1.6 }}>No applications yet. When a candidate applies on Seen, their résumé, contact details and note show up here — and we email you.</div>
           )}
-          <div style={{ display: filling ? 'none' : 'flex', flexDirection: 'column', gap: '.65rem' }}>
+          <div style={{ display: filling ? 'none' : 'flex', flexDirection: 'column', gap: '.75rem' }}>
             {(apps || []).map(a => (
-              <div key={a.id} style={{ background: 'var(--raised)', border: `1px solid ${a.status === 'new' ? 'rgba(16,185,129,.4)' : 'var(--line2)'}`, borderRadius: 11, padding: '.8rem .9rem' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.6rem', flexWrap: 'wrap' }}>
+              <div key={a.id} style={{ background: 'var(--raised)', border: `1px solid ${a.status === 'new' ? 'rgba(16,185,129,.4)' : 'var(--line2)'}`, borderRadius: 11, padding: '.75rem 1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.5rem', flexWrap: 'wrap' }}>
                   <div style={{ flex: 1, minWidth: 180 }}>
                     <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 'var(--fs-ui)', color: 'var(--white)' }}>{a.name}</div>
-                    <div style={{ ...mono('.58rem', 'var(--sub)'), marginTop: '.2rem', display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+                    <div style={{ ...mono('var(--fs-meta)', 'var(--sub)'), marginTop: '.25rem', display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
                       <a href={`mailto:${a.email}?subject=${encodeURIComponent(`Your application — ${listing.title}`)}`} style={{ color: 'var(--blue)', textDecoration: 'none' }}>{a.email}</a>
                       {a.phone && <a href={`tel:${a.phone}`} style={{ color: 'var(--blue)', textDecoration: 'none' }}>{a.phone}</a>}
                       <span style={{ color: 'var(--dim)' }}>· {fmtDate(a.created_at)}</span>
@@ -1019,39 +1020,39 @@ function ApplicationsInbox({ listing, token, onClose, canClose }: { listing: Lis
                     </div>
                   </div>
                   {a.status === 'withdrawn'
-                    ? <span style={{ ...mono('.58rem', 'var(--muted)'), textTransform: 'uppercase', letterSpacing: '.08em', border: '1px solid var(--line2)', borderRadius: 999, padding: '.25rem .6rem' }}>Withdrawn</span>
+                    ? <span style={{ ...mono('var(--fs-meta)', 'var(--muted)'), textTransform: 'uppercase', letterSpacing: '.08em', border: '1px solid var(--line2)', borderRadius: 999, padding: '.25rem .5rem' }}>Withdrawn</span>
                     : (
-                      <select value={a.status} onChange={e => pickStatus(a, e.target.value as AppStatus)} aria-label="Application status" style={{ ...inputStyle, flex: 'none', minWidth: 0, width: 'auto', padding: '.35rem .5rem', cursor: 'pointer' }}>
+                      <select value={a.status} onChange={e => pickStatus(a, e.target.value as AppStatus)} aria-label="Application status" style={{ ...inputStyle, flex: 'none', minWidth: 0, width: 'auto', padding: '.25rem .5rem', cursor: 'pointer' }}>
                         {APP_STATUSES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                       </select>
                     )}
                 </div>
-                {a.note && <div style={{ ...mono('.6rem', 'var(--sub)'), lineHeight: 1.6, marginTop: '.55rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>“{a.note}”</div>}
+                {a.note && <div style={{ ...mono('var(--fs-meta)', 'var(--sub)'), lineHeight: 1.6, marginTop: '.5rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>“{a.note}”</div>}
                 {a.clears_in_days != null && (
-                  <div style={{ ...mono('.55rem', 'var(--muted)'), marginTop: '.45rem', lineHeight: 1.5 }}>
+                  <div style={{ ...mono('var(--fs-meta)', 'var(--muted)'), marginTop: '.5rem', lineHeight: 1.5 }}>
                     Résumé and contact details are cleared {a.clears_in_days === 0 ? 'today' : `in ${a.clears_in_days} day${a.clears_in_days === 1 ? '' : 's'}`} — download the résumé if you need to keep it.
                   </div>
                 )}
                 {(a.has_resume_file || a.has_resume_text) && (
-                  <button type="button" onClick={() => openResume(a)} disabled={busyId === a.id} style={{ ...ghostBtn, marginTop: '.6rem', padding: '.35rem .8rem', ...mono('.6rem', 'var(--blue)'), opacity: busyId === a.id ? .6 : 1 }}>
+                  <button type="button" onClick={() => openResume(a)} disabled={busyId === a.id} style={{ ...ghostBtn, marginTop: '.5rem', padding: '.25rem .75rem', ...mono('var(--fs-meta)', 'var(--blue)'), opacity: busyId === a.id ? .6 : 1 }}>
                     {busyId === a.id ? 'Opening…' : a.has_resume_file ? `View résumé${a.resume_file_name ? ` (${a.resume_file_name})` : ''} ↗` : 'View résumé'}
                   </button>
                 )}
                 {!!a.thread?.length && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '.35rem', marginTop: '.6rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '.25rem', marginTop: '.5rem' }}>
                     {a.thread.map((m, i) => (
-                      <div key={i} style={{ borderRadius: 8, padding: '.45rem .65rem', background: m.from === 'employer' ? 'rgba(59,130,246,.08)' : 'var(--card)', border: `1px solid ${m.from === 'employer' ? 'rgba(59,130,246,.25)' : 'var(--line)'}` }}>
-                        <div style={{ ...mono('.52rem', m.from === 'employer' ? 'var(--blue)' : 'var(--muted)'), marginBottom: '.15rem' }}>
+                      <div key={i} style={{ borderRadius: 8, padding: '.5rem .75rem', background: m.from === 'employer' ? 'rgba(59,130,246,.08)' : 'var(--card)', border: `1px solid ${m.from === 'employer' ? 'rgba(59,130,246,.25)' : 'var(--line)'}` }}>
+                        <div style={{ ...mono('var(--fs-meta)', m.from === 'employer' ? 'var(--blue)' : 'var(--muted)'), marginBottom: '.125rem' }}>
                           {m.from === 'employer' ? 'You' : m.withdrawal ? `${a.name} · withdrew` : a.name} · {fmtDate(m.at)}
                         </div>
                         {m.text
                           ? <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--white)', lineHeight: 1.5, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{m.text}</div>
-                          : <div style={mono('.58rem', 'var(--muted)')}>Withdrew without a note.</div>}
+                          : <div style={mono('var(--fs-meta)', 'var(--muted)')}>Withdrew without a note.</div>}
                       </div>
                     ))}
                   </div>
                 )}
-                <div style={{ display: 'flex', gap: '.4rem', alignItems: 'flex-end', marginTop: '.6rem' }}>
+                <div style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-end', marginTop: '.5rem' }}>
                   <textarea autoComplete="off"
                     value={drafts[a.id] || ''}
                     onChange={e => setDrafts(m => ({ ...m, [a.id]: e.target.value }))}
@@ -1061,12 +1062,12 @@ function ApplicationsInbox({ listing, token, onClose, canClose }: { listing: Lis
                     placeholder={`Message ${a.name} — interview time, a number to call, anything they should know`}
                     style={{ ...inputStyle, flex: 1, minHeight: 44, resize: 'vertical', fontSize: 'var(--fs-meta)', lineHeight: 1.45 }}
                   />
-                  <button type="button" onClick={() => sendMessage(a)} disabled={sendingId === a.id || !(drafts[a.id] || '').trim()} style={{ ...ghostBtn, padding: '.45rem .8rem', ...mono('.6rem', 'var(--blue)'), opacity: sendingId === a.id || !(drafts[a.id] || '').trim() ? .55 : 1 }}>
+                  <button type="button" onClick={() => sendMessage(a)} disabled={sendingId === a.id || !(drafts[a.id] || '').trim()} style={{ ...ghostBtn, padding: '.5rem .75rem', ...mono('var(--fs-meta)', 'var(--blue)'), opacity: sendingId === a.id || !(drafts[a.id] || '').trim() ? .55 : 1 }}>
                     {sendingId === a.id ? 'Sending…' : 'Send'}
                   </button>
                 </div>
                 {resumeText[a.id] && (
-                  <pre style={{ ...mono('.6rem', 'var(--text)'), whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.7rem', marginTop: '.55rem', maxHeight: 360, overflowY: 'auto' }}>{resumeText[a.id]}</pre>
+                  <pre style={{ ...mono('var(--fs-meta)', 'var(--text)'), whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.75rem', marginTop: '.5rem', maxHeight: 360, overflowY: 'auto' }}>{resumeText[a.id]}</pre>
                 )}
               </div>
             ))}

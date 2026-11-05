@@ -10,7 +10,6 @@ import s from './studio.module.css'
 import { aiHeaders } from '@/lib/aiHeaders'
 import type { ResumeDoc, AtsCheck, FormatInfo } from '@/lib/resume/types'
 import { listTemplates, renderText, renderMarkdown, formatRange } from '@/lib/resume/engine-client'
-import { scoreColor } from './HealthPanel'
 
 const FORMATS: FormatInfo[] = [
   { id: 'pdf', label: 'PDF', extension: 'pdf', templated: true, description: 'What you send. One column, real text, parses everywhere.' },
@@ -21,6 +20,9 @@ const FORMATS: FormatInfo[] = [
 ]
 
 type Props = { doc: ResumeDoc; pro: boolean | null; isLoggedIn: boolean; onNeedPro: () => void; role?: string }
+
+// The template accent a renderer reports for 'no accent' (lib/resume/render/templates.js); compared, never painted.
+const BLACK = '#000000' // colour-literal: compared against templates.js, never painted
 
 export default function ExportPanel({ doc, pro, isLoggedIn, onNeedPro, role }: Props) {
   const templates = useMemo(() => listTemplates(), [])
@@ -68,18 +70,18 @@ export default function ExportPanel({ doc, pro, isLoggedIn, onNeedPro, role }: P
     <div style={{ animation: 'fadeUp .3s ease both' }}>
       <div className={s.card}>
         <div className={s.cardTitle}>Template</div>
-        <p className={s.dim} style={{ marginBottom: '.7rem' }}>All three are one column, real text, standard headings — the structure every parser reads. They differ in typography only.</p>
+        <p className={s.dim} style={{ marginBottom: '.75rem' }}>All three are one column, real text, standard headings — the structure every parser reads. They differ in typography only.</p>
         <div className={s.tpls}>
           {templates.map((t) => (
             <button key={t.id} type="button" className={`${s.tpl}${template === t.id ? ` ${s.tplActive}` : ''}`} onClick={() => setTemplate(t.id)} disabled={!templated}>
-              <div className={s.tplName}><span className={s.swatch} style={{ background: t.accent === '#000000' ? '#9ca3af' : t.accent }} />{t.label}</div>
+              <div className={s.tplName}><span className={s.swatch} style={{ background: t.accent === BLACK ? 'var(--text-3)' : t.accent }} />{t.label}</div>
               <div className={s.tplTag}>{t.tagline}</div>
               <div className={s.preview} style={{ fontFamily: t.id === 'classic' ? 'Georgia, serif' : 'Arial, sans-serif', textAlign: t.header === 'center' ? 'center' : 'left' }}>
-                <div className={s.pvName} style={{ color: t.id === 'modern' ? t.accent : '#111' }}>{doc.basics.name || 'Your Name'}</div>
-                <div style={{ color: '#555' }}>{[doc.basics.location, doc.basics.email].filter(Boolean).join(' · ') || 'city · email'}</div>
+                <div className={s.pvName} style={{ color: t.id === 'modern' ? t.accent : 'var(--paper-ink)' }}>{doc.basics.name || 'Your Name'}</div>
+                <div style={{ color: 'var(--paper-ink-2)' }}>{[doc.basics.location, doc.basics.email].filter(Boolean).join(' · ') || 'city · email'}</div>
                 {t.id !== 'modern' && <div className={s.pvRule} />}
-                <div className={s.pvHead} style={{ color: t.id === 'modern' ? t.accent : '#111', textAlign: 'left' }}>EXPERIENCE</div>
-                <div className={s.pvLine} style={{ textAlign: 'left' }}><span style={{ fontWeight: 700 }}>{t.roleLayout === 'company-first' ? (doc.experience[0]?.company || 'Company') : (doc.experience[0]?.title || 'Title')}</span><span style={{ color: '#666' }}>{t.roleLayout === 'company-first' ? (doc.experience[0]?.location || (doc.experience[0] ? '' : 'City')) : (doc.experience[0] ? (formatRange(doc.experience[0].start, doc.experience[0].end) || doc.experience[0].dateText || '') : 'Dates')}</span></div>
+                <div className={s.pvHead} style={{ color: t.id === 'modern' ? t.accent : 'var(--paper-ink)', textAlign: 'left' }}>EXPERIENCE</div>
+                <div className={s.pvLine} style={{ textAlign: 'left' }}><span style={{ fontWeight: 700 }}>{t.roleLayout === 'company-first' ? (doc.experience[0]?.company || 'Company') : (doc.experience[0]?.title || 'Title')}</span><span style={{ color: 'var(--paper-ink-2)' }}>{t.roleLayout === 'company-first' ? (doc.experience[0]?.location || (doc.experience[0] ? '' : 'City')) : (doc.experience[0] ? (formatRange(doc.experience[0].start, doc.experience[0].end) || doc.experience[0].dateText || '') : 'Dates')}</span></div>
                 <div style={{ textAlign: 'left' }}>• {(doc.experience[0]?.bullets[0]?.text || (doc.experience[0] ? '' : 'Your first bullet appears here.')).slice(0, 60)}</div>
               </div>
             </button>
@@ -89,10 +91,10 @@ export default function ExportPanel({ doc, pro, isLoggedIn, onNeedPro, role }: P
 
       <div className={s.card}>
         <div className={s.cardTitle}>Format</div>
-        <div className={s.fmts} style={{ marginBottom: '.6rem' }}>
+        <div className={s.fmts} style={{ marginBottom: '.5rem' }}>
           {FORMATS.map((f) => <button key={f.id} type="button" className={`${s.segBtn}${format === f.id ? ` ${s.segBtnActive}` : ''}`} onClick={() => setFormat(f.id)}>{f.label}</button>)}
         </div>
-        <div className={s.dim} style={{ marginBottom: '.7rem' }}>{FORMATS.find((f) => f.id === format)?.description}</div>
+        <div className={s.dim} style={{ marginBottom: '.75rem' }}>{FORMATS.find((f) => f.id === format)?.description}</div>
         {templated && (
           <div className={s.opts} style={{ marginBottom: '.75rem' }}>
             <span className={s.label} style={{ margin: 0 }}>Paper</span>
@@ -106,28 +108,28 @@ export default function ExportPanel({ doc, pro, isLoggedIn, onNeedPro, role }: P
         )}
         <div className={s.findingActions}>
           <button type="button" className={s.btnPrimary} onClick={download} disabled={busy !== null}>{busy === 'download' ? 'Building…' : `⬇ Download ${FORMATS.find((f) => f.id === format)?.label}`}</button>
-          {(format === 'pdf' || format === 'docx' || format === 'txt') && <button type="button" className={s.btn} onClick={runAts} disabled={busy !== null}>{busy === 'ats' ? 'Checking…' : '🔍 Check what a parser reads'}</button>}
+          {(format === 'pdf' || format === 'docx' || format === 'txt') && <button type="button" className={s.btn} onClick={runAts} disabled={busy !== null}>{busy === 'ats' ? 'Checking…' : 'Check what a parser reads'}</button>}
           {format === 'txt' && <button type="button" className={s.btn} onClick={() => copy('txt')}>{copied === 'txt' ? '✓ Copied' : 'Copy text'}</button>}
           {format === 'md' && <button type="button" className={s.btn} onClick={() => copy('md')}>{copied === 'md' ? '✓ Copied' : 'Copy Markdown'}</button>}
         </div>
         {templated && pro !== true && (
           <div className={s.notice} style={{ marginTop: '.75rem' }}>
-            Free exports carry one small “Optimized with Seen · seenjobs.io” line in the footer. <button type="button" onClick={onNeedPro} style={{ background: 'none', border: 'none', color: '#c7d2fe', fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 700, cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>Unbranded files come with the Job Search Pass →</button>
+            Free exports carry one small “Optimized with Seen · seenjobs.io” line in the footer. <button type="button" onClick={onNeedPro} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 700, cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>Unbranded files come with the Job Search Pass →</button>
           </div>
         )}
-        {error && <div className={s.err} style={{ marginTop: '.7rem', marginBottom: 0 }}>{error}</div>}
+        {error && <div className={s.err} style={{ marginTop: '.75rem', marginBottom: 0 }}>{error}</div>}
       </div>
 
       {ats && (
         <div className={s.card}>
           <div className={s.scoreRow}>
-            <div className={s.ring} style={{ borderColor: scoreColor(ats.score), width: 60, height: 60 }}><span className={s.ringNum} style={{ color: scoreColor(ats.score), fontSize: '1.2rem' }}>{ats.score}</span></div>
+            <div className={s.ring} style={{ width: 60, height: 60 }}><span className={s.ringNum} style={{ fontSize: 'var(--fs-h3)' }}>{ats.score}</span></div>
             <div style={{ minWidth: 0 }}>
               <div className={s.grade}>Parser read-back · {ats.grade}</div>
               <div className={s.dim}>{ats.summary} {ats.format.toUpperCase()}{ats.template ? ` · ${ats.template}` : ''}{ats.pages ? ` · ${ats.pages} page${ats.pages === 1 ? '' : 's'}` : ''}{ats.font ? ` · ${ats.font}` : ''} · {ats.ms} ms</div>
             </div>
           </div>
-          <div style={{ marginTop: '.7rem' }}>
+          <div style={{ marginTop: '.75rem' }}>
             {ats.checks.map((c) => (
               <div key={c.code} className={s.check}>
                 <span className={c.ok ? s.ok : s.bad}>{c.ok ? '✓' : '✕'}</span>

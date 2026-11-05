@@ -1,12 +1,45 @@
+import { orLiteral, ilikeContains } from '../lib/server/pgrest.js';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { getQueryExpansion } from '../lib/server/expand.js';
 import { applyRateLimit, rateLimit, rateLimitGlobal, resolveRateBucket } from '../lib/server/ratelimit.js';
 import { jobsReadFromQuery, setPublicCache } from '../lib/server/publicRead.js';
 import { logError } from '../lib/server/errlog.js';
-import { filterAndRank, relevanceScore, isTitleRelated, sortByProximity, locationDbTerm, expandQueryTerms, parseLocation, locationScore } from './_utils/jobRelevance.js';
+import { filterAndRank, relevanceScore, isTitleRelated, sortByProximity, locationDbTerm, expandQueryTerms, parseLocation, locationScore, searchFitFromSignal } from './_utils/jobRelevance.js';
 import { sortByPriority, companyMatchesQuery, queryNamesCompany, isSeedListing } from '../lib/server/jobPriority.js';
 import { waitUntil } from '@vercel/functions';
 import { aggregateForQuery, upsertJobs, inferLevel, wasRecentlyPulled, recordPull, adzunaPay, cleanDescription } from '../lib/server/jobSources.js';
+
+// Adzuna rows stored before 2026-10-20 carry Adzuna's own salary ESTIMATE (salary_is_predicted) as if it were
+// the posting's pay (adzunaPay() drops estimates at ingest since then; a re-seen row keeps its old value). A
+// tester saw "$416k–$624k/yr" on a Turing teaser. Those rows show no pay at all.
+const ADZUNA_ESTIMATE_CUTOFF = '2026-10-20';
+export function honestSalary(j) {
+  if (/^adzuna$/i.test(String(j?.source || '')) && j?.created_at && String(j.created_at) < ADZUNA_ESTIMATE_CUTOFF) return null;
+  const s = j?.salary == null ? null : String(j.salary).trim();
+  if (!s) return null;
+  // A pay line below any legal wage is a parse of tips, a stipend or a per-task rate ("$2/hr" on a DashMart card):
+  // better no pay than a wrong one.
+  const nums = (s.match(/\$?\s*([\d,]+(?:\.\d+)?)\s*(k)?/gi) || []).map((m) => { const mm = m.match(/([\d,]+(?:\.\d+)?)\s*(k)?/i); return parseFloat(mm[1].replace(/,/g, '')) * (mm[2] ? 1000 : 1); }).filter((n) => n > 0);
+  if (nums.length) {
+    const hourly = /\/\s*h(?:ou)?r\b|per hour|hourly/i.test(s);
+    const top = Math.max(...nums);
+    if (hourly ? top < MIN_HOURLY : top < 12000) return null; // the same floor lib/jobs/pay.js renders by
+    if (!hourly && /^adzuna$/i.test(String(j?.source || '')) && top > 350000) return null; // an hourly contractor rate × 2080
+  }
+  return s;
+}
+
+// A title that ends in a place outside the US ("Team Lead, Android – Athens, Greece") is a non-US posting even when
+// its location field says "Remote": the location scope check runs on that tail too (lib/jobs/usLocation.js).
+// Letters of any script: "Malmö, Sweden", "Košice, Slovakia", "Gdańsk, Poland" (Speechify, a Remote search
+// 2026-11-03) fell through an ASCII-only pattern and were served as US remote rows.
+function titleNamesNonUs(title) {
+  const t = String(title || '');
+  const m = t.match(/(?:[-–—|(]\s*)([\p{Lu}][\p{L}\p{M}\d .'’-]*,\s*[\p{Lu}][\p{L}\p{M}\d .'’-]+)\)?\s*$/u);
+  if (m && locationScope(m[1]) === 'non_us') return true;
+  const paren = t.match(/\(([\p{Lu}][\p{L}\p{M} .'’-]{2,30})\)\s*$/u); // "(Canada)", "(United Kingdom)"
+  return !!(paren && locationScope(paren[1]) === 'non_us');
+}
 import { locationScope } from '../lib/jobs/usLocation.js';
 import { preferFullText } from '../lib/jobs/listingTwins.js';
 import { loadTenantNames, applyTenantNames, withTenantName } from '../lib/server/tenantNames.js';
@@ -14,10 +47,74 @@ import { aggregateWithSources } from '../lib/jobs/expand.js';
 import { scoreJob, wasteScore, scoreRow, explainListingScore } from '../lib/server/jobScore.js';
 import { computeListingFreshness } from '../lib/server/listingFreshness.js';
 import { listingSignals } from '../lib/server/listingSignals.js';
-import { geocodeLocation, haversineMiles, milesToKm, hasUsableCoords, sanitizeCoords } from '../lib/server/geo.js';
-import { findResumeMatches, geoScopeClause } from '../lib/server/resumeMatches.js';
+import { geocodeLocation, haversineMiles, milesToKm, hasUsableCoords, sanitizeCoords, boundingBox } from '../lib/server/geo.js';
+import { findResumeMatches } from '../lib/server/resumeMatches.js';
+import { geocodePlace, placesWithin } from '../lib/geo/usPlaces.js';
+import { MIN_HOURLY } from '../lib/jobs/pay.js';
+import { collapseLocationVariants } from '../lib/jobs/groupListings.js';
 
-// DB-side scope for a place search (box OR city text): geoScopeClause in lib/server/resumeMatches.js.
+// ── Where a listing is ──────────────────────────────────────────────────────────────────────
+// A row's point: its own coordinates, else its location text placed by the vendored US places
+// table (lib/geo/usPlaces.js). Text naming only a state ("Arizona", "Remote - TX") has no point,
+// and neither does a non-US line. Exported for the tests.
+export function rowPoint(j) {
+  if (!j) return null;
+  const text = j.location || '';
+  if (text && locationScope(text) === 'non_us') return null;
+  const placed = text ? geocodePlace(text) : null;
+  if (placed && placed.stateOnly) return null; // coords on a state-only row are the state's middle
+  if (hasUsableCoords(j)) return { lat: Number(j.lat), lng: Number(j.lng) };
+  return placed;
+}
+const inState = (j, state) => { const g = j && j.location ? geocodePlace(j.location) : null; return !!g && g.state === state; };
+
+// PostgREST-safe ilike value: no logic-tree punctuation; a "." matches anything ("St. Louis" / "St Louis").
+const ilikeTerm = (s) => String(s || '').replace(/[(),*\\:"]/g, ' ').replace(/\./g, '*').replace(/\s+/g, ' ').trim().toLowerCase();
+const NEARBY_PLACE_TERMS = 10;
+
+// DB-side scope for a radius search: the bounding box, OR the row's location text naming the
+// searched city, OR one of the biggest places inside the radius written "<Place>, <ST>" or
+// "<Place>, <State>" (state-anchored so "Mesa" does not read every "Costa Mesa"). nearSearch then
+// measures every row it returns. Two `or=` params on one read are ANDed (verified 2026-10-23).
+export function placeScopeClause(center, miles, cityTerm) {
+  const parts = [];
+  const b = boundingBox(center, miles);
+  const f = (n) => n.toFixed(6);
+  if (b) parts.push(`and(lat.gte.${f(b.latMin)},lat.lte.${f(b.latMax)},lng.gte.${f(b.lngMin)},lng.lte.${f(b.lngMax)})`);
+  const city = ilikeTerm(cityTerm);
+  const terms = new Set();
+  if (city.length >= 2) terms.add(`location.ilike.*${city}*`);
+  for (const p of placesWithin(center, miles, { limit: NEARBY_PLACE_TERMS, minPop: 2000 })) {
+    const name = ilikeTerm(p.name);
+    if (name.length < 3 || name === city) continue;
+    // `_` (any one character) stands for the comma: a comma would split PostgREST's or=() list.
+    terms.add(`location.ilike.*${name}_ ${p.state.toLowerCase()}*`);
+    const full = STATE_NAMES[p.state];
+    if (full) terms.add(`location.ilike.*${name}_ ${full}*`);
+  }
+  parts.push(...terms);
+  return parts.length ? `&or=${encodeURIComponent(`(${parts.join(',')})`)}` : '';
+}
+
+// DB-side scope for a whole-state search: the state's name, or its code after a comma, at the end
+// or followed by one more character ("Austin, TX", "Austin, TX 78701", "Austin, TX, US").
+export function stateScopeClause(state) {
+  const full = STATE_NAMES[state];
+  const code = state.toLowerCase();
+  const parts = [`location.ilike.*_ ${code}`, `location.ilike.*_ ${code}_*`];
+  if (full) parts.push(`location.ilike.*${full}*`);
+  return `&or=${encodeURIComponent(`(${parts.join(',')})`)}`;
+}
+const STATE_NAMES = {
+  AL: 'alabama', AK: 'alaska', AZ: 'arizona', AR: 'arkansas', CA: 'california', CO: 'colorado', CT: 'connecticut',
+  DE: 'delaware', DC: 'district of columbia', FL: 'florida', GA: 'georgia', HI: 'hawaii', ID: 'idaho', IL: 'illinois',
+  IN: 'indiana', IA: 'iowa', KS: 'kansas', KY: 'kentucky', LA: 'louisiana', ME: 'maine', MD: 'maryland',
+  MA: 'massachusetts', MI: 'michigan', MN: 'minnesota', MS: 'mississippi', MO: 'missouri', MT: 'montana',
+  NE: 'nebraska', NV: 'nevada', NH: 'new hampshire', NJ: 'new jersey', NM: 'new mexico', NY: 'new york',
+  NC: 'north carolina', ND: 'north dakota', OH: 'ohio', OK: 'oklahoma', OR: 'oregon', PA: 'pennsylvania',
+  PR: 'puerto rico', RI: 'rhode island', SC: 'south carolina', SD: 'south dakota', TN: 'tennessee', TX: 'texas',
+  UT: 'utah', VT: 'vermont', VA: 'virginia', WA: 'washington', WV: 'west virginia', WI: 'wisconsin', WY: 'wyoming',
+};
 
 // ── Suppressed listings (migration 047) ─────────────────────────────────────────────────────
 // Admins can "delete" an ephemeral (live-search) listing they've confirmed dead; its apply_url
@@ -124,6 +221,32 @@ async function _resolveUid(req) {
   return null;
 }
 
+// ── Who is searching: the signed-in person's résumé family + industry (api/_utils/jobRelevance.js) ──
+// Read once per user per 10 minutes from resume_skills (the rail's self-healed signal) and the profile's
+// industry; anonymous searches and any read failure → null (no boost). Never blocks the DB reads: it runs
+// alongside them and is awaited only where the pool is ranked.
+const FIT_TTL_MS = 10 * 60_000;
+const _fitCache = new Map();
+async function resolveSearchFit(req, url, headers) {
+  try {
+    if (!url || !req?.headers?.authorization) return null;
+    const uid = await _resolveUid(req);
+    if (!uid) return null;
+    const hit = _fitCache.get(uid);
+    if (hit && Date.now() - hit.at < FIT_TTL_MS) return hit.fit;
+    const u = encodeURIComponent(uid);
+    const [skills, prof] = await Promise.all([
+      fetch(`${url}/rest/v1/resume_skills?user_id=eq.${u}&select=top_titles,function&limit=1`, { headers }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
+      fetch(`${url}/rest/v1/profiles?id=eq.${u}&select=industry&limit=1`, { headers }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
+    ]);
+    const row = Array.isArray(skills) && skills[0] ? skills[0] : {};
+    const fit = searchFitFromSignal({ top_titles: row.top_titles, function: row.function, industry: Array.isArray(prof) && prof[0] ? prof[0].industry : null });
+    _fitCache.set(uid, { at: Date.now(), fit });
+    if (_fitCache.size > 5000) _fitCache.delete(_fitCache.keys().next().value);
+    return fit;
+  } catch { return null; }
+}
+
 // Per-instance request coalescing: concurrent identical searches share one live aggregation
 const _inflight = new Map();
 
@@ -204,6 +327,7 @@ export default async function handler(req, res) {
       // plus the factual freshness descriptor (our-own-observation facts — never an employer verdict).
       const job = withTenantName({
         ...rows[0], url: rows[0].apply_url || null,
+        salary: honestSalary(rows[0]), // the same pay rule as every list (a stored sub-wage line is never shown)
         ...scoreRow(rows[0]), score_explanation: explainListingScore(rows[0]),
         freshness: computeListingFreshness(rows[0]),
       }, await loadTenantNames(U, { apikey: K, Authorization: `Bearer ${K}` }));
@@ -226,6 +350,7 @@ export default async function handler(req, res) {
   let inflightKey = '';
 
   let dbMatches = []; // related listings already in our DB (merged with any API top-up)
+  let fit = null; // the signed-in searcher's résumé family / industry (jobRelevance.searchFitFromSignal), or null
   let relevanceQuery = ''; // the ORIGINAL user query — what relevance is judged against
   let synonyms = []; // canonical + expansion terms — true-synonym signals (matched vs the TITLE)
   let searchTerms = []; // original + canonical + deterministic expansion — the DB pool + corpus reads
@@ -234,6 +359,7 @@ export default async function handler(req, res) {
   // pool reads widen with it so a later page has rows to rank; capped so one search stays bounded.
   const PAGE = 60;
   const MAX_OFFSET = 240;
+  const TITLE_POOL_MIN = 200; // a title read is never shallower than this
   let offset = 0;
   let poolLimit = PAGE + 1;
   let poolFull = false; // a title/search_query read came back full → more matches exist past this page
@@ -271,6 +397,7 @@ export default async function handler(req, res) {
     // Board slug → registered employer name (lib/server/tenantNames.js), cached per instance; a row
     // still stored under its slug ("plscareers") is served as the name the registry holds for it.
     const tenantNamesP = SUPABASE_URL && SUPABASE_SERVICE_KEY ? loadTenantNames(SUPABASE_URL, dbHeaders) : Promise.resolve(new Map());
+    const fitP = resolveSearchFit(req, SUPABASE_URL, dbHeaders);
     const [suppressedSet, featuredSet] = await Promise.all([
       getSuppressedSet(SUPABASE_URL, dbHeaders),
       getFeaturedSet(SUPABASE_URL, dbHeaders),
@@ -283,28 +410,38 @@ export default async function handler(req, res) {
     let relatedTerms = [];
 
     // ── Radius ───────────────────────────────────────────────────────────────
-    // Real distance search: clamp the requested radius, geocode the searched place once
-    // (cached), and pass the distance to Adzuna so the live pull is already scoped. `center`
-    // is filled in during the DB-first Promise.all below (overlapped with the DB reads).
+    // Real distance search: clamp the requested radius, place the searched location, and pass the
+    // distance to Adzuna so the live pull is already scoped. The place comes from the vendored US
+    // places table (lib/geo/usPlaces.js — no network); only a name it does not know goes to
+    // geocodeLocation (geocode_cache, then Nominatim) in the DB-first Promise.all below.
     // radius === '0'/'remote' means REMOTE: skip geo filtering entirely and search remote
     // listings — the old clamp silently turned "Remote" into an ordinary 25-mile search.
     const isRemote = String(radius) === '0' || String(radius).toLowerCase() === 'remote';
-    const isRemoteListing = (j) => /\bremote\b|\bwork from home\b|\banywhere\b/i.test(`${j.location || ''} ${j.type || ''} ${j.description || ''}`);
+    // A listing is remote when its location/type says so, or its text says so plainly near the top (a
+    // description that merely mentions "remote" — "not remote", "remote teams we support" — ranked a San
+    // Francisco office job #1 in a Remote search).
+    const isRemoteListing = (j) => /\bremote\b|\bwork from home\b|\banywhere\b/i.test(`${j.location || ''} ${j.type || ''}`)
+      || (/\b(?:fully|100%|is|are) remote\b|\bremote[- ](?:first|friendly|ok|position|role|work|job)\b|\bwork from home\b|\bwork from anywhere\b/i.test(String(j.description || '').slice(0, 600))
+        && !/\b(?:not|no|non-?)\s*remote\b|\bon-?site only\b/i.test(String(j.description || '').slice(0, 600)));
     if (isRemote) { loc = 'remote'; }
     const radiusMiles = isRemote ? Infinity : Math.min(500, Math.max(5, parseInt(radius, 10) || 25));
     const distanceKm = isRemote ? null : milesToKm(radiusMiles);
-    let center = null; // { lat, lng } | null (null → geocode unavailable, fall back to city/state)
+    const searchedPlace = loc && !isRemote ? geocodePlace(loc) : null;
+    // A whole-state search ("Texas") is a state filter, not a circle around the state's middle.
+    const searchState = searchedPlace && searchedPlace.stateOnly ? searchedPlace.state : null;
+    let center = searchedPlace && !searchState ? { lat: searchedPlace.lat, lng: searchedPlace.lng } : null; // null → fall back to city/state text
 
     // Is a listing inside the searched area? ONE predicate, used to filter the in-radius page, to
     // stamp `in_radius` on every served row (the client never reorders in-radius rows below the
     // fill-ins) and to count `in_radius` for the honest banner.
     //  • Remote search → only listings that say remote. (Partitioning "remote first, keep the rest"
     //    served 58 non-remote Dallas/Phoenix rows as a "Remote" result.)
-    //  • Usable coords → exact-circle haversine (1 mi buffer for border rounding).
-    //  • NULL / (0,0) coords are UNKNOWN, not a point: such a row is in the area only when its own
-    //    location text names the searched city (an ATS-board row saying "Phoenix, AZ" IS in Phoenix;
-    //    before, every one of them was dropped and "customer service · Phoenix" showed one HVAC tech).
-    //  • Search geocode failed (no center) → coarse city / same-state text match (honest degrade).
+    //  • A point for the row (its own coords, else its location text placed by usPlaces) → great-circle
+    //    distance from the searched point (1 mi buffer for border rounding). A row whose text says only
+    //    a state ("Arizona") has no point: it is never inside a city radius.
+    //  • No point at all → in the area only when its own text names the searched city.
+    //  • Whole-state search → the row's text places it in that state.
+    //  • Search location could not be placed (no center) → coarse city / same-state text match.
     // Order is NOT changed here: in-radius rows keep their relevance order (relevance first,
     // transparency score as the tiebreak) instead of nearest-first, which scrambled matches.
     const parsedLoc = parseLocation(loc);
@@ -312,8 +449,10 @@ export default async function handler(req, res) {
     const nearSearch = (j) => {
       if (!loc) return true;
       if (isRemote) return isRemoteListing(j);
+      if (searchState) return inState(j, searchState) || locationScore(j.location, parsedLoc) >= 2;
       if (!center) return locationScore(j.location, parsedLoc) >= 2;
-      if (hasUsableCoords(j)) return haversineMiles(center, j) <= radiusMiles + 1;
+      const p = rowPoint(j);
+      if (p) return haversineMiles(center, p) <= radiusMiles + 1;
       return namesSearchedCity(j);
     };
     const applyRadius = (list) => (Array.isArray(list) ? list : []).filter(nearSearch);
@@ -325,13 +464,13 @@ export default async function handler(req, res) {
     // or the listing matches the query, and it is remote or inside the searched area. Reads
     // relevanceQuery/synonyms at call time (they are filled in by the DB-first block below).
     let seedsDropped = 0; // Seen's own seed/test rows kept out of results (reported, never served)
-    serve = async (list, { withPosts = true } = {}) => {
+    serve = async (list, { withPosts = true, limit = PAGE } = {}) => {
       const base = Array.isArray(list) ? list : [];
       // A later page carries only its own slice: the direct posts already led page one.
       const employerPool = withPosts ? await employerPoolP : [];
       const relevant = (employerPool || []).filter((row) =>
         companyMatchesQuery(row.company, relevanceQuery) ||
-        filterAndRank([row], relevanceQuery, { synonyms, canonical }).length > 0);
+        filterAndRank([row], relevanceQuery, { synonyms, canonical, fit }).length > 0);
       const inArea = relevant.filter((row) => !loc || isRemote || isRemoteListing(row) || nearSearch(row));
       const postIds = new Set(inArea.map((r) => r.id).filter(Boolean));
       const out = [], seenKeys = new Set();
@@ -341,7 +480,7 @@ export default async function handler(req, res) {
       // Phoenix" on 2026-10-23). An Adzuna teaser of a posting we hold in full from the employer's
       // board is hidden behind that full-text row (lib/jobs/listingTwins.js).
       for (const j of preferFullText([...inArea.map(toUiRow), ...base])) {
-        if (locationScope(j.location) === 'non_us') continue;
+        if (locationScope(j.location) === 'non_us' || titleNamesNonUs(j.title)) continue;
         if (isSeedListing(j)) { seedsDropped++; continue; }
         const key = j.id || `${(j.title || '').toLowerCase()}|${(j.company || '').toLowerCase()}|${(j.location || '').toLowerCase()}`;
         if (seenKeys.has(key)) continue;
@@ -350,7 +489,7 @@ export default async function handler(req, res) {
           ...j,
           employer_posted: postIds.has(j.id) || j.employer_posted === true,
           in_radius: nearSearch(j),
-          relevance: relevanceScore(j, relevanceQuery, { synonyms, canonical }),
+          relevance: relevanceScore(j, relevanceQuery, { synonyms, canonical, fit }),
           // A MATCH (the role typed) vs an opening that only shares a word with it — the page lists
           // matches first and the rest under "Other openings" (jobRelevance.isTitleRelated).
           related: isTitleRelated(j, relevanceQuery, { canonical }),
@@ -359,8 +498,14 @@ export default async function handler(req, res) {
         // company's listings first — jobPriority.priorityTier, kept by the client's sort too.
         out.push(queryNamesCompany(j.company, relevanceQuery) ? { ...flagged, company_match: true } : flagged);
       }
-      return applyTenantNames(applyFeatured(dropSuppressed(out, suppressedSet), featuredSet), await tenantNamesP);
+      // A Remote search: a board that posts one remote role once per city ("Team Lead, Android Core Product -
+      // Cleveland, OH, USA" × 46, round 3) is one row here, carrying `also_in` (lib/jobs/groupListings.js).
+      // The callers hand a Remote search several pages of candidates (candidates()) so the page is still full after.
+      const rows = isRemote ? collapseLocationVariants(out).slice(0, limit) : out;
+      return applyTenantNames(applyFeatured(dropSuppressed(rows, suppressedSet), featuredSet), await tenantNamesP);
     };
+    // How many ranked rows to hand serve() for one page: a Remote search's per-city copies collapse there.
+    const candidates = (arr, n = PAGE) => arr.slice(0, isRemote ? n * 5 : n);
     const countInRadius = (jobs) => (jobs || []).filter((j) => j.in_radius !== false).length;
 
     // ── DB-FIRST search ──────────────────────────────────────────────────────
@@ -372,36 +517,36 @@ export default async function handler(req, res) {
       try {
         const now = encodeURIComponent(new Date().toISOString());
         const t3filter = buildFallbackFilter(qNorm);
-        const qEnc = encodeURIComponent(qNorm);
 
-        // Geocode the searched place FIRST (cached in geocode_cache — usually one fast DB read)
-        // so the DB query itself is geo-scoped. THE SCALE FIX: we never fetch the whole ~22k
-        // corpus and haversine it in Node. Overlap the geocode with the cheap expansion +
-        // aggregation-target reads that don't depend on it.
+        // Place the searched location FIRST so the DB query itself is geo-scoped. THE SCALE FIX:
+        // we never fetch the whole corpus and haversine it in Node. A place the vendored table
+        // does not know goes to geocodeLocation (geocode_cache, then Nominatim), overlapped with
+        // the cheap expansion + aggregation-target reads that don't depend on it.
         const [expansion, tgtRows, centerResolved] = await Promise.all([
           getQueryExpansion(qNorm, SUPABASE_URL, dbHeaders),
           // Admin-tunable aggregation target (feature_flags.job_search_target.percentage).
           fetch(`${SUPABASE_URL}/rest/v1/feature_flags?flag_name=eq.job_search_target&select=percentage&limit=1`, { headers: dbHeaders })
             .then(r => r.ok ? r.json() : []).catch(() => []),
-          // 'remote' is not a place: skip geocoding (a null center + remote loc also skips the
-          // distance filter below).
-          loc && !isRemote ? geocodeLocation(loc, SUPABASE_URL, SUPABASE_SERVICE_KEY) : Promise.resolve(null),
+          // 'remote' is not a place, and a whole state is a filter, not a point.
+          loc && !isRemote && !searchedPlace ? geocodeLocation(loc, SUPABASE_URL, SUPABASE_SERVICE_KEY) : Promise.resolve(center),
         ]);
         center = centerResolved;
 
         // DB-side geo scope applied to EVERY pool query:
-        //  • center resolved → indexed bounding-box range scan (jobs_latlng_idx, migration 033),
-        //    NULL/(0,0) excluded. The DB returns only rows near the point — Node never loads the
-        //    corpus; the exact-circle haversine refine (applyRadius) runs on the ≤60-row page.
-        //  • geocode failed  → coarse `location ilike city/state` text (honest degrade).
+        //  • center → indexed bounding-box range scan (jobs_latlng_idx, migration 033) OR the row's
+        //    location text naming the searched city or one of the biggest places inside the radius
+        //    (placeScopeClause). Many rows have no coordinates (497 of 509 coordinate-less Phoenix
+        //    rows on 2026-10-23 were ATS-board rows saying "Phoenix, AZ"); the text half reads them,
+        //    nearSearch then measures each from its placed text.
+        //  • whole-state search → the state's name or ", XX" in the location text.
+        //  • location not placed → coarse `location ilike city/state` text (honest degrade).
         //  • remote/national → no geo scope.
-        // The box (not the old exact-city text) is what lets a radius search surface NEARBY
-        // cities — Irvine/Santa Ana for a "Tustin" search — instead of only name matches.
-        // The box is OR'd with the city named in the row's own location text (geoScopeClause) so
-        // coordinate-less ATS-board rows in the searched city are read too.
         const locTerm = locationDbTerm(loc);
         const textClause = locTerm ? `&location=ilike.*${encodeURIComponent(locTerm)}*` : '';
-        const geoClause = isRemote ? '' : (center ? geoScopeClause(center, radiusMiles, parsedLoc && parsedLoc.city) : textClause);
+        const geoClause = isRemote ? ''
+          : searchState ? stateScopeClause(searchState)
+          : center ? placeScopeClause(center, radiusMiles, parsedLoc && parsedLoc.city)
+          : textClause;
 
         // Below TARGET related listings → top up from the live API. Admin lowers this
         // to calm aggregation, raises it to aggregate harder. Clamped to a sane range.
@@ -433,24 +578,32 @@ export default async function handler(req, res) {
         // the query filters). Company-column match surfaces ANY company name, not just the
         // hardcoded buildFallbackFilter set.
         // All pool reads in ONE parallel round (keyword + company + every term) — they're independent.
-        const [[kwRows, coRows], termRows] = await Promise.all([Promise.all([
-          t3filter
-            ? fetch(`${SUPABASE_URL}/rest/v1/jobs?${t3filter}${geoClause}&expires_at=gt.${now}&limit=${poolLimit}`, { headers: dbHeaders })
-                .then(r => r.ok ? r.json() : []).catch(() => [])
-            : Promise.resolve([]),
-          fetch(`${SUPABASE_URL}/rest/v1/jobs?company=ilike.*${qEnc}*${geoClause}&expires_at=gt.${now}&limit=${poolLimit}`, { headers: dbHeaders })
-            .then(r => r.ok ? r.json() : []).catch(() => []),
+        //
+        // Every read is ORDERED and the title reads are capped apart from the provenance reads. Without an
+        // order Postgres hands back whichever rows it reaches first, so a capped read answered a 10-mile
+        // search with the Tempe Target team leads and the 25-mile search without them: the rows stamped
+        // search_query="team lead" (any title) filled the one shared cap before the title matches did.
+        // Widening a radius must only ADD rows (every related row at 10 mi is still there at 25 and 50 mi)
+        // and two loads of one URL must agree (round 3, 2026-11-03; api/jobs.pool.test.mjs).
+        const ORDER = '&order=score.desc.nullslast,id.asc';
+        const TITLE_POOL = Math.max(TITLE_POOL_MIN, poolLimit);
+        const read = (filter, limit) => fetch(`${SUPABASE_URL}/rest/v1/jobs?${filter}${geoClause}&expires_at=gt.${now}${ORDER}&limit=${limit}`, { headers: dbHeaders })
+          .then(r => r.ok ? r.json() : []).catch(() => []);
+        const [[kwRows, coRows], titleRows, stampRows] = await Promise.all([Promise.all([
+          t3filter ? read(t3filter, poolLimit) : Promise.resolve([]),
+          read(`company=ilike.${ilikeContains(qNorm)}`, poolLimit),
         ]),
-          // Search both search_query and title columns so jobs cached under different
-          // query keys still surface for synonymous searches.
-          Promise.all(searchTerms.map(term => {
-            const orFilter = `or=${encodeURIComponent(`(search_query.ilike.*${term}*,title.ilike.*${term}*)`)}`;
-            return fetch(`${SUPABASE_URL}/rest/v1/jobs?${orFilter}${geoClause}&expires_at=gt.${now}&limit=${poolLimit}`, { headers: dbHeaders })
-              .then(r => r.ok ? r.json() : []).catch(() => []);
-          })),
+          // The TITLE reads: what a search is a match for. Deep enough that a specific query reads every
+          // title in the area (prod 2026-11-03: 10 "team lead" titles within 50 mi of Phoenix).
+          Promise.all(searchTerms.map(term => read(`title=ilike.*${encodeURIComponent(orLiteral(term))}*`, TITLE_POOL))),
+          // The provenance reads: rows our own aggregation fetched FOR this query (search_query), whatever
+          // their title, so synonymous searches still find them.
+          Promise.all(searchTerms.map(term => read(`search_query=ilike.*${encodeURIComponent(orLiteral(term))}*`, poolLimit))),
         ]);
+        const termRows = [...titleRows, ...stampRows];
 
-        poolFull = termRows.some((arr) => Array.isArray(arr) && arr.length >= poolLimit);
+        poolFull = titleRows.some((arr) => Array.isArray(arr) && arr.length >= TITLE_POOL) || stampRows.some((arr) => Array.isArray(arr) && arr.length >= poolLimit);
+        fit = await fitP;
         // Pool everything, dedup, then keep only listings RELATED to the query,
         // ranked by relevance (title > company > description) then quality score.
         const pool = [], seen = new Set();
@@ -462,10 +615,15 @@ export default async function handler(req, res) {
             pool.push(row);
           }
         }
-        dbMatches = filterAndRank(pool, relevanceQuery, { synonyms, canonical }).map(j => toUiRow(j, loc));
+        dbMatches = filterAndRank(pool, relevanceQuery, { synonyms, canonical, fit }).map(j => toUiRow(j, loc));
         // Keep only listings within the searched radius (true distance when we have
         // coordinates, else coarse city → state), nearest first.
         dbMatches = applyRadius(dbMatches);
+        // Rows serve() would drop anyway (Seen's own seed rows, non-US places) leave the ranked set here,
+        // so a page sliced from it is a full page, never 59 rows.
+        const kept = dbMatches.filter((j) => !isSeedListing(j) && locationScope(j.location) !== 'non_us' && !titleNamesNonUs(j.title));
+        seedsDropped += dbMatches.filter(isSeedListing).length;
+        dbMatches = kept;
 
         // A later page ("Show 60 more") is a slice of the same ranked matches — no top-up, no fill-ins.
         // The pool is re-read wider for every page and re-ranked, so a row's rank can move between
@@ -474,12 +632,12 @@ export default async function handler(req, res) {
         if (offset > 0) {
           const shown = new Set((Array.isArray(body.exclude) ? body.exclude : []).slice(0, MAX_OFFSET + PAGE).map(String));
           const rest = dbMatches.filter((j) => !shown.has(String(j.id)));
-          const jobs = await serve(rest.slice(0, PAGE), { withPosts: false });
+          const jobs = await serve(candidates(rest), { withPosts: false });
           return res.status(200).json({ ok: true, jobs, in_radius: countInRadius(jobs), query, location: loc, radius: Number.isFinite(radiusMiles) ? radiusMiles : null, offset, has_more: offset + PAGE <= MAX_OFFSET && (rest.length > PAGE || (poolFull && rest.length >= PAGE)), _src: 'db-page' });
         }
         if (dbMatches.length >= TARGET) {
           console.log(`DB HIT: "${query}" → "${canonical}" @ "${loc}" (${radiusMiles}mi) — ${dbMatches.length} in-radius results (no API call)`);
-          const jobs = await serve(dbMatches.slice(0, PAGE));
+          const jobs = await serve(candidates(dbMatches));
           if (seedsDropped) console.log(`SEED ROWS DROPPED: ${seedsDropped}`);
           return res.status(200).json({ ok: true, jobs, in_radius: countInRadius(jobs), query, location: loc, radius: Number.isFinite(radiusMiles) ? radiusMiles : null, offset: 0, has_more: dbMatches.length > PAGE || (poolFull && dbMatches.length >= PAGE), _src: 'db' });
         }
@@ -505,10 +663,10 @@ export default async function handler(req, res) {
     // Fill a thin in-radius page from our own corpus (query-relevant, nearest-first), then the
     // nearest listings so the board is never empty. Pure DB.
     const pageP = (async () => {
-      let page = dbMatches.slice(0, 60);
+      let page = candidates(dbMatches);
       let fallback = null; // 'outside_radius' | 'remote_thin' | 'unrelated' — the client labels the page by this
       if (page.length < PAGE_MIN && SUPABASE_URL && SUPABASE_SERVICE_KEY) {
-        const corpus = await corpusRelevant({ supabaseUrl: SUPABASE_URL, dbHeaders, terms: searchTerms, query: relevanceQuery, canonical, synonyms, center, loc, limit: 60 });
+        const corpus = await corpusRelevant({ supabaseUrl: SUPABASE_URL, dbHeaders, terms: searchTerms, query: relevanceQuery, canonical, synonyms, fit, center, loc, limit: 60 });
         const before = page.length;
         page = dedupByIdentity([...page, ...corpus]).slice(0, 60);
         if (page.length > before) fallback = isRemote ? 'remote_thin' : 'outside_radius';
@@ -554,7 +712,7 @@ export default async function handler(req, res) {
       // Record the pull so a repeat search inside the cooldown window doesn't pull again.
       recordPull(canonical, loc, agg.jobs?.length || 0, SUPABASE_URL, SUPABASE_SERVICE_KEY);
       const fresh = (agg.jobs || []).map((j) => toUiRow(j, loc));
-      const inRadius = applyRadius(filterAndRank(dedupByIdentity([...dbMatches, ...fresh]), relevanceQuery, { synonyms, canonical }));
+      const inRadius = applyRadius(filterAndRank(dedupByIdentity([...dbMatches, ...fresh]), relevanceQuery, { synonyms, canonical, fit }));
       console.log(`TOP-UP: "${query}" → "${canonical}" @ "${loc}" — ${agg.jobs?.length || 0} fetched, ${agg.upserted || 0} saved, ${inRadius.length} relevant in radius`);
       _logSearch(canonical, loc, inRadius.length, SUPABASE_URL, dbHeaders);
       // Still thin → widen geographically (≈4× the radius, 60–250mi), and nationally if nothing at
@@ -613,7 +771,7 @@ function toUiRow(j, loc = '') {
   return {
     id: j.id || null, // keep the DB id — without it /jobs/<id> permalinks can never resolve
     title: j.title, company: j.company, location: j.location || loc,
-    salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
+    salary: honestSalary(j), url: j.apply_url || j.url || null, description: j.description,
     type: j.type || 'Full-time', level: inferLevel(j.title || ''),
     source: j.source || 'Seen', ...scoreRow(j),
     search_query: j.search_query || null, // provenance for the merged re-filter downstream
@@ -643,7 +801,7 @@ function dedupByIdentity(arr) {
 // page shows "1 result" when we have plenty nearby. This reads the corpus for the query's terms
 // with NO box, applies the SAME relevance bar, and ranks nearest-first. Pure DB — no paid pull —
 // so it's safe to call on the cooldown / degraded / geo-widen paths. Never throws.
-async function corpusRelevant({ supabaseUrl, dbHeaders, terms, query, canonical, synonyms, center, loc, limit = 60 }) {
+async function corpusRelevant({ supabaseUrl, dbHeaders, terms, query, canonical, synonyms, fit = null, center, loc, limit = 60 }) {
   if (!supabaseUrl) return [];
   const now = encodeURIComponent(new Date().toISOString());
   const cols = 'id,created_at,title,company,location,salary,apply_url,description,type,level,source,score,waste_score,search_query,lat,lng,ats_tenant';
@@ -651,8 +809,9 @@ async function corpusRelevant({ supabaseUrl, dbHeaders, terms, query, canonical,
   if (!uniq.length) return [];
   try {
     const arrays = await Promise.all(uniq.map(t => {
-      const orf = `or=${encodeURIComponent(`(company.ilike.*${t}*,title.ilike.*${t}*,search_query.ilike.*${t}*)`)}`;
-      return fetch(`${supabaseUrl}/rest/v1/jobs?${orf}&expires_at=gt.${now}&select=${cols}&limit=120`, { headers: dbHeaders })
+      const tl = orLiteral(t);
+      const orf = `or=${encodeURIComponent(`(company.ilike.*${tl}*,title.ilike.*${tl}*,search_query.ilike.*${tl}*)`)}`;
+      return fetch(`${supabaseUrl}/rest/v1/jobs?${orf}&expires_at=gt.${now}&select=${cols}&order=score.desc.nullslast,id.asc&limit=120`, { headers: dbHeaders })
         .then(r => r.ok ? r.json() : []).catch(() => []);
     }));
     const pool = [], seen = new Set();
@@ -662,10 +821,10 @@ async function corpusRelevant({ supabaseUrl, dbHeaders, terms, query, canonical,
       seen.add(key);
       pool.push(row);
     }
-    let rel = filterAndRank(pool, query, { synonyms, canonical });
-    // Nearest-first (unknown coords last), relevance order as the tiebreak.
+    let rel = filterAndRank(pool, query, { synonyms, canonical, fit });
+    // Nearest-first (rows we cannot place last), relevance order as the tiebreak.
     if (center && hasUsableCoords(center)) {
-      rel = rel.map((j, i) => ({ j, d: hasUsableCoords(j) ? haversineMiles(center, j) : Infinity, i }))
+      rel = rel.map((j, i) => { const p = rowPoint(j); return { j, d: p ? haversineMiles(center, p) : Infinity, i }; })
         .sort((a, b) => (a.d - b.d) || (a.i - b.i)).map(x => x.j);
     } else if (loc) {
       rel = sortByProximity(rel, loc);
@@ -673,7 +832,7 @@ async function corpusRelevant({ supabaseUrl, dbHeaders, terms, query, canonical,
     return rel.slice(0, limit).map(j => ({
       id: j.id || null,
       title: j.title, company: j.company, location: j.location || loc,
-      salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
+      salary: honestSalary(j), url: j.apply_url || j.url || null, description: j.description,
       type: j.type || 'Full-time', level: inferLevel(j.title || ''),
       source: j.source || 'Seen', ...scoreRow(j),
       search_query: j.search_query || null,
@@ -697,7 +856,7 @@ async function nearestListings(loc, supabaseUrl, dbHeaders) {
   const mapUi = rows => (Array.isArray(rows) ? rows : []).map(j => ({
     id: j.id || null,
     title: j.title, company: j.company, location: j.location,
-    salary: j.salary, url: j.apply_url, description: j.description,
+    salary: honestSalary(j), url: j.apply_url, description: j.description,
     type: j.type || 'Full-time', level: inferLevel(j.title || ''),
     source: j.source || 'Seen', ...scoreRow(j),
     posted_at: j.created_at || null,
@@ -833,7 +992,7 @@ async function handleCompanyJobs(req, res, body) {
     const cached = preferFullText((r.ok ? await r.json() : []).filter(j => nameKey(j.company) === nameKey(safeName) && locationScope(j.location) !== 'non_us')).slice(0, 20);
     if (Array.isArray(cached) && cached.length >= 3) {
       const names = await loadTenantNames(SUPABASE_URL, dbHeaders);
-      const jobs = applyTenantNames(cached.map(j => ({ title: j.title, company: j.company, location: j.location, salary: j.salary, url: j.apply_url, source: j.source, type: j.type, level: inferLevel(j.title || ''), ...scoreRow(j), ats_tenant: j.ats_tenant || null })), names);
+      const jobs = applyTenantNames(cached.map(j => ({ title: j.title, company: j.company, location: j.location, salary: honestSalary(j), url: j.apply_url, source: j.source, type: j.type, level: inferLevel(j.title || ''), ...scoreRow(j), ats_tenant: j.ats_tenant || null })), names);
       return res.status(200).json({ ok: true, jobs, _src: 'cache' });
     }
   } catch(e) { console.warn('company_jobs cache:', e.message); }
@@ -868,7 +1027,7 @@ async function handleCompanyJobs(req, res, body) {
       })
       .map(j => ({
         title: j.title, company: j.company, location: j.location,
-        salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
+        salary: honestSalary(j), url: j.apply_url || j.url || null, description: j.description,
         source: j.source, type: j.type, level: inferLevel(j.title || ''),
         ...scoreRow(j),
       }));
@@ -924,7 +1083,7 @@ async function handleRecommended(req, res, _body) {
       company: j.company,
       ats_tenant: j.ats_tenant || null,
       location: j.location,
-      salary: j.salary,
+      salary: honestSalary(j),
       apply_url: j.apply_url,
       description: j.description,
       type: j.type || 'Full-time',

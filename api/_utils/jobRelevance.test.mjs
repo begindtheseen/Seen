@@ -287,3 +287,44 @@ test('isTitleRelated: abbreviations a title uses count as the query word (live 2
   assert.equal(isTitleRelated({ title: 'Travel Agent', company: 'X' }, 'travel nurse'), false);
   assert.equal(isTitleRelated({ title: 'Technical Writer', company: 'X' }, 'pharmacy technician'), false);
 });
+
+test('ranking: a tighter title match outranks a buried one; the searcher\'s own industry leads among equals (team lead · Phoenix, round 3)', async () => {
+  const { relevanceScore, filterAndRank, searchFitFromSignal, industryOf, fitBoost, titleTightness } = await import('./jobRelevance.js');
+  // The live rows (2026-11-03): every title matched "team lead" equally; the posting score (88) put the insurer first.
+  const jencap = { title: 'Underwriting Operations Team Lead', company: 'Jencap', score: 88, description: 'Why Jencap? We are one of the largest wholesale insurance intermediaries in the United States with expertise in wholesale brokerage, binding authority.' };
+  const walmart = { title: '(USA) Member Team Lead', company: 'Walmart', score: 62, description: "Position Summary What you'll do Assists management with the supervision of associates in assigned area of responsibility by assigning duties to associates in the club store." };
+  const sonora = { title: 'Patient Services Team Lead (PRQ)', company: 'Sonora Quest Laboratories', score: 50, description: 'Primary City/State: Mesa, Arizona Department Name: PSC-Power Road-PRQ Job Category: Phlebotomy. Patient services in the laboratory.' };
+  const hello = { title: 'IT Operations Team Lead (Fulfillment Centres)', company: 'HelloFresh', score: 80, description: 'For our growing North America IT function, we are looking for a Team Lead, IT Operations to own the technology experience across all US fulfillment centres.' };
+  const bare = { title: 'Team Lead', company: 'Acme', score: 40, description: 'Lead a team.' };
+  const q = 'team lead';
+  // Tightness: a bare title is +6, each extra title word costs one.
+  assert.equal(titleTightness('Team Lead', ['team', 'lead']), 6);
+  assert.equal(titleTightness('Underwriting Operations Team Lead', ['team', 'lead']), 4);
+  assert.equal(titleTightness('IT Operations Team Lead (Fulfillment Centres)', ['team', 'lead']), 2);
+  assert.equal(titleTightness('Team Lead, Android Core Product - Cleveland, OH, USA', ['team', 'lead']), 3, 'the city clause is not title words');
+  assert.ok(relevanceScore(bare, q) > relevanceScore(jencap, q));
+  assert.ok(relevanceScore(jencap, q) > relevanceScore(hello, q), 'four title words beat six');
+  // No résumé: title tiers first, posting score breaks the tie — the insurer stays a legitimate #1 among 4-word titles.
+  assert.deepEqual(filterAndRank([sonora, jencap, walmart, hello], q).map((j) => j.company), ['Jencap', 'Walmart', 'Sonora Quest Laboratories', 'HelloFresh']);
+  // Industry read from the row.
+  assert.equal(industryOf(walmart), 'retail');
+  assert.equal(industryOf(jencap), 'finance');
+  assert.equal(industryOf(sonora), 'healthcare');
+  // A retail résumé ("Team Lead" / "Department Supervisor" at a grocer are 'general' to the ontology — the industry bucket carries it).
+  const fit = searchFitFromSignal({ top_titles: ['Team Lead', 'Department Supervisor'], function: 'other', industry: 'retail' });
+  assert.deepEqual(fit, { families: [], industry: 'retail' });
+  assert.equal(fitBoost(walmart, fit), 6);
+  assert.equal(fitBoost(jencap, fit), 0);
+  assert.deepEqual(filterAndRank([sonora, jencap, walmart, hello], q, { fit }).map((j) => j.company), ['Walmart', 'Jencap', 'Sonora Quest Laboratories', 'HelloFresh']);
+  // A healthcare résumé: the lab's team lead leads; a family match is worth more than an industry match.
+  const nurse = searchFitFromSignal({ top_titles: ['Phlebotomist', 'Patient Care Technician'], function: 'other', industry: null });
+  assert.ok(nurse.families.length >= 1 && nurse.industry === 'healthcare', JSON.stringify(nurse));
+  assert.equal(filterAndRank([jencap, walmart, sonora], q, { fit: nurse })[0].company, 'Sonora Quest Laboratories');
+  // The industry can come from the function alone; nothing known → null (no boost anywhere).
+  assert.equal(searchFitFromSignal({ top_titles: [], function: 'engineering' }).industry, 'tech');
+  assert.equal(searchFitFromSignal({ top_titles: [], function: 'other' }), null);
+  // The fit never makes an unrelated row relevant or lifts a non-match over a match.
+  const unrelated = { title: 'Store Manager', company: 'Walmart', score: 90, description: 'Run the store.' };
+  assert.equal(filterAndRank([unrelated, jencap], q, { fit }).length, 1);
+  assert.ok(relevanceScore(walmart, q, { fit }) > relevanceScore(unrelated, q, { fit }));
+});

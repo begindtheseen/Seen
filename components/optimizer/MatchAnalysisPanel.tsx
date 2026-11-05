@@ -10,7 +10,7 @@ import { useState } from 'react'
 import type { MatchAnalysis, Match, Recommendation } from '@/lib/resume-intelligence/engine'
 
 const C = {
-  green: '#34d399', amber: '#fbbf24', red: '#f87171', dim: 'var(--dim)', sub: 'var(--sub)',
+  green: 'var(--good-text)', amber: 'var(--caution-text)', red: 'var(--bad-text)', dim: 'var(--dim)', sub: 'var(--sub)',
   white: 'var(--white)', line: 'var(--line2)', raised: 'var(--raised)', mono: 'var(--mono)',
 }
 
@@ -19,7 +19,7 @@ function scoreColor(n: number) { return n >= 75 ? C.green : n >= 50 ? C.amber : 
 function Bar({ label, value }: { label: string; value: number }) {
   return (
     <div style={{ marginBottom: '.5rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: C.mono, fontSize: '.55rem', color: C.dim, marginBottom: '.2rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: C.mono, fontSize: 'var(--fs-meta)', color: C.dim, marginBottom: '.25rem' }}>
         <span>{label}</span><span style={{ color: scoreColor(value) }}>{value}%</span>
       </div>
       <div style={{ height: 5, borderRadius: 4, background: 'rgba(255,255,255,.07)', overflow: 'hidden' }}>
@@ -35,16 +35,16 @@ function Chip({ m, tone }: { m: Match; tone: 'green' | 'amber' | 'red' }) {
   const bg = tone === 'green' ? 'rgba(52,211,153,.12)' : tone === 'amber' ? 'rgba(251,191,36,.12)' : 'rgba(248,113,113,.12)'
   const border = tone === 'green' ? 'rgba(52,211,153,.3)' : tone === 'amber' ? 'rgba(251,191,36,.3)' : 'rgba(248,113,113,.3)'
   return (
-    <div style={{ display: 'inline-block', margin: '0 .35rem .35rem 0' }}>
+    <div style={{ display: 'inline-block', margin: '0 .25rem .25rem 0' }}>
       <button
         onClick={() => setOpen(o => !o)}
         title={m.explanation}
-        style={{ background: bg, border: `1px solid ${border}`, borderRadius: 999, padding: '.22rem .6rem', fontFamily: C.mono, fontSize: '.56rem', color, cursor: 'pointer', textTransform: 'capitalize' }}
+        style={{ background: bg, border: `1px solid ${border}`, borderRadius: 999, padding: '.25rem .5rem', fontFamily: C.mono, fontSize: 'var(--fs-meta)', color, cursor: 'pointer', textTransform: 'capitalize' }}
       >
         {m.requirement}{m.mustNotInvent ? ' ⚠' : ''}
       </button>
       {open && (
-        <div style={{ marginTop: '.25rem', maxWidth: 320, background: C.raised, border: `1px solid ${C.line}`, borderRadius: 7, padding: '.5rem .6rem', fontFamily: C.mono, fontSize: '.54rem', color: C.sub, lineHeight: 1.5 }}>
+        <div style={{ marginTop: '.25rem', maxWidth: 320, background: C.raised, border: `1px solid ${C.line}`, borderRadius: 7, padding: '.5rem .5rem', fontFamily: C.mono, fontSize: 'var(--fs-meta)', color: C.sub, lineHeight: 1.5 }}>
           <div style={{ color: C.white, marginBottom: '.25rem' }}>{m.explanation}</div>
           {m.evidence?.length > 0 && <div style={{ color: C.dim, fontStyle: 'italic' }}>“{m.evidence[0]}”</div>}
           <div style={{ color: C.dim, marginTop: '.25rem' }}>{m.matchType.replace(/_/g, ' ').toLowerCase()} · {Math.round(m.confidence * 100)}% confidence</div>
@@ -57,8 +57,8 @@ function Chip({ m, tone }: { m: Match; tone: 'green' | 'amber' | 'red' }) {
 function Section({ title, count, color, children }: { title: string; count: number; color: string; children: React.ReactNode }) {
   if (!count) return null
   return (
-    <div style={{ marginBottom: '.9rem' }}>
-      <div style={{ fontFamily: C.mono, fontSize: '.55rem', color: C.dim, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: '.45rem' }}>
+    <div style={{ marginBottom: '1rem' }}>
+      <div style={{ fontFamily: C.mono, fontSize: 'var(--fs-meta)', color: C.dim, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: '.5rem' }}>
         {title} <span style={{ color }}>{count}</span>
       </div>
       <div>{children}</div>
@@ -80,20 +80,20 @@ export default function MatchAnalysisPanel({ analysis }: { analysis: MatchAnalys
       {/* headline */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 92 }}>
-          <div style={{ fontFamily: C.mono, fontSize: '2.4rem', fontWeight: 800, color: scoreColor(a.overallScore), lineHeight: 1 }}>{a.overallScore}</div>
-          <div style={{ fontFamily: C.mono, fontSize: '.5rem', color: C.dim, textTransform: 'uppercase', letterSpacing: 1 }}>Match</div>
+          <div style={{ fontFamily: C.mono, fontSize: 'var(--fs-fig-m)', fontWeight: 800, color: scoreColor(a.overallScore), lineHeight: 1 }}>{a.overallScore}</div>
+          <div style={{ fontFamily: C.mono, fontSize: 'var(--fs-meta)', color: C.dim, textTransform: 'uppercase', letterSpacing: 1 }}>Match</div>
         </div>
         <div style={{ flex: 1, minWidth: 200 }}>
-          <div style={{ fontFamily: C.mono, fontSize: '.6rem', color: C.sub, marginBottom: '.15rem' }}>
+          <div style={{ fontFamily: C.mono, fontSize: 'var(--fs-meta)', color: C.sub, marginBottom: '.125rem' }}>
             Critical requirements met: <span style={{ color: scoreColor(a.criticalRequirementCoverage) }}>{a.criticalRequirementCoverage}%</span>
             {a.job.roleFamilyLabel && <span style={{ color: C.dim }}> · {a.job.roleFamilyLabel}</span>}
           </div>
-          <div style={{ fontFamily: C.mono, fontSize: '.52rem', color: C.dim, lineHeight: 1.5 }}>{a.disclaimer}</div>
+          <div style={{ fontFamily: C.mono, fontSize: 'var(--fs-meta)', color: C.dim, lineHeight: 1.5 }}>{a.disclaimer}</div>
         </div>
       </div>
 
       {/* score dimensions */}
-      <div style={{ background: C.raised, border: `1px solid ${C.line}`, borderRadius: 9, padding: '.7rem .8rem', marginBottom: '1rem' }}>
+      <div style={{ background: C.raised, border: `1px solid ${C.line}`, borderRadius: 9, padding: '.75rem .75rem', marginBottom: '1rem' }}>
         <Bar label="Critical requirement coverage" value={a.criticalRequirementCoverage} />
         <Bar label="Skill alignment" value={a.skillAlignment} />
         <Bar label="Evidence strength" value={a.evidenceStrength} />
@@ -110,7 +110,7 @@ export default function MatchAnalysisPanel({ analysis }: { analysis: MatchAnalys
 
       <Section title="Missing" count={a.missingRequirements.length} color={C.red}>
         {critical.length > 0 && (
-          <div style={{ fontFamily: C.mono, fontSize: '.5rem', color: C.red, marginBottom: '.35rem' }}>⚠ = a credential/gate you can’t claim unless you truly hold it.</div>
+          <div style={{ fontFamily: C.mono, fontSize: 'var(--fs-meta)', color: C.red, marginBottom: '.25rem' }}>⚠ = a credential/gate you can’t claim unless you truly hold it.</div>
         )}
         {a.missingRequirements.map(m => <Chip key={m.requirement} m={m} tone="red" />)}
       </Section>
@@ -118,20 +118,20 @@ export default function MatchAnalysisPanel({ analysis }: { analysis: MatchAnalys
       {/* recommendations */}
       {a.recommendations.length > 0 && (
         <div style={{ marginTop: '.5rem' }}>
-          <div style={{ fontFamily: C.mono, fontSize: '.55rem', color: C.dim, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: '.5rem' }}>Top improvements</div>
+          <div style={{ fontFamily: C.mono, fontSize: 'var(--fs-meta)', color: C.dim, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: '.5rem' }}>Top improvements</div>
           {a.recommendations.slice(0, 6).map((r, i) => (
-            <div key={i} style={{ display: 'flex', gap: '.5rem', marginBottom: '.5rem', background: C.raised, border: `1px solid ${C.line}`, borderRadius: 7, padding: '.5rem .6rem' }}>
-              <span style={{ color: r.priority === 'high' ? C.red : r.priority === 'medium' ? C.amber : C.dim, fontFamily: C.mono, fontSize: '.7rem' }}>{recIcon[r.type] || '•'}</span>
+            <div key={i} style={{ display: 'flex', gap: '.5rem', marginBottom: '.5rem', background: C.raised, border: `1px solid ${C.line}`, borderRadius: 7, padding: '.5rem .5rem' }}>
+              <span style={{ color: r.priority === 'high' ? C.red : r.priority === 'medium' ? C.amber : C.dim, fontFamily: C.mono, fontSize: 'var(--fs-meta)' }}>{recIcon[r.type] || '•'}</span>
               <div>
-                <div style={{ fontFamily: C.mono, fontSize: '.58rem', color: C.white, marginBottom: '.15rem' }}>{r.title}</div>
-                <div style={{ fontFamily: C.mono, fontSize: '.54rem', color: C.sub, lineHeight: 1.5 }}>{r.detail}</div>
+                <div style={{ fontFamily: C.mono, fontSize: 'var(--fs-meta)', color: C.white, marginBottom: '.125rem' }}>{r.title}</div>
+                <div style={{ fontFamily: C.mono, fontSize: 'var(--fs-meta)', color: C.sub, lineHeight: 1.5 }}>{r.detail}</div>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      <div style={{ fontFamily: C.mono, fontSize: '.48rem', color: C.dim, marginTop: '.6rem', textAlign: 'right' }}>
+      <div style={{ fontFamily: C.mono, fontSize: 'var(--fs-meta)', color: C.dim, marginTop: '.5rem', textAlign: 'right' }}>
         Resume Intelligence Engine · {a.semantic_backend === 'neural' ? 'neural + deterministic' : 'deterministic, no external AI'}
       </div>
     </div>

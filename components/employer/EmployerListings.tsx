@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useEmployerCompany } from './EmployerCompanyContext'
 import { useAuth } from '@/lib/auth'
+import { httpHref } from '@/lib/safeHref.js'
+import Icon from '@/components/ui/Icon'
 
 // Manage your listings — the employer portal's first real management surface
 // (seen-command#94). Seen's corpus is ingest-driven and the portal is account-free, so
@@ -85,74 +87,77 @@ export function EmployerListings() {
 
   return (
     <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 18, padding: '2rem', marginBottom: '2.5rem' }}>
-      <div style={{ ...mono('.55rem', 'var(--blue)'), textTransform: 'uppercase', letterSpacing: '.16em', marginBottom: '.5rem' }}>Your listings</div>
+      <div style={{ ...mono('var(--fs-meta)', 'var(--text-3)'), textTransform: 'uppercase', letterSpacing: '.16em', marginBottom: '.5rem' }}>Your listings</div>
       <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--white)', margin: '0 0 .5rem', letterSpacing: '-.02em' }}>Filled the role? Close the listing in one click.</h2>
-      <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-ui)', lineHeight: 1.7, margin: '0 0 1.4rem', maxWidth: 560 }}>
+      <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-ui)', lineHeight: 1.7, margin: '0 0 1.5rem', maxWidth: 560 }}>
         A filled role that stays listed collects applications you&apos;ll never answer — and every one of those becomes a ghost report against your score. Find your live listings and close the ones that are done. We confirm against your own posting before anything is removed.
       </p>
 
       {scoped ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap', marginBottom: listings || loading ? '1.6rem' : 0 }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '.5rem', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.55rem .9rem' }}>
-            <span style={{ ...mono('.52rem', 'var(--dim)'), textTransform: 'uppercase', letterSpacing: '.14em' }}>Your company</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap', marginBottom: listings || loading ? '1.6rem' : 0 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '.5rem', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.5rem 1rem' }}>
+            <span style={{ ...mono('var(--fs-meta)', 'var(--dim)'), textTransform: 'uppercase', letterSpacing: '.14em' }}>Your company</span>
             <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)', color: 'var(--white)' }}>{employerCompany}</span>
           </div>
-          {loading && <span style={mono('.6rem', 'var(--dim)')}>Loading…</span>}
+          {loading && <span style={mono('var(--fs-meta)', 'var(--dim)')}>Loading…</span>}
         </div>
       ) : (
-        <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', marginBottom: listings || loading ? '1.6rem' : 0 }}>
+        <div style={{ display: 'flex', marginBottom: listings || loading ? '1.5rem' : 0 }}>
           <input autoComplete="off"
             value={name}
             onChange={e => setName(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') look() }}
-            placeholder="Your company name (as it appears on the listing)"
+            placeholder="Company name as it appears on the listing"
             aria-label="Your company name, as it appears on the listing"
-            style={{ flex: 1, minWidth: 220, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.7rem .9rem', ...mono('.75rem', 'var(--white)'), outline: 'none' }}
+            style={{ flex: 1, minWidth: 0, background: 'var(--raised)', border: '1px solid var(--border-2)', borderRight: 'none', borderRadius: '10px 0 0 10px', padding: '.75rem 1rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-ui)', color: 'var(--text-1)', outline: 'none' }}
           />
-          <button onClick={look} disabled={loading || !name.trim()} style={{ background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 9, padding: '.7rem 1.4rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-sm)', color: '#fff', cursor: 'pointer', opacity: loading ? .6 : 1 }}>
+          <button onClick={look} disabled={loading || !name.trim()} style={{ flexShrink: 0, minHeight: 44, background: 'var(--surface-2)', border: '1px solid var(--border-2)', borderRadius: '0 10px 10px 0', padding: '.75rem 1rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', color: 'var(--text-1)', cursor: loading || !name.trim() ? 'default' : 'pointer', opacity: loading || !name.trim() ? .6 : 1 }}>
             {loading ? 'Looking…' : 'Show my listings →'}
           </button>
         </div>
       )}
-      {err && <div style={mono('.6rem', 'var(--red)')}>{err}</div>}
+      {err && <div style={mono('var(--fs-meta)', 'var(--red)')}>{err}</div>}
 
       {listings !== null && !loading && (
         listings.length > 0 ? (
-          <div style={{ borderTop: '1px solid var(--line)', paddingTop: '.4rem' }}>
+          <div style={{ borderTop: '1px solid var(--line)', paddingTop: '.5rem' }}>
             {listings.map(l => {
               const st = rows[l.id] || {}
               const done = st.closed || st.queued
               return (
-                <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', padding: '.85rem 0', borderBottom: '1px solid var(--line)' }}>
+                <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', padding: '.75rem 0', borderBottom: '1px solid var(--line)' }}>
                   <div style={{ flex: 1, minWidth: 220 }}>
                     <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-ui)', fontWeight: 700, color: 'var(--white)' }}>{l.title}</div>
-                    <div style={{ ...mono('.6rem', 'var(--dim)'), marginTop: 2 }}>
+                    <div style={{ ...mono('var(--fs-meta)', 'var(--dim)'), marginTop: 2 }}>
                       {[l.location, l.created_at ? `posted ${new Date(l.created_at).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}` : '', l.availability_status].filter(Boolean).join(' · ')}
-                      {l.apply_url && <> · <a href={l.apply_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--dim)' }}>view</a></>}
+                      {l.apply_url && <> · <a href={httpHref(l.apply_url) ?? undefined} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--dim)' }}>view</a></>}
                     </div>
                   </div>
                   {done ? (
-                    <div style={{ maxWidth: 320, ...mono('.6rem', st.closed ? 'var(--green)' : 'var(--amber)'), lineHeight: 1.55 }}>
-                      {st.closed
-                        ? (st.already ? '✓ Already removed from Seen.' : '✓ Removed from Seen — your posting confirmed this role is closed.')
-                        : '⏳ Your posting still looks live at the source, so we’ve flagged it for our team to verify and remove.'}
+                    <div style={{ maxWidth: 320, display: 'flex', gap: '.5rem', alignItems: 'flex-start', ...mono('var(--fs-meta)', st.closed ? 'var(--green)' : 'var(--amber)'), lineHeight: 1.55 }}>
+                      <span style={{ flexShrink: 0, marginTop: 2 }}><Icon name={st.closed ? 'circle-check' : 'hourglass'} size={14} /></span>
+                      <span>
+                        {st.closed
+                          ? (st.already ? 'Already removed from Seen.' : 'Removed from Seen — your posting confirmed this role is closed.')
+                          : 'Your posting still looks live at the source, so we’ve flagged it for our team to verify and remove.'}
+                      </span>
                     </div>
                   ) : (
-                    <button onClick={() => close(l.id)} disabled={st.busy} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem 1rem', ...mono('.62rem', 'var(--white)'), cursor: st.busy ? 'default' : 'pointer', opacity: st.busy ? .6 : 1 }}>
+                    <button onClick={() => close(l.id)} disabled={st.busy} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem 1rem', ...mono('var(--fs-meta)', 'var(--white)'), cursor: st.busy ? 'default' : 'pointer', opacity: st.busy ? .6 : 1 }}>
                       {st.busy ? 'Checking your posting…' : 'Mark filled / close'}
                     </button>
                   )}
-                  {st.error && <div style={mono('.6rem', 'var(--red)')}>{st.error}</div>}
+                  {st.error && <div style={mono('var(--fs-meta)', 'var(--red)')}>{st.error}</div>}
                 </div>
               )
             })}
-            <p style={{ ...mono('.55rem', 'var(--muted)'), lineHeight: 1.6, margin: '.9rem 0 0' }}>
+            <p style={{ ...mono('var(--fs-meta)', 'var(--muted)'), lineHeight: 1.6, margin: '1rem 0 0' }}>
               Closing is verified against your own posting URL — if it still shows the role open, nothing is removed until our team checks. Closing a listing never changes your transparency score.
             </p>
           </div>
         ) : (
-          <div style={{ borderTop: '1px solid var(--line)', paddingTop: '1.4rem' }}>
-            <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', marginBottom: '.35rem' }}>No live listings found for &ldquo;{checked}&rdquo;.</div>
+          <div style={{ borderTop: '1px solid var(--line)', paddingTop: '1.5rem' }}>
+            <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--white)', marginBottom: '.25rem' }}>No live listings found for &ldquo;{checked}&rdquo;.</div>
             <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.65, margin: 0, maxWidth: 520 }}>
               Try the exact company name as it appears on your job listing. If a stale listing of yours is still showing in search, email <a href="mailto:hello@seenjobs.io" style={{ color: 'var(--sub)' }}>hello@seenjobs.io</a> and we&apos;ll remove it.
             </p>

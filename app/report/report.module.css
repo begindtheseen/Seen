@@ -1,0 +1,10 @@
+/* /report — the field grid: two columns on wide screens, ONE under 480px so placeholders ("e.g. Austin, TX")
+   are never cut to "e.g. Austin, T" at 390px. Outcome chips carry an icon from the one icon set. */
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
+.three { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr)); gap: var(--sp-3); }
+@media (max-width: 480px) { .two { grid-template-columns: minmax(0, 1fr); } }
+.radio { display: inline-flex; align-items: center; gap: var(--sp-2); min-height: 44px; padding: 0 var(--sp-3); border-radius: var(--r-pill); background: var(--surface-1); border: 1px solid var(--border-2); color: var(--text-2); font-family: var(--body); font-size: var(--fs-sm); font-weight: 500; cursor: pointer; transition: border-color var(--dur-state) var(--ease-out), background var(--dur-state) var(--ease-out); }
+.radio:hover { border-color: var(--border-3); color: var(--text-1); }
+.radioOn { background: var(--accent-tint); border-color: var(--accent-line); color: var(--text-1); }
+.radio input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.radio:focus-within { box-shadow: var(--sh-focus); }

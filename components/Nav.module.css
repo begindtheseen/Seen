@@ -1,8 +1,8 @@
 /* Redesigned top nav — full-width hairline bar (the global `nav{}` tag styles
    already give the fixed bar + single bottom hairline; this module only styles the
    contents). Replaces the old floating translucent `.nav-pills` container: primary
-   links are now plain text with a gradient underline for the active route.
-   Uses the real brand tokens (--display Syne, --mono DM Mono, --body Instrument Sans,
+   links are now plain text with a flat accent underline for the active route.
+   Uses the real brand tokens (--display Syne, --body Instrument Sans (--mono aliases it),
    and the dark identity palette) declared in app/globals.css. */
 
 /* Primary link row — sits just after the logo; the right cluster uses margin-left:auto
@@ -12,8 +12,8 @@
   position: relative; /* anchors the sliding indicator */
   display: flex;
   align-items: center;
-  gap: 0.12rem;
-  margin-left: 1.1rem;
+  gap: .125rem;
+  margin-left: 1rem;
   min-width: 0;
 }
 
@@ -21,8 +21,8 @@
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.42rem 0.62rem;
+  gap: .25rem;
+  padding: .5rem .5rem;
   border-radius: 8px;
   font-family: var(--body);
   font-size: var(--fs-sm);
@@ -41,7 +41,7 @@
   background: rgba(255, 255, 255, 0.06);
 }
 .linkActive {
-  color: #fff;
+  color: var(--text-1);
   font-weight: 600;
 }
 /* ONE sliding indicator for the active destination. Nav.tsx measures the active link and
@@ -50,12 +50,11 @@
 .ind {
   position: absolute;
   left: 0;
-  bottom: -0.42rem;
+  bottom: -.5rem;
   height: 2px;
   width: 0;
   border-radius: 2px;
-  background: linear-gradient(90deg, var(--indigo), var(--blue));
-  box-shadow: 0 0 10px rgba(99, 102, 241, 0.55);
+  background: var(--accent-strong);
   opacity: 0;
   pointer-events: none;
   transition: transform 0.45s var(--ease-out), width 0.45s var(--ease-out), opacity 0.2s ease;
@@ -95,12 +94,12 @@
   right: 0;
   z-index: 600;
   min-width: 216px;
-  padding: 0.4rem;
+  padding: .5rem;
   /* SOLID. A translucent glass menu inside the (already backdrop-filtered) nav is never blurred
      on iOS Safari — nested backdrop-filters don't composite — so the hero text showed straight
      through the 72%-alpha surface and the menu was unreadable. Same rule as .co-sticky and
      CompanyScoreModal: floating panels over content are opaque. */
-  background: #0e111c;
+  background: var(--surface-overlay);
   border: 1px solid var(--line2);
   border-radius: 14px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 24px 60px rgba(0, 0, 0, 0.55);
@@ -137,15 +136,15 @@
   text-transform: uppercase;
   letter-spacing: 0.14em;
   color: var(--dim);
-  padding: 0.5rem 0.6rem 0.3rem;
+  padding: 0.5rem .5rem .25rem;
 }
 
 .menuItem {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: .5rem;
   width: 100%;
-  padding: 0.5rem 0.6rem;
+  padding: 0.5rem .5rem;
   border-radius: 8px;
   font-family: var(--body);
   font-size: var(--fs-meta);
@@ -159,16 +158,16 @@
   position: relative;
   transition: color 0.14s ease, background 0.14s ease, padding-left 0.22s var(--ease-out);
 }
-/* Hover: the row lights up and a small indigo tick slides in from the left edge. */
+/* Hover: the row lights up and a small accent tick slides in from the left edge. */
 .menuItem::before {
   content: "";
   position: absolute;
-  left: 0.35rem;
+  left: .25rem;
   top: 50%;
   width: 3px;
   height: 0;
   border-radius: 2px;
-  background: linear-gradient(180deg, var(--indigo), var(--blue));
+  background: var(--accent-strong);
   transform: translateY(-50%);
   opacity: 0;
   transition: height 0.22s var(--ease-out), opacity 0.15s ease;
@@ -176,7 +175,7 @@
 .menuItem:hover {
   color: var(--white);
   background: var(--raised);
-  padding-left: 0.95rem;
+  padding-left: 1rem;
 }
 .menuItem:hover::before { height: 55%; opacity: 1; }
 .menuItemIcon {
@@ -190,15 +189,15 @@
 
 .menuDivider {
   height: 1px;
-  margin: 0.35rem 0.3rem;
+  margin: .25rem .25rem;
   background: var(--line);
 }
 
 .menuNote {
   display: flex;
-  gap: 0.4rem;
-  margin: 0.25rem 0.3rem 0.1rem;
-  padding: 0.5rem 0.55rem;
+  gap: .5rem;
+  margin: 0.25rem .25rem .125rem;
+  padding: 0.5rem .5rem;
   border-radius: 8px;
   background: var(--bdim);
   border: 1px solid var(--bmid);
@@ -208,7 +207,7 @@
   color: var(--blue);
 }
 
-/* Credits chip — subtle monospace pill (replaces the loud gradient "🪙 10 credits"). */
+/* Credits chip — subtle monospace pill (replaces the loud "🪙 10 credits" pill). */
 /* The BUTTON is the hit area (transparent, 44px tall on phones — see the phone block); the inner
    .pill is the visual. Same split for the Pro badge and the avatar: a 44×44 target never grows the
    glyph (phone audit 2026-10-23: chip 49×25, icons 32×32, avatar 32×32, menu rows 31px). */
@@ -229,8 +228,8 @@
 .pill {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.34rem 0.62rem;
+  gap: .5rem;
+  padding: .25rem .5rem;
   border-radius: 999px;
   border: 1px solid var(--line2);
   background: rgba(255, 255, 255, 0.02);
@@ -242,8 +241,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--green);
-  box-shadow: 0 0 8px rgba(16, 185, 129, 0.7);
+  background: var(--accent);
   flex-shrink: 0;
 }
 /* Out-of-credits: still subtle, just semantic red. */
@@ -270,9 +268,9 @@
 }
 /* link = hit area, .proPill = the visual */
 .proPill {
-  gap: 0.34rem;
+  gap: .25rem;
   border: 1px solid rgba(16, 185, 129, 0.4);
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.14), rgba(99, 102, 241, 0.14));
+  background: var(--good-tint);
 }
 
 /* Icon button (Saved bookmark). */
@@ -295,8 +293,8 @@
 
 /* ⌘K trigger — reads as a search field, acts as the palette opener. */
 .cmdk {
-  display: inline-flex; align-items: center; gap: 0.45rem;
-  height: 34px; padding: 0 0.55rem 0 0.65rem; border-radius: 9px;
+  display: inline-flex; align-items: center; gap: .5rem;
+  height: 34px; padding: 0 .5rem 0 .75rem; border-radius: 9px;
   border: 1px solid var(--line); background: rgba(255, 255, 255, 0.025);
   color: var(--dim); font-family: var(--body); font-size: var(--fs-meta); cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
@@ -309,13 +307,14 @@
 .cmdkKey {
   display: inline-block; width: 4.6em; box-sizing: border-box; white-space: nowrap; text-align: center;
   font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.04em; color: var(--sub);
-  border: 1px solid var(--line2); border-bottom-width: 2px; border-radius: 4px; padding: 0.08rem 0.32rem;
+  border: 1px solid var(--line2); border-bottom-width: 2px; border-radius: 4px; padding: .0625rem .25rem;
 }
 @media (max-width: 1024px) { .cmdkLabel { display: none; } .cmdk { padding: 0 0.5rem; } }
-@media (max-width: 768px) { .cmdk { display: none; } }
+/* Under 900px (a phone held sideways is 844) the pill ran into "More" (round 2); the palette still opens with ⌘K. */
+@media (max-width: 900px) { .cmdk { display: none; } }
 
 /* Account avatar trigger. */
-/* The button is the hit area, .avatarDot the 32px gradient disc. */
+/* The button is the hit area, .avatarDot the 32px solid disc. */
 .avatar {
   display: grid;
   place-items: center;
@@ -333,21 +332,22 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--g-start) 0%, var(--g-mid) 55%, var(--g-end) 100%);
-  color: #fff;
+  background: var(--cta);
+  color: var(--text-1);
   font-family: var(--body);
   font-size: var(--fs-meta);
   font-weight: 600;
   line-height: 1;
   transition: transform 0.3s var(--ease-spring), box-shadow 0.25s ease;
 }
-.avatar:hover .avatarDot { filter: brightness(1.08); transform: scale(1.08); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25), 0 6px 18px rgba(99, 102, 241, 0.35); }
+.avatar:hover .avatarDot { filter: brightness(1.08); transform: scale(1.08); box-shadow: 0 0 0 3px var(--accent-tint), var(--sh-raised); }
 .avatar:active .avatarDot { transform: scale(0.94); }
 
 /* Below the tablet breakpoint the primary row + More collapse into the existing
    hamburger drawer (global .side-menu / .side-menu-toggle). */
 @media (max-width: 768px) {
   .primary { display: none; }
+  .topSignIn { display: none; } /* the tab bar and the drawer have Sign in; one button up top */
   /* 44×44 hit areas (phone audit 2026-10-23: chip 49×25, icons 32×32, avatar 32×32, menu rows 31px)
      without a wider bar: the boxes grow, the glyphs don't, and the gap between them goes — the
      boxes carry their own spacing. */
@@ -360,7 +360,7 @@
 @media (prefers-reduced-motion: reduce) {
   .menu, .menu > * { animation: none; }
   .menuItem, .menuItem::before, .avatarDot { transition: none; }
-  .menuItem:hover { padding-left: 0.6rem; }
+  .menuItem:hover { padding-left: .5rem; }
   .avatar:hover .avatarDot, .avatar:active .avatarDot { transform: none; }
 }
 @media (max-width: 480px) {
@@ -378,7 +378,7 @@ div.drawer {
   right: 0;
   border-right: 0;
   border-left: 1px solid var(--line);
-  background: #0e111c;
+  background: var(--surface-overlay);
   transform: translateX(100%);
   box-shadow: -20px 0 60px rgba(0, 0, 0, 0.5);
   padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
@@ -391,8 +391,8 @@ div.drawer.drawerOpen { transform: translateX(0); visibility: visible; transitio
   margin-left: auto;
   width: 44px;
   height: 44px;
-  margin-top: -10px;
-  margin-bottom: -10px;
+  margin-top: -12px;
+  margin-bottom: -12px;
   margin-right: -0.5rem;
   display: grid;
   place-items: center;
@@ -405,7 +405,7 @@ div.drawer.drawerOpen { transform: translateX(0); visibility: visible; transitio
 }
 .drawerClose svg { width: 20px; height: 20px; }
 .drawerClose:hover, .drawerClose:focus-visible { color: var(--white); background: rgba(255, 255, 255, 0.07); outline: none; }
-.drawerClose:focus-visible { box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.6); }
+.drawerClose:focus-visible { box-shadow: var(--sh-focus); }
 /* Every control in the drawer's foot is a real thumb target (≥44px). */
 .drawerCta { width: 100%; justify-content: center; min-height: 44px; font-size: var(--fs-sm); }
 .drawerGhost, .drawerDanger {
@@ -426,12 +426,12 @@ div.drawer :global(.side-menu-item) { min-height: 44px; }
 .drawerWord { font-family: var(--body); font-weight: 600; font-size: var(--fs-lead); color: var(--text-1); letter-spacing: -0.02em; }
 .drawerCredit {
   display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2);
-  width: calc(100% - 2rem); margin: 0.25rem 1rem 0.6rem; padding: 0 var(--sp-4); min-height: 48px;
+  width: calc(100% - 2rem); margin: 0.25rem 1rem .5rem; padding: 0 var(--sp-4); min-height: 48px;
   border-radius: var(--r-control); border: 1px solid var(--accent-line); background: var(--accent-tint);
   color: var(--text-1); font-family: var(--body); font-size: var(--fs-sm); font-weight: 600; text-align: left; text-decoration: none; cursor: pointer;
 }
 .drawerCredit > span:last-child { color: var(--accent); }
-.drawerCredit > span { display: inline-flex; align-items: center; gap: 6px; }
+.drawerCredit > span { display: inline-flex; align-items: center; gap: 8px; }
 .drawerCreditPro { border-color: var(--good-line); background: var(--good-tint); }
 .drawerCreditPro > span:last-child { color: var(--good-text); }
 .drawerCreditEmpty { border-color: var(--bad-line); background: var(--bad-tint); }

@@ -70,10 +70,10 @@ type Loaded = {
 }
 
 const mono = (size: string, color: string): React.CSSProperties => ({ fontFamily: 'var(--mono)', fontSize: size, color })
-const card: React.CSSProperties = { background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16, padding: '1.6rem 1.7rem', marginBottom: '1.4rem' }
-const kicker: React.CSSProperties = { fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.16em', color: 'var(--blue)', marginBottom: '.55rem' }
-const h2: React.CSSProperties = { fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', margin: '0 0 .2rem', letterSpacing: '-.02em' }
-const sub: React.CSSProperties = { color: 'var(--sub)', fontSize: 'var(--fs-meta)', lineHeight: 1.6, margin: '.15rem 0 1.1rem' }
+const card: React.CSSProperties = { background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16, padding: '1.5rem 1.75rem', marginBottom: '1.5rem' }
+const kicker: React.CSSProperties = { fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.16em', color: 'var(--text-3)', marginBottom: '.5rem' }
+const h2: React.CSSProperties = { fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', margin: '0 0 .25rem', letterSpacing: '-.02em' }
+const sub: React.CSSProperties = { color: 'var(--sub)', fontSize: 'var(--fs-meta)', lineHeight: 1.6, margin: '.125rem 0 1rem' }
 
 const fmtPct = (v: number | null | undefined) => (v == null ? '—' : `${Number.isInteger(v) ? v : v.toFixed(1)}%`)
 const gradeColor = (letter: string | null) => { const g = letter ? letter.charAt(0) : null; return g === 'A' || g === 'B' ? 'var(--green)' : g === 'C' ? 'var(--amber)' : 'var(--red)' }
@@ -99,9 +99,9 @@ function Bar({ pct, color = 'var(--blue)', grow = false, delay = 0 }: { pct: num
 function BreakdownTable({ rows, color = 'var(--blue)' }: { rows: { key: string; count: number; pct: number }[]; color?: string }) {
   const max = Math.max(...rows.map(r => r.count), 1)
   return (
-    <div style={{ display: 'grid', gap: '.6rem' }}>
+    <div style={{ display: 'grid', gap: '.5rem' }}>
       {rows.map(r => (
-        <div key={r.key} style={{ display: 'grid', gridTemplateColumns: 'minmax(120px,1.4fr) 2fr auto', gap: '.8rem', alignItems: 'center' }}>
+        <div key={r.key} style={{ display: 'grid', gridTemplateColumns: 'minmax(120px,1.4fr) 2fr auto', gap: '.75rem', alignItems: 'center' }}>
           <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.key}</span>
           <Bar pct={(r.count / max) * 100} color={color} />
           <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', whiteSpace: 'nowrap' }}>{r.count.toLocaleString()} · {fmtPct(r.pct)}</span>
@@ -156,15 +156,15 @@ function ActivityCard({ activity }: { activity: ActivityShape | null | undefined
         How many candidates clicked apply on your roles via Seen — aggregate only, never an applicant&apos;s identity.
         {total === 0 ? ' No apply activity yet; this fills in as candidates apply.' : ''}
       </p>
-      <div style={{ display: 'flex', gap: '1.8rem', flexWrap: 'wrap', marginBottom: byRole.length ? '1.2rem' : 0 }}>
+      <div style={{ display: 'flex', gap: '1.75rem', flexWrap: 'wrap', marginBottom: byRole.length ? '1.2rem' : 0 }}>
         <CountTile target={last7} render={n => Math.round(n).toLocaleString()} label="last 7 days" color="var(--blue)" revealDelay={40} />
         <CountTile target={last30} render={n => Math.round(n).toLocaleString()} label="last 30 days" revealDelay={100} />
         <CountTile target={total} render={n => Math.round(n).toLocaleString()} label="all time" revealDelay={160} />
       </div>
       {byRole.length > 0 && (
-        <div style={{ display: 'grid', gap: '.6rem' }}>
+        <div style={{ display: 'grid', gap: '.5rem' }}>
           {byRole.map((r, i) => (
-            <div key={r.role} style={{ display: 'grid', gridTemplateColumns: 'minmax(120px,1.4fr) 2fr auto', gap: '.8rem', alignItems: 'center' }}>
+            <div key={r.role} style={{ display: 'grid', gridTemplateColumns: 'minmax(120px,1.4fr) 2fr auto', gap: '.75rem', alignItems: 'center' }}>
               <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.role}</span>
               <Bar pct={(r.count / maxRole) * 100} color="var(--blue)" grow delay={i * 60} />
               <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', whiteSpace: 'nowrap' }}>{r.count.toLocaleString()}{r.count7 > 0 ? ` · ${r.count7} new` : ''}</span>
@@ -180,7 +180,7 @@ function ActivityCard({ activity }: { activity: ActivityShape | null | undefined
 function StateCard({ title, children, cta }: { title: string; children: React.ReactNode; cta?: React.ReactNode }) {
   return (
     <div style={card}>
-      <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', marginBottom: '.4rem' }}>{title}</div>
+      <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', marginBottom: '.5rem' }}>{title}</div>
       <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.7, maxWidth: 540, margin: cta ? '0 0 1rem' : 0 }}>{children}</p>
       {cta}
     </div>
@@ -233,16 +233,16 @@ export function EmployerAnalyticsView() {
     return (
       <div>
         <div style={card}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', marginBottom: '1.2rem' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', marginBottom: '1.25rem' }}>
             <div style={{ display: 'grid', gap: '.5rem' }}>
               <div className="emp-skel" style={{ width: 110, height: 11 }} />
               <div className="emp-skel" style={{ width: 190, height: 24 }} />
             </div>
             <div className="emp-skel" style={{ width: 78, height: 78, borderRadius: 999 }} />
           </div>
-          <div style={{ display: 'flex', gap: '1.8rem', flexWrap: 'wrap', paddingTop: '1.2rem', borderTop: '1px solid var(--line)' }}>
+          <div style={{ display: 'flex', gap: '1.75rem', flexWrap: 'wrap', paddingTop: '1.25rem', borderTop: '1px solid var(--line)' }}>
             {[0, 1, 2, 3, 4].map(i => (
-              <div key={i} style={{ display: 'grid', gap: '.4rem' }}>
+              <div key={i} style={{ display: 'grid', gap: '.5rem' }}>
                 <div className="emp-skel" style={{ width: 60, height: 26 }} />
                 <div className="emp-skel" style={{ width: 84, height: 9 }} />
               </div>
@@ -250,10 +250,10 @@ export function EmployerAnalyticsView() {
           </div>
         </div>
         <div style={card}>
-          <div className="emp-skel" style={{ width: 230, height: 13, marginBottom: '1.1rem' }} />
-          <div style={{ display: 'grid', gap: '.55rem' }}>
+          <div className="emp-skel" style={{ width: 230, height: 13, marginBottom: '1rem' }} />
+          <div style={{ display: 'grid', gap: '.5rem' }}>
             {[0, 1, 2, 3, 4, 5].map(i => (
-              <div key={i} style={{ display: 'grid', gridTemplateColumns: '52px 1fr auto', gap: '.8rem', alignItems: 'center' }}>
+              <div key={i} style={{ display: 'grid', gridTemplateColumns: '52px 1fr auto', gap: '.75rem', alignItems: 'center' }}>
                 <div className="emp-skel" style={{ width: 40, height: 10 }} />
                 <div className="emp-skel" style={{ height: 8, borderRadius: 999 }} />
                 <div className="emp-skel" style={{ width: 26, height: 10 }} />
@@ -306,7 +306,7 @@ export function EmployerAnalyticsView() {
     return (
       <div>
         {data.benchmark && (
-          <div className="emp-reveal" style={{ marginBottom: '1.4rem' }}>
+          <div className="emp-reveal" style={{ marginBottom: '1.5rem' }}>
             <IndustryBenchmark benchmark={data.benchmark} variant="employer" />
           </div>
         )}
@@ -329,34 +329,34 @@ export function EmployerAnalyticsView() {
       <ActivityCard activity={data.activity} />
       {/* Industry benchmark — how this grade compares to the sector on Seen (always available). */}
       {data.benchmark && (
-        <div className="emp-reveal" style={{ marginBottom: '1.4rem' }}>
+        <div className="emp-reveal" style={{ marginBottom: '1.5rem' }}>
           <IndustryBenchmark benchmark={data.benchmark} variant="employer" />
         </div>
       )}
       {/* Identity + headline reputation (what candidates see) */}
       <div className="emp-reveal" style={{ ...card, animationDelay: '0ms' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.5rem', marginBottom: '1.2rem' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.5rem', marginBottom: '1.25rem' }}>
           <div>
             <div style={kicker}>Reporting on</div>
             <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-h3)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', textTransform: 'capitalize' }}>
               {resolvedCompany}
-              {verified ? <span style={{ ...mono('.55rem', 'var(--green)'), marginLeft: '.6rem', textTransform: 'uppercase', letterSpacing: '.1em' }}>✓ Verified</span> : null}
+              {verified ? <span style={{ ...mono('var(--fs-meta)', 'var(--green)'), marginLeft: '.5rem', textTransform: 'uppercase', letterSpacing: '.1em' }}>✓ Verified</span> : null}
             </div>
-            {industry ? <div style={mono('.6rem', 'var(--dim)')}>{industry}</div> : null}
+            {industry ? <div style={mono('var(--fs-meta)', 'var(--dim)')}>{industry}</div> : null}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: 78, height: 78, borderRadius: 999, border: `4px solid ${gradeColor(h.grade)}`, flexShrink: 0 }}>
             {h.grade ? (
               <>
                 <div style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-h2)', fontWeight: 800, color: gradeColor(h.grade), lineHeight: 1 }}>{h.grade}</div>
-                <div style={mono('.5rem', 'var(--dim)')}>{h.overallScore}/100</div>
+                <div style={mono('var(--fs-meta)', 'var(--dim)')}>{h.overallScore}/100</div>
               </>
             ) : (
-              <div style={{ ...mono('.5rem', 'var(--dim)'), textAlign: 'center', padding: '0 .3rem' }}>grade<br />pending</div>
+              <div style={{ ...mono('var(--fs-meta)', 'var(--dim)'), textAlign: 'center', padding: '0 .25rem' }}>grade<br />pending</div>
             )}
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '1.8rem', flexWrap: 'wrap', paddingTop: '1.2rem', borderTop: '1px solid var(--line)' }}>
+        <div style={{ display: 'flex', gap: '1.75rem', flexWrap: 'wrap', paddingTop: '1.25rem', borderTop: '1px solid var(--line)' }}>
           <CountTile target={h.reportCount} render={n => Math.round(n).toLocaleString()} label="applicant accounts" revealDelay={40} />
           {h.ghostPct == null
             ? <StatTile value="—" label="ghost rate" color="var(--red)" revealDelay={100} />
@@ -370,7 +370,7 @@ export function EmployerAnalyticsView() {
           <CountTile target={analytics.roleCount} render={n => Math.round(n).toLocaleString()} label="roles reported" revealDelay={280} />
         </div>
         {h.ratesWithheld ? (
-          <p style={{ ...mono('.58rem', 'var(--muted)'), marginTop: '1rem', lineHeight: 1.6 }}>
+          <p style={{ ...mono('var(--fs-meta)', 'var(--muted)'), marginTop: '1rem', lineHeight: 1.6 }}>
             Ghost / response rates need at least {h.rateFloor} reports before we’ll show a percentage — below that,
             a rate would be noise. The raw outcomes are broken out below.
           </p>
@@ -387,17 +387,17 @@ export function EmployerAnalyticsView() {
         </p>
         <div style={{ display: 'grid', gap: '.5rem' }}>
           {analytics.monthly.map((m, i) => (
-            <div key={m.month} style={{ display: 'grid', gridTemplateColumns: '52px 1fr auto', gap: '.8rem', alignItems: 'center' }}>
-              <span style={mono('.62rem', 'var(--dim)')}>{monthLabel(m.month)}</span>
+            <div key={m.month} style={{ display: 'grid', gridTemplateColumns: '52px 1fr auto', gap: '.75rem', alignItems: 'center' }}>
+              <span style={mono('var(--fs-meta)', 'var(--dim)')}>{monthLabel(m.month)}</span>
               <Bar pct={(m.count / maxMonth) * 100} color="var(--blue)" grow delay={i * 60} />
-              <span style={mono('.64rem', 'var(--sub)')}>{m.count.toLocaleString()}</span>
+              <span style={mono('var(--fs-meta)', 'var(--sub)')}>{m.count.toLocaleString()}</span>
             </div>
           ))}
         </div>
       </div>
 
       {/* Applicant sources */}
-      <div className="emp-reveal" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: '1.4rem', animationDelay: '140ms' }}>
+      <div className="emp-reveal" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: '1.5rem', animationDelay: '140ms' }}>
         <div style={card}>
           <div style={kicker}>Applicant sources</div>
           <h2 style={h2}>Where applicants applied</h2>
@@ -408,7 +408,7 @@ export function EmployerAnalyticsView() {
           <div style={kicker}>Report provenance</div>
           <h2 style={h2}>How each outcome reached Seen</h2>
           <p style={sub}>Whether the outcome was reported directly or gathered from public applicant discussion.</p>
-          <BreakdownTable rows={analytics.provenance} color="var(--purple)" />
+          <BreakdownTable rows={analytics.provenance} color="var(--accent)" />
         </div>
       </div>
 
@@ -422,7 +422,7 @@ export function EmployerAnalyticsView() {
           ghost / response rates above use the same trust-weighted computation as your public grade, so they can
           differ from this raw count.
         </p>
-        <div style={{ display: 'flex', gap: '1.8rem', flexWrap: 'wrap', marginBottom: '1.3rem' }}>
+        <div style={{ display: 'flex', gap: '1.75rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
           <StatTile value={rs.responded.toLocaleString()} label={`responded · ${fmtPct(rs.respondedPct)}`} color="var(--green)" />
           <StatTile value={rs.ghosted.toLocaleString()} label={`ghosted · ${fmtPct(rs.ghostedPct)}`} color="var(--red)" />
           <StatTile value={rs.rejected.toLocaleString()} label={`rejected · ${fmtPct(rs.rejectedPct)}`} color="var(--amber)" />
@@ -439,25 +439,25 @@ export function EmployerAnalyticsView() {
           Seen doesn’t host individual postings, so role is the finest posting-level cut the data supports —
           the honest stand-in for per-posting performance.
         </p>
-        <div style={{ display: 'grid', gap: '.7rem', overflowX: 'auto' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(120px,2fr) 1fr 1fr 1fr', minWidth: 360, gap: '.6rem', paddingBottom: '.4rem', borderBottom: '1px solid var(--line)' }}>
+        <div style={{ display: 'grid', gap: '.75rem', overflowX: 'auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(120px,2fr) 1fr 1fr 1fr', minWidth: 360, gap: '.5rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--line)' }}>
             {['Role', 'Reports', 'Responded', 'Ghosted'].map((t, i) => (
-              <span key={t} style={{ ...mono('.55rem', 'var(--dim)'), textTransform: 'uppercase', letterSpacing: '.08em', textAlign: i === 0 ? 'left' : 'right' }}>{t}</span>
+              <span key={t} style={{ ...mono('var(--fs-meta)', 'var(--dim)'), textTransform: 'uppercase', letterSpacing: '.08em', textAlign: i === 0 ? 'left' : 'right' }}>{t}</span>
             ))}
           </div>
           {analytics.roles.map(r => (
-            <div key={r.role} style={{ display: 'grid', gridTemplateColumns: 'minmax(120px,2fr) 1fr 1fr 1fr', minWidth: 360, gap: '.6rem', alignItems: 'center' }}>
+            <div key={r.role} style={{ display: 'grid', gridTemplateColumns: 'minmax(120px,2fr) 1fr 1fr 1fr', minWidth: 360, gap: '.5rem', alignItems: 'center' }}>
               <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.role}</span>
-              <span style={{ ...mono('.66rem', 'var(--sub)'), textAlign: 'right', whiteSpace: 'nowrap' }}>{r.count.toLocaleString()}</span>
-              <span style={{ ...mono('.66rem', 'var(--green)'), textAlign: 'right', whiteSpace: 'nowrap' }}>{r.responded} · {fmtPct(r.respondedPct)}</span>
-              <span style={{ ...mono('.66rem', 'var(--red)'), textAlign: 'right', whiteSpace: 'nowrap' }}>{r.ghosted} · {fmtPct(r.ghostedPct)}</span>
+              <span style={{ ...mono('var(--fs-meta)', 'var(--sub)'), textAlign: 'right', whiteSpace: 'nowrap' }}>{r.count.toLocaleString()}</span>
+              <span style={{ ...mono('var(--fs-meta)', 'var(--green)'), textAlign: 'right', whiteSpace: 'nowrap' }}>{r.responded} · {fmtPct(r.respondedPct)}</span>
+              <span style={{ ...mono('var(--fs-meta)', 'var(--red)'), textAlign: 'right', whiteSpace: 'nowrap' }}>{r.ghosted} · {fmtPct(r.ghostedPct)}</span>
             </div>
           ))}
         </div>
       </div>
 
       {/* Methodology / honesty note */}
-      <p style={{ ...mono('.56rem', 'var(--muted)'), lineHeight: 1.7, marginTop: '.4rem' }}>
+      <p style={{ ...mono('var(--fs-meta)', 'var(--muted)'), lineHeight: 1.7, marginTop: '.5rem' }}>
         Methodology: numbers are computed from applicant-reported outcomes on record for this company (the same
         source as your public grade), excluding reports flagged for review. Seen aggregates listings from external
         sources and does not host employer postings or track views/impressions — so this page reports real applicant
@@ -469,6 +469,6 @@ export function EmployerAnalyticsView() {
 }
 
 const ctaStyle: React.CSSProperties = {
-  display: 'inline-block', background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 8,
-  padding: '.55rem 1.1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-meta)', color: '#fff', textDecoration: 'none',
+  display: 'inline-block', background: 'var(--cta)', border: 'none', borderRadius: 8,
+  padding: '.5rem 1rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', color: 'var(--text-1)', textDecoration: 'none',
 }

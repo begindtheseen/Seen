@@ -53,12 +53,16 @@
 .odo{display:inline-flex;align-items:baseline;line-height:1;font-variant-numeric:tabular-nums;white-space:nowrap;vertical-align:baseline}
 .odo-d{display:inline-block;height:1.16em;overflow:hidden;position:relative;vertical-align:bottom;user-select:none}
 .odo-r{display:block;transform:translateY(calc(var(--n,0) * -1.16em));transition:transform .95s var(--ease-spring);transition-delay:calc(var(--c,0) * 55ms)}
-.odo-r>span{display:block;height:1.16em;line-height:1.16em}
+.odo-r::before{content:"0\A 1\A 2\A 3\A 4\A 5\A 6\A 7\A 8\A 9";display:block;white-space:pre;line-height:1.16em}
+.odo-s::before{content:attr(data-t)}
 .odo-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
 /* ── Scroll reveal: shorter travel, expo-out — snaps into place ──────────────── */
-.rv{opacity:0;transform:translateY(12px);transition:opacity .6s var(--ease-out),transform .6s var(--ease-out)}
-.rv.rv-in{opacity:1;transform:none}
+/* DESIGN.md §6: motion only when state changes. Marketing blocks are VISIBLE from first paint (a full-page
+   capture, reader mode, print or a fast scroll on a slow phone used to show blank space); `.rv-in` now only
+   settles a 4px drift — no opacity gate. */
+.rv{opacity:1;transform:translateY(4px);transition:transform .6s var(--ease-out)}
+.rv.rv-in{transform:none}
 
 /* ── Staggered children (dashboard sections, metric tiles, mobile drawer) ───────
    `backwards` fill only — a transform left on a wrapper would become the containing
@@ -127,7 +131,7 @@ html.seen-first .logo-c:nth-child(3) .logo-l{animation-delay:.18s}
 html.seen-first .logo-c:nth-child(4) .logo-l{animation-delay:.23s}
 html.seen-first .logo-pulse{animation:spDot .32s var(--ease-out) .42s both}
 html.seen-first nav::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:1px;pointer-events:none;
-  background:linear-gradient(90deg,rgba(129,140,248,.9),rgba(59,130,246,.6) 40%,transparent 85%);
+  background:linear-gradient(90deg,rgba(96,165,250,.9),transparent 85%);
   transform-origin:left center;animation:growX 1.1s var(--ease-out) .1s both,spFadeOut .6s ease 1.5s forwards}
 @keyframes spFadeOut{to{opacity:0}}
 
@@ -147,4 +151,13 @@ html.seen-first nav::after{content:'';position:absolute;left:0;right:0;bottom:-1
   html.seen-first .logo-l{animation:none;transform:none}
   html.seen-first .logo-pulse{animation:none}
   html.seen-first nav::after{display:none}
+}
+
+/* ── A hidden tab finishes every entrance at once (components/shell/NavMemory.tsx sets .tab-hidden while
+   Seen is in the background). An iPhone freezes a hidden tab's animations at their first frame, so a
+   popup that opened as the employer's site took over came back invisible on a dark backdrop. ── */
+html.tab-hidden *, html.tab-hidden *::before, html.tab-hidden *::after {
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+  transition-duration: 0s !important;
 }

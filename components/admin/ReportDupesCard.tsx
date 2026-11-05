@@ -5,10 +5,11 @@
 // audit-logged with its prior values — reversible) and recomputes the touched companies' grades.
 
 import { useState } from 'react'
+import Icon from '@/components/ui/Icon'
 import { Card, CardHeader } from './primitives'
 import { drainAdminAction, num } from './drain'
 
-const btn: React.CSSProperties = { background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.4rem .9rem', fontFamily: 'var(--mono)', fontSize: '.6rem', cursor: 'pointer', whiteSpace: 'nowrap' }
+const btn: React.CSSProperties = { background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', cursor: 'pointer', whiteSpace: 'nowrap' }
 
 export function ReportDupesCard({ token, onChanged }: { token: string; onChanged?: () => void }) {
   const [busy, setBusy] = useState<'' | 'scan' | 'mark'>('')
@@ -44,17 +45,17 @@ export function ReportDupesCard({ token, onChanged }: { token: string; onChanged
   const rows = Object.entries(found?.byCompany || {}).sort((a, b) => b[1] - a[1])
   return (
     <Card style={{ marginBottom: '1.25rem' }}>
-      <CardHeader title="Duplicate reports" action={<span style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--dim)' }}>Same company, outcome, source, role and text</span>} />
+      <CardHeader title="Duplicate reports" action={<span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)' }}>Same company, outcome, source, role and text</span>} />
       <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginBottom: msg || rows.length ? '.6rem' : 0 }}>
-        <button onClick={scan} disabled={!!busy} style={{ ...btn, borderColor: 'var(--blue)', color: 'var(--blue)' }}>{busy === 'scan' ? '⏳ Scanning…' : '⟳ Scan for duplicate reports'}</button>
-        {!!found?.suspected && <button onClick={mark} disabled={!!busy} style={{ ...btn, borderColor: 'var(--red)', color: 'var(--red)' }}>{busy === 'mark' ? '⏳ Marking…' : `✕ Mark ${found.suspected} duplicate${found.suspected === 1 ? '' : 's'}`}</button>}
+        <button onClick={scan} disabled={!!busy} style={{ ...btn, borderColor: 'var(--blue)', color: 'var(--blue)' }}>{busy === 'scan' ? <><Icon name="hourglass" size={14} /> Scanning…</> : '⟳ Scan for duplicate reports'}</button>
+        {!!found?.suspected && <button onClick={mark} disabled={!!busy} style={{ ...btn, borderColor: 'var(--red)', color: 'var(--red)' }}>{busy === 'mark' ? <><Icon name="hourglass" size={14} /> Marking…</> : `✕ Mark ${found.suspected} duplicate${found.suspected === 1 ? '' : 's'}`}</button>}
       </div>
       {rows.length > 0 && !!found?.suspected && (
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--amber)', lineHeight: 1.6 }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--amber)', lineHeight: 1.6 }}>
           {rows.map(([c, n]) => <div key={c}>{c}: {n} extra cop{n === 1 ? 'y' : 'ies'}</div>)}
         </div>
       )}
-      {msg && <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: msg.startsWith('✗') ? 'var(--red)' : msg.startsWith('✓') ? 'var(--green)' : 'var(--amber)' }}>{msg}</div>}
+      {msg && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: msg.startsWith('✗') ? 'var(--red)' : msg.startsWith('✓') ? 'var(--green)' : 'var(--amber)' }}>{msg}</div>}
     </Card>
   )
 }

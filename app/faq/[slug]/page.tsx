@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { possessive } from '@/lib/companyDisplay'
 import { pageMetadata } from '@/lib/seo'
 import Link from 'next/link'
 import {
@@ -73,7 +74,7 @@ export async function generateMetadata(
     const title = `Does ${name} Ghost Applicants? (${reported ? 'Real Data' : 'Hiring Data'}, ${new Date().getFullYear()})`
     const description = ghostPct != null
       ? (reported
-          ? `${name} ghosts roughly ${ghostPct}% of applicants based on real reported outcomes. See ${name}'s response rate, average wait time, and what Reddit says before you apply.`
+          ? `${name} ghosts roughly ${ghostPct}% of applicants based on real reported outcomes. See ${possessive(name)} response rate, average wait time, and what Reddit says before you apply.`
           : `Seen estimates ${name} ghosts roughly ${ghostPct}% of applicants, from aggregated public hiring data — no applicant accounts yet. See the estimate and add your own experience.`)
       : `Does ${name} ghost applicants? See real reported hiring outcomes, response rates, and wait times — and add your own experience.`
     return {
@@ -85,7 +86,7 @@ export async function generateMetadata(
     }
   }
   const title = `${name} Hiring Process: Stages, Wait Time & Ghost Rate`
-  const description = `How ${name}'s hiring process works — stages, average wait time${ghostPct != null ? `, and a ${ghostPct}% ${reported ? '' : 'estimated '}ghost rate` : ''} — ${reported ? 'from real applicant accounts' : 'estimated from aggregated public hiring data'}. What to expect before you apply.`
+  const description = `How ${possessive(name)} hiring process works — stages, average wait time${ghostPct != null ? `, and a ${ghostPct}% ${reported ? '' : 'estimated '}ghost rate` : ''} — ${reported ? 'from real applicant accounts' : 'estimated from aggregated public hiring data'}. What to expect before you apply.`
   return {
     ...pageMetadata({
       title, description, path: url, ogTitle: title, type: 'article',
@@ -97,18 +98,18 @@ export async function generateMetadata(
 
 const S = {
   wrap: { maxWidth: 760, margin: '0 auto', padding: '3.5rem 1.25rem 5rem', width: '100%', boxSizing: 'border-box' as const },
-  eyebrow: { fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase' as const, letterSpacing: '.2em', color: 'var(--blue)', marginBottom: '.7rem', display: 'flex', alignItems: 'center', gap: 10 },
+  eyebrow: { fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase' as const, letterSpacing: '.2em', color: 'var(--text-3)', marginBottom: '.75rem', display: 'flex', alignItems: 'center', gap: 12 },
   h1: { fontFamily: 'var(--display)', fontSize: 'clamp(1.6rem,5vw,2.3rem)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', lineHeight: 1.1, margin: '0 0 1rem' },
   lead: { color: 'var(--sub)', fontSize: 'var(--fs-body)', lineHeight: 1.7, fontWeight: 300, margin: '0 0 2rem' },
-  h2: { fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', margin: '2.2rem 0 .8rem', letterSpacing: '-.01em' },
+  h2: { fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 700, color: 'var(--white)', margin: '2rem 0 .75rem', letterSpacing: '-.01em' },
   p: { color: 'var(--sub)', fontSize: 'var(--fs-ui)', lineHeight: 1.75, margin: '0 0 1rem', fontWeight: 300 },
 }
 
 function MetricCard({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <div style={{ flex: '1 1 120px', minWidth: 0, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '.9rem 1rem' }}>
+    <div style={{ flex: '1 1 120px', minWidth: 0, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '1rem 1rem' }}>
       <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-xl)', fontWeight: 500, color, lineHeight: 1, letterSpacing: '-.02em' }}>{value}</div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', marginTop: '.45rem' }}>{label}</div>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', marginTop: '.5rem' }}>{label}</div>
     </div>
   )
 }
@@ -121,7 +122,7 @@ function DataPanel({ name, s }: { name: string; s: GrowthScore }) {
   const wait = s.avg_wait_days != null ? Math.round(s.avg_wait_days) : null
   const fp = firstPartyReportCount(s)
   return (
-    <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderLeft: `3px solid ${accent}`, borderRadius: 12, padding: '1.2rem 1.25rem', margin: '0 0 1.8rem' }}>
+    <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderLeft: `3px solid ${accent}`, borderRadius: 12, padding: '1.25rem 1.25rem', margin: '0 0 1.75rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: '1rem' }}>
         <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-h2)', fontWeight: 600, color: accent, lineHeight: 1 }}>{grade(s.overall_score)}</div>
         <div>
@@ -129,12 +130,12 @@ function DataPanel({ name, s }: { name: string; s: GrowthScore }) {
           <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', letterSpacing: '.1em', color: accent }}>{riskLabel(s.risk_level)}</div>
         </div>
       </div>
-      <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
         {ghostPct != null && <MetricCard label="Ghost rate" value={`${ghostPct}%`} color="var(--red)" />}
         {respPct != null && <MetricCard label="Response rate" value={`${respPct}%`} color="var(--green)" />}
         {wait != null && <MetricCard label="Avg wait" value={`${wait}d`} color="var(--amber)" />}
       </div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.9rem' }}>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '1rem' }}>
         {`Based on ${fp.toLocaleString()} applicant account${fp === 1 ? '' : 's'}`} · A community signal, not a verified fact
       </div>
     </div>
@@ -143,14 +144,14 @@ function DataPanel({ name, s }: { name: string; s: GrowthScore }) {
 
 function CTAs({ name, cslug }: { name: string; cslug: string }) {
   return (
-    <div style={{ display: 'flex', gap: '.7rem', flexWrap: 'wrap', margin: '2.4rem 0 0' }}>
-      <Link href={`/company/${cslug}`} className="btn" style={{ background: 'linear-gradient(135deg,var(--g-start),var(--g-mid),var(--g-end))', color: '#fff', padding: '.7rem 1.3rem', fontWeight: 700 }}>
-        See {name}&apos;s full hiring report →
+    <div style={{ display: 'flex', gap: '.75rem', flexWrap: 'wrap', margin: '2.5rem 0 0' }}>
+      <Link href={`/company/${cslug}`} className="btn" style={{ background: 'var(--cta)', color: 'var(--text-1)', padding: '.75rem 1.25rem', fontWeight: 700 }}>
+        See {possessive(name)} full hiring report →
       </Link>
-      <Link href={`/tracker?add=1&company=${encodeURIComponent(name)}`} className="btn btn-ghost" style={{ padding: '.7rem 1.3rem' }}>
+      <Link href={`/tracker?add=1&company=${encodeURIComponent(name)}`} className="btn btn-ghost" style={{ padding: '.75rem 1.25rem' }}>
         Track your application
       </Link>
-      <Link href="/report" className="btn btn-ghost" style={{ padding: '.7rem 1.3rem' }}>
+      <Link href="/report" className="btn btn-ghost" style={{ padding: '.75rem 1.25rem' }}>
         Report your experience
       </Link>
     </div>
@@ -192,7 +193,7 @@ export default async function FaqSlugPage({ params }: { params: Promise<{ slug: 
   if (graded && ghostPct != null && reported) {
     shortAnswer = isGhost
       ? `Based on real reported outcomes, ${name} ghosts roughly ${ghostPct}% of applicants${respPct != null ? `, and responds to about ${respPct}%` : ''}. That puts ${name} at a Seen Grade of ${graded.overall_score}/100 (${riskLabel(graded.risk_level).toLowerCase()}).`
-      : `${name} carries a Seen Grade of ${graded.overall_score}/100${wait != null ? `, with an average wait of about ${wait} days to hear back` : ''}${ghostPct != null ? ` and a ${ghostPct}% ghost rate` : ''}. Here's what applicants report.`
+      : `${name} carries a Seen Grade of ${graded.overall_score}/100${wait != null ? `, with an average wait of about ${wait} days to hear back` : ''} and a ${ghostPct}% ghost rate. Here's what applicants report.`
   } else if (graded) {
     shortAnswer = `${name} has a Seen Grade of ${graded.overall_score}/100. We don't yet have a precise ghost rate — add your experience to sharpen the picture for the next applicant.`
   } else if (fp > 0) {
@@ -204,23 +205,23 @@ export default async function FaqSlugPage({ params }: { params: Promise<{ slug: 
   // FAQ JSON-LD (real Q&A) so this can win a rich result and be cited by AI answer engines.
   const faqQa: { q: string; a: string }[] = [
     {
-      q: isGhost ? `Does ${name} ghost applicants?` : `How long does ${name}'s hiring process take?`,
+      q: isGhost ? `Does ${name} ghost applicants?` : `How long does ${possessive(name)} hiring process take?`,
       a: graded && ghostPct != null
         ? (reported
             ? (isGhost
                 ? `${name} ghosts about ${ghostPct}% of applicants based on reported outcomes${respPct != null ? `, and responds to roughly ${respPct}%` : ''}.`
-                : `${name}'s reported average wait is ${wait != null ? `about ${wait} days` : 'variable'}, with a ${ghostPct}% ghost rate.`)
+                : `${possessive(name)} reported average wait is ${wait != null ? `about ${wait} days` : 'variable'}, with a ${ghostPct}% ghost rate.`)
             : (isGhost
                 ? `Seen has no applicant accounts for ${name} yet. Its estimate from aggregated public hiring data is a ghost rate of about ${ghostPct}%${respPct != null ? ` and a response rate of roughly ${respPct}%` : ''}.`
                 : `Seen has no applicant accounts for ${name} yet. Its estimate from aggregated public hiring data is an average wait of ${wait != null ? `about ${wait} days` : 'unknown length'}, with a ${ghostPct}% ghost rate.`))
         : fp > 0 ? notEnough : `We don't have enough verified reports for ${name} yet. Reported outcomes update this answer in real time.`,
     },
     {
-      q: `What is ${name}'s Seen Grade?`,
+      q: `What is ${possessive(name)} Seen Grade?`,
       a: graded ? `${name} has a Seen Grade of ${graded.overall_score}/100 (${riskLabel(graded.risk_level).toLowerCase()}). Higher is more transparent.` : fp > 0 ? notEnough : `${name} doesn't have a Seen Grade yet — be the first to report.`,
     },
     {
-      q: `Is ${name}'s ghost rate a verified fact?`,
+      q: `Is ${possessive(name)} ghost rate a verified fact?`,
       a: `No. Seen scores are aggregated community signals from applicant accounts, not verified facts. Treat them as a directional signal, not a verdict.`,
     },
   ]
@@ -242,22 +243,22 @@ export default async function FaqSlugPage({ params }: { params: Promise<{ slug: 
         <p style={S.lead}>{shortAnswer}</p>
 
         {graded ? <DataPanel name={name} s={graded} /> : (
-          <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderLeft: '3px solid var(--blue)', borderRadius: 12, padding: '1.2rem 1.25rem', margin: '0 0 1.8rem' }}>
-            <div style={{ fontFamily: 'var(--body)', fontWeight: 600, color: 'var(--white)', marginBottom: '.4rem' }}>{fp > 0 ? `${name} is not graded yet (${Math.min(fp, MIN_REPORTS_FOR_GRADE)} of ${MIN_REPORTS_FOR_GRADE} applicant accounts)` : `No reports yet for ${name}`}</div>
-            <p style={{ ...S.p, margin: 0 }}>{fp > 0 ? `Read the ${fp} applicant account${fp === 1 ? '' : 's'} on ${name}'s page — and add yours so it can be graded fairly.` : `Be the first to report how ${name} treated your application. Your report becomes the data the next applicant searches for tonight.`}</p>
+          <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderLeft: '3px solid var(--blue)', borderRadius: 12, padding: '1.25rem 1.25rem', margin: '0 0 1.75rem' }}>
+            <div style={{ fontFamily: 'var(--body)', fontWeight: 600, color: 'var(--white)', marginBottom: '.5rem' }}>{fp > 0 ? `${name} is not graded yet (${Math.min(fp, MIN_REPORTS_FOR_GRADE)} of ${MIN_REPORTS_FOR_GRADE} applicant accounts)` : `No reports yet for ${name}`}</div>
+            <p style={{ ...S.p, margin: 0 }}>{fp > 0 ? `Read the ${fp} applicant account${fp === 1 ? '' : 's'} on ${possessive(name)} page — and add yours so it can be graded fairly.` : `Be the first to report how ${name} treated your application. Your report becomes the data the next applicant searches for tonight.`}</p>
           </div>
         )}
 
-        <h2 style={S.h2}>{isGhost ? `Why applicants think ${name} ghosts them` : `What ${name}'s hiring process looks like`}</h2>
+        <h2 style={S.h2}>{isGhost ? `Why applicants think ${name} ghosts them` : `What ${possessive(name)} hiring process looks like`}</h2>
         <p style={S.p}>
           {isGhost
-            ? `"Ghosting" means applying and never hearing back — no rejection, no update, nothing. ${s && respPct != null ? `${name}'s ${reported ? 'reported' : 'estimated'} response rate is ${respPct}%, so a meaningful share of applicants never get a reply.` : `Reported response data for ${name} is still thin — every new report makes the signal sharper.`} Common reasons: roles filled internally, listings left open after closing, or high applicant volume that outpaces recruiting capacity.`
-            : `${s?.summary ? s.summary : `Seen does not have a written summary of ${name}'s hiring process yet.`} ${wait != null ? `${reported ? 'Reported' : 'Estimated'} average time to first response is about ${wait} days.` : ''} ${s?.avg_rounds ? (reported ? `Applicants report roughly ${Math.round(s.avg_rounds)} interview round(s).` : `Public hiring data suggests roughly ${Math.round(s.avg_rounds)} interview round(s).`) : ''}`}
+            ? `"Ghosting" means applying and never hearing back — no rejection, no update, nothing. ${s && respPct != null ? `${possessive(name)} ${reported ? 'reported' : 'estimated'} response rate is ${respPct}%, so a meaningful share of applicants never get a reply.` : `Reported response data for ${name} is still thin — every new report makes the signal sharper.`} Common reasons: roles filled internally, listings left open after closing, or high applicant volume that outpaces recruiting capacity.`
+            : `${s?.summary ? s.summary : `Seen does not have a written summary of ${possessive(name)} hiring process yet.`} ${wait != null ? `${reported ? 'Reported' : 'Estimated'} average time to first response is about ${wait} days.` : ''} ${s?.avg_rounds ? (reported ? `Applicants report roughly ${Math.round(s.avg_rounds)} interview round(s).` : `Public hiring data suggests roughly ${Math.round(s.avg_rounds)} interview round(s).`) : ''}`}
         </p>
 
         <h2 style={S.h2}>What you can do before you apply</h2>
         <p style={S.p}>
-          Check {name}&apos;s full hiring report for the latest grade, the city-by-city breakdown, and recent applicant accounts. If you&apos;ve already applied, track it so you know exactly when to follow up — and report what happened so the data stays honest for everyone after you.
+          Check {possessive(name)} full hiring report for the latest grade, the city-by-city breakdown, and recent applicant accounts. If you&apos;ve already applied, track it so you know exactly when to follow up — and report what happened so the data stays honest for everyone after you.
         </p>
 
         <CTAs name={name} cslug={cslug} />

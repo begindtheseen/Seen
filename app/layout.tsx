@@ -11,18 +11,30 @@ import TabBar from '@/components/shell/TabBar'
 import CommandPalette from '@/components/shell/CommandPalette'
 import RouteProgress from '@/components/shell/RouteProgress'
 import NavMemory from '@/components/shell/NavMemory'
-import { Syne, Instrument_Sans, DM_Mono } from 'next/font/google'
+import localFont from 'next/font/local'
 import './globals.css'
 import '@/components/ui/ui.css'
 import './motion.css'
 
-// Exactly the faces the type scale uses (app/globals.css tokens) — self-hosted by next/font, so no
-// render-blocking Google Fonts stylesheet and no faux bold: a weight that is not listed here must not
-// be rendered (the type codemod capped every rule to these). Fallback metrics stay hand-tuned per
-// weight in globals.css (Syne 800 is 176% of Arial's width), hence adjustFontFallback: false.
-const syne = Syne({ subsets: ['latin'], weight: ['700', '800'], display: 'swap', variable: '--font-syne', adjustFontFallback: false })
-const instrument = Instrument_Sans({ subsets: ['latin'], weight: ['400', '500', '600'], display: 'swap', variable: '--font-instrument', adjustFontFallback: false })
-const dmMono = DM_Mono({ subsets: ['latin'], weight: ['400', '500'], display: 'swap', variable: '--font-dm-mono', adjustFontFallback: false })
+// Exactly TWO families (DESIGN.md: max two fonts) — Syne for the one headline, Instrument Sans for everything
+// else, figures included (it has tabular numerals; app/globals.css turns them on). Exactly the faces the type scale uses (app/globals.css tokens), shipped WITH the site from app/fonts
+// (latin subset, one woff2 per weight; SIL Open Font License — app/fonts/OFL.txt). They used to be
+// downloaded from Google at build time (next/font/google), which failed the Vercel build on Next 15.5.28
+// when Google answered with a font link the loader could not read (2026-11-01) — a build must not depend
+// on a third party. No faux bold: a weight that is not listed here must not be rendered. Fallback metrics
+// stay hand-tuned per weight in globals.css (Syne 800 is 176% of Arial's width), hence adjustFontFallback: false.
+const syne = localFont({
+  src: [{ path: './fonts/syne-700.woff2', weight: '700' }, { path: './fonts/syne-800.woff2', weight: '800' }],
+  display: 'swap', variable: '--font-syne', adjustFontFallback: false,
+})
+const instrument = localFont({
+  src: [
+    { path: './fonts/instrument-sans-400.woff2', weight: '400' },
+    { path: './fonts/instrument-sans-500.woff2', weight: '500' },
+    { path: './fonts/instrument-sans-600.woff2', weight: '600' },
+  ],
+  display: 'swap', variable: '--font-instrument', adjustFontFallback: false,
+})
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://seenjobs.io'),
@@ -30,9 +42,10 @@ export const metadata: Metadata = {
     default: 'Seen — Company Ghost Rates & Hiring Transparency',
     template: '%s | Seen',
   },
-  // Sources named here must be ones Seen actually reads: Reddit (public discussion) and reports submitted
-  // to Seen. Glassdoor is an excluded source (owner decision 2026-10-20, lib/reports/excludedSources.js).
-  description: 'Check any company’s ghost rate, response time, and real applicant outcomes before you apply. Hiring transparency aggregated from Reddit and verified job-seeker reports.',
+  // What the grades are actually built from (prod, 2026-11-01, live scored reports): ~79% first-hand
+  // accounts in public review posts, ~20% Reddit, ~0.5% reports submitted to Seen. Say "public applicant
+  // accounts", never a single source the data is not mostly from.
+  description: 'Check any company’s ghost rate, response time, and real applicant outcomes before you apply — compiled from public applicant accounts and reports from Seen users.',
   keywords: ['company ghost rate', 'does company ghost applicants', 'hiring reviews reddit', 'interview process reviews', 'job application tracker', 'company response rate'],
   applicationName: 'Seen',
   // Google Search Console ownership tag. Set GOOGLE_SITE_VERIFICATION in Vercel to the content value
@@ -46,7 +59,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: 'Seen — Company Ghost Rates & Hiring Transparency',
-    description: 'Know before you apply. Real ghost rates and applicant outcomes from Reddit and verified reports.',
+    description: 'Know before you apply. Real ghost rates and applicant outcomes, compiled from public applicant accounts and Seen users’ reports.',
     type: 'website',
     siteName: 'Seen',
     url: 'https://seenjobs.io',
@@ -73,7 +86,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${syne.variable} ${instrument.variable} ${dmMono.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${syne.variable} ${instrument.variable}`} suppressHydrationWarning>
       <head>
         {/* The opening: on the FIRST load of a session the nav wordmark rises letter by letter and the
             nav hairline draws (app/motion.css `html.seen-first`). Marked before first paint so the pure-CSS
@@ -89,10 +102,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <AuthProvider>
           <AnalyticsProvider />
-          {/* Global aurora background orbs — renders on all pages */}
-          <div className="aurora" aria-hidden="true">
-            <div className="aurora-3" />
-          </div>
           {/* The connected shell: route progress hairline, nav, page, footer, phone tab bar, ⌘K palette. */}
           <RouteProgress />
           <NavMemory />

@@ -19,6 +19,7 @@ import ExportPanel from '@/components/resume/ExportPanel'
 import FixPreview from '@/components/resume/FixPreview'
 import UpgradeModal from '@/components/UpgradeModal'
 import PageHeader from '@/components/shell/PageHeader'
+import Icon from '@/components/ui/Icon'
 import { useAuth } from '@/lib/auth'
 import { RESUME_PARSE_COST, creditCostLabel } from '@/lib/creditRules'
 import { aiHeaders } from '@/lib/aiHeaders'
@@ -248,14 +249,15 @@ function StudioInner() {
           tone="indigo"
           sub="Score it, fix every weak bullet without inventing a word, tailor it to a job from your own facts, then export it in a template any ATS can parse."
           actions={doc ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '.45rem', minWidth: 0 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '.5rem', minWidth: 0 }}>
               <div className={s.src}>
                 {active ? <strong>Tailored · {active.label}</strong> : <strong>Base résumé</strong>}
                 {baseMeta && !active && <span>· {baseMeta.fileName}</span>}
                 <span>· {docStats(doc).words} words</span>
-                {!active && <span style={{ color: saveState === 'saved' ? 'var(--green)' : 'var(--muted)' }}>· {saveState === 'saving' ? 'saving…' : saveState === 'saved' ? 'saved' : ''}</span>}
+                {/* the save rule, said where it happens: edits here go to the résumé on file as they are typed (Dev, round 3) */}
+                {!active && <span style={{ color: 'var(--text-3)' }} data-testid="studio-save-status">· Edits save to your résumé on file as you type{saveState === 'saving' ? ' · saving…' : saveState === 'saved' ? ' · saved' : ''}</span>}
               </div>
-              <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                 <button type="button" className={s.btn} onClick={() => fileRef.current?.click()} disabled={busy}>{busy ? 'Reading…' : 'Upload a file'}</button>
                 <button type="button" className={s.btn} onClick={() => { setPasteText(''); setMode('paste') }}>Paste text</button>
                 <Link href="/resume" className={s.btn} style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>Application Intelligence →</Link>
@@ -271,17 +273,17 @@ function StudioInner() {
         {mode === 'empty' && (
           <div className={s.grid} style={{ gridTemplateColumns: '1fr' }}>
             <div className={`${s.drop}${dragging ? ` ${s.dropActive}` : ''}`} onDragOver={(e) => { e.preventDefault(); setDragging(true) }} onDragLeave={() => setDragging(false)} onDrop={(e) => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) uploadFile(f) }}>
-              <div style={{ fontSize: '2rem', marginBottom: '.5rem' }}>📄</div>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '.5rem', color: 'var(--text-3)' }}><Icon name="file-text" size={32} strokeWidth={1.5} /></div>
               <div className={s.cardTitle}>Drop your résumé here</div>
               <div className={s.dim} style={{ marginBottom: '1rem' }}>PDF, Word or text. We read the layout (columns, bold headings, bullets), not just the characters.</div>
               <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
                 {/* Upload/parse is FREE (RESUME_PARSE_COST = 0; api/resume.js `parse` is never credit-gated).
                     The live audit found this button priced "· 1 credit" while Settings and /pricing said free. */}
-                <button type="button" className={s.btnPrimary} onClick={() => fileRef.current?.click()} disabled={busy}>{busy ? 'Reading…' : 'Upload a file'}<span style={{ marginLeft: '.45rem', fontSize: 'var(--fs-55)', opacity: .7, fontFamily: 'var(--mono)', fontWeight: 400 }}>· {creditCostLabel(RESUME_PARSE_COST)}</span></button>
+                <button type="button" className={s.btnPrimary} onClick={() => fileRef.current?.click()} disabled={busy}>{busy ? 'Reading…' : 'Upload a file'}<span style={{ marginLeft: '.5rem', fontSize: 'var(--fs-55)', opacity: .7, fontFamily: 'var(--mono)', fontWeight: 400 }}>· {creditCostLabel(RESUME_PARSE_COST)}</span></button>
                 <button type="button" className={s.btn} onClick={() => setMode('paste')}>Paste text · free</button>
                 <button type="button" className={s.btn} onClick={startBlank}>Start from blank</button>
               </div>
-              {!isLoggedIn && <div className={s.muted} style={{ marginTop: '.8rem' }}>Signed out: pasting and editing work on this device only. Sign in to keep your résumé on your account.</div>}
+              {!isLoggedIn && <div className={s.muted} style={{ marginTop: '.75rem' }}>Signed out: pasting and editing work on this device only. Sign in to keep your résumé on your account.</div>}
             </div>
           </div>
         )}
@@ -289,9 +291,9 @@ function StudioInner() {
         {mode === 'paste' && (
           <div className={s.card}>
             <div className={s.cardTitle}>Paste your résumé</div>
-            <div className={s.dim} style={{ marginBottom: '.6rem' }}>Keep the line breaks — section headings on their own lines, one bullet per line.</div>
+            <div className={s.dim} style={{ marginBottom: '.5rem' }}>Keep the line breaks — section headings on their own lines, one bullet per line.</div>
             <textarea autoComplete="off" className={s.pasteArea} value={pasteText} onChange={(e) => setPasteText(e.target.value)} placeholder={'JORDAN REYES\nPhoenix, AZ · 602-555-0142 · jordan@example.com\n\nEXPERIENCE\nJourneyman Electrician — Desert Power Solutions | Mar 2020 – Present\n• Install and troubleshoot 480V three-phase systems across 14 sites.\n…'} />
-            <div className={s.findingActions} style={{ marginTop: '.6rem' }}>
+            <div className={s.findingActions} style={{ marginTop: '.5rem' }}>
               <button type="button" className={s.btnPrimary} onClick={usePasted}>Structure it →</button>
               <button type="button" className={s.btn} onClick={() => setMode(baseDoc ? 'editor' : 'empty')}>Cancel</button>
             </div>
@@ -301,11 +303,11 @@ function StudioInner() {
         {mode === 'editor' && doc && (
           <>
             {variants.length > 0 && (
-              <div className={s.variants} style={{ marginBottom: '.9rem' }}>
+              <div className={s.variants} style={{ marginBottom: '1rem' }}>
                 <span className={s.label} style={{ margin: 0 }}>Versions</span>
                 <button type="button" className={`${s.vbtn}${!activeId ? ` ${s.vbtnActive}` : ''}`} onClick={() => switchTo(null)}>Base</button>
                 {variants.map((v) => (
-                  <span key={v.id} style={{ display: 'inline-flex', alignItems: 'center', gap: '.15rem' }}>
+                  <span key={v.id} style={{ display: 'inline-flex', alignItems: 'center', gap: '.125rem' }}>
                     <button type="button" className={`${s.vbtn}${activeId === v.id ? ` ${s.vbtnActive}` : ''}`} onClick={() => switchTo(v.id)} title={v.label}>{v.label}{v.scoreAfter != null ? ` · ${v.scoreAfter}` : ''}</button>
                     <button type="button" className={s.tiny} onClick={() => removeVariant(v.id)} aria-label={`Remove ${v.label}`}>✕</button>
                   </span>
@@ -313,17 +315,17 @@ function StudioInner() {
               </div>
             )}
             <div className={`${s.seg} ${s.mobileOnly}`}>
-              {(['edit', 'health', 'tailor', 'export'] as Tab[]).map((t) => <button key={t} type="button" className={`${s.segBtn}${tab === t ? ` ${s.segBtnActive}` : ''}`} onClick={() => setTab(t)}>{t === 'edit' ? '📝 Document' : t === 'health' ? `💚 Health${health ? ` ${health.score}` : ''}` : t === 'tailor' ? '🎯 Tailor' : '📤 Export'}</button>)}
+              {(['edit', 'health', 'tailor', 'export'] as Tab[]).map((t) => <button key={t} type="button" className={`${s.segBtn}${tab === t ? ` ${s.segBtnActive}` : ''}`} onClick={() => setTab(t)}>{t === 'edit' ? 'Document' : t === 'health' ? `Health${health ? ` ${health.score}` : ''}` : t === 'tailor' ? 'Tailor' : 'Export'}</button>)}
             </div>
             <div className={s.grid}>
               {showEditor && <div><DocEditor doc={doc} onChange={onChange} highlightId={highlight} /></div>}
               {showPanel && (
                 <div className={s.panel}>
                   <div className={`${s.seg} ${s.hideMobile}`}>
-                    {(['health', 'tailor', 'export'] as Tab[]).map((t) => <button key={t} type="button" className={`${s.segBtn}${panelTab === t ? ` ${s.segBtnActive}` : ''}`} onClick={() => setTab(t)}>{t === 'health' ? `💚 Health${health ? ` · ${health.score}` : ''}` : t === 'tailor' ? '🎯 Tailor' : '📤 Export'}</button>)}
+                    {(['health', 'tailor', 'export'] as Tab[]).map((t) => <button key={t} type="button" className={`${s.segBtn}${panelTab === t ? ` ${s.segBtnActive}` : ''}`} onClick={() => setTab(t)}>{t === 'health' ? `Health${health ? ` · ${health.score}` : ''}` : t === 'tailor' ? 'Tailor' : 'Export'}</button>)}
                   </div>
                   {panelTab === 'health' && undo && (
-                    <div className={s.okBox} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap' }}>
+                    <div className={s.okBox} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
                       <span>Rewrote {undo.n} bullet{undo.n === 1 ? '' : 's'}. Not what you wanted?</span>
                       <button type="button" className={s.btn} data-testid="fix-undo" onClick={undoFixes}>Undo</button>
                     </div>

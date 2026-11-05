@@ -43,7 +43,7 @@ function readFileAsBase64(file: File): Promise<string> {
 
 export async function parseResumeFile(
   file: File,
-  opts: { location?: string } = {},
+  opts: { location?: string; signal?: boolean } = {},
 ): Promise<ParseResumeResult> {
   const base64 = await readFileAsBase64(file)
   const res = await fetch('/api/resume', {
@@ -56,6 +56,8 @@ export async function parseResumeFile(
       mimeType: file.type,
       // Feeds the server's non-blocking résumé→jobs warm; omitted when unknown.
       ...(opts.location && opts.location.trim() ? { location: opts.location.trim() } : {}),
+      // false: an extra (non-default) saved résumé — the server leaves the job-rail signal alone.
+      ...(opts.signal === false ? { signal: false } : {}),
     }),
   })
   const data = (await res.json().catch(() => ({}))) as {

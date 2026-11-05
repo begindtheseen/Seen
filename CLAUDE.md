@@ -29,6 +29,133 @@ stand instead of re-reading everything — that is the token save.**
    history and authoritative credential attribution. If you skip this, the next session pays the
    context cost you just saved.
 
+## OWNER RULE: SQL is always a copy-paste block (2026-11-01)
+When the owner needs to run SQL (migrations, fixes, queries), NEVER send a .sql file or point at a file
+path. Put the SQL in the chat as a plain fenced code block he can copy straight into the Supabase SQL
+Editor — comments stripped, one block per migration, and say which to run first.
+
+## DESIGN SYSTEM — locked 2026-11-02 (owner: "ditch the purple gradient… without sacrificing how good it looks")
+**Read `DESIGN.md` before touching any CSS, page or component.** It is the whole system; the short form:
+- **Personality: Candid. Calm. Exact.** Reference: an air-traffic control room at night — dark, every reading real, one
+  thing lit at a time. Not another SaaS template.
+- **Colour 60/30/10, every value a token in `app/globals.css`:** 60 dark field (`--bg`, `--surface-*`), 30 neutral ink
+  (`--text-1..4`, `--border-1..3`), 10 signal = ONE flat blue on actions and the current place (`--cta`/`--cta-hover`
+  for THE primary button, `--accent` text/icons, `--accent-strong` fills) + semantic good/caution/bad/info WITH a word
+  and an icon. Eyebrows/labels/meta are ink (`--text-3`), never the accent. No raw hex/rgb in `*.module.css` or `.tsx`
+  (only globals.css, OG/canvas renderers and SVGs may hold literals).
+- **Retired for good:** indigo/violet/purple/fuchsia, any gradient mixing two colours, glow shadows, gradient text,
+  glass over content, backdrop-filter on full-screen overlays, aurora orbs, a gradient primary button.
+- **Type: exactly TWO fonts** — Syne 700/800 (`--display`, H1–H3 only) and Instrument Sans 400/500/600 (`--body`;
+  `--mono` now aliases it; DM Mono is gone). Tabular figures are on page-wide. The `--fs-*` scale only; 12px floor.
+  **One `<h1>` per screen.**
+- **Spacing: 8px grid** for layout (`--sp-2/4/6/8/12/16/24`), 4px steps only inside a component, 1–2px for hairlines;
+  the whole codebase was snapped to it (1,140 values). Radii `--r-*`, shadows `--sh-*` (four), widths `--w-*`.
+- **Layout: one scroll per page, one filled button per screen**, less density; phone first at 390.
+- **Guardrails:** `lib/ui/designRules.test.mjs` (purple, retired tokens, multi-hue gradients, gradient text, font
+  count, grid, raw hex) fails the suite; `node scripts/design-audit.mjs` (h1 count, font families, filled CTAs per
+  viewport, 60/30/10 pixel share) runs against `next start`; `scripts/overlap-sweep.mjs` for phone overlap.
+- **Skill:** `.claude/skills/ui-ux-pro-max/` (UX rules, patterns, charts, WCAG — Python search over local CSVs) is for
+  decisions INSIDE this system; never use its `--design-system` output to pick a palette or font.
+
+## Session 2026-11-02: design system locked + persona acceptance rounds (PR #389, branch claude/alerts-radius-security)
+- **Owner asks, in order:** ditch the purple gradient ("vibecode slop") → do it with the ui-ux-pro-max skill and the five
+  anti-slop rules without losing the look → "run the whole layout through the skill… test with agents until they approve
+  and perceive a legitimate company; every feature must be tested." The design system is `DESIGN.md` (section above).
+- **Acceptance rounds** (reusable pattern): four personas — Maria (retail lead, phone 390), Dev (backend engineer,
+  desktop 1280), Tasha (newcomer, fresh signup, phone), Jules (senior designer, both widths) — each with a brief in the
+  session scratchpad `roundN/BRIEF.md`, a real account (`<name>.r1@seenjobs.io`, password in `round1/.password`, never in
+  chat/files), real résumés in `lib/fixtures/personas/`, Playwright against the PR's Vercel PREVIEW via
+  `get_access_to_vercel_url` share link (visit it once per context), outcomes only on "Northwind Test Labs", no payments.
+  Score table (legitimate company? trust? taste? come back? APPROVE?) + feature table + ranked top 10 + bugs. **ONE
+  browser context per persona, signed in once** — several contexts sharing one Supabase refresh token rotate each other
+  out and read as "session expired".
+- **Round 1 (dpl_3toMfD9m): 4× NO, legitimacy 6/10 each.** What cost trust (all fixed in 10858e0…41610a7): counts that
+  disagreed page to page (home / data / ghost-report totals; Amazon 26/49/43), any string rendering a full company page,
+  emoji icons, blue eyebrows on ~16 pages, 7 filled buttons on /employers, a 9-target jobs card, lime swipe deck,
+  three-brand auth emails, Remote search with non-remote/non-US rows, Adzuna estimate shown as pay, Tailor charging for
+  70→70, "Aaa"/"Group On" casing, a share-card popup after a rejection, day-one upsell crowding, guest saves vanishing at
+  sign-in. Fixers ran in parallel on disjoint file sets; every rule they enforced became a test
+  (`lib/ui/designRules.test.mjs`, 13 tests) or an audit check (`npm run design:audit`, 24 pages × 2 widths).
+- **Durable product rules added:** every count on a page says what it counts; unknown companies get an empty state with no
+  CTAs and are not remembered; the homepage total is the open dataset's (same as /data); a Tailor that cannot raise the
+  score is free and says so (`no_gain`); guest device data is offered (Keep/Discard), never auto-imported; nothing opens
+  itself after an outcome; Interview Prep is collapsed to one line until tapped; `honestSalary()` hides pre-2026-10-20
+  Adzuna rows' pay and sub-wage lines; Remote = location/type or a plain statement near the top of the text;
+  `adaptive_pricing[enabled]=false` on every Checkout session; the fixed nav is solid when scrolled.
+- **Rounds 2–3 (2026-11-03, previews 41610a7 → 708afbd):** R2 Jules 8 "yes after 3 fixes", Dev 7, Tasha "no — close",
+  Maria 7, all NO; R3 Dev 7/7/8/6, Tasha 7/8/7/6, Maria 7/6/7/5, Jules 8/7/8/6, all NO — the deciding items were the SAME
+  across testers: three graded counts (345 / 401 / 384), the drawer's one filled button clipping to "Ap…", the swipe
+  deck under the phone tab bar, Settings dirty on load, and Optimize printing word stems ("knowledg / navigat").
+- **Round-3 root causes (fixed in 216b15d, 5e2b4c7, f1c2e0b):** the leaderboard's graded total selected no mention
+  column AND read one capped PostgREST page (1,000 rows whatever `limit` says) — every "count everything" read must
+  keyset-page (`order=id.asc&id=gt.`) and use the one gate from `lib/server/openDataRead.ts`; Apply and Optimize shared
+  one flex class (`.grow`) so the filled button had no priority — the filled button is `.main { flex:1 1 auto;
+  min-width:max-content }`; the swipe deck's CSS height assumed a fixed deck top — it now measures itself (`deckH`);
+  the résumé city was typed INTO the Settings field (dirty form) — a suggestion is a button under the field, never a
+  value; `domainOfYearsSentence` returned stems that constraints.js printed — matching uses stems, copy uses
+  `domainWordsOfYearsSentence`; the jobs pool read was unordered + capped, so widening the radius changed WHICH rows
+  filled the cap (10 mi had Tempe Walmart, 25 did not) — every pool read is ordered and the title read is separate
+  from the `search_query` stamp read (`api/jobs.pool.test.mjs`); DashMart "$2/hr" was the CLIENT parsing "$2/hour
+  premium" from the description (`isAddOn` in lib/jobs/pay.js; MIN_HOURLY is the one floor); a second report by the
+  same user on the same company within 30 days is HELD (`duplicate_user_company`) — quick_submit now answers `held`
+  and the toast says it will not change the grade (three personas "saved" Northwind reports that never appeared);
+  Pro-days `too_new` judges `applications.created_at` (added to the tracker), never the applied date — the copy says so.
+- **Durable rules added in round 3:** one `possessive()` (lib/companyNames.js) — never "Fry's's"; a legal suffix glued
+  to one slug word is the name (Labcorp, not "Lab"); the homepage LIVE strip shows graded companies only (feed rows carry
+  `graded`); micro-survey never over an editor (/resume/studio, /profile); the prep panel is collapsed on EVERY load;
+  "Not yet" promises nothing ("nothing recorded"); an unknown company page offers `name_suggest` prefix matches
+  ("Did you mean Fry's Food Stores?"); Odometer prints thousands separators; /data caps at 60 rows + Show all; the
+  tracker's current stage is a tint (one --cta fill per screen); Verdict/Optimize panels carry no green tint.
+- **Round 4 (f1c2e0b, dpl_CTWkRdSkRoDcWibwMH4GdoNvXyF1): ALL FOUR APPROVED.** Tasha 8/8/8/7 YES (both clipped controls
+  fixed); Jules 9/8/8/6 YES (every count agrees, system holds on 62 captures); Maria 8/7/8/6 YES (paid Optimize reads as
+  words and says what the credit bought); Dev 8/7/8/6 yes-conditional (counts agree everywhere; condition = the blank-title
+  Tailor summary stating "most recently at H-E-B Digital", a 2018–2020 role). Regressions my fixes introduced, fixed in
+  4c299a2: the Optimize button clipped once Apply kept max-content (`.grow` basis 0 → `1 1 auto`); the swipe deck's
+  self-fit floor was 150px and the excerpt ran over the footer (floor 212/260); Settings "Save changes" sent nothing when
+  the name was blank (the email-prefix name is shown as none, and saveProfile refused a blank name — the name is now
+  optional in the save); the Optimize sheet opened on a cached pre-fix result (CACHE_VERSION = ENGINE_VERSION — bump
+  `lib/optimizer/types.js` whenever requirement wording changes); the flat-text splitter glued "Key Responsibilities CRM
+  Platform & Database Management Keep…" (heading / Title-Case sub-heading / imperative duty line are three blocks). Round
+  5 (4c299a2) is a confirmation round.
+- **Rules from round 4:** a company page with listings but no accounts shows "Did you mean …" (`name_suggest`) and NO
+  Track / prep CTAs (`nothingFound`); the Tailor summary's "most recently at" is the latest-ending role, never the
+  best-ranked; a blank Tailor title is inferred from the posting (`inferJobTitle`) before the family is decided; the
+  tracker shows both the held-report line and the Pro-days line; /report shows a `?company=` slug as a name.
+- **Round 5 (4c299a2, confirmation): Jules YES (9/8/8/7); Tasha NO on one item; Dev and Maria YES on one condition.**
+  Both were regressions from my round-4 fixes, found by the testers, not the audits: (1) the swipe deck's phone floor
+  equalled its cap, so the self-fit was a no-op and ✕ ↑ ♡ sat under the tab bar whenever the sort select pushed the deck
+  down — the deck now scrolls the page once on mount when the room above it is short (`window.scrollBy`), probe at 390:
+  actions end 728 < tab bar 777; (2) the drawer's Optimize tap called `onClose()` AND the page's `onApply` closed the
+  `?job=` place again — two `history.back()` in one tap, the page left /jobs with no sheet; now ONE close and the sheet
+  opens via `afterPendingBack` (lib/nav/urlState.ts). Rule: a handler that closes a URL place must be the only close in
+  the tap, and anything pushed after it waits for `afterPendingBack`. Fixed in 2521834; round 6 = two-item re-check.
+- **Also round 5:** prep "Why site reliability engineering now?" (several qualifiers before the role noun); a company page
+  with no score row shows Track / prep only once it has accounts (the CTA flashed during the reports read and fired
+  `offer_shown` on empty pages); flat posting text also splits a Title-Case sub-heading sitting mid-block after a
+  sentence (`MID_SUBHEAD_RE`); completed tracker stage steps carry a ✓ (semantic colour always with a glyph).
+- **Round 6 (2521834, two-item re-check): ALL FOUR APPROVE, no conditions.** Tasha 8/8/8/7 yes (deck scrolls to 95 on
+  mount, buttons 676–728 above the 777 tab bar, a real tap advances the card; drawer Optimize: URL stays, sheet opens);
+  Dev 8/8/8/7 yes unconditional (drawer Optimize 129 ms, one Back returns to the list, from a fresh `&job=` load too);
+  Maria 8/9/9/6 yes (same, plus the credit prompt "Use 1 credit / Not now" spends nothing on Not now). Jules approved in
+  round 5. Follow-ups from their nits in 43aa697: an unseeded company page shows Track / prep only after the live read
+  (the CTA was in the server HTML under a skeleton hero for ~350 ms); the cached Optimize note names "the earlier credit".
+  Still open, reported not fixed: "team lead" Phoenix ranks Oscar Health / Jencap above Walmart for a retail résumé whose
+  `profiles.industry` is unset (the fit boost reads resume_skills / profiles.industry); the Optimize summary "9+ years"
+  beside the fit line's "10.7 years"; health rises after a rejection (a rejection counts as a reply); /feed rows that read
+  scraped and the owner-side companies (Backend, Lab, AAA, Northwind test rows).
+- **Harness (round 3):** the container restarted mid-pass — resume stopped agents with SendMessage to their ids (the
+  working tree persists; fixers that had not written yet lost nothing). A checkpoint commit may exclude a fixer's
+  in-progress files; never commit a tree with that fixer's own pins red. CodeQL alert annotations are readable via the
+  PR's review threads (`pull_request_read get_review_comments`), not the check-run text.
+- **Round-1 items still owner-side:** Supabase auth email templates (`supabase/email-templates/` + README; the Management
+  API token in the cloud env answers 401); confirm-email landing on prod; Stripe currency verified only by code.
+- **CodeQL:** the design commit touched 100+ files, so scanning surfaced 51 old alerts. Every data-driven link now goes
+  through `httpHref`/`pathSegment`; the EmployerGradeChip sink was the TITLE text (found only by running CodeQL locally:
+  bundle in the scratchpad + a `{"type":"commonjs"}` package.json beside it when the scratchpad has an ESM package.json).
+- **Harness:** `git add -A` swept the testers' scripts into a commit → `scripts/_*` is git-ignored; `pgrep -f "next start"`
+  matches your own shell (exit 144) — use `pgrep -f "^next-server"`; killing the npx wrapper leaves next-server alive on
+  the port and a stale server serves HTML whose CSS hashes 400 (check every CSS bundle is 200 before trusting a run).
+
 ## North Star
 Read SEEN_STRATEGY.md at the start of every session. That document is the product strategy.
 Every code change must serve the strategy. When in doubt, re-read it.
@@ -49,6 +176,48 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 "restore" them back to `origin/main` parity. `origin/main` remains useful history but is no
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
+
+## Session 2026-11-01 B: job alerts, free radius data, upload + security hardening (PR #389, stacked on #388)
+- **Radius:** `lib/geo/usPlaces.js` (+ `lib/geo/data/us-places.json`, `us-zips.json`; public-domain Census 2024
+  Gazetteer + USGS GNIS, rebuilt by `scripts/geo/build-us-places.mjs`) places location TEXT locally; api/jobs.js
+  measures every row (own coords, else its text) and reads nearby towns from the DB; `upsertJobs` fills missing
+  lat/lng. Old rows: `scripts/geo/backfill-job-coords.mjs --write` (not run). vercel.json `includeFiles` carries
+  `lib/geo/data/**` for every function that reaches it. Not yet using it: resumeJobMatch `jobNearCity`,
+  resumeMatches `geoScopeClause`, demand.js.
+- **Job alerts:** Settings → résumé matches / only my alerts (≤5: keywords + place + 10/25/50/100 mi) / off.
+  `lib/server/jobAlerts.js`, user-sync `job_alerts_get|save`, cron-job-matches alert mode. Migration
+  `20261101120000_job_alerts.sql` NOT applied (section hidden until it is).
+- **Uploads:** `lib/server/archiveGuard.js` (DOCX: 10 MB unpacked, 1,000 entries, 100:1, 5 s, CRC, no nested zips);
+  PDF pre-scan + pdf.js in a worker killed at 5 s (`lib/resume/extract/pdfWorker.js`). Python deliverable in
+  `security/zip_guard/`.
+- **Security (audit, partly cut off by a safeguard; finished as a fix-only pass):** employer claims never auto-approve
+  (verified auth email shown to the admin); submit_answer only takes questions the account was asked;
+  `save_profile` no longer takes email/type; migration `20261101130000_profiles_server_write_only.sql` (profiles
+  writes service-only — NOT applied); `lib/server/pgrest.js` for every user value in a PostgREST filter
+  (`orLiteral` inside or=()); `lib/server/safeFetch.js` for user-supplied URLs (connect-time IP check, redirects
+  re-checked, size/time caps); `lib/server/escapeHtml.js` for email HTML; legacy apply mails only the verified
+  account email, per-user limit; next 15.5.28.
+- **Résumé export:** qualified experience headings ("Relevant … Experience") + two experience sections kept
+  (`role.group`, `experienceGroups`); optimizer notes never printed in a résumé (no `appendix`); built-in font text
+  always sanitized.
+- **Data fact (owner decision pending):** live scored reports = ~79% `web_search_public_review` paraphrases of
+  public review pages (≈3,200 Glassdoor, 466 Blind, 90 Indeed — Glassdoor/Indeed are EXCLUDED sources since
+  2026-10-20 but these older rows still count), ~20% Reddit, ~0.5% Seen users. Meta description now says "public
+  applicant accounts and reports from Seen users".
+- Verified: suite 2470/2470, tsc, next build, nav smoke 28/28, overlap sweep clean, job-page buttons 320–390px.
+- **Fonts ship with the site** (`app/fonts/*.woff2` via `next/font/local`, OFL): on Vercel, Next 15.5.28's
+  `next/font/google` loader threw on a Google font link with no file extension and failed the build twice. Never
+  go back to build-time Google font downloads.
+- **Black screen after Apply (iPhone):** Apply opens the employer's site AND the "Did you apply?" popup; its full-screen
+  backdrop-filter + an entrance animation started while hidden left a dark overlay with nothing on it. Rules: NO
+  backdrop-filter on any full-screen overlay (solid dim); `html.tab-hidden` (NavMemory) finishes animations while hidden.
+- **Saved résumés (owner 2026-11-01):** `public.resumes` (migration `20261101140000_resumes.sql`, NOT applied; server-only,
+  backfills one default per profile). Free 1 / Pro 5 (`MAX_RESUMES_FREE/PRO`); Pro = any active `ai_credits.pro_until`
+  (Interview Prep 14 d, Pass 30 d — there is no monthly Pro any more). Lapsed Pro: nothing deleted, only the default usable.
+  The default is MIRRORED into `profiles.resume_text` so every old reader is unchanged. `lib/server/resumes.js`
+  (`handleResumeAction`, `resumeForApply`), user-sync `resumes_list|resume_get|resume_create|resume_rename|resume_delete|
+  resume_set_default`; UI `components/resume/{ResumeLibraryPanel,ResumePicker,ResumeView}.tsx`; picker in the Optimize sheet,
+  /resume and Apply-on-Seen (`resume_id`, checked server-side).
 
 ## Session 2026-11-01: "be more like Indeed" — navigation that remembers where you came from (branch claude/like-indeed-nav)
 - **Owner bug:** the Day 7/14/30 check-in email ("Did X get back to you?") opened `/report?company=…`, not the

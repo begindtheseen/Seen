@@ -12,6 +12,11 @@
 // Motion: the window rises in on scroll; tabs auto-advance every CYCLE_MS while the window is in
 // view and the visitor hasn't touched it (a hairline under the active tab fills to show the
 // timer); numbers roll with the shared Odometer. prefers-reduced-motion: no auto-advance.
+//
+// First paint: the Dashboard tab is rendered on the server and VISIBLE. The window used to start at
+// opacity 0 until an IntersectionObserver saw it, so a full-page capture at 300 ms (and any tall
+// viewport before hydration) showed a blank 500px band where the workspace goes (round 3, 2026-11-03).
+// The rise-in is now a transform only (no opacity), applied after mount to a window still below the fold.
 
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { gradeLetter } from '@/lib/companyDisplay'
@@ -51,6 +56,7 @@ export default function WorkspacePreview({ proof, live = false }: { proof: Proof
   const [tab, setTab] = useState<Tab>('dashboard')
   const [inView, setInView] = useState(false)
   const [seen, setSeen] = useState(false) // has ever been in view — gates the first number roll
+  const [below, setBelow] = useState(false) // mounted and still below the fold → the rise-in waits for it
   const [touched, setTouched] = useState(false)
   const [hover, setHover] = useState(false)
   const [reduced, setReduced] = useState(false)
@@ -60,9 +66,12 @@ export default function WorkspacePreview({ proof, live = false }: { proof: Proof
     setReduced(!!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)
     const el = ref.current
     if (!el || !('IntersectionObserver' in window)) { setInView(true); setSeen(true); return }
+    // Below the fold at mount → hide it for the rise-in; in (or above) view → stay as painted.
+    const r = el.getBoundingClientRect()
+    if (r.top >= window.innerHeight) setBelow(true)
     const io = new IntersectionObserver(([e]) => {
       setInView(e.isIntersecting)
-      if (e.isIntersecting) setSeen(true)
+      if (e.isIntersecting) { setSeen(true); setBelow(false) }
     }, { threshold: 0.3 })
     io.observe(el)
     return () => io.disconnect()
@@ -83,7 +92,7 @@ export default function WorkspacePreview({ proof, live = false }: { proof: Proof
 
   return (
     <section className={styles.section} aria-label="What your Seen workspace looks like">
-      <div className={`${styles.window}${seen ? ' ' + styles.windowIn : ''}`} ref={ref}
+      <div className={`${styles.window}${below ? ' ' + styles.windowPre : ''}`} ref={ref}
         onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
         <div className={styles.chrome} aria-hidden="true">
           <i /><i /><i />

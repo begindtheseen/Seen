@@ -132,11 +132,11 @@ export function EmployerLiveNotifications() {
 
   return (
     <div style={{ ...wrap, maxWidth: 820, padding: 0, marginBottom: '2rem' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-        <span style={{ ...mono('.55rem', 'var(--blue)'), textTransform: 'uppercase', letterSpacing: '.14em' }}>Your live feed</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+        <span style={{ ...mono('var(--fs-meta)', 'var(--blue)'), textTransform: 'uppercase', letterSpacing: '.14em' }}>Your live feed</span>
         {company && <span style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-ui)', fontWeight: 700, color: 'var(--white)', textTransform: 'capitalize' }}>{company}</span>}
         {unread > 0 && (
-          <span style={{ ...mono('.55rem', 'var(--green)'), border: '1px solid rgba(16,185,129,.35)', borderRadius: 999, padding: '.22rem .6rem' }}>{unread} unread</span>
+          <span style={{ ...mono('var(--fs-meta)', 'var(--green)'), border: '1px solid rgba(16,185,129,.35)', borderRadius: 999, padding: '.25rem .5rem' }}>{unread} unread</span>
         )}
         {/* At-a-glance summary chips (computed server-side; previously returned but never rendered) */}
         {summary && ([
@@ -144,18 +144,18 @@ export function EmployerLiveNotifications() {
           { n: summary.postingsExpired, label: 'expired', color: 'var(--red)', border: 'rgba(239,68,68,.35)' },
           { n: summary.postingsNearingStale, label: 'expiring soon', color: 'var(--amber)', border: 'rgba(245,158,11,.35)' },
         ] as const).filter(c => (c.n ?? 0) > 0).map(c => (
-          <span key={c.label} style={{ ...mono('.55rem', c.color), border: `1px solid ${c.border}`, borderRadius: 999, padding: '.22rem .6rem' }}>
+          <span key={c.label} style={{ ...mono('var(--fs-meta)', c.color), border: `1px solid ${c.border}`, borderRadius: 999, padding: '.25rem .5rem' }}>
             {c.n} {c.label}
           </span>
         ))}
         {hasUnreadStored && (
-          <button onClick={markAllRead} disabled={marking} style={{ marginLeft: 'auto', background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.4rem .8rem', ...mono('.6rem', 'var(--sub)'), cursor: marking ? 'default' : 'pointer', opacity: marking ? .6 : 1 }}>
+          <button onClick={markAllRead} disabled={marking} style={{ marginLeft: 'auto', background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem .75rem', ...mono('var(--fs-meta)', 'var(--sub)'), cursor: marking ? 'default' : 'pointer', opacity: marking ? .6 : 1 }}>
             {marking ? 'Marking…' : 'Mark all read'}
           </button>
         )}
       </div>
 
-      <div style={{ display: 'grid', gap: '.6rem' }}>
+      <div style={{ display: 'grid', gap: '.5rem' }}>
         {items.map(it => {
           const color = SEV_COLOR[it.severity] || 'var(--blue)'
           const isUnread = it.stored && !it.read
@@ -164,30 +164,30 @@ export function EmployerLiveNotifications() {
               key={it.id}
               style={{
                 display: 'flex',
-                gap: '.85rem',
+                gap: '.75rem',
                 alignItems: 'flex-start',
                 background: isUnread ? 'rgba(59,130,246,.06)' : 'var(--card)',
                 border: `1px solid ${isUnread ? 'rgba(59,130,246,.3)' : 'var(--line)'}`,
                 borderLeft: `3px solid ${color}`,
                 borderRadius: 12,
-                padding: '.9rem 1.1rem',
+                padding: '1rem 1rem',
               }}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '.55rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '.5rem', flexWrap: 'wrap' }}>
                   <span style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-ui)', fontWeight: 700, color: 'var(--white)' }}>{it.title}</span>
                   {isUnread && (
-                    <span style={{ ...mono('.5rem', 'var(--green)'), textTransform: 'uppercase', letterSpacing: '.1em', border: '1px solid rgba(16,185,129,.35)', borderRadius: 4, padding: '.1rem .35rem' }}>New</span>
+                    <span style={{ ...mono('var(--fs-meta)', 'var(--green)'), textTransform: 'uppercase', letterSpacing: '.1em', border: '1px solid rgba(16,185,129,.35)', borderRadius: 4, padding: '.125rem .25rem' }}>New</span>
                   )}
                 </div>
-                <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-meta)', lineHeight: 1.6, margin: '.3rem 0 0' }}>{it.detail}</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '.7rem', marginTop: '.45rem', flexWrap: 'wrap' }}>
-                  <span style={{ ...mono('.55rem', color), textTransform: 'uppercase', letterSpacing: '.08em' }}>{it.severity}</span>
-                  {it.at && <span style={mono('.55rem', 'var(--dim)')}>{fmtDate(it.at)}</span>}
+                <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-meta)', lineHeight: 1.6, margin: '.25rem 0 0' }}>{it.detail}</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', marginTop: '.5rem', flexWrap: 'wrap' }}>
+                  <span style={{ ...mono('var(--fs-meta)', color), textTransform: 'uppercase', letterSpacing: '.08em' }}>{it.severity}</span>
+                  {it.at && <span style={mono('var(--fs-meta)', 'var(--dim)')}>{fmtDate(it.at)}</span>}
                   {/* Dispute number — the shared reference the employer, seeker report, and admin
                       verdict all meet on. Verdict notifications carry it in meta.dispute_id. */}
                   {it.meta && it.meta.dispute_id != null && (
-                    <span style={{ ...mono('.55rem', 'var(--blue)'), border: '1px solid rgba(59,130,246,.35)', borderRadius: 4, padding: '.1rem .4rem' }}>Dispute #{String(it.meta.dispute_id)}</span>
+                    <span style={{ ...mono('var(--fs-meta)', 'var(--blue)'), border: '1px solid rgba(59,130,246,.35)', borderRadius: 4, padding: '.125rem .5rem' }}>Dispute #{String(it.meta.dispute_id)}</span>
                   )}
                   {/* A reported listing is disputable RIGHT HERE: deep-link to the dashboard's
                       listings manager, which auto-opens the dispute modal for this listing with
@@ -195,7 +195,7 @@ export function EmployerLiveNotifications() {
                   {it.kind === 'listing_reported' && it.jobId && (
                     <a
                       href={`/employers/dashboard?dispute=${encodeURIComponent(it.jobId)}&kind=still_active`}
-                      style={{ ...mono('.58rem', 'var(--white)'), border: '1px solid var(--line2)', borderRadius: 6, padding: '.25rem .6rem', textDecoration: 'none', fontWeight: 700 }}
+                      style={{ ...mono('var(--fs-meta)', 'var(--white)'), border: '1px solid var(--line2)', borderRadius: 6, padding: '.25rem .5rem', textDecoration: 'none', fontWeight: 700 }}
                     >
                       ⚖ Dispute this report →
                     </a>
@@ -205,7 +205,7 @@ export function EmployerLiveNotifications() {
                   {(it.action === 'repost' || it.action === 'post_yourself') && it.jobId && (
                     <a
                       href={`/employers/dashboard?prefill=${encodeURIComponent(it.jobId)}`}
-                      style={{ ...mono('.58rem', 'var(--white)'), border: '1px solid var(--line2)', borderRadius: 6, padding: '.25rem .6rem', textDecoration: 'none', fontWeight: 700 }}
+                      style={{ ...mono('var(--fs-meta)', 'var(--white)'), border: '1px solid var(--line2)', borderRadius: 6, padding: '.25rem .5rem', textDecoration: 'none', fontWeight: 700 }}
                     >
                       {it.action === 'repost' ? '↻ Repost this listing →' : '＋ Post this role yourself →'}
                     </a>
@@ -217,7 +217,7 @@ export function EmployerLiveNotifications() {
         })}
       </div>
 
-      <p style={{ ...mono('.55rem', 'var(--muted)'), lineHeight: 1.7, margin: '1.2rem 0 0' }}>
+      <p style={{ ...mono('var(--fs-meta)', 'var(--muted)'), lineHeight: 1.7, margin: '1.25rem 0 0' }}>
         This is your persisted, login-scoped feed — stored updates keep their read state across visits. Below is the live-derived view for any company.
       </p>
     </div>

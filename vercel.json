@@ -2,6 +2,15 @@
   "framework": "nextjs",
   "headers": [
     {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains; preload" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "X-Frame-Options", "value": "DENY" }
+      ]
+    },
+    {
       "source": "/",
       "headers": [
         {
@@ -31,48 +40,58 @@
   ],
   "functions": {
     "api/employer-listings.js": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "includeFiles": "lib/geo/data/**"
     },
     "api/job-insights.js": {
       "maxDuration": 20
     },
     "api/optimizer.js": {
-      "maxDuration": 30
+      "maxDuration": 30,
+      "includeFiles": "lib/geo/data/**"
     },
     "api/refresh-jobs.js": {
-      "maxDuration": 300
+      "maxDuration": 300,
+      "includeFiles": "lib/geo/data/**"
     },
     "api/refresh-employer-boards.js": {
-      "maxDuration": 300
+      "maxDuration": 300,
+      "includeFiles": "lib/geo/data/**"
     },
     "api/local-company-jobs.js": {
-      "maxDuration": 300
+      "maxDuration": 300,
+      "includeFiles": "lib/geo/data/**"
     },
     "api/ingest-local-career-jobs.js": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "includeFiles": "lib/geo/data/**"
     },
     "api/discover-sources.js": {
-      "maxDuration": 300
+      "maxDuration": 300,
+      "includeFiles": "lib/geo/data/**"
     },
     "api/refresh-stale-jobs.js": {
-      "maxDuration": 300
+      "maxDuration": 300,
+      "includeFiles": "lib/geo/data/**"
     },
     "api/prune-jobs.js": {
       "maxDuration": 60
     },
     "api/resume.js": {
       "maxDuration": 30,
-      "includeFiles": "node_modules/pdfjs-dist/**"
+      "includeFiles": "{node_modules/pdfjs-dist/**,lib/resume/extract/pdfWorker.js,lib/geo/data/**}"
     },
     "api/apply.js": {
       "maxDuration": 30,
-      "includeFiles": "node_modules/pdfjs-dist/**"
+      "includeFiles": "{node_modules/pdfjs-dist/**,lib/resume/extract/pdfWorker.js}"
     },
     "api/jobs.js": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "includeFiles": "lib/geo/data/**"
     },
     "api/ingest-local-indeed.js": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "includeFiles": "lib/geo/data/**"
     },
     "api/ingest-local-company-intel.js": {
       "maxDuration": 60
@@ -87,13 +106,15 @@
       "maxDuration": 300
     },
     "api/user-sync.js": {
-      "maxDuration": 15
+      "maxDuration": 15,
+      "includeFiles": "lib/geo/data/**"
     },
     "api/demand.js": {
       "maxDuration": 60
     },
     "api/reports.js": {
-      "maxDuration": 300
+      "maxDuration": 300,
+      "includeFiles": "lib/geo/data/**"
     },
     "api/stripe.js": {
       "maxDuration": 30
@@ -108,19 +129,22 @@
       "maxDuration": 300
     },
     "api/inbox-email.js": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "includeFiles": "lib/geo/data/**"
     },
     "api/cron-search-data.js": {
       "maxDuration": 120
     },
     "api/cron-job-matches.js": {
-      "maxDuration": 300
+      "maxDuration": 300,
+      "includeFiles": "lib/geo/data/**"
     },
     "api/interview-prep.js": {
       "maxDuration": 150
     },
     "api/optimize.js": {
-      "maxDuration": 30
+      "maxDuration": 30,
+      "includeFiles": "lib/geo/data/**"
     }
   },
   "crons": [

@@ -4,7 +4,13 @@
 // next to — never inside — the Seen Grade, which stays report-only (owner decision 2026-10-20).
 // Every number is a stated factor; the label says plainly that this is not applicant accounts.
 import { useEffect, useState } from 'react'
+import Badge from '@/components/ui/Badge'
+import type { Tone } from '@/lib/ui/tone.js'
 import styles from './ListingSignals.module.css'
+
+// The band is the one decided reading here (lib/server/listingSignals.js): it colours the label — with its
+// word and icon — never the factor bars, which are ink whatever their value (design review 2026-11-02).
+const BAND_TONE: Record<'clear' | 'mixed' | 'thin', Tone> = { clear: 'good', mixed: 'caution', thin: 'bad' }
 
 type Factor = { key: string; label: string; value: number; weight: number; detail: string }
 type Signals = { rated: true; listings: number; score: number; band: 'clear' | 'mixed' | 'thin'; label: string; factors: Factor[]; basis: string }
@@ -26,14 +32,14 @@ export default function ListingSignals({ companyName }: { companyName: string })
   if (!s || s.listings === 0) return null
   if (!s.rated) return <p className={styles.thinLine}>Listing signals: {s.reason}.</p>
   return (
-    <section className={`${styles.card} ${styles[s.band]}`} aria-label="Listing signals">
+    <section className={styles.card} aria-label="Listing signals">
       <div className={styles.head}>
         <span className={styles.kicker}>Listing signals</span>
         <span className={styles.scope}>from its job posts · not applicant accounts</span>
       </div>
       <div className={styles.top}>
         <span className={styles.score}>{s.score}<small>/100</small></span>
-        <span className={styles.label}>{s.label}</span>
+        <Badge tone={BAND_TONE[s.band]}>{s.label}</Badge>
       </div>
       <ul className={styles.factors}>
         {s.factors.map((f) => (

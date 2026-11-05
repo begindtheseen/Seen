@@ -64,7 +64,7 @@ function BulletList({ bullets, onChange, highlightId, placeholder }: { bullets: 
             <AutoArea value={b.text} onChange={(v) => set(i, v)} className={s.bulletArea} placeholder={placeholder} />
             <div className={s.bulletTools}>
               {canFix && fix && <button type="button" className={s.fixBtn} title={`→ ${fix.text}`} onClick={() => set(i, fix.text)}>✦ fix</button>}
-              <div style={{ display: 'flex', gap: '.15rem' }}>
+              <div style={{ display: 'flex', gap: '.125rem' }}>
                 <button type="button" className={s.tiny} onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up">↑</button>
                 <button type="button" className={s.tiny} onClick={() => move(i, 1)} disabled={i === bullets.length - 1} aria-label="Move down">↓</button>
                 <button type="button" className={s.tiny} onClick={() => remove(i)} aria-label="Remove">✕</button>
@@ -130,7 +130,7 @@ export default function DocEditor({ doc, onChange, highlightId }: Props) {
         <div className={s.secHead}><span className={s.secTitle}>Contact</span></div>
         <div className={s.row}>
           <Field label="Full name" value={b.name} onChange={(v) => update((x) => { x.basics.name = v })} placeholder="Your name" />
-          <Field label="Headline (optional)" value={b.headline} onChange={(v) => update((x) => { x.basics.headline = v })} placeholder="Journeyman Electrician" />
+          <Field label="Headline (optional)" value={b.headline} onChange={(v) => update((x) => { x.basics.headline = v })} placeholder="Job title" />
         </div>
         <div className={s.row}>
           <Field label="Email" type="email" value={b.email} onChange={(v) => update((x) => { x.basics.email = v })} placeholder="you@example.com" />
@@ -146,7 +146,7 @@ export default function DocEditor({ doc, onChange, highlightId }: Props) {
               </select>
             </div>
             <Field label="URL" value={l.url} onChange={(v) => update((x) => { x.basics.links[i].url = v })} placeholder="linkedin.com/in/you" />
-            <button type="button" className={s.tiny} style={{ alignSelf: 'end', marginBottom: '.2rem' }} onClick={() => update((x) => { x.basics.links.splice(i, 1) })} aria-label="Remove link">✕</button>
+            <button type="button" className={s.tiny} style={{ alignSelf: 'end', marginBottom: '.25rem' }} onClick={() => update((x) => { x.basics.links.splice(i, 1) })} aria-label="Remove link">✕</button>
           </div>
         ))}
         <div className={s.addRow}><button type="button" className={s.tiny} onClick={() => update((x) => { x.basics.links.push({ kind: 'linkedin', url: '', label: '' }) })}>+ link</button></div>
@@ -208,7 +208,7 @@ export default function DocEditor({ doc, onChange, highlightId }: Props) {
                 <Field label="Certification" value={c.name || c.text} onChange={(v) => update((x) => { x.certifications[i].name = v; x.certifications[i].text = v })} placeholder="OSHA 30" />
                 <Field label="Issuer" value={c.issuer} onChange={(v) => update((x) => { x.certifications[i].issuer = v })} placeholder="OSHA" />
                 <Field label="Date" value={c.date} onChange={(v) => update((x) => { x.certifications[i].date = parseDateText(v).start || v })} placeholder="2022" />
-                <button type="button" className={s.tiny} style={{ alignSelf: 'end', marginBottom: '.2rem' }} onClick={() => update((x) => { x.certifications.splice(i, 1) })} aria-label="Remove">✕</button>
+                <button type="button" className={s.tiny} style={{ alignSelf: 'end', marginBottom: '.25rem' }} onClick={() => update((x) => { x.certifications.splice(i, 1) })} aria-label="Remove">✕</button>
               </div>
             ))}
             <div className={s.addRow}><button type="button" className={s.btn} onClick={() => update((x) => { x.certifications.push({ id: newId('c'), name: '', issuer: '', date: '', text: '' }) })}>+ Add certification</button></div>
@@ -240,7 +240,7 @@ export default function DocEditor({ doc, onChange, highlightId }: Props) {
               <div key={l.id} className={s.row} style={{ gridTemplateColumns: '1fr 1fr auto' }}>
                 <Field label="Language" value={l.name} onChange={(v) => update((x) => { x.languages[i].name = v })} placeholder="Spanish" />
                 <Field label="Level" value={l.level} onChange={(v) => update((x) => { x.languages[i].level = v })} placeholder="Fluent" />
-                <button type="button" className={s.tiny} style={{ alignSelf: 'end', marginBottom: '.2rem' }} onClick={() => update((x) => { x.languages.splice(i, 1) })} aria-label="Remove">✕</button>
+                <button type="button" className={s.tiny} style={{ alignSelf: 'end', marginBottom: '.25rem' }} onClick={() => update((x) => { x.languages.splice(i, 1) })} aria-label="Remove">✕</button>
               </div>
             ))}
             <div className={s.addRow}><button type="button" className={s.btn} onClick={() => update((x) => { x.languages.push({ id: newId('l'), name: '', level: '' }) })}>+ Add language</button></div>
@@ -253,7 +253,7 @@ export default function DocEditor({ doc, onChange, highlightId }: Props) {
           return (
             <div key={key} className={s.sec}>
               <div className={s.secHead}>
-                <input autoComplete="off" className={s.input} style={{ maxWidth: 260, fontFamily: 'var(--mono)', fontSize: '.62rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--green)' }} value={ex.title} onChange={(e) => update((x) => { x.extra[xi].title = e.target.value })} />
+                <input autoComplete="off" className={s.input} style={{ maxWidth: 260, fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--text-3)' }} value={ex.title} onChange={(e) => update((x) => { x.extra[xi].title = e.target.value })} />
                 <div className={s.secTools}>
                   <button type="button" className={s.tiny} onClick={() => moveSection(key, -1)} aria-label="Move up">↑</button>
                   <button type="button" className={s.tiny} onClick={() => moveSection(key, 1)} aria-label="Move down">↓</button>
@@ -294,8 +294,8 @@ function RoleEditor({ role, index, count, highlightId, onChange, onMove, onRemov
         </div>
       </div>
       <div className={s.row}>
-        <Field label="Title" value={role.title} onChange={(v) => set({ title: v })} placeholder="Journeyman Electrician" />
-        <Field label="Company" value={role.company} onChange={(v) => set({ company: v })} placeholder="Desert Power Solutions" />
+        <Field label="Title" value={role.title} onChange={(v) => set({ title: v })} placeholder="Job title" />
+        <Field label="Company" value={role.company} onChange={(v) => set({ company: v })} placeholder="Company" />
       </div>
       <div className={s.row}>
         <Field label="Location" value={role.location} onChange={(v) => set({ location: v })} placeholder="Phoenix, AZ" />
@@ -320,7 +320,7 @@ function SkillGroupEditor({ group, onChange, onRemove }: { group: ResumeSkillGro
           <span className={s.label}>Skills — comma separated</span>
           <input autoComplete="off" className={s.input} value={text} placeholder="Go, Python, SQL" onChange={(e) => setText(e.target.value)} onBlur={() => onChange({ ...group, items: splitSkillList(text) })} />
         </div>
-        <button type="button" className={s.tiny} style={{ alignSelf: 'end', marginBottom: '.2rem' }} onClick={onRemove} aria-label="Remove group">✕</button>
+        <button type="button" className={s.tiny} style={{ alignSelf: 'end', marginBottom: '.25rem' }} onClick={onRemove} aria-label="Remove group">✕</button>
       </div>
       {group.items.length > 0 && <div className={s.chips} style={{ marginTop: '.5rem' }}>{group.items.map((it, i) => <span key={`${it}${i}`} className={s.chip}>{it}</span>)}</div>}
     </div>

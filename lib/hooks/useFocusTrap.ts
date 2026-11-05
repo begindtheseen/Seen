@@ -90,7 +90,7 @@ export function useFocusTrap(
       cancelAnimationFrame(raf)
       document.removeEventListener('keydown', onKey, true)
       document.removeEventListener('focusin', onFocusIn)
-      if (returnFocus && opener && opener.isConnected) opener.focus()
+      if (returnFocus && opener && opener.isConnected) opener.focus({ preventScroll: true }) // a sticky-bar opener sits at the end of the document: never scroll to it
     }
   }, [ref, active, initialFocus, returnFocus])
 }

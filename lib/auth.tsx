@@ -8,6 +8,8 @@ import { _sync } from './sync'
 import { consumeIntentionalSignOut, handleSessionExpired, resetSessionExpiredGuard } from './sessionExpired'
 import type { UserProfile } from './types'
 import { resolveEmployerCompany, selectActiveClaim } from './server/employerClaims'
+import { SavedJobsStore } from './stores/SavedJobs'
+import GuestSavesPrompt, { GUEST_SAVES_EVENT } from '@/components/GuestSavesPrompt'
 
 /** An employer's request to manage a company (ADMIN-APPROVED CLAIMS model, migration 053).
  *  Only a 'approved' claim grants login-scoped access to that company's employer surfaces. */
@@ -145,10 +147,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(merged)
 
       // Backfill the DB with the user's OWN signup name if the row is missing it — never
-      // from a shared local cache. Preserve the row's REAL type — hardcoding 'seeker' here
-      // would silently demote an employer whose row happened to be missing a name.
+      // from a shared local cache. Email and account type are set by the sign-up trigger and
+      // are not client-writable (the server ignores them).
       if (data && !data.name && metaName) {
-        _sync('save_profile', { profile: { email: currentUser.email || '', type: data.account_type || data.type || 'seeker', name: metaName } }).catch(() => {})
+        _sync('save_profile', { profile: { name: metaName } }).catch(() => {})
       }
     } catch {
       setProfile(prev => prev || { name: metaName, city: '', experience: '' })
@@ -169,6 +171,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) hadUser = true
       if (event === 'SIGNED_IN' && session?.user) {
+        // Jobs saved on this device while signed out are set aside BEFORE any page reads the account's
+        // list, and the person is asked once (components/GuestSavesPrompt.tsx: Keep · Discard). They are
+        // never imported on their own — device-local data must not flow into an account by itself.
+        const guestSaves = SavedJobsStore.stashGuestSaves()
+        if (guestSaves > 0) window.dispatchEvent(new CustomEvent(GUEST_SAVES_EVENT, { detail: { count: SavedJobsStore.guestSaves().length } }))
         setUser(session.user)
         resetSessionExpiredGuard()
       } else if (event === 'TOKEN_REFRESHED' && session?.user) {
@@ -228,6 +235,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={{ user, profile, isLoggedIn, isSeeker, isEmployer, ready, employerCompany, employerClaim, claimsReady, reloadClaims, token: getToken, loadProfile }}>
       {children}
+      <GuestSavesPrompt />
     </AuthContext.Provider>
   )
 }

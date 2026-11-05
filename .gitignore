@@ -25,3 +25,6 @@ memory/
 
 # One-time API-credit batch runs (scripts/credit): state, results, spend ledger
 .credit-runs/
+
+# Session-local helper scripts (tester harnesses, one-off probes) — never part of the repo
+scripts/_*

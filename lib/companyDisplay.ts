@@ -9,7 +9,7 @@
 
 import { NONTERMINAL_OUTCOMES } from '@/api/_utils/companyIntel.js'
 import { formatPacific } from '@/lib/time/pacific.js'
-import { displayCompanyName as displayCompanyNameJs, KNOWN_BRANDS } from '@/lib/companyNames.js'
+import { displayCompanyName as displayCompanyNameJs, possessive as possessiveJs, KNOWN_BRANDS } from '@/lib/companyNames.js'
 import { displayPlatform as displayPlatformJs } from '@/lib/reports/platformLabel.js'
 import { gradeLetter as gradeLetterJs } from '@/lib/gradeScale.js'
 
@@ -34,6 +34,11 @@ export { KNOWN_BRANDS }
  */
 export function displayCompanyName(name: string | null | undefined): string {
   return displayCompanyNameJs(name)
+}
+
+/** "Target’s", "Starbucks’", "Fry’s" — never "Fry's's" (lib/companyNames.js possessive). */
+export function possessive(name: string | null | undefined): string {
+  return possessiveJs(name)
 }
 
 // ── Platform label ───────────────────────────────────────────────────────────────────────────────

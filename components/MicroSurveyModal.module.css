@@ -1,6 +1,6 @@
 /* MicroSurveyModal.module.css
    Compact bottom-corner card for the no-incentive micro-survey. Aura-Glass tokens
-   (var(--surface)/--raised/--line/--line2/--mono/--display/--indigo/etc). Light + unobtrusive —
+   (var(--surface)/--raised/--line/--line2/--mono/--display/--accent/etc). Light + unobtrusive —
    NOT a full-screen center modal, so it never blocks the page or reads as a nag. Sits below the
    incented SurveyModal backdrop (z 9900) and toasts (z 10000). Reduced-motion aware. */
 
@@ -11,18 +11,16 @@
   z-index: 9000;
   width: min(340px, calc(100vw - 32px));
   box-sizing: border-box;
-  padding: 15px 18px 13px;
-  border-radius: 16px;
-  background: linear-gradient(180deg, rgba(20, 24, 36, 0.96), rgba(12, 15, 26, 0.97));
-  border: 1px solid var(--line2);
-  box-shadow:
-    0 16px 48px rgba(0, 0, 0, 0.5),
-    0 0 40px rgba(99, 102, 241, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(24px) saturate(160%);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  padding: 16px 20px 12px;
+  border-radius: var(--r-card);
+  background: var(--surface-overlay);
+  border: 1px solid var(--border-2);
+  box-shadow: var(--sh-overlay);
   animation: microIn 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
+/* Over the phone tab bar (html.tabbar, 64px + safe area): the sheet sits above it, so Track / Companies /
+   Résumé stay tappable while it is up (round 2, Tasha). */
+:global(html.tabbar) .card { bottom: calc(64px + 12px + env(safe-area-inset-bottom, 0px)); }
 
 .card.leaving {
   animation: microOut 0.18s ease forwards;
@@ -30,15 +28,20 @@
 
 .dismiss {
   position: absolute;
-  top: 7px;
-  right: 9px;
+  top: 0;
+  right: 0;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
   background: none;
   border: none;
-  color: var(--muted);
+  color: var(--text-3);
   font-size: var(--fs-lead);
   line-height: 1;
   cursor: pointer;
-  padding: 4px;
+  padding: 0;
+  border-radius: var(--r-control);
   transition: color 0.15s ease;
 }
 .dismiss:hover {
@@ -50,9 +53,10 @@
   font-size: var(--fs-meta);
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--indigo);
+  font-weight: 600;
+  color: var(--text-3);
   margin-bottom: 8px;
-  padding-right: 22px;
+  padding-right: 24px;
 }
 
 .question {
@@ -67,17 +71,18 @@
 .choices {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
+  gap: 8px;
 }
 
 .choice {
   flex: 1 1 auto;
   min-width: calc(50% - 4px);
-  padding: 9px 12px;
-  border-radius: 9px;
-  background: var(--raised);
-  border: 1px solid var(--line);
-  color: var(--text);
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: var(--r-control);
+  background: var(--surface-2);
+  border: 1px solid var(--border-2);
+  color: var(--text-2);
   font-family: var(--body);
   font-size: var(--fs-sm);
   font-weight: 500;
@@ -86,8 +91,8 @@
   transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease, transform 0.1s ease;
 }
 .choice:hover {
-  border-color: rgba(99, 102, 241, 0.5);
-  background: rgba(99, 102, 241, 0.1);
+  border-color: var(--accent-line);
+  background: var(--accent-tint);
   color: var(--white);
 }
 .choice:active {
@@ -98,7 +103,7 @@
   font-family: var(--mono);
   font-size: var(--fs-meta);
   color: var(--muted);
-  margin-top: 11px;
+  margin-top: 12px;
   line-height: 1.4;
 }
 
@@ -124,8 +129,7 @@
   }
 }
 
-/* Full-width strip on small screens (mobile nav here is a left drawer, so there's no bottom bar
-   to clash with). */
+/* Full-width strip on small screens; above the tab bar when it is there (rule above). */
 @media (max-width: 480px) {
   .card {
     right: 12px;
@@ -133,6 +137,7 @@
     bottom: max(12px, env(safe-area-inset-bottom, 0px));
     width: auto;
   }
+  :global(html.tabbar) .card { bottom: calc(64px + 12px + env(safe-area-inset-bottom, 0px)); }
 }
 
 @media (prefers-reduced-motion: reduce) {

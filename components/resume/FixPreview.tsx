@@ -25,17 +25,17 @@ export default function FixPreview({ log, onApply, onCancel }: Props) {
   return (
     <div className={s.card} data-testid="fix-preview">
       <span className={s.secTitle}>Review before anything changes · {picked.size} of {entries.length} selected</span>
-      <div className={s.dim} style={{ margin: '.35rem 0 .6rem' }}>Each line shows your bullet and the proposed wording. Untick anything you do not want. Nothing is saved until you press Apply, and you can undo afterwards.</div>
+      <div className={s.dim} style={{ margin: '.25rem 0 .5rem' }}>Each line shows your bullet and the proposed wording. Untick anything you do not want. Nothing is saved until you press Apply, and you can undo afterwards.</div>
       {entries.map((l) => (
         <label key={l.bulletId} className={s.finding} style={{ cursor: 'pointer', alignItems: 'flex-start' }}>
-          <input type="checkbox" checked={picked.has(l.bulletId)} onChange={() => toggle(l.bulletId)} style={{ marginTop: '.2rem' }} />
+          <input type="checkbox" checked={picked.has(l.bulletId)} onChange={() => toggle(l.bulletId)} style={{ marginTop: '.25rem' }} />
           <div className={s.findingBody}>
             <div className={s.diff}><span className={s.del}>{l.from}</span><br /><span className={s.ins}>{l.to}</span></div>
-            <div className={s.muted} style={{ marginTop: '.2rem' }}>{isPunctuationOnly(l) ? 'Punctuation only' : isTenseOnly(l) ? 'Tense only — off unless you want it' : [...new Set(l.changes.map((c) => c.rule))].join(', ')}</div>
+            <div className={s.muted} style={{ marginTop: '.25rem' }}>{isPunctuationOnly(l) ? 'Punctuation only' : isTenseOnly(l) ? 'Tense only — off unless you want it' : [...new Set(l.changes.map((c) => c.rule))].join(', ')}</div>
           </div>
         </label>
       ))}
-      <div className={s.findingActions} style={{ marginTop: '.6rem' }}>
+      <div className={s.findingActions} style={{ marginTop: '.5rem' }}>
         <button type="button" className={s.btnGreen} data-testid="fix-apply" disabled={picked.size === 0} onClick={() => onApply([...picked])}>Apply {picked.size} change{picked.size === 1 ? '' : 's'}</button>
         <button type="button" className={s.btn} onClick={onCancel}>Cancel</button>
       </div>

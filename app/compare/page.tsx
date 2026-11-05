@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { pageMetadata } from '@/lib/seo'
 import Link from 'next/link'
 import { Suspense } from 'react'
-import { getLeaderboard, titleCase, slugify } from '@/lib/growth'
+import { getLeaderboard, slugify, displayCompanyName } from '@/lib/growth'
 import ComparePicker, { CompareQuery } from './ComparePicker'
 
 // Compare tool landing — fully STATIC (revalidated hourly). This server component must never
@@ -30,22 +30,23 @@ export default async function ComparePage() {
 
   // Real, interesting matchups: pair adjacent leaderboard companies in the same industry-ish band.
   const top = board.slice(0, 12)
-  const matchups: [string, string][] = []
+  // Display names for the labels; the links slug the STORED names (a display name's spaces would miss the row).
+  const matchups: [string, string, string, string][] = []
   for (let i = 0; i + 1 < top.length && matchups.length < 6; i += 2) {
-    matchups.push([titleCase(top[i].name), titleCase(top[i + 1].name)])
+    matchups.push([displayCompanyName(top[i].name), displayCompanyName(top[i + 1].name), slugify(top[i].name), slugify(top[i + 1].name)])
   }
 
   return (
     <div className="page-full">
       <div style={wrap}>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.2em', color: 'var(--blue)', marginBottom: '.7rem', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ width: 20, height: 1, background: 'var(--blue)', display: 'inline-block' }} />
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.2em', color: 'var(--text-3)', marginBottom: '.75rem', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ width: 20, height: 1, background: 'currentColor', display: 'inline-block' }} />
           Compare
         </div>
-        <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.6rem,5vw,2.3rem)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', lineHeight: 1.1, margin: '0 0 .7rem' }}>
+        <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.6rem,5vw,2.3rem)', fontWeight: 800, color: 'var(--text-1)', letterSpacing: '-.03em', lineHeight: 1.1, margin: '0 0 .75rem' }}>
           Compare hiring, side by side
         </h1>
-        <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-body)', lineHeight: 1.7, fontWeight: 400, margin: '0 0 2rem' }}>
+        <p style={{ color: 'var(--text-3)', fontSize: 'var(--fs-body)', lineHeight: 1.7, fontWeight: 400, margin: '0 0 2rem' }}>
           Two companies, head to head — ghost rate, response rate, average wait, and Seen Grade, from applicant accounts where we have them and clearly labeled public-data estimates where we don&apos;t. Pick where your application actually has a chance.
         </p>
 
@@ -55,20 +56,20 @@ export default async function ComparePage() {
         </Suspense>
 
         <div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--blue)', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--line)' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--text-3)', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--line)' }}>
             Popular matchups
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.6rem' }}>
-            {matchups.map(([x, y]) => (
-              <Link key={`${x}-${y}`} href={`/compare/${slugify(x)}-vs-${slugify(y)}`} className="btn btn-ghost" style={{ fontSize: 'var(--fs-meta)', padding: '.55rem .9rem' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.5rem' }}>
+            {matchups.map(([x, y, xs, ys]) => (
+              <Link key={`${xs}-${ys}`} href={`/compare/${xs}-vs-${ys}`} className="btn btn-ghost" style={{ fontSize: 'var(--fs-sm)', padding: '.5rem 1rem', minHeight: 44 }}>
                 {x} vs {y}
               </Link>
             ))}
           </div>
         </div>
 
-        <p style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '2.5rem', lineHeight: 1.7 }}>
-          Seen Grades are aggregated community signals from applicant accounts, not verified facts. Browse all <Link href="/companies" style={{ color: 'var(--blue)' }}>companies</Link>.
+        <p style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--text-4)', marginTop: '2.5rem', lineHeight: 1.7 }}>
+          Seen Grades are aggregated community signals from applicant accounts, not verified facts. Browse all <Link href="/companies" style={{ color: 'var(--accent)' }}>companies</Link>.
         </p>
       </div>
     </div>

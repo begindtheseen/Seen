@@ -167,7 +167,7 @@ export function AdminAttentionQueue({ items, emgMsg }: {
         {sorted.length > 0 && <span className="a2-queue-count">{sorted.length}</span>}
       </div>
       {emgMsg && (
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', marginBottom: '.6rem', color: emgMsg.ok ? 'var(--green)' : 'var(--red)' }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', marginBottom: '.5rem', color: emgMsg.ok ? 'var(--green)' : 'var(--red)' }}>
           {emgMsg.ok ? '✓ ' : '✗ '}{emgMsg.text}
         </div>
       )}

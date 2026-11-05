@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useEffect, Fragment } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useRef, Fragment } from 'react'
 import type { Job } from '@/lib/types'
 import { trackApplyClick } from '@/lib/trackApply'
 import { useJobSearch, type SortMode } from '@/lib/hooks/useJobSearch'
@@ -26,8 +25,9 @@ import Button from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Badge'
 import Icon from '@/components/ui/Icon'
 import j from './jobs.module.css'
-import { useUrlPlace, useScrollMemory } from '@/lib/nav/urlState'
+import { useUrlPlace, useScrollMemory, afterPendingBack } from '@/lib/nav/urlState'
 import { JobCache } from '@/lib/stores/JobCache'
+import { httpHref } from '@/lib/safeHref.js'
 
 // Empty-state suggestions, most-held first. Live corpus counts by title (prod, read-only,
 // 2026-10-23): software engineer 3,960 · nurse 1,360 · sales associate 648 · customer service 489 ·
@@ -37,7 +37,6 @@ import { JobCache } from '@/lib/stores/JobCache'
 const SUGGESTED_ROLES = ['Cashier', 'Warehouse', 'Customer Service', 'Sales Associate', 'Nurse', 'Server', 'Data Analyst', 'Software Engineer']
 
 export default function JobsPage() {
-  const router = useRouter()
   const {
     isLoggedIn,
     query, setQuery,
@@ -86,7 +85,7 @@ export default function JobsPage() {
     if (job) { JobCache.set(job); setDetailJobState(job); jobPlace.open(String(job.id)) }
     else { setDetailJobState(null); jobPlace.close() }
   }
-  const [saveVersion, setSaveVersion] = useState(0)
+  const [, setSaveVersion] = useState(0)
   const [swipeMode, setSwipeMode] = useState(false)
   const [checkpointJob, setCheckpointJob] = useState<Job | null>(null)
   // When the checkpoint is opened AFTER the user already confirmed applying (the Apply &
@@ -117,6 +116,22 @@ export default function JobsPage() {
   // After a search with results, phones get a sticky one-line query bar (audit #25: the first card sat
   // ~700px down under a three-row form). The location row reappears while the bar has focus.
   const searched = status === 'done' && filtered.length > 0
+  // The compact bar's location row is opened by STATE, not by CSS :focus-within — moving focus from the
+  // title box to the city box (or tapping the 📍 / distance controls) dropped focus-within for a frame,
+  // the row vanished under the finger and the city could not be changed (owner 2026-11-01). It stays
+  // open until a search runs.
+  const [whereOpen, setWhereOpen] = useState(false)
+  const locRef = useRef<HTMLInputElement>(null)
+  function runSearch() {
+    setWhereOpen(false)
+    try { (document.activeElement as HTMLElement | null)?.blur?.() } catch { /* ignore */ }
+    searchJobs()
+  }
+  function openWhere() {
+    setWhereOpen(true)
+    setTimeout(() => locRef.current?.focus(), 0)
+  }
+  const radiusLabel = radius === '0' ? 'Remote' : hasCity ? `${radius} mi` : 'Anywhere'
   // Follow the URL: Back/Forward open or close the listing; a page loaded on ?job= (Back from another
   // page) reopens it once its row is known — from the results, the rail, or this tab's listing cache.
   useEffect(() => {
@@ -142,7 +157,6 @@ export default function JobsPage() {
         <div className="jpage-hdr">
           <PageHeader
             eyebrow="Job search · transparency-first"
-            tone="green"
             title="Open positions"
             crumbLabel="Jobs"
             sub="Ranked by how well they match your search. Every listing shows how complete its posting is and how the employer treats applicants — not just pay and location."
@@ -150,7 +164,7 @@ export default function JobsPage() {
           />
 
           {/* Search bar — job titles AND company names in the same box. No autofill: Enter / Search runs it. */}
-          <div className={`${bar.wrap}${searched ? ' ' + bar.compact : ''}`} role="search">
+          <div className={`${bar.wrap}${searched ? ' ' + bar.compact : ''}${whereOpen ? ' ' + bar.whereOpen : ''}`} role="search">
             <div className={bar.query}>
             <input
               type="text"
@@ -165,17 +179,26 @@ export default function JobsPage() {
               spellCheck={false}
               enterKeyHint="search"
               onChange={e => setQuery(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') searchJobs() }}
+              onFocus={() => { if (searched) setWhereOpen(true) }}
+              onKeyDown={e => { if (e.key === 'Enter') runSearch() }}
             />
             {/* Compact (phone, after a search): the one-line bar's own Search button. */}
-            <button type="button" className={bar.goIcon} onClick={() => searchJobs()} disabled={status === 'loading'} aria-label="Search">
+            <button type="button" className={bar.goIcon} onClick={runSearch} disabled={status === 'loading'} aria-label="Search">
               <Icon name="search" size={18} />
             </button>
             </div>
-            <div className={bar.row}>
+            {/* Compact: where the search is, as one tap target that opens the location row. */}
+            {/* Remote results are not the city's results: the chip reads "Remote" alone (phone tester 2026-11-02). */}
+            <button type="button" className={bar.whereChip} onClick={openWhere} aria-label={radius === '0' ? 'Change location: Remote' : `Change location: ${location.trim() || 'anywhere'}, ${radiusLabel}`}>
+              <Icon name={radius === '0' ? 'globe' : 'map-pin'} size={14} />
+              <span className={bar.whereText}>{radius === '0' ? 'Remote' : `${location.trim() || 'Anywhere'} · ${radiusLabel}`}</span>
+              <span className={bar.whereEdit}>Change</span>
+            </button>
+            <div className={bar.row} onPointerDownCapture={() => { if (searched) setWhereOpen(true) }}>
               <div className={bar.loc}>
                 <input
                   type="text"
+                  ref={locRef}
                   className={`${bar.input} ${bar.locInput}`}
                   placeholder="City or state..."
                   aria-label="City or state"
@@ -186,7 +209,8 @@ export default function JobsPage() {
                   spellCheck={false}
                   enterKeyHint="search"
                   onChange={e => setLocation(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') searchJobs() }}
+                  onFocus={() => { if (searched) setWhereOpen(true) }}
+                  onKeyDown={e => { if (e.key === 'Enter') runSearch() }}
                 />
                 <button
                   type="button"
@@ -222,7 +246,7 @@ export default function JobsPage() {
               <button
                 type="button"
                 className={bar.go}
-                onClick={() => searchJobs()}
+                onClick={runSearch}
                 disabled={status === 'loading'}
               >
                 {status === 'loading' ? 'Searching…' : 'Search'}
@@ -292,7 +316,7 @@ export default function JobsPage() {
             onOpen={j => setDetailJob(j)}
             onDismiss={() => setSwipeMode(false)}
             onSave={() => setSaveVersion(v => v + 1)}
-            onApply={j => { if (takesSeenApply(j)) { setDetailJob(j); return } if (j.apply_url) { trackApplyClick(j); window.open(j.apply_url, '_blank', 'noopener,noreferrer') } setCheckpointJob(j) }}
+            onApply={j => { if (takesSeenApply(j)) { setDetailJob(j); return } const u = httpHref(j.apply_url); if (u) { trackApplyClick(j); window.open(u, '_blank', 'noopener,noreferrer') } setCheckpointJob(j) }}
             coScores={coScores}
           />
         ) : view === 'results' ? (
@@ -306,7 +330,7 @@ export default function JobsPage() {
                     <span className={bar.dividerSub}>Not {query.trim() ? `“${query.trim()}”` : 'this role'} — they share a word with your search.</span>
                   </div>
                 )}
-                <JobCard job={job} more={more} index={i} onSaveToggle={handleSaveToggle} onOpen={j => setDetailJob(j)} onApply={j => takesSeenApply(j) ? setDetailJob(j) : setApplyJob(j)} onCheckCompany={co => setCheckCompany(co)} alreadyApplied={appliedCos.has(job.id) || (!!job.apply_url && appliedCos.has(job.apply_url))} employerScore={coScores[job.company.toLowerCase().trim()]?.overall_score ?? null} />
+                <JobCard job={job} more={more} index={i} onSaveToggle={handleSaveToggle} onOpen={j => setDetailJob(j)} onCheckCompany={co => setCheckCompany(co)} alreadyApplied={appliedCos.has(job.id) || (!!job.apply_url && appliedCos.has(job.apply_url))} employerScore={coScores[job.company.toLowerCase().trim()]?.overall_score ?? null} />
               </Fragment>
             ))}
           </div>
@@ -374,7 +398,9 @@ export default function JobsPage() {
         job={detailJob}
         isLoggedIn={isLoggedIn}
         onClose={() => setDetailJob(null)}
-        onApply={j => { setDetailJob(null); setApplyJob(j) }}
+        // Close the drawer (one Back for its ?job= entry) and open the sheet only once that Back has landed: the
+        // drawer used to call onClose() AND this handler closed again — two Backs, and the page left /jobs (round 5).
+        onApply={j => { setDetailJob(null); afterPendingBack(() => setApplyJob(j)) }}
         onCheckCompany={co => { setDetailJob(null); setCheckCompany(co) }}
       />
     )}

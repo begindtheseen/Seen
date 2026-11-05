@@ -36,19 +36,20 @@ export default function LegalPage() {
   //     price uses the same cents); fulfilled once by lib/server/stripeFulfillment.js;
   //   no new subscription or trial → api/stripe.js checkout refuses a request without a sellable sku;
   //   an earlier subscription → api/stripe.js cancel_subscription, Settings → Plan & billing;
-  //   résumé → profiles.resume_text via save_resume / delete via delete_resume + delete_account.
+  //   résumés → public.resumes (default mirrored into profiles.resume_text) via save_resume / resume_*;
+  //   delete via resume_delete + delete_account.
   const facts = [
     'Company grades, the tracker and its check-ins, job search and résumé match are free, with no card.',
     `${offerLine()} ${prep.name} also opens ${prep.pro_days} days of Pro, and the ${pass.name} is ${pass.pro_days} days of Pro; when the time ends, access simply ends and nothing is charged again.`,
     'Seen no longer starts subscriptions or free trials. A Seen Pro subscription started before October 25, 2026 keeps its price and renewal date until you cancel it in Settings → Plan & billing; access continues to the end of the period you paid for.',
-    'Your résumé is stored on your profile until you replace it or delete your account, and is used for your own tools (job matching, fit scores, rewrites). It is never sold, and an employer sees it only if you send it with an application through Seen.',
+    'Your résumés are stored on your account until you replace or delete them or delete your account, and are used for your own tools (job matching, fit scores, rewrites). They are never sold, and an employer sees one only if you send it with an application through Seen.',
     'We do not sell personal data. Company scores and reports are aggregated applicant claims and public discussion, not verified facts, and nothing on Seen is legal, employment or financial advice.',
   ]
 
   return (
     <div className="rise-in" style={{ minHeight: '100vh' }}>
       <div style={{ maxWidth: 760, margin: '0 auto', padding: '4rem 2rem', width: '100%', boxSizing: 'border-box' }}>
-        <h1 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-h2)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', marginBottom: '.35rem' }}>
+        <h1 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-h2)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', marginBottom: '.25rem' }}>
           Legal
         </h1>
         <p style={{ color: 'var(--sub)', fontSize: 'var(--fs-sm)', lineHeight: 1.7, marginBottom: '2rem' }}>
@@ -59,22 +60,22 @@ export default function LegalPage() {
 
         <div style={{ display: 'grid', gap: '.75rem', marginBottom: '2.5rem' }}>
           {DOCS.map(d => (
-            <Link key={d.href} href={d.href} style={{ display: 'block', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1rem 1.2rem', textDecoration: 'none' }}>
+            <Link key={d.href} href={d.href} style={{ display: 'block', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1rem 1.25rem', textDecoration: 'none' }}>
               <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', marginBottom: '.25rem' }}>{d.title} →</div>
               <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.6 }}>{d.body}</div>
             </Link>
           ))}
         </div>
 
-        <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', marginBottom: '.65rem' }}>
+        <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', marginBottom: '.75rem' }}>
           The plain facts
         </h2>
-        <p style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.7, margin: '0 0 .9rem' }}>
+        <p style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.7, margin: '0 0 1rem' }}>
           Each line below is what the product does today and is stated in the documents above
           (<Link href="/terms#one-time" style={{ color: 'var(--sub)' }}>Terms §9–10</Link>,{' '}
           <Link href="/privacy" style={{ color: 'var(--sub)' }}>Privacy §2–7</Link>).
         </p>
-        <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
+        <ul style={{ margin: 0, paddingLeft: '1rem' }}>
           {facts.map(f => (
             <li key={f} style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.8, marginBottom: '.5rem' }}>{f}</li>
           ))}

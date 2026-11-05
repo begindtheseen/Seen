@@ -284,6 +284,9 @@ let installed = false
 export function installBackOverClosedPopups() {
   if (installed || typeof window === 'undefined') return
   installed = true
+  // A page LOADED on a popup's entry (Back from the employer's site reloads Seen on the entry the
+  // "Did you apply?" popup had pushed) has no popup open: mark it dead so the next Back is one step.
+  if (isStaleOverlayEntry()) markDead()
   window.addEventListener('popstate', () => {
     const leftDead = onDeadHref
     onDeadHref = ''

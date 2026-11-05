@@ -6,6 +6,7 @@ import { AppStore } from '@/lib/stores/AppStore'
 import { isPublicDiscussion, reportDate, reportSourceBadge, reportSourceLink } from '@/lib/reportSource'
 import ReportSourceLink from '@/components/ReportSourceLink'
 import PageHeader from '@/components/shell/PageHeader'
+import Icon, { type IconName } from '@/components/ui/Icon'
 import { displayCompanyName, displayPlatform } from '@/lib/companyDisplay'
 import { collapseByCompany } from '@/lib/reports/feedFilter.js'
 import { replaceParam, readParam, useScrollMemory } from '@/lib/nav/urlState'
@@ -29,25 +30,30 @@ interface FeedReport {
   more_from_company?: number
 }
 
-const OUTCOME_LABELS: Record<string, { label: string; cls: string }> = {
-  ghosted:      { label: '👻 Ghosted', cls: 'outcome-ghosted' },
-  autoreject:   { label: '🤖 Auto-rejected', cls: 'outcome-autoreject' },
-  rejected:     { label: '🤝 Rejected with feedback', cls: 'outcome-autoreject' },
-  human:        { label: '💬 Got a response', cls: 'outcome-human' },
-  interview:    { label: '📅 Interviewing', cls: 'outcome-human' },
-  interviewing: { label: '📅 Interviewing', cls: 'outcome-human' },
-  hired:        { label: '✅ Hired / Offer', cls: 'outcome-hired' },
-  offer:        { label: '✅ Got an offer', cls: 'outcome-hired' },
-  waiting:      { label: '⏳ Waiting', cls: '' },
+// One stroke icon per outcome (components/ui/Icon.tsx) — never an emoji, which the OS paints in its own
+// colour font.
+const OUTCOME_LABELS: Record<string, { icon: IconName; label: string; cls: string }> = {
+  ghosted:      { icon: 'ghost', label: 'Ghosted', cls: 'outcome-ghosted' },
+  autoreject:   { icon: 'bot', label: 'Auto-rejected', cls: 'outcome-autoreject' },
+  rejected:     { icon: 'handshake', label: 'Rejected with feedback', cls: 'outcome-autoreject' },
+  human:        { icon: 'message-square', label: 'Got a response', cls: 'outcome-human' },
+  interview:    { icon: 'calendar', label: 'Interviewing', cls: 'outcome-human' },
+  interviewing: { icon: 'calendar', label: 'Interviewing', cls: 'outcome-human' },
+  hired:        { icon: 'circle-check', label: 'Hired / Offer', cls: 'outcome-hired' },
+  offer:        { icon: 'circle-check', label: 'Got an offer', cls: 'outcome-hired' },
+  waiting:      { icon: 'hourglass', label: 'Waiting', cls: '' },
 }
 
-const FILTERS: { key: Filter; label: string }[] = [
+const FILTERS: { key: Filter; label: string; icon?: IconName }[] = [
   { key: 'all', label: 'All' },
-  { key: 'interviewing', label: '📞 Interviewing' },
-  { key: 'ghosted', label: '👻 Ghosted' },
-  { key: 'rejected', label: '❌ Rejected' },
-  { key: 'hired', label: '🎉 Hired' },
+  { key: 'interviewing', label: 'Interviewing', icon: 'phone' },
+  { key: 'ghosted', label: 'Ghosted', icon: 'ghost' },
+  { key: 'rejected', label: 'Rejected', icon: 'circle-x' },
+  { key: 'hired', label: 'Hired', icon: 'party-popper' },
 ]
+// The active chip is an outlined accent state (DESIGN.md §2: colour on states, no filled chip); the
+// filled var(--blue) in globals' .feed-filter-btn.active fails contrast on white text.
+const ACTIVE_CHIP = { background: 'var(--accent-tint)', borderColor: 'var(--accent-line)', color: 'var(--accent)' } as const
 
 const PAGE_SIZE = 15
 
@@ -202,13 +208,14 @@ export default function FeedPage() {
           sub="Applicant accounts, newest first — submitted to Seen or compiled from public review sites and discussions (labeled). Each one counts toward that company's score at its trust weight."
         />
 
-        {/* CTA strip — old HTML order: report CTA comes first */}
-        <Link href="/report" style={{ background: 'rgba(16,185,129,.06)', border: '1px solid rgba(16,185,129,.18)', borderRadius: 10, padding: '.75rem 1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.75rem', flexWrap: 'wrap', cursor: 'pointer', transition: 'background .15s', textDecoration: 'none' }}>
+        {/* The ONE report call on this page: an outlined link in ink (the old green callout here plus a
+            filled "Submit your report" at the foot were two CTAs for one action). */}
+        <Link href="/report" style={{ background: 'var(--surface-1)', border: '1px solid var(--border-2)', borderRadius: 10, padding: '.75rem 1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.75rem', flexWrap: 'wrap', cursor: 'pointer', textDecoration: 'none' }}>
           <div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', fontWeight: 500, marginBottom: '.1rem' }}>Your experience matters</div>
-            <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', fontWeight: 400 }}>Had an interview? Got ghosted? Add your report — it shapes scores for every future applicant.</div>
+            <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-1)', fontWeight: 600, marginBottom: '.125rem' }}>Your experience matters</div>
+            <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', fontWeight: 400 }}>Had an interview? Got ghosted? Add your report — it shapes scores for every future applicant.</div>
           </div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--green)', flexShrink: 0, whiteSpace: 'nowrap' }}>Add yours →</div>
+          <div style={{ fontSize: 'var(--fs-meta)', fontWeight: 600, color: 'var(--text-1)', flexShrink: 0, whiteSpace: 'nowrap' }}>Add yours →</div>
         </Link>
 
         {/* The old "ghost surges this week" banner here was any two companies with a ghosted row in the
@@ -221,8 +228,9 @@ export default function FeedPage() {
               key={f.key}
               onClick={() => changeFilter(f.key)}
               className={`feed-filter-btn${filter === f.key ? ' active' : ''}`}
+              style={filter === f.key ? ACTIVE_CHIP : undefined}
             >
-              {f.label}
+              {f.icon && <Icon name={f.icon} size={14} />}{f.icon ? ' ' : ''}{f.label}
             </button>
           ))}
         </div>
@@ -239,22 +247,22 @@ export default function FeedPage() {
         ) : (
           <>
             {reports.map(r => {
-              const oc = OUTCOME_LABELS[r.outcome] || { label: r.outcome, cls: '' }
+              const oc: { icon?: IconName; label: string; cls: string } = OUTCOME_LABELS[r.outcome] || { label: r.outcome, cls: '' }
               const badge = reportSourceBadge(r.platform, r.report_text, r.trust_reason)
               const src = reportSourceLink(r.platform, r.report_text)
               const body = src ? src.body : r.report_text
               return (
-                <div key={r.id} className={`rcard ${oc.cls}`} style={{ marginBottom: '.65rem' }}>
+                <div key={r.id} className={`rcard ${oc.cls}`} style={{ marginBottom: '.75rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '.5rem' }}>
                     <div>
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, color: 'var(--white)' }}>{oc.label}</span>
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, color: 'var(--white)' }}>{oc.icon && <Icon name={oc.icon} size={14} />}{oc.icon ? ' ' : ''}{oc.label}</span>
                       {r.company_name && (
                         <Link href={`/company/${encodeURIComponent(r.company_name.toLowerCase().replace(/\s+/g, '-'))}`} prefetch={false} className="tap" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', marginLeft: '.5rem', textDecoration: 'none' }}>
                           @ {displayCompanyName(r.company_name)}
                         </Link>
                       )}
                       {r.company_name && appliedCos.has(r.company_name.toLowerCase().trim()) && (
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', background: 'rgba(99,102,241,.12)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 4, padding: '.1rem .35rem', color: 'var(--indigo)', marginLeft: '.3rem', verticalAlign: 'middle' }}>
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 4, padding: '.125rem .25rem', color: 'var(--accent)', marginLeft: '.25rem', verticalAlign: 'middle' }}>
                           You applied
                         </span>
                       )}
@@ -265,7 +273,7 @@ export default function FeedPage() {
                   </div>
 
                   {r.role && (
-                    <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginBottom: '.4rem' }}>
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginBottom: '.5rem' }}>
                       {r.role}{r.experience_level ? ` · ${r.experience_level}` : ''}
                     </div>
                   )}
@@ -291,7 +299,7 @@ export default function FeedPage() {
                     </p>
                   )}
                   {src && (
-                    <div style={{ marginTop: '.45rem' }}>
+                    <div style={{ marginTop: '.5rem' }}>
                       <ReportSourceLink url={src.url} host={src.host} posted={src.posted} />
                     </div>
                   )}
@@ -309,7 +317,7 @@ export default function FeedPage() {
                 <button
                   onClick={loadMore}
                   disabled={loadingMore}
-                  style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.65rem 1.5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', cursor: loadingMore ? 'not-allowed' : 'pointer', opacity: loadingMore ? 0.6 : 1 }}
+                  style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.75rem 1.5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', cursor: loadingMore ? 'not-allowed' : 'pointer', opacity: loadingMore ? 0.6 : 1 }}
                 >
                   {loadingMore ? 'Loading...' : `Load more${total > offset ? ` (${(total - offset).toLocaleString()} to read)` : ''}`}
                 </button>
@@ -318,18 +326,6 @@ export default function FeedPage() {
           </>
         )}
 
-        {/* CTA */}
-        <div style={{ marginTop: '2.5rem', textAlign: 'center', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.5rem' }}>
-          <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-lead)', fontWeight: 600, color: 'var(--white)', marginBottom: '.4rem' }}>
-            Had a notable experience?
-          </div>
-          <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '1rem' }}>
-            Takes 60 seconds. Helps the next applicant who checks this company.
-          </p>
-          <Link href="/report" style={{ display: 'inline-block', background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)', border: 'none', borderRadius: 8, padding: '.65rem 1.5rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-sm)', color: '#fff', textDecoration: 'none', boxShadow: '0 0 20px rgba(59,130,246,0.3)' }}>
-            Submit your report →
-          </Link>
-        </div>
       </div>
     </div>
   )

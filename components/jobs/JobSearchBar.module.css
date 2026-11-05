@@ -44,12 +44,12 @@
   outline: none;
   caret-color: var(--accent);
 }
-.input:focus { border-color: var(--accent); box-shadow: var(--sh-focus); }
-.locInput { padding-right: 2.4rem; }
+.input:focus-visible { border-color: var(--accent); box-shadow: var(--sh-focus); }
+.locInput { padding-right: 2.5rem; }
 
 .pin {
   position: absolute;
-  right: 0.15rem;
+  right: .125rem;
   top: 50%;
   transform: translateY(-50%);
   width: 2.5rem;
@@ -87,12 +87,13 @@
   outline: none;
   cursor: pointer;
 }
+.radius:focus-visible { border-color: var(--accent); box-shadow: var(--sh-focus); }
 
 .go {
   flex: none;
   min-height: 44px;
-  background: var(--cta-gradient);
-  color: #fff;
+  background: var(--cta);
+  color: var(--text-1);
   border: none;
   border-radius: var(--r-control);
   padding: 0 var(--sp-6);
@@ -103,7 +104,7 @@
   box-shadow: var(--sh-control);
   transition: background var(--dur-state) var(--ease-out), box-shadow var(--dur-state) var(--ease-out), transform var(--dur-press) var(--ease-out);
 }
-.go:hover:not(:disabled) { background: var(--cta-gradient-hover); box-shadow: 0 10px 28px -10px rgba(124, 58, 237, .7); }
+.go:hover:not(:disabled) { background: var(--cta-hover); box-shadow: var(--sh-raised); }
 .go:active:not(:disabled) { transform: scale(.98); }
 .go:disabled { cursor: progress; background: var(--surface-2); color: var(--text-3); box-shadow: none; }
 
@@ -125,7 +126,7 @@
 
 /* One line for a signed-in account with a résumé but no city on the profile. */
 .cityLine {
-  margin: 0.2rem 0 1.1rem;
+  margin: .25rem 0 1rem;
   font-family: var(--body);
   font-size: var(--fs-sm);
   color: var(--text-3);
@@ -134,7 +135,7 @@
 
 @media (max-width: 560px) {
   /* Three rows: title · city (full width, so "Phoenix, AZ" never clips) · [radius · Search]. */
-  .wrap { gap: 0.45rem; }
+  .wrap { gap: .5rem; }
   .query, .row { flex: 1 1 100%; }
   .row { flex-wrap: wrap; }
   .loc { flex: 1 1 100%; }
@@ -146,9 +147,9 @@
 .divider {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
-  margin: 0.6rem 0 0.2rem;
-  padding: 0.75rem 0 0.35rem;
+  gap: .25rem;
+  margin: .5rem 0 .25rem;
+  padding: 0.75rem 0 .25rem;
   border-top: 1px solid var(--line2);
 }
 .dividerTitle {
@@ -171,7 +172,7 @@
   display: block;
   width: 100%;
   min-height: 44px;
-  margin: 0.4rem 0 2.5rem;
+  margin: .5rem 0 2.5rem;
   background: var(--card);
   border: 1px solid var(--line2);
   border-radius: 10px;
@@ -196,11 +197,16 @@
 }
 
 
-/* ── After a search, on phones: ONE sticky line (title box + Search). The location row comes back while
-   the bar has focus, so it can still be changed (audit #25). Solid surface, never glass. ── */
+/* The compact bar's "where" line — hidden except in the compact bar on phones. */
+.whereChip { display: none; }
+
+/* ── After a search, on phones: ONE sticky line (title box + Search) and a "where" line under it that
+   opens the location row (audit #25). The row is opened by state (.whereOpen), never by :focus-within —
+   that dropped for a frame between fields and hid the row under the finger (owner 2026-11-01). Solid
+   surface, never glass. ── */
 @media (max-width: 768px) {
   .compact {
-    position: sticky; top: 58px; z-index: 30;
+    position: sticky; top: 56px; z-index: 30;
     margin: 0 calc(-1 * var(--sp-4)); padding: var(--sp-2) var(--sp-4);
     background: var(--surface-overlay); border-bottom: 1px solid var(--border-1);
   }
@@ -208,9 +214,18 @@
   .compact .goIcon {
     display: inline-flex; align-items: center; justify-content: center; flex: none;
     width: 44px; height: 44px; border: 0; border-radius: var(--r-control);
-    background: var(--cta-gradient); color: #fff; cursor: pointer;
+    background: var(--cta); color: var(--text-1); cursor: pointer;
   }
   .compact .row { display: none; }
-  .compact:focus-within .row { display: flex; }
-  .compact:focus-within .go { display: none; }
+  .compact.whereOpen .row { display: flex; }
+  .compact.whereOpen .go { display: none; }
+  .compact:not(.whereOpen) .whereChip {
+    display: flex; align-items: center; gap: var(--sp-2); width: 100%; min-height: 44px;
+    margin-top: var(--sp-1); padding: 0 0 0 var(--sp-1); border: 0; background: none;
+    color: var(--text-3); font: inherit; font-size: var(--fs-sm); text-align: left; cursor: pointer;
+  }
+  .whereChip:focus-visible { outline: none; }
+  .whereChip:focus-visible .whereEdit { box-shadow: var(--sh-focus); border-color: var(--accent); }
+  .whereText { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .whereEdit { flex: none; display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--sp-4); border: 1px solid var(--border-2); border-radius: var(--r-pill); color: var(--text-1); font-size: var(--fs-sm); font-weight: 600; }
 }

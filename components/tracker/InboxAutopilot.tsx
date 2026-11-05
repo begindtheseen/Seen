@@ -10,6 +10,8 @@ import { showReportReward } from '@/lib/rewardNotice'
 import { _sync } from '@/lib/sync'
 import { formatPacific } from '@/lib/time/pacific.js'
 import type { Application } from '@/lib/types'
+import Badge from '@/components/ui/Badge'
+import Icon from '@/components/ui/Icon'
 import s from './InboxAutopilot.module.css'
 
 type InboxEvent = {
@@ -69,6 +71,8 @@ export default function InboxAutopilot({ apps, token, onAppsChanged, status }: {
     load()
   }, [status, load])
 
+  // "Setting up" (polling for Gmail's code) is unchanged; what is SHOWN is the one-line status row, with
+  // the steps behind a "Setup steps" disclosure (round 2: the 900px recipe was the first screen of /tracker).
   const settingUp = !!(st?.enabled && (showSetup || !st.received_count || st.forwarding_confirm))
   // While the user is setting up, look every 15 s so Gmail's confirmation code appears on its own.
   useEffect(() => {
@@ -118,8 +122,23 @@ export default function InboxAutopilot({ apps, token, onAppsChanged, status }: {
   if (!st || !st.ready) return null // not live yet (migration pending) or still loading
 
   if (!st.enabled) {
+    // Before the first application the promo is one line (the empty tracker should read as one thing to
+    // do); with ≥1 application it is the full pitch. Either way it is a promo, so it sits under the list
+    // (.promo) and "Turn it on" is outlined — the tracker's one filled button is "+ Track application"
+    // (DESIGN.md §5).
+    if (apps.length === 0) {
+      return (
+        <section className={`${s.card} ${s.promo} ${s.oneLine}`} id="autopilot" data-testid="autopilot-promo">
+          <p className={s.oneLineRow}>
+            <b>Inbox Autopilot</b> — forward job emails, the tracker fills itself.{' '}
+            <button className={s.link} disabled={busy} onClick={() => act('inbox_enable')}>{busy ? 'Turning on…' : 'Turn it on →'}</button>
+          </p>
+          {err && <div className={s.err}>{err}</div>}
+        </section>
+      )
+    }
     return (
-      <section className={s.card} id="autopilot">
+      <section className={`${s.card} ${s.promo}`} id="autopilot" data-testid="autopilot-promo">
         <div className={s.pitch}>
           <div>
             <div className={s.eyebrow}>New · Inbox Autopilot</div>
@@ -127,7 +146,7 @@ export default function InboxAutopilot({ apps, token, onAppsChanged, status }: {
             <p className={s.sub}>Forward your job emails to a private Seen address. Every “thanks for applying”, interview invite and rejection updates your applications on its own — no typing.</p>
             <p className={s.fine}>Free. Seen keeps only the company, the role and what happened — never the email itself. Turn it off any time and it’s all deleted.</p>
           </div>
-          <button className="btn btn-green" disabled={busy} onClick={() => act('inbox_enable')}>{busy ? 'Turning on…' : 'Turn it on'}</button>
+          <button className="btn btn-ghost" disabled={busy} onClick={() => act('inbox_enable')}>{busy ? 'Turning on…' : 'Turn it on'}</button>
         </div>
         {err && <div className={s.err}>{err}</div>}
       </section>
@@ -142,42 +161,46 @@ export default function InboxAutopilot({ apps, token, onAppsChanged, status }: {
   const fc = st.forwarding_confirm
 
   return (
-    <section className={s.card} id="autopilot">
+    <section className={`${s.card} ${s.on}`} id="autopilot">
+      {/* ONE status row: name · state · address · what was read. */}
       <div className={s.head}>
         <div className={s.headL}>
-          <span className={`${s.dot} ${st.paused ? s.dotOff : ''}`} />
           <b>Inbox Autopilot</b>
+          {st.paused ? <Badge tone="neutral" icon="circle">Paused</Badge> : <Badge tone="good" icon="check">On</Badge>}
           <span className={s.muted}>
-            {st.paused ? 'Paused' : 'On'} · {st.received_count || 0} email{st.received_count === 1 ? '' : 's'} read
+            {st.received_count || 0} email{st.received_count === 1 ? '' : 's'} read
             {st.last_received_at ? ` · last ${formatPacific(st.last_received_at, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}` : ''}
           </span>
         </div>
-        <button className={s.link} onClick={() => setShowSetup(v => !v)}>{settingUp ? 'Hide setup' : 'Setup'}</button>
-      </div>
-
-      <div className={s.addrRow}>
-        <code className={s.addr}>{st.address}</code>
-        <button className="btn btn-ghost" style={{ fontSize: 'var(--fs-meta)' }} onClick={() => copy(st.address || '', 'address')}>{copied === 'address' ? 'Copied ✓' : 'Copy address'}</button>
+        <div className={s.addrRow}>
+          <code className={s.addr}>{st.address}</code>
+          <button type="button" className="ui-btn ui-btn--ghost ui-btn--sm" aria-label="Copy address" onClick={() => copy(st.address || '', 'address')}><Icon name={copied === 'address' ? 'check' : 'copy'} size={16} />{copied === 'address' ? 'Copied' : 'Copy'}</button>
+        </div>
       </div>
 
       {fc && (fc.code || fc.url) && (
         <div className={s.confirm}>
           <b>Gmail sent a confirmation code{fc.for ? ` for ${fc.for}` : ''}:</b>
-          {fc.code && <><code className={s.code}>{fc.code}</code><button className={s.link} onClick={() => copy(fc.code || '', 'code')}>{copied === 'code' ? 'Copied ✓' : 'Copy'}</button></>}
+          {fc.code && <><code className={s.code}>{fc.code}</code><button className={s.link} onClick={() => copy(fc.code || '', 'code')}>{copied === 'code' ? 'Copied' : 'Copy'}</button></>}
           <div className={s.muted}>Paste it in Gmail → Settings → Forwarding and POP/IMAP, then click Verify{fc.url ? <> — or <a href={fc.url} target="_blank" rel="noopener noreferrer">confirm it in Gmail</a></> : null}.</div>
         </div>
       )}
 
-      {settingUp && (
+      <details className={s.setup} open={showSetup} onToggle={e => setShowSetup((e.currentTarget as HTMLDetailsElement).open)}>
+        <summary className={s.setupSum}>
+          <span>Setup steps</span>
+          <span className={s.muted}>{st.received_count ? 'Gmail forwarding + filter' : 'Nothing read yet — connect Gmail'}</span>
+          <Icon name="chevron-down" size={18} className={s.chev} />
+        </summary>
         <ol className={s.steps}>
-          <li><b>Gmail on a computer</b> (the phone app can’t set this up): Settings ⚙ → <i>See all settings</i> → <i>Forwarding and POP/IMAP</i> → <i>Add a forwarding address</i> → paste your Seen address. Leave forwarding itself <b>off</b> at the top of that page.</li>
+          <li><b>In Gmail on the desktop site</b> — its forwarding settings are only there (mail.google.com on a computer, or “Request desktop site” in your phone’s browser; copy your Seen address here first): Settings ⚙ → <i>See all settings</i> → <i>Forwarding and POP/IMAP</i> → <i>Add a forwarding address</i> → paste your Seen address. Leave forwarding itself <b>off</b> at the top of that page.</li>
           <li>Gmail sends Seen a confirmation code — it shows up right here within a minute. Paste it back into Gmail and click <i>Verify</i>.</li>
           <li>Make a filter so only job emails go to Seen: in Gmail’s search bar open <i>Show search options</i>, paste this into <i>Has the words</i>, click <i>Create filter</i>, tick <i>Forward it to</i> your Seen address.
-            <div className={s.addrRow}><code className={s.filter}>{st.gmail_filter}</code><button className={s.link} onClick={() => copy(st.gmail_filter || '', 'filter')}>{copied === 'filter' ? 'Copied ✓' : 'Copy'}</button></div>
+            <div className={s.addrRow}><code className={s.filter}>{st.gmail_filter}</code><button className={s.link} onClick={() => copy(st.gmail_filter || '', 'filter')}>{copied === 'filter' ? 'Copied' : 'Copy'}</button></div>
           </li>
           <li>Old emails don’t forward by themselves — forward any past “thanks for applying” or interview email to your Seen address and it’s tracked too. Outlook, Yahoo or anything else: forward to the same address.</li>
         </ol>
-      )}
+      </details>
 
       {asks.length > 0 && (
         <div className={s.block}>
@@ -185,7 +208,7 @@ export default function InboxAutopilot({ apps, token, onAppsChanged, status }: {
             <div key={ev.id} className={s.ask}>
               <span>Seen read {ev.kind === 'interview' ? 'an interview invite' : ev.kind === 'offer' ? 'an offer' : 'a rejection'} from <b>{ev.company}</b>. Add it to {ev.company}’s grade? <span className={s.muted}>Anonymous — it warns the next applicant.</span></span>
               <span className={s.btns}>
-                <button className="btn btn-green" style={{ fontSize: 'var(--fs-meta)' }} disabled={busy} onClick={() => share(ev, true)}>Yes</button>
+                <button className="btn btn-ghost" style={{ fontSize: 'var(--fs-meta)' }} disabled={busy} onClick={() => share(ev, true)}>Yes</button>
                 <button className="btn btn-ghost" style={{ fontSize: 'var(--fs-meta)' }} disabled={busy} onClick={() => share(ev, false)}>No</button>
               </span>
             </div>
@@ -225,7 +248,7 @@ export default function InboxAutopilot({ apps, token, onAppsChanged, status }: {
       <div className={s.foot}>
         <button className={s.link} disabled={busy} onClick={() => act('inbox_pause', { paused: !st.paused })}>{st.paused ? 'Resume' : 'Pause'}</button>
         <button className={s.link} disabled={busy} onClick={() => { if (confirm('Get a new address? The old one stops working right away — update your Gmail forwarding to the new one.')) act('inbox_new_address') }}>New address</button>
-        <button className={`${s.link} ${s.danger}`} disabled={busy} onClick={() => { if (confirm('Turn off Inbox Autopilot? Your address stops working and everything Seen read is deleted. Your tracker cards stay.')) act('inbox_disable') }}>Turn off</button>
+        <button type="button" className={`ui-btn ui-btn--ghost ui-btn--sm ${s.off}`} disabled={busy} onClick={() => { if (confirm('Turn off Inbox Autopilot? Your address stops working and everything Seen read is deleted. Your tracker cards stay.')) act('inbox_disable') }}>Turn off</button>
       </div>
       {err && <div className={s.err}>{err}</div>}
     </section>

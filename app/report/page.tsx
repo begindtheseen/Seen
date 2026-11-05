@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, Suspense } from 'react'
+import { displayCompanyName } from '@/lib/companyDisplay'
 import { useSearchParams } from 'next/navigation'
 import { AppStore, isDbId } from '@/lib/stores/AppStore'
 import { showReportReward } from '@/lib/rewardNotice'
@@ -11,6 +12,8 @@ import { reportSourceBadge } from '@/lib/reportSource'
 import type { Application } from '@/lib/types'
 import PageHeader from '@/components/shell/PageHeader'
 import { formatPacific } from '@/lib/time/pacific.js'
+import Icon, { type IconName } from '@/components/ui/Icon'
+import st from './report.module.css'
 
 type Outcome = 'ghosted' | 'autoreject' | 'human' | 'waiting' | ''
 type Stage = 'application' | 'phone' | 'interview' | 'final' | ''
@@ -22,71 +25,66 @@ const OUTCOME_LABELS: Record<string, string> = {
 }
 const outcomeLabel = (o: string) => OUTCOME_LABELS[o] || (o ? o.charAt(0).toUpperCase() + o.slice(1) : '—')
 
+// Every field is a 44px target on phones (the smoke measured 36px inputs at 390).
 const inputStyle: React.CSSProperties = {
   width: '100%',
+  minHeight: 44,
+  boxSizing: 'border-box',
   background: 'var(--surface)',
   border: '1.5px solid var(--line2)',
   borderRadius: 8,
-  padding: '.62rem .9rem',
+  padding: '.5rem 1rem',
   color: 'var(--white)',
   fontFamily: 'var(--body)',
   fontSize: 'var(--fs-ui)',
   outline: 'none',
   caretColor: 'var(--blue)',
-  marginBottom: '.85rem',
+  marginBottom: '.75rem',
 }
 
 const selectStyle: React.CSSProperties = {
-  ...{} as React.CSSProperties,
   width: '100%',
+  minHeight: 44,
+  boxSizing: 'border-box',
   background: 'var(--surface)',
   border: '1.5px solid var(--line2)',
   borderRadius: 8,
-  padding: '.62rem .9rem',
+  padding: '.5rem 1rem',
   color: 'var(--white)',
   fontFamily: 'var(--body)',
   fontSize: 'var(--fs-ui)',
   outline: 'none',
   cursor: 'pointer',
-  marginBottom: '.85rem',
+  marginBottom: '.75rem',
 }
 
 const lbl = (text: string) => (
-  <label style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase' as const, letterSpacing: '.08em', color: 'var(--dim)', display: 'block', marginBottom: '.3rem' }}>
+  <label style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase' as const, letterSpacing: '.08em', color: 'var(--dim)', display: 'block', marginBottom: '.25rem' }}>
     {text}
   </label>
 )
 
+// Outcome / stage chips: real radios, each a 44px pill; an icon from the one icon set (never an emoji).
 function RadioGroup<T extends string>({
   name, options, value, onChange,
 }: {
   name: string
-  options: { value: T; label: string }[]
+  options: { value: T; label: string; icon?: IconName }[]
   value: T
   onChange: (v: T) => void
 }) {
   return (
-    <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginBottom: '.85rem' }}>
+    <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginBottom: '.75rem' }}>
       {options.map(o => (
-        <label
-          key={o.value}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '.35rem',
-            background: value === o.value ? 'var(--bdim)' : 'var(--surface)',
-            border: `1.5px solid ${value === o.value ? 'var(--blue)' : 'var(--line2)'}`,
-            borderRadius: 8, padding: '.45rem .85rem', cursor: 'pointer',
-            fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: value === o.value ? 'var(--white)' : 'var(--sub)',
-            transition: 'all .15s',
-          }}
-        >
+        <label key={o.value} className={`${st.radio}${value === o.value ? ' ' + st.radioOn : ''}`}>
           <input
             type="radio"
             name={name}
             value={o.value}
             checked={value === o.value}
             onChange={() => onChange(o.value)}
-            style={{ display: 'none' }}
           />
+          {o.icon && <Icon name={o.icon} size={16} />}
           {o.label}
         </label>
       ))}
@@ -138,13 +136,23 @@ function ReportPage() {
   const [companyLocked, setCompanyLocked] = useState(false)
   const roleRef = useRef<HTMLInputElement>(null)
   const locationRef = useRef<HTMLInputElement>(null)
+  // After a submit on a phone the viewport sat at the footer while the success card rendered where
+  // the form had been: bring the card into view and put focus on its heading (tester 2026-11-02).
+  const doneRef = useRef<HTMLHeadingElement>(null)
+  useEffect(() => {
+    if (!done) return
+    window.scrollTo({ top: 0, left: 0 })
+    doneRef.current?.focus({ preventScroll: true })
+  }, [done])
 
   useEffect(() => {
     try {
       // EXPLICIT URL params win over any tracker guess. Job pages and company pages link
       // here with ?company=&role=&outcome= — ignoring them prefilled the form with a
       // DIFFERENT company from the user's tracker, one click away from a wrong-company report.
-      const urlCompany = searchParams?.get('company') || ''
+      // A slug ("northwind-test-labs" from a company page link) is shown as the name it stands for (round 4).
+      const rawCompany = searchParams?.get('company') || ''
+      const urlCompany = /^[a-z0-9]+(?:-[a-z0-9']+)+$/.test(rawCompany) ? displayCompanyName(rawCompany.replace(/-/g, ' ')) : rawCompany
       const urlRole = searchParams?.get('role') || ''
       const urlOutcomeRaw = (searchParams?.get('outcome') || '').toLowerCase()
       // Map caller vocab onto the form's outcome union ('human' = a person responded).
@@ -316,40 +324,40 @@ function ReportPage() {
     return (
       <div style={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 2rem 3rem' }}>
         <div style={{ textAlign: 'center', maxWidth: 440 }}>
-          <div style={{ fontSize: 'var(--fs-fig-l)', marginBottom: '1rem' }}>✅</div>
-          <h2 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--white)', marginBottom: '.5rem' }}>
+          <div style={{ color: 'var(--good-text)', marginBottom: '1rem' }}><Icon name="circle-check" size={48} label="Submitted" /></div>
+          <h2 ref={doneRef} tabIndex={-1} style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--white)', marginBottom: '.5rem', outline: 'none' }}>
             Report submitted
           </h2>
           <p style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.7, marginBottom: '1.5rem' }}>
             Thank you. Your experience has been added to the transparency feed and will update {company}&apos;s score in real time.
           </p>
           <div style={{ display: 'flex', gap: '.75rem', justifyContent: 'center' }}>
-            <a href="/feed" style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.6rem 1.25rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', textDecoration: 'none' }}>
+            <a href="/feed" style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem 1.25rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', textDecoration: 'none' }}>
               View feed →
             </a>
-            <a href={`/company/${encodeURIComponent(company.trim().toLowerCase().replace(/\s+/g, '-'))}`} style={{ background: 'var(--blue)', border: 'none', borderRadius: 8, padding: '.6rem 1.25rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: '#fff', textDecoration: 'none' }}>
+            <a href={`/company/${encodeURIComponent(company.trim().toLowerCase().replace(/\s+/g, '-'))}`} style={{ background: 'var(--blue)', border: 'none', borderRadius: 8, padding: '.5rem 1.25rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--text-1)', textDecoration: 'none' }}>
               See {company} score →
             </a>
           </div>
           {matchedAppId && !trackerUpdated && (
-            <div style={{ marginTop: '1.5rem', background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.2)', borderRadius: 10, padding: '1rem 1.15rem', textAlign: 'left' }}>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--indigo)', marginBottom: '.35rem' }}>Your tracker still shows this as active</div>
+            <div style={{ marginTop: '1.5rem', background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 10, padding: '1rem 1.25rem', textAlign: 'left' }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--accent)', marginBottom: '.25rem' }}>Your tracker still shows this as active</div>
               <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', marginBottom: '.75rem' }}>Update it to match your report?</div>
               <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
                 {/* Pass the real login state — hardcoding false meant the change never synced
                     to the DB and quietly reverted on the next load for signed-in users. */}
                 {outcome === 'ghosted' && (
-                  <button onClick={() => { AppStore.update(matchedAppId, { status: 'ghosted' }, isLoggedIn); setTrackerUpdated(true) }} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 7, padding: '.35rem .8rem', color: 'var(--red)', cursor: 'pointer' }}>Mark as ghosted in tracker</button>
+                  <button onClick={() => { AppStore.update(matchedAppId, { status: 'ghosted' }, isLoggedIn); setTrackerUpdated(true) }} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 7, padding: '.25rem .75rem', color: 'var(--red)', cursor: 'pointer' }}>Mark as ghosted in tracker</button>
                 )}
                 {(outcome === 'autoreject' || outcome === 'human') && (
-                  <button onClick={() => { AppStore.update(matchedAppId, { status: 'rejected', stage: 'Rejected' }, isLoggedIn); setTrackerUpdated(true) }} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 7, padding: '.35rem .8rem', color: 'var(--red)', cursor: 'pointer' }}>Mark as rejected in tracker</button>
+                  <button onClick={() => { AppStore.update(matchedAppId, { status: 'rejected', stage: 'Rejected' }, isLoggedIn); setTrackerUpdated(true) }} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 7, padding: '.25rem .75rem', color: 'var(--red)', cursor: 'pointer' }}>Mark as rejected in tracker</button>
                 )}
                 {/* "Mark as hired" only makes sense when a human responded — offering it on a
                     "Still waiting" report was contradictory. */}
                 {outcome === 'human' && (
-                  <button onClick={() => { AppStore.update(matchedAppId, { status: 'hired', stage: 'Offer' }, isLoggedIn); setTrackerUpdated(true) }} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', background: 'rgba(16,185,129,.1)', border: '1px solid rgba(16,185,129,.3)', borderRadius: 7, padding: '.35rem .8rem', color: 'var(--green)', cursor: 'pointer' }}>Mark as hired in tracker</button>
+                  <button onClick={() => { AppStore.update(matchedAppId, { status: 'hired', stage: 'Offer' }, isLoggedIn); setTrackerUpdated(true) }} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', background: 'rgba(16,185,129,.1)', border: '1px solid rgba(16,185,129,.3)', borderRadius: 7, padding: '.25rem .75rem', color: 'var(--green)', cursor: 'pointer' }}>Mark as hired in tracker</button>
                 )}
-                <button onClick={() => setMatchedAppId(null)} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', background: 'none', border: '1px solid var(--line2)', borderRadius: 7, padding: '.35rem .8rem', color: 'var(--dim)', cursor: 'pointer' }}>Skip</button>
+                <button onClick={() => setMatchedAppId(null)} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', background: 'none', border: '1px solid var(--line2)', borderRadius: 7, padding: '.25rem .75rem', color: 'var(--dim)', cursor: 'pointer' }}>Skip</button>
               </div>
             </div>
           )}
@@ -369,21 +377,21 @@ function ReportPage() {
     <div className="page-full">
       <div style={{ maxWidth: 680, margin: '0 auto', padding: '2.5rem 2rem', width: '100%', boxSizing: 'border-box' }}>
         {appId && auto && !autoApp && (
-          <div style={{ background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.22)', borderRadius: 10, padding: '.7rem 1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.75rem', flexWrap: 'wrap' }}>
+          <div style={{ background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 10, padding: '.75rem 1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.75rem', flexWrap: 'wrap' }}>
             <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6 }}>
-              ✦ Prefilled from your tracker.{company ? ` Reporting your ${company} outcome.` : ''}
+              Prefilled from your tracker.{company ? ` Reporting your ${company} outcome.` : ''}
             </div>
             <button
               onClick={() => { const apps = AppStore.loadSync(); const a = apps.find(x => x.id === appId); if (a) setAutoApp(a) }}
-              style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, color: '#fff', border: 'none', background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)', borderRadius: 8, padding: '.45rem .9rem', cursor: 'pointer', flexShrink: 0 }}
+              style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', fontWeight: 500, color: 'var(--text-1)', border: 'none', background: 'var(--cta)', borderRadius: 8, padding: '.5rem 1rem', cursor: 'pointer', flexShrink: 0 }}
             >
-              ✦ Open share card
+              Open share card
             </button>
           </div>
         )}
         {urlPrefilled && (
-          <div style={{ background: 'rgba(59,130,246,.08)', border: '1px solid rgba(59,130,246,.22)', borderRadius: 10, padding: '.7rem 1rem', marginBottom: '1.25rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6 }}>
-            ✦ Prefilled for you{company ? <> — reporting <span style={{ color: 'var(--white)', fontWeight: 700 }}>{company}</span></> : ''}. Fill any missing field and hit submit.
+          <div style={{ background: 'rgba(59,130,246,.08)', border: '1px solid rgba(59,130,246,.22)', borderRadius: 10, padding: '.75rem 1rem', marginBottom: '1.25rem', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6 }}>
+            Prefilled for you{company ? <> — reporting <span style={{ color: 'var(--white)', fontWeight: 700 }}>{company}</span></> : ''}. Fill any missing field and hit submit.
           </div>
         )}
         <PageHeader
@@ -396,11 +404,11 @@ function ReportPage() {
         {/* Step progress indicator */}
         {(() => { const step = outcome ? 2 : 1; return (
           <div style={{ display: 'flex', gap: '.5rem', marginBottom: '1.5rem', alignItems: 'center' }}>
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '.3rem' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '.25rem' }}>
               <div style={{ height: 3, background: 'var(--blue)', borderRadius: 2, width: '100%' }} />
               <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', fontWeight: 500 }}>The listing</div>
             </div>
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '.3rem' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '.25rem' }}>
               <div style={{ height: 3, background: step >= 2 ? 'var(--blue)' : 'var(--line2)', borderRadius: 2, width: '100%' }} />
               <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: step >= 2 ? 'var(--blue)' : 'var(--dim)' }}>What happened</div>
             </div>
@@ -408,7 +416,7 @@ function ReportPage() {
         )})()}
 
         {error && (
-          <div style={{ background: 'var(--rdim)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '.72rem 1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--red)', marginBottom: '1rem' }}>
+          <div style={{ background: 'var(--rdim)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '.75rem 1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--red)', marginBottom: '1rem' }}>
             {error}
           </div>
         )}
@@ -419,12 +427,12 @@ function ReportPage() {
             <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--line)' }}>
               The listing
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.75rem' }}>
+            <div className={st.two}>
               <div>
                 {lbl('Company name *')}
                 {companyLocked && company ? (
                   <div style={{ ...inputStyle, display: 'flex', alignItems: 'center', gap: '.5rem', borderColor: 'rgba(16,185,129,.45)' }}>
-                    <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>✓ {company}</span>
+                    <Icon name="check" size={16} /><span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>{company}</span>
                     <button type="button" onClick={() => setCompanyLocked(false)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', flexShrink: 0 }}>change</button>
                   </div>
                 ) : (
@@ -436,7 +444,7 @@ function ReportPage() {
                 <input autoComplete="off" ref={roleRef} type="text" placeholder="e.g. Software Engineer" value={role} onChange={e => setRole(e.target.value)} style={inputStyle} />
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.75rem' }}>
+            <div className={st.two}>
               <div>
                 {lbl('City, State *')}
                 <input autoComplete="off" ref={locationRef} type="text" placeholder="e.g. Austin, TX" value={location} onChange={e => setLocation(e.target.value)} style={inputStyle} />
@@ -459,10 +467,10 @@ function ReportPage() {
               value={outcome}
               onChange={setOutcome}
               options={[
-                { value: 'ghosted', label: '👻 Ghosted' },
-                { value: 'autoreject', label: '🤖 Auto-rejected' },
-                { value: 'human', label: '💬 Got a response' },
-                { value: 'waiting', label: '⏳ Still waiting' },
+                { value: 'ghosted', label: 'Ghosted', icon: 'ghost' },
+                { value: 'autoreject', label: 'Auto-rejected', icon: 'bot' },
+                { value: 'human', label: 'Got a response', icon: 'message-square' },
+                { value: 'waiting', label: 'Still waiting', icon: 'hourglass' },
               ]}
             />
 
@@ -489,7 +497,7 @@ function ReportPage() {
             <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--line)' }}>
               Details
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '.75rem' }}>
+            <div className={st.three}>
               <div>
                 {lbl('Interview rounds')}
                 <select value={rounds} onChange={e => setRounds(e.target.value)} style={selectStyle}>
@@ -522,14 +530,14 @@ function ReportPage() {
               value={notes}
               onChange={e => setNotes(e.target.value)}
               rows={4}
-              style={{ width: '100%', background: 'var(--surface)', border: '1.5px solid var(--line2)', borderRadius: 8, padding: '.72rem 1rem', color: 'var(--white)', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', outline: 'none', resize: 'vertical', lineHeight: 1.6, caretColor: 'var(--blue)' }}
+              style={{ width: '100%', background: 'var(--surface)', border: '1.5px solid var(--line2)', borderRadius: 8, padding: '.75rem 1rem', color: 'var(--white)', fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', outline: 'none', resize: 'vertical', lineHeight: 1.6, caretColor: 'var(--blue)' }}
             />
           </div>
 
           <button
             onClick={submit}
             disabled={loading}
-            style={{ width: '100%', background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)', color: '#fff', border: 'none', borderRadius: 8, padding: '.85rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-ui)', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1, boxShadow: '0 0 20px rgba(59,130,246,0.3)' }}
+            style={{ width: '100%', background: 'var(--cta)', color: 'var(--text-1)', border: 'none', borderRadius: 8, padding: '.75rem', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-ui)', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1, boxShadow: 'var(--sh-control)' }}
           >
             {loading ? 'Submitting...' : 'Submit report →'}
           </button>
@@ -547,12 +555,12 @@ function ReportPage() {
               <div key={r.id} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.75rem 1rem', marginBottom: '.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
                 <div>
                   <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--white)', fontWeight: 500 }}>{outcomeLabel(r.outcome)}</div>
-                  {r.company_name && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', marginTop: '.15rem' }}>@ {r.company_name}</div>}
-                  {r.role && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.1rem' }}>{r.role}</div>}
+                  {r.company_name && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--blue)', marginTop: '.125rem' }}>@ {displayCompanyName(r.company_name)}</div>}
+                  {r.role && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', marginTop: '.125rem' }}>{r.role}</div>}
                   {(() => {
                     const badge = reportSourceBadge(r.platform, null, r.trust_reason)
                     return badge && (
-                      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.2rem' }} title={badge.title}>{badge.label}</div>
+                      <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', marginTop: '.25rem' }} title={badge.title}>{badge.label}</div>
                     )
                   })()}
                 </div>

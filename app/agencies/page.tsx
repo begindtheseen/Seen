@@ -257,7 +257,7 @@ export default async function AgenciesPage() {
       <div className={st.wrap}>
         <PageHeader
           size="lg"
-          eyebrow="Live index · updates hourly"
+          eyebrow="Staffing agency index"
           title="The Staffing Agency Ghost Index"
           crumbLabel="Agency Ghost Index"
           sub={<>
@@ -326,7 +326,7 @@ export default async function AgenciesPage() {
         </section>
 
         <p className={st.fine}>
-          Seen Grades aggregate applicant accounts and public hiring signals into a 0–100 score. They are community signals, not verified facts, and update hourly as new reports arrive. Grades and percentages appear only once at least {MIN_REPORTS_FOR_GRADE} applicants have reported outcomes. Report counts include outcomes shared publicly in discussion threads and on review sites (labeled and counted at reduced weight); web-research estimates are never counted as reports.
+          Seen Grades aggregate applicant accounts and public hiring signals into a 0–100 score. They are community signals, not verified facts, and update as new reports arrive. Grades and percentages appear only once at least {MIN_REPORTS_FOR_GRADE} applicants have reported outcomes. Report counts include outcomes shared publicly in discussion threads and on review sites (labeled and counted at reduced weight); web-research estimates are never counted as reports.
         </p>
       </div>
     </div>

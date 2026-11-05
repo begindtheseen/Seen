@@ -79,7 +79,7 @@ export default function InviteCard({ id, onReady }: { id?: string; onReady?: (re
           {cap && <small>{cap}</small>}
         </div>
         <div className={s.stat}>
-          <b>{earned || 'No Pro days earned yet'}</b>
+          <b>{earned || 'No Pro days yet — an outcome reported on an application tracked for 7+ days earns 3'}</b>
           {until && <small>{until}</small>}
         </div>
       </div>

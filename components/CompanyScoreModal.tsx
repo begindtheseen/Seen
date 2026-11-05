@@ -6,6 +6,7 @@
 // the "vs your industry" benchmark, a one-tap track, and a link to the full report.
 
 import { useEffect, useRef, useState, useCallback } from 'react'
+import Icon from '@/components/ui/Icon'
 import Link from 'next/link'
 import { useFocusTrap } from '@/lib/hooks/useFocusTrap'
 import { AppStore } from '@/lib/stores/AppStore'
@@ -49,9 +50,9 @@ function DataQuality({ s }: { s: Score }) {
       s.employee_review_count ? `${s.employee_review_count} employee review${s.employee_review_count === 1 ? '' : 's'}` : '',
       s.mention_count ? `${s.mention_count} online mention${s.mention_count === 1 ? '' : 's'}` : '',
     ].filter(Boolean)
-    return <span className={styles.dq} style={{ color: 'var(--green)' }}>🟢 {[`${fp} applicant account${fp === 1 ? '' : 's'}`, ...extra].join(' · ')}</span>
+    return <span className={styles.dq} style={{ color: 'var(--green)' }}><Icon name="circle-check" size={14} />{[`${fp} applicant account${fp === 1 ? '' : 's'}`, ...extra].join(' · ')}</span>
   }
-  return <span className={styles.dq} style={{ color: 'var(--amber)' }}>🌐 Web-research estimate — no first-party reports yet</span>
+  return <span className={styles.dq} style={{ color: 'var(--amber)' }}><Icon name="globe" size={14} />Web-research estimate — no first-party reports yet</span>
 }
 
 export default function CompanyScoreModal({ companyName, onClose }: { companyName: string; onClose: () => void }) {
@@ -128,7 +129,7 @@ export default function CompanyScoreModal({ companyName, onClose }: { companyNam
           <div className={styles.skeleton}>
             <div className={styles.skRow}>
               <div className="sk" style={{ width: 92, height: 92, borderRadius: '50%', flexShrink: 0 }} />
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                 <div className="sk" style={{ width: '60%', height: 12 }} />
                 <div className="sk" style={{ width: '40%', height: 10 }} />
               </div>

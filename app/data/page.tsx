@@ -96,7 +96,7 @@ export default async function DataPage() {
       <div className={styles.wrap}>
         <PageHeader
           size="lg"
-          eyebrow={`Open data · ${LICENSE_NAME} · updated hourly`}
+          eyebrow={`Open data · ${LICENSE_NAME} · snapshot of ${d.asOfLabel}`}
           title={DATASET_NAME}
           crumbLabel="Open data"
           sub={datasetSummary(d)}
@@ -128,7 +128,7 @@ export default async function DataPage() {
             {` Online mentions (${t.mentions.toLocaleString('en-US')} here) count half a report each. Estimates from web research are never counted as reports.`}
           </p>
           <p className={styles.p}>
-            Percentages appear only for companies with at least {MIN_REPORTS_FOR_RATES} applicant accounts ({plural(t.withRates, 'company', 'companies')} here); the others show a grade only. Reports are self-reported claims, not verified facts. How grades are built: <Link href={METHODS_PATH} prefetch={false}>methods</Link>. Rankings built from this table: <Link href="/lists" prefetch={false}>monthly lists</Link>.
+            Percentages appear only for companies with at least {MIN_REPORTS_FOR_RATES} applicant accounts ({t.withRates.toLocaleString()} of the {t.companies.toLocaleString()}); the others show a grade only. Reports are self-reported claims, not verified facts. How grades are built: <Link href={METHODS_PATH} prefetch={false}>methods</Link>. Rankings built from this table: <Link href="/lists" prefetch={false}>monthly lists</Link>.
           </p>
         </section>
 

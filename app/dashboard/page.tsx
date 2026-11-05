@@ -1,6 +1,7 @@
 'use client'
 
 import { whenLabel } from '@/lib/interviewTime'
+import { displayCompanyName, possessive } from '@/lib/companyDisplay'
 import { pathSegment, slugSegment, loginHref } from '@/lib/safeHref.js'
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -16,7 +17,6 @@ import { STAGES } from '@/lib/constants'
 import { _sync } from '@/lib/sync'
 import { isChecklistDismissed, withChecklistDismissed } from '@/lib/onboardingPrefs'
 import { healthUnlockLine, HEALTH_MIN_APPS } from '@/lib/dashboardCopy'
-import WelcomeOnboarding from '@/components/WelcomeOnboarding'
 import InviteCard from '@/components/growth/InviteCard'
 import type { Application } from '@/lib/types'
 import { isGradeableScore } from '@/lib/gradeGate'
@@ -24,6 +24,7 @@ import Odometer from '@/components/motion/Odometer'
 import { LoadError, PageSkeleton } from '@/components/shell/LoadStates'
 import styles from './dashboard.module.css'
 import Icon, { type IconName } from '@/components/ui/Icon'
+import Badge, { type BadgeTone } from '@/components/ui/Badge'
 
 // BadgeStore's ids drawn with the shared icon set (the store's emoji stay for share cards).
 const BADGE_ICON: Record<string, IconName> = {
@@ -74,7 +75,8 @@ function calcJobSearchHealth(apps: Application[]) {
 function localRecentCompanies(): Array<{ name: string; slug: string }> {
   try {
     const raw = localStorage.getItem('seen_recent_cos')
-    if (raw) return (JSON.parse(raw) as Array<{ name: string; slug: string }>).filter(c => c && c.name && c.slug)
+    // The stored name is the slug's lowercase; the chip shows the display casing (round 3: "fry's food stores").
+    if (raw) return (JSON.parse(raw) as Array<{ name: string; slug: string }>).filter(c => c && c.name && c.slug).map(c => ({ ...c, name: displayCompanyName(c.name) }))
   } catch {}
   return []
 }
@@ -239,7 +241,7 @@ export default function DashboardPage() {
   const staleApps = sortApplications(active.filter(a => windowOf(a).past), 'oldest', new Set())
   const staleSub = (a: Application) => windowOf(a).reference
     ? `Past the ${REFERENCE_WINDOW_DAYS}-day reference window — Seen has no response-time data for ${a.company} yet.`
-    : `Past ${a.company}'s usual response window (~${Math.round(coScores[a.company.toLowerCase()]!.avg_wait_days)} days).`
+    : `Past ${possessive(a.company)} usual response window (~${Math.round(coScores[a.company.toLowerCase()]!.avg_wait_days)} days).`
   const alertCount = staleApps.length + surges.length
   const allEvents = EventStore.get()
 
@@ -262,8 +264,10 @@ export default function DashboardPage() {
       const ratio = hi ? v / Math.max(avg, 1) : avg / Math.max(v, 1)
       return Math.min(99, Math.max(1, Math.round(50 * ratio)))
     }
-    const col = (v: number, avg: number | null, hi: boolean) => v === 0 || avg == null ? 'var(--muted)' : (hi ? (v >= avg ? 'var(--green)' : 'var(--amber)') : (v <= avg ? 'var(--green)' : v < avg * 1.4 ? 'var(--amber)' : 'var(--red)'))
-    const row = (lbl: string, v: number, avg: number | null, hi: boolean) => ({ lbl, val: `${v}%`, pct: avg == null ? 50 : pct(v, avg, hi), avg: avg == null ? 'reference pending' : `${avg}% reference`, col: col(v, avg, hi) })
+    // The figure is ink; the one tone signal on a tile is a Badge (word + icon), decided here by the reference.
+    const tone = (v: number, avg: number | null, hi: boolean): BadgeTone | null => v === 0 || avg == null ? null : (hi ? (v >= avg ? 'good' : 'caution') : (v <= avg ? 'good' : v < avg * 1.4 ? 'caution' : 'bad'))
+    const toneWord = (t: BadgeTone | null) => t === 'good' ? 'Ahead' : t === 'caution' ? 'Behind' : t === 'bad' ? 'Well behind' : ''
+    const row = (lbl: string, v: number, avg: number | null, hi: boolean) => { const t = tone(v, avg, hi); return { lbl, val: `${v}%`, pct: avg == null ? 50 : pct(v, avg, hi), avg: avg == null ? 'reference pending' : `${avg}% reference`, tone: t, word: toneWord(t) } }
     return {
       n,
       hasRef: !!AVG,
@@ -290,8 +294,8 @@ export default function DashboardPage() {
   // a red "50" next to "too early" read as a bad verdict (audit 2026-10-23).
   // No number at all until two real outcomes exist (audit 3 M1: "58" next to "Too early to call", drifting
   // 58 → 56 → 53 as Day-0 cards were added).
+  // The ring and the figure are ink; the card's one tone signal is the Badge beside the eyebrow.
   const healthReal = !!health && health.terminal >= HEALTH_MIN_OUTCOMES
-  const healthColor = health && healthReal ? (health.score >= 75 ? 'var(--green)' : health.score >= 55 ? 'var(--amber)' : 'var(--red)') : 'var(--muted)'
   const healthDeg = health && healthReal ? Math.round((health.score / 100) * 360) : 0
 
   // Status line — "open" = currently in-progress; distinct from "tracked total" (all-time).
@@ -338,35 +342,34 @@ export default function DashboardPage() {
 
   // Health headline: one plain sentence instead of a caption line.
   const healthHead = !health
-    ? { t: 'Your score unlocks soon.', s: healthUnlockLine(apps.length), badge: 'Getting started', tone: 'muted' }
+    ? { t: 'Your score unlocks soon.', s: healthUnlockLine(apps.length), badge: 'Getting started', tone: 'neutral' as BadgeTone }
     : !healthReal
-      ? { t: 'Too early to call.', s: `Your score appears once ${HEALTH_MIN_OUTCOMES} applications have a real outcome (hired, rejected or ghosted) — ${health.terminal} so far.`, badge: 'Early days', tone: 'muted' }
-      : health.score >= 75
-        ? { t: "You're getting noticed.", s: `${health.interviewRate}% of your applications reached an interview and ${health.responseRate}% got a reply. Keep doing what works.`, badge: 'Strong', tone: 'green' }
+      ? { t: 'Too early to call.', s: `Your score appears once ${HEALTH_MIN_OUTCOMES} applications have a real outcome (hired, rejected or ghosted) — ${health.terminal} so far.`, badge: 'Early days', tone: 'neutral' as BadgeTone }
+      : health.score >= 75 && health.ghostRate < 40
+        ? { t: "You're getting noticed.", s: `${health.interviewRate}% of your applications reached an interview and ${health.responseRate}% got a reply. Keep doing what works.`, badge: 'Strong', tone: 'good' as BadgeTone }
         : health.score >= 55
-          ? { t: "You're on track.", s: `${health.responseRate}% of your applications got a reply. A follow-up on the quiet ones could tip it.`, badge: 'On track', tone: 'amber' }
-          : { t: 'Room to improve.', s: `${health.ghostRate}% of your applications went silent. Check a company's ghost rate before applying and tailor your résumé.`, badge: 'Needs attention', tone: 'red' }
+          ? { t: "You're on track.", s: `${health.responseRate}% of your applications got a reply. A follow-up on the quiet ones could tip it.`, badge: 'On track', tone: 'caution' as BadgeTone }
+          : { t: 'Room to improve.', s: `${health.ghostRate}% of your applications went silent. Check a company's ghost rate before applying and tailor your résumé.`, badge: 'Needs attention', tone: 'bad' as BadgeTone }
   const signalCount = alertCount + (surveyInsight ? 1 : 0)
-  const today = new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles', month: 'short', year: 'numeric' })
+  // A fresh account (nothing tracked, and not because the load failed): the empty health / pipeline / signals
+  // boxes collapse into one row with the one button (DESIGN.md §5).
+  const fresh = apps.length === 0 && !loadFailed
+  const startSteps = [
+    { done: hasResume, label: 'Add your résumé', href: '/resume' },
+    { done: apps.length > 0, label: 'Track your first application', href: '/tracker?add=1' },
+    { done: recentCos.length > 0, label: 'Check a company before you apply', href: '/companies' },
+  ]
+  const startNext = startSteps.find(st => !st.done)
+  const startDone = startSteps.filter(st => st.done).length
 
   return (
     <div className="page-full">
       <div className={styles.dash}>
 
-        {/* ── First-run getting-started guide ── */}
-        {showOnboarding && (
-          <WelcomeOnboarding
-            name={name}
-            state={{ hasResume, appsCount: apps.length, companiesChecked: recentCos.length }}
-            onDismiss={dismissOnboarding}
-          />
-        )}
-
         {/* ── Intro: who, what matters today, one primary action. (Settings / sign-out live in the
             nav's account menu; Pro shows in the nav.) ── */}
         <header className={styles.intro}>
           <div style={{ minWidth: 0 }}>
-            <div className={styles.eyebrow}>Command Center · {today}</div>
             <h1 className={styles.hello}>{greeting}, {name}<span className={styles.dot}>.</span></h1>
             <p className={styles.status}>
               {loadFailed
@@ -374,8 +377,20 @@ export default function DashboardPage() {
                 : <>{statusLine}{apps.length ? <span className={styles.statusDim}> · {apps.length} tracked total</span> : null}</>}
             </p>
           </div>
-          <Link href="/tracker?add=1" className={`${styles.primary}`}>+ Track application</Link>
+          {/* The page's one filled button. A fresh account gets it in the empty row below instead. */}
+          {!fresh && <Link href="/tracker?add=1" className={`${styles.primary}`}>+ Track application</Link>}
         </header>
+
+        {/* ── Getting started: one line under the greeting, not a card above the fold (DESIGN.md §5) ── */}
+        {showOnboarding && (
+          <div role="status" style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap', padding: '.25rem .75rem', marginBottom: '1rem', border: '1px solid var(--border-1)', borderRadius: 'var(--r-control)', background: 'var(--surface-2)', fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--text-3)' }}>
+            <span style={{ fontWeight: 600, color: 'var(--text-2)' }}>Getting started · {startDone}/{startSteps.length}</span>
+            {startNext
+              ? <Link href={startNext.href} style={{ display: 'inline-flex', alignItems: 'center', minHeight: 40, color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>Next: {startNext.label} →</Link>
+              : <span>All set.</span>}
+            <button type="button" onClick={dismissOnboarding} aria-label="Hide getting started" title="Hide getting started" style={{ marginLeft: 'auto', marginRight: '-.75rem', display: 'grid', placeItems: 'center', minWidth: 44, minHeight: 44, background: 'none', border: 'none', color: 'var(--text-4)', cursor: 'pointer' }}><Icon name="x" size={14} /></button>
+          </div>
+        )}
 
         {loadFailed && (
           <div style={{ marginBottom: '1rem' }}>
@@ -388,16 +403,29 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {fresh ? (
+          <section className={styles.card} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+            <div style={{ minWidth: 0, flex: '1 1 240px' }}>
+              <b style={{ display: 'block', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-body)', color: 'var(--white)' }}>Nothing yet — track your first application</b>
+              <p style={{ margin: '.25rem 0 0', fontSize: 'var(--fs-sm)', lineHeight: 1.55, color: 'var(--sub)' }}>Your response rate, pipeline and signals fill in from here.</p>
+            </div>
+            <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+              <Link href="/tracker?add=1" className={styles.primary}>+ Track application</Link>
+              <Link href="/jobs" className={styles.ghostBtn}>Find jobs →</Link>
+            </div>
+          </section>
+        ) : (
+        <>
         {/* ── Row 1: search health | next best move ── */}
         <div className={styles.row}>
           <section className={`${styles.card} ${styles.health}`}>
             <div className={styles.cardHead}>
               <span className={styles.eyebrow}>Job search health</span>
-              <span className={`${styles.badge} ${styles[healthHead.tone]}`}>● {healthHead.badge}</span>
+              <Badge tone={healthHead.tone}>{healthHead.badge}</Badge>
             </div>
             <div className={styles.healthBody}>
-              <div className={styles.ring} style={{ background: `conic-gradient(${healthColor} ${healthDeg}deg, rgba(255,255,255,.1) 0deg)` }}>
-                <span style={{ color: healthColor }} aria-label={healthReal ? undefined : 'No score yet'}>{health && healthReal ? <Odometer value={health.score} /> : '—'}</span>
+              <div className={styles.ring} style={{ background: `conic-gradient(var(--text-2) ${healthDeg}deg, var(--border-2) 0deg)` }}>
+                <span aria-label={healthReal ? undefined : 'No score yet'}>{health && healthReal ? <Odometer value={health.score} /> : '—'}</span>
               </div>
               <div style={{ minWidth: 0 }}>
                 <h2 className={styles.healthT}>{healthHead.t}</h2>
@@ -406,10 +434,10 @@ export default function DashboardPage() {
             </div>
             {/* No numbers from a failed load with nothing local: "0 / 0 / 0" under an error reads as a verdict (R-1). */}
             <div className={styles.pills}>
-              <div className={styles.pill}><small>Open</small><b style={{ color: '#93b4ff' }}>{noData ? '—' : <Odometer value={active.length} />}</b></div>
-              <div className={styles.pill}><small>Response</small><b style={{ color: '#a5a2ff' }}>{noData || responseNum == null ? '—' : <Odometer value={responseNum} suffix="%" />}</b></div>
-              <div className={styles.pill}><small>Hired</small><b style={{ color: 'var(--green)' }}>{noData ? '—' : <Odometer value={hired.length} />}</b></div>
-              <div className={styles.pill}><small>Ghosted</small><b style={{ color: '#f87185' }}>{noData ? '—' : <Odometer value={ghosted.length} />}</b></div>
+              <div className={styles.pill}><small>Open</small><b>{noData ? '—' : <Odometer value={active.length} />}</b></div>
+              <div className={styles.pill}><small>Response</small><b>{noData || responseNum == null ? '—' : <Odometer value={responseNum} suffix="%" />}</b></div>
+              <div className={styles.pill}><small>Hired</small><b>{noData ? '—' : <Odometer value={hired.length} />}</b></div>
+              <div className={styles.pill}><small>Ghosted</small><b>{noData ? '—' : <Odometer value={ghosted.length} />}</b></div>
             </div>
             {ratedCount > 0 && <p className={styles.caption}>Based on {ratedCount} tracked application{ratedCount !== 1 ? 's' : ''}{apps.length > ratedCount ? ` · ${apps.length - ratedCount} withdrawn not counted` : ''}</p>}
           </section>
@@ -435,7 +463,7 @@ export default function DashboardPage() {
                 <b>Start tracking applications</b>
                 <p>Your real response rate, ghost rate and company benchmarks fill in from here.</p>
                 <div className={styles.emptyBtns}>
-                  <Link href="/jobs" className={`${styles.primary}`}>Find jobs</Link>
+                  <Link href="/jobs" className={styles.ghostBtn}>Find jobs</Link>
                   <Link href="/tracker?add=1" className={styles.ghostBtn}>Add one I applied to</Link>
                 </div>
               </div>
@@ -472,14 +500,13 @@ export default function DashboardPage() {
               const ivAt = ivEv ? String(ivEv.data!.at) : ''
               const sc = coScores[app.company.toLowerCase()]
               const ghostPct = sc ? Math.round(sc.ghost_rate * 100) : null
-              const tone = sc ? (sc.ghost_rate > 0.55 ? 'var(--red)' : sc.ghost_rate > 0.35 ? 'var(--amber)' : 'var(--green)') : undefined
               return (
                 <Link key={app.id} href={`/tracker#app_${pathSegment(app.id)}`} className={styles.job}>
                   <span className={styles.jobIco}>{(app.company || '?').charAt(0).toUpperCase()}</span>
                   <span className={styles.jobInfo}>
                     <b>{app.company}</b>
                     <small>{app.role || 'Role'}</small>
-                    <small className={styles.jobMeta}>{ivAt ? `${app.stage} · ${whenLabel(ivAt)}` : ivEv === null && ['Phone Screen', 'Interview', 'Final Round'].includes(app.stage) ? `${app.stage} · add the date` : <>Day {days}{ghostPct != null && <> · <span style={{ color: tone }}>{ghostPct}% reported ghost rate</span></>}</>}</small>
+                    <small className={styles.jobMeta}>{ivAt ? `${app.stage} · ${whenLabel(ivAt)}` : ivEv === null && ['Phone Screen', 'Interview', 'Final Round'].includes(app.stage) ? `${app.stage} · add the date` : <>Day {days}{ghostPct != null && <> · <span className={styles.ghostPct}>{ghostPct}% reported ghost rate</span></>}</>}</small>
                   </span>
                   <span className={styles.stage}>{app.stage}</span>
                 </Link>
@@ -490,7 +517,7 @@ export default function DashboardPage() {
           <section className={`${styles.card} ${styles.tight}`}>
             <div className={styles.cardHead}>
               <h2 className={styles.cardT}>Signals</h2>
-              {signalCount > 0 && <span className={`${styles.badge} ${styles.red}`}>{signalCount} to review</span>}
+              {signalCount > 0 && <Badge tone="bad">{signalCount} to review</Badge>}
             </div>
             {signalCount === 0 && <p className={styles.allClear}>All clear. Nothing needs you right now.</p>}
             {surveyInsight && (
@@ -523,6 +550,9 @@ export default function DashboardPage() {
           </section>
         </div>
 
+        </>
+        )}
+
         {/* ── Benchmarks (only once there is enough of your own data) ── */}
         {benchmarks && (
           <>
@@ -534,8 +564,9 @@ export default function DashboardPage() {
               {benchmarks.metrics.map(m => (
                 <div key={m.lbl} className={styles.metric}>
                   <span className={styles.eyebrow}>{m.lbl}</span>
-                  <b style={{ color: m.col }}>{m.val}</b>
+                  <b>{m.val}</b>
                   <small>{m.avg}</small>
+                  {m.tone && <Badge tone={m.tone}>{m.word}</Badge>}
                 </div>
               ))}
             </div>
@@ -550,30 +581,40 @@ export default function DashboardPage() {
         <div className={styles.tools}>
           <Link href="/resume" className={`${styles.tool}`}>
             <span className={styles.sym}><Icon name="file-text" size={18} /></span>
-            <b>Résumé</b>
-            <small>{hasResume ? `${profile?.resume_file_name || 'Résumé on file'} · Scan fit →` : 'Add your résumé →'}</small>
+            <span className={styles.toolBody}>
+              <b>Résumé</b>
+              <small>{hasResume ? `${profile?.resume_file_name || 'Résumé on file'} · Scan fit →` : 'Add your résumé →'}</small>
+            </span>
           </Link>
           <Link href="/tracker" className={`${styles.tool}`}>
             <span className={styles.sym}><Icon name="list-checks" size={18} /></span>
-            <b>Applications</b>
-            <small>{dueChecks.length ? `${dueChecks.length} check-in${dueChecks.length > 1 ? 's' : ''} waiting →` : 'Manage your pipeline →'}</small>
+            <span className={styles.toolBody}>
+              <b>Applications</b>
+              <small>{dueChecks.length ? `${dueChecks.length} check-in${dueChecks.length > 1 ? 's' : ''} waiting →` : 'Manage your pipeline →'}</small>
+            </span>
           </Link>
           {inbox?.ready && (
             <Link href="/tracker#autopilot" className={`${styles.tool}`}>
               <span className={styles.sym}><Icon name="mail" size={18} /></span>
-              <b>Inbox Autopilot</b>
-              <small>{inbox.enabled ? `On · ${inbox.received_count || 0} email${inbox.received_count === 1 ? '' : 's'} read →` : 'Forward job emails — tracking fills itself →'}</small>
+              <span className={styles.toolBody}>
+                <b>Inbox Autopilot</b>
+                <small>{inbox.enabled ? `On · ${inbox.received_count || 0} email${inbox.received_count === 1 ? '' : 's'} read →` : 'Forward job emails — tracking fills itself →'}</small>
+              </span>
             </Link>
           )}
           <Link href="/companies" className={`${styles.tool}`}>
             <span className={styles.sym}><Icon name="briefcase-business" size={18} /></span>
-            <b>Company intel</b>
-            <small>See who actually responds →</small>
+            <span className={styles.toolBody}>
+              <b>Company intel</b>
+              <small>See who actually responds →</small>
+            </span>
           </Link>
           <Link href="/report" className={`${styles.tool}`}>
             <span className={styles.sym}><Icon name="megaphone" size={18} /></span>
-            <b>Report an outcome</b>
-            <small>Warn the next applicant →</small>
+            <span className={styles.toolBody}>
+              <b>Report an outcome</b>
+              <small>Warn the next applicant →</small>
+            </span>
           </Link>
         </div>
 

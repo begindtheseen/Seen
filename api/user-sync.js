@@ -16,13 +16,16 @@ import { cancelLiveSubscriptions } from '../lib/server/stripeCancel.js';
 import { normalizeClaimCompany } from '../lib/server/employerClaims.js';
 import { buildNotificationRow } from '../lib/server/employerNotificationsStore.js';
 import { isReadableResume } from '../lib/server/resumeReadability.js';
+import { RESUME_ACTIONS, RESUME_WRITE_ACTIONS, handleResumeAction, saveDefaultResume, clearDefaultResume } from '../lib/server/resumes.js';
 import { deleteApplicantResumes } from '../lib/server/seenApplyStore.js';
 import { decodeThread } from '../lib/server/applicationThread.js';
 import { pacificDate } from '../lib/time/pacific.js';
+import { QUESTION_TYPES, TRACKER_OUTCOME_OPTIONS, VERIFY_OPTIONS, GENERIC_QUESTIONS, readAnswer, answerOutcome } from '../lib/server/intelQuestions.js';
 import { claimReferral, referralStatus, rewardReferralOnApplication } from '../lib/server/growthRewards.js';
 import { recordSignupAttribution } from '../lib/server/signupAttribution.js';
 import * as inbox from '../lib/server/inbox/store.js';
 import { PROFILE_LIMITS, PROFILE_NAME_REQUIRED } from '../lib/profileLimits.js';
+import { cleanMode, cleanAlertsInput, prefsFromRow, isRemotePlace, MAX_ALERTS, ALERT_RADII } from '../lib/server/jobAlerts.js';
 import { sanitizeEvents, clientApplicationId, casWindow, timelineAnomalies, naturalKeyQuery, isMissingColumn, cleanText, COMPANY_MAX, ROLE_MAX, CITY_MAX, PLATFORM_MAX } from '../lib/server/trackerWrites.js';
 
 // Does applications.client_id exist yet (migration 20261024130000)? Probed on use; a "no" is
@@ -84,8 +87,8 @@ export default async function handler(req, res) {
   console.log(`[user-sync] action=${action} uid=${uid} auth=${who.via}`);
 
   // Rate-limit mutating actions per user (not reads — those are cheap DB fetches)
-  const WRITE_ACTIONS = new Set(['claim_referral','record_attribution','add_application','update_application','remove_application','save_job','unsave_job','save_profile','save_resume','delete_account','submit_resume_survey','report_job_availability']);
-  if (WRITE_ACTIONS.has(action)) {
+  const WRITE_ACTIONS = new Set(['claim_referral','record_attribution','add_application','update_application','remove_application','save_job','unsave_job','save_profile','save_resume','delete_account','submit_resume_survey','report_job_availability','job_alerts_save']);
+  if (WRITE_ACTIONS.has(action) || RESUME_WRITE_ACTIONS.has(action)) {
     const windowHour = Math.floor(Date.now() / 3_600_000);
     const rlKey = `${uid}:user-sync:${windowHour}`;
     try {
@@ -99,6 +102,19 @@ export default async function handler(req, res) {
         if (count > 300) return res.status(429).json({ error: 'Too many requests — slow down.' });
       }
     } catch(_) { /* fail open */ }
+  }
+
+  // ── SAVED RÉSUMÉS (lib/server/resumes.js) — list / get / create / rename / delete / set_default ──
+  // Free keeps MAX_RESUMES_FREE, Pro MAX_RESUMES_PRO; the default is mirrored into profiles.resume_text.
+  // { ready: false } before migration 20261101140000 (the page keeps the single résumé).
+  if (RESUME_ACTIONS.has(action)) {
+    try {
+      const out = await handleResumeAction({ db, uid, action, body: body || {} });
+      return res.status(out.status).json(out.body);
+    } catch (e) {
+      console.error('[user-sync] resumes: %s', String(e.message || e).replace(/\n|\r/g, ' ').replace(/[^\x20-\x7e]/g, '').slice(0, 200));
+      return res.status(500).json({ error: 'Something went wrong with your résumés — try again.' });
+    }
   }
 
   // ── INBOX AUTOPILOT — the user's own controls (lib/server/inbox/store.js) ───────────────────────────
@@ -129,6 +145,58 @@ export default async function handler(req, res) {
       console.error('[user-sync] inbox: %s', String(e.message || e).replace(/\n|\r/g, ' ').replace(/[^\x20-\x7e]/g, '').slice(0, 200));
       return res.status(500).json({ error: String(e.message || 'inbox error').slice(0, 200) });
     }
+  }
+
+  // ── JOB ALERTS — which job-match emails this person gets (lib/server/jobAlerts.js) ─────────────────
+  // get  → { ready, mode: 'resume'|'alerts'|'off', alerts, has_resume, max, radii }
+  // save { mode, alerts: [{ keywords, place, miles }] } → the same shape, or 400 { error, index, field }.
+  // 'off' is the job-match unsubscribe (email_prefs.job_match_opt_out). { ready: false } until
+  // migration 20261101120000 adds email_prefs.job_match_mode / job_alerts.
+  if (action === 'job_alerts_get' || action === 'job_alerts_save') {
+    const prefsRead = async () => {
+      const r = await db(`email_prefs?user_id=eq.${uid}&select=job_match_opt_out,job_match_mode,job_alerts&limit=1`).catch(() => null);
+      if (!r) return { error: true };
+      if (!r.ok) { const e = await r.json().catch(() => null); return isMissingColumn(e) ? { missing: true } : { error: true }; }
+      const list = await r.json().catch(() => null);
+      return Array.isArray(list) ? { row: list[0] || null } : { error: true };
+    };
+    const answer = async () => {
+      const [p, pr] = await Promise.all([
+        prefsRead(),
+        db(`profiles?id=eq.${uid}&resume_text=not.is.null&select=id&limit=1`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      ]);
+      if (p.missing) return res.status(200).json({ ready: false });
+      if (p.error) return res.status(502).json({ error: 'Could not load your alerts — try again.' });
+      const prefs = prefsFromRow(p.row);
+      return res.status(200).json({
+        ready: true, mode: prefs.mode, saved_mode: prefs.savedMode, alerts: prefs.alerts,
+        has_resume: Array.isArray(pr) ? pr.length > 0 : null, max: MAX_ALERTS, radii: ALERT_RADII,
+      });
+    };
+    if (action === 'job_alerts_get') return answer();
+
+    const mode = cleanMode(body.mode);
+    if (!mode) return res.status(400).json({ error: 'Choose résumé matches, only my alerts, or off.' });
+    if (!Array.isArray(body.alerts)) return res.status(400).json({ error: 'Alerts must be a list.' });
+    let geo = null;
+    if (body.alerts.some((a) => a && typeof a === 'object' && !isRemotePlace(a.place))) {
+      try { geo = await import('../lib/geo/usPlaces.js'); } catch { geo = null; }
+      if (!geo || typeof geo.geocodePlace !== 'function') return res.status(503).json({ error: 'Places are not available right now — try again shortly.' });
+    }
+    const cleaned = cleanAlertsInput(body.alerts, { geocodePlace: geo ? geo.geocodePlace : () => null });
+    if (!cleaned.ok) return res.status(400).json({ error: cleaned.error, index: cleaned.index ?? null, field: cleaned.field ?? null });
+    if (mode === 'alerts' && !cleaned.alerts.length) return res.status(400).json({ error: 'Add at least one alert, or choose résumé matches.' });
+    const row = { user_id: uid, job_alerts: cleaned.alerts, job_match_opt_out: mode === 'off', updated_at: new Date().toISOString() };
+    if (mode !== 'off') row.job_match_mode = mode; // 'off' keeps the last mode for when they turn it back on
+    const w = await db('email_prefs?on_conflict=user_id', {
+      method: 'POST', body: JSON.stringify(row), headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    }).catch(() => null);
+    if (!w || !w.ok) {
+      const e = w ? await w.json().catch(() => null) : null;
+      if (isMissingColumn(e)) return res.status(200).json({ ready: false });
+      return res.status(502).json({ error: 'Could not save your alerts — try again.' });
+    }
+    return answer();
   }
 
   // ── LOAD — applications + saved jobs + recent cos + credits + feature flags ──
@@ -409,10 +477,21 @@ export default async function handler(req, res) {
   // ── SAVE PROFILE ────────────────────────────────────────────────────────────
   if (action === 'save_profile') {
     const p = body.profile || {};
-    // Only include columns guaranteed to exist — survey fields saved separately
-    const SAFE_FIELDS = ['email','name','type','city','industry','experience','survey_completed','onboarding_survey'];
+    // Only columns the person may edit. `email`, `type` and `account_type` are NOT client-writable
+    // (security audit 2026-11-01): the sign-up trigger sets them from the verified auth user, the
+    // account type gates employer features, and an editable email must never decide who gets mail.
+    const SAFE_FIELDS = ['name','city','industry','experience','survey_completed','onboarding_survey'];
     const row = { id: uid };
     SAFE_FIELDS.forEach(f => { if (p[f] !== undefined) row[f] = p[f]; });
+    if (row.experience !== undefined && row.experience !== null) {
+      if (typeof row.experience !== 'string') return res.status(400).json({ ok: false, error: 'experience must be text' });
+      row.experience = row.experience.trim().slice(0, 60);
+    }
+    if (row.survey_completed !== undefined) row.survey_completed = row.survey_completed === true;
+    if (row.onboarding_survey !== undefined && row.onboarding_survey !== null
+        && JSON.stringify(row.onboarding_survey).length > 8000) {
+      return res.status(400).json({ ok: false, error: 'onboarding_survey too large' });
+    }
     // Input hygiene (audit 2026-10-24, P1): the free-text fields are trimmed and capped (same limits as
     // the Settings form, lib/profileLimits.js), and a name that is present but blank is refused —
     // signup requires one, and the dashboard greeting has nowhere to fall back to.
@@ -436,13 +515,24 @@ export default async function handler(req, res) {
 
   // ── SAVE RESUME — upsert so it works even if profile row doesn't exist yet ──
   if (action === 'save_resume') {
-    const { text, fileName, wordCount } = body;
+    const { fileName, wordCount } = body;
+    if (body.text != null && typeof body.text !== 'string') return res.status(400).json({ ok: false, error: 'text must be text' });
+    const text = body.text ? body.text.replace(/\u0000/g, '') : body.text; // Postgres text refuses NUL
     // AUTHORITATIVE readability gate: unreadable text (glyph codes, binary spill) must NEVER
     // reach profiles.resume_text — the DB is the source of truth for signed-in users, so one
     // poisoned save corrupts the résumé on EVERY device (the 2026-07-03 cross-device incident).
     // Same canonical predicate as the upload + optimize gates (lib/server/resumeReadability.js).
     if (text && !isReadableResume(text)) {
       return res.status(400).json({ ok: false, error: 'RESUME_UNREADABLE' });
+    }
+    // Saved résumés: the text replaces the DEFAULT résumé (lib/server/resumes.js), then the profiles
+    // mirror below is written as before. Before the migration the table is missing and only profiles is.
+    if (text) {
+      const saved = await saveDefaultResume(db, uid, { text, fileName, wordCount });
+      if (saved === false) return res.status(502).json({ ok: false, error: 'Could not save your résumé — try again.' });
+    } else {
+      const cleared = await clearDefaultResume(db, uid);
+      if (cleared !== 'missing') return res.status(cleared ? 200 : 502).json({ ok: !!cleared });
     }
     const r = await db('profiles?on_conflict=id', {
       method: 'POST',
@@ -464,6 +554,9 @@ export default async function handler(req, res) {
 
   // ── CLEAR RESUME ────────────────────────────────────────────────────────────
   if (action === 'clear_resume') {
+    // With saved résumés the default goes and the newest other one takes over (and is mirrored).
+    const cleared = await clearDefaultResume(db, uid);
+    if (cleared !== 'missing') return res.status(200).json({ ok: !!cleared });
     await db(`profiles?id=eq.${uid}`, {
       method: 'PATCH',
       body: JSON.stringify({ resume_text: null, resume_file_name: null, resume_word_count: null }),
@@ -507,6 +600,8 @@ export default async function handler(req, res) {
       // Email preferences and send history (045, 20261024190000) and Inbox Autopilot (20261022120000):
       // the Privacy Policy promises these go with the account.
       'email_prefs', 'outcome_email_log', 'job_match_email_log', 'inbox_events', 'inbox_addresses', 'interview_preps',
+      // Saved résumés (migration 20261101140000; also cascade with the auth user).
+      'resumes',
     ];
     await Promise.all([
       ...userTables.map(t =>
@@ -846,17 +941,11 @@ export default async function handler(req, res) {
     // Priority 1: Resume-based company questions
     const empRes = await db(`resume_employment?user_id=eq.${uid}&select=company,title&limit=10`);
     const employment = empRes.ok ? await empRes.json() : [];
-    const Q_TYPES = [
-      { type: 'ghost', q: (co) => `Did ${co} respond to your application?`, opts: ['Yes, they responded','No, was ghosted','Haven\'t applied there'] },
-      { type: 'timeline', q: (co) => `How long did ${co} take to first contact you?`, opts: ['Same day','1–3 days','4–7 days','1–2 weeks','2–4 weeks','Never heard back'] },
-      { type: 'rounds', q: (co) => `How many interview rounds did ${co} put you through?`, opts: ['None / auto-rejected','1 round','2 rounds','3 rounds','4+ rounds'] },
-      { type: 'return', q: (co) => `Would you apply to ${co} again?`, opts: ['Definitely yes','Probably yes','Probably not','Never again'] },
-    ];
     for (const emp of employment) {
-      for (const qt of Q_TYPES) {
+      for (const qt of QUESTION_TYPES) {
         const key = `${qt.type}|${emp.company.toLowerCase()}`;
         if (!answered.has(key)) {
-          return res.status(200).json({ question: { key, company: emp.company, prompt: `We noticed ${emp.company} on your resume.`, text: qt.q(emp.company), options: qt.opts, credit_value: 1, source: 'resume' } });
+          return res.status(200).json({ question: { key, company: emp.company, prompt: `We noticed ${emp.company} on your resume.`, text: qt.text(emp.company), options: qt.options, credit_value: 1, source: 'resume' } });
         }
       }
     }
@@ -868,7 +957,7 @@ export default async function handler(req, res) {
       const co = app.company_name; if (!co) continue;
       const key = `tracker_outcome|${co.toLowerCase()}`;
       if (!answered.has(key)) {
-        return res.status(200).json({ question: { key, company: co, prompt: `You applied to ${co}.`, text: `What happened with your application at ${co}?`, options: ['Hired 🎉','Got an interview','Rejected','Ghosted','Still waiting'], credit_value: 1, source: 'tracker' } });
+        return res.status(200).json({ question: { key, company: co, prompt: `You applied to ${co}.`, text: `What happened with your application at ${co}?`, options: TRACKER_OUTCOME_OPTIONS, credit_value: 1, source: 'tracker' } });
       }
     }
 
@@ -882,16 +971,12 @@ export default async function handler(req, res) {
     for (const co of lowCos) {
       const key = `verify_ghost|${co.name.toLowerCase()}`;
       if (!answered.has(key)) {
-        return res.status(200).json({ question: { key, company: co.name, prompt: `${co.name} isn't graded yet — we need more applicant reports.`, text: `Did ${co.name} respond to your application?`, options: ['Yes, they responded','No, was ghosted','I haven\'t applied there'], credit_value: 1, source: 'verification' } });
+        return res.status(200).json({ question: { key, company: co.name, prompt: `${co.name} isn't graded yet — we need more applicant reports.`, text: `Did ${co.name} respond to your application?`, options: VERIFY_OPTIONS, credit_value: 1, source: 'verification' } });
       }
     }
 
     // Fallback: generic
-    const generics = [
-      { key: 'generic|response_time', text: 'On average, how long do companies take to respond to you?', options: ['Under a week','1–2 weeks','2–4 weeks','Over a month','They rarely respond'] },
-      { key: 'generic|ghosting_stage', text: 'At what stage are you ghosted most often?', options: ['After applying','After phone screen','After interview','After final round','Rarely get ghosted'] },
-      { key: 'generic|apps_per_week', text: 'How many applications do you send per week?', options: ['1–5','6–10','11–20','20+','I\'m between searches'] },
-    ];
+    const generics = GENERIC_QUESTIONS;
     for (const g of generics) {
       if (!answered.has(g.key)) return res.status(200).json({ question: { ...g, company: null, prompt: null, credit_value: 1, source: 'generic' } });
     }
@@ -903,6 +988,25 @@ export default async function handler(req, res) {
   if (action === 'submit_answer') {
     const { question_key, answer } = body;
     if (!question_key || !answer) return res.status(400).json({ error: 'question_key and answer required' });
+    // Only a question this account could have been asked, answered with one of its own options.
+    const read = readAnswer(question_key, answer);
+    if (!read.ok) return res.status(400).json({ error: read.error });
+    if (read.needs) {
+      const co = read.company;
+      const rows = async (path) => { const r = await db(path); return r.ok ? await r.json() : null; };
+      let asked = false;
+      if (read.needs === 'resume') {
+        const emp = await rows(`resume_employment?user_id=eq.${uid}&select=company&limit=50`);
+        asked = Array.isArray(emp) && emp.some((e) => String(e.company || '').toLowerCase() === co);
+      } else if (read.needs === 'tracker') {
+        const apps = await rows(`applications?user_id=eq.${uid}&select=company_name&limit=500`);
+        asked = Array.isArray(apps) && apps.some((a) => String(a.company_name || '').toLowerCase() === co);
+      } else {
+        const cos = await rows(`company_scores?company_name=ilike.${encodeURIComponent(co.replace(/[%_*,()]/g, ''))}&report_count=lt.5&select=company_name&limit=5`);
+        asked = Array.isArray(cos) && cos.some((c) => String(c.company_name || '').toLowerCase() === co);
+      }
+      if (!asked) return res.status(400).json({ error: 'unknown_question' });
+    }
     const today = pacificDate();
 
     // Check daily earn cap
@@ -934,15 +1038,14 @@ export default async function handler(req, res) {
     if (Object.keys(patch).length) await db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify(patch), headers: { Prefer: 'return=minimal' } });
     if (credited) await db('credit_transactions', { method: 'POST', body: JSON.stringify({ user_id: uid, delta: earned.gained, reason: 'earned_question', metadata: { question_key, answer } }), headers: { Prefer: 'return=minimal' } });
 
-    // Feed answer back into company intelligence (best-effort)
-    const [qtype, company] = question_key.split('|');
-    if (company && (qtype === 'ghost' || qtype === 'verify_ghost' || qtype === 'tracker_outcome')) {
-      const wasGhosted = answer.toLowerCase().includes('ghost') || answer.toLowerCase().includes('never');
-      const responded = answer.toLowerCase().includes('respond') || answer.toLowerCase().includes('interview') || answer.toLowerCase().includes('hired') || answer.toLowerCase().includes('rejected');
-      if (wasGhosted || responded) {
-        const outcome = wasGhosted ? 'ghosted' : 'human';
-        await db('reports', { method: 'POST', body: JSON.stringify({ company_name: company, outcome, experience_level: 'unspecified', platform: 'seen_intel', report_text: `[Intel] ${answer}` }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
-      }
+    // Feed the answer back into company intelligence (best-effort) — as THIS user's report, through the
+    // same anti-gaming check as every other first-party report (a second report on the same company in
+    // 30 days, or more than 15 in a day, is held for review at low weight).
+    const outcome = answerOutcome(read.qtype, answer);
+    if (read.company && outcome) {
+      const hdrs = { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' };
+      const trust = await assessSubmitTrust(SUPABASE_URL, hdrs, uid, `company_name=eq.${encodeURIComponent(read.company)}`);
+      await db('reports', { method: 'POST', body: JSON.stringify({ company_name: read.company, outcome, experience_level: 'unspecified', platform: 'seen_intel', report_text: `[Intel] ${answer}`, user_id: uid, trust_reason: trust.reason, outcome_weight: trust.weight, needs_review: trust.review }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
     }
 
     return res.status(200).json({ ok: true, credited, balance: isPro ? newBalance : newBalance + Math.max(0, cred.purchased_credits || 0), earned_today: newEarned });

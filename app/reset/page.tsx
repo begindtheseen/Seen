@@ -5,13 +5,15 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { internalPath, loginHref } from '@/lib/safeHref.js'
+// The same shell as /login (card under the nav on phones, centred on desktop) — one sign-in look.
+import styles from '@/app/login/login.module.css'
 
 const inp: React.CSSProperties = {
   width: '100%',
   background: 'var(--surface)',
   border: '1.5px solid var(--line2)',
   borderRadius: 8,
-  padding: '.72rem 1rem',
+  padding: '.75rem 1rem',
   color: 'var(--white)',
   fontFamily: 'var(--body)',
   fontSize: 'var(--fs-ui)',
@@ -19,13 +21,15 @@ const inp: React.CSSProperties = {
   caretColor: 'var(--blue)',
   boxSizing: 'border-box',
 }
-const label: React.CSSProperties = { fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)', display: 'block', marginBottom: '.35rem' }
-const h1: React.CSSProperties = { fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', margin: '0 0 .2rem' }
+const label: React.CSSProperties = { fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)', display: 'block', marginBottom: '.25rem' }
+const h1: React.CSSProperties = { fontFamily: 'var(--display)', fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', margin: '0 0 .25rem' }
 const sub: React.CSSProperties = { fontSize: 'var(--fs-sm)', color: 'var(--sub)', fontWeight: 300, marginBottom: '.5rem' }
 const fine: React.CSSProperties = { fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', lineHeight: 1.55, marginBottom: '1.5rem' }
 const focusOn = (e: React.FocusEvent<HTMLInputElement>) => { e.target.style.borderColor = 'var(--blue)' }
 const focusOff = (e: React.FocusEvent<HTMLInputElement>) => { e.target.style.borderColor = 'var(--line2)' }
-const cta = (busy: boolean): React.CSSProperties => ({ width: '100%', padding: '.85rem', background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)', color: '#fff', border: 'none', borderRadius: 8, fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)', cursor: busy ? 'not-allowed' : 'pointer', marginBottom: '.75rem', boxShadow: '0 0 20px rgba(59,130,246,0.3)', opacity: busy ? 0.7 : 1 })
+// The one primary on this screen: the flat CTA fill, body face (Syne is for headings), plain control shadow — the
+// same button as /login (round 2: the reset page had a glowing display-font button).
+const cta = (busy: boolean): React.CSSProperties => ({ width: '100%', minHeight: 48, padding: '.75rem', background: 'var(--cta)', color: 'var(--text-1)', border: 'none', borderRadius: 'var(--r-control)', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-ui)', cursor: busy ? 'not-allowed' : 'pointer', marginBottom: '.75rem', boxShadow: 'var(--sh-control)', opacity: busy ? 0.6 : 1 })
 
 /** The neutral answer to "send me a code" — the same words whether or not the address has an account
  *  (the raw Supabase error, "Signups not allowed for otp", told anyone which emails are registered;
@@ -173,7 +177,7 @@ export default function ResetPage() {
 
   const passwordFields = (onEnter: () => void) => (
     <>
-      <div style={{ marginBottom: '.85rem' }}>
+      <div style={{ marginBottom: '.75rem' }}>
         <label style={label} htmlFor="rs-new">New password</label>
         <input id="rs-new" type="password" autoComplete="new-password" value={newPass} onChange={e => setNewPass(e.target.value)} onFocus={focusOn} onBlur={focusOff} placeholder="Min 8 characters" style={inp} />
       </div>
@@ -183,13 +187,13 @@ export default function ResetPage() {
       </div>
     </>
   )
-  const message = msg && <div role="status" style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: ok ? 'var(--green)' : 'var(--red)', marginBottom: '.85rem', lineHeight: 1.6 }}>{msg}</div>
+  const message = msg && <div role="status" style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: ok ? 'var(--good-text)' : 'var(--bad-text)', marginBottom: '.75rem', lineHeight: 1.6 }}>{msg}</div>
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 1.5rem 1.5rem' }}>
-      <div className="rise-in" style={{ width: '100%', maxWidth: 420 }}>
+    <div className={styles.wrap}>
+      <div className={styles.card}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '2rem', justifyContent: 'center' }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--blue)', boxShadow: '0 0 10px rgba(59,130,246,0.6)', display: 'inline-block' }} />
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--blue)', display: 'inline-block' }} />
           <span style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-h3)', fontWeight: 600, color: 'var(--white)', letterSpacing: '-.02em' }}>Seen</span>
         </div>
 
@@ -211,7 +215,7 @@ export default function ResetPage() {
               {verifying ? 'Saving...' : 'Save new password →'}
             </button>
             <div style={{ textAlign: 'center' }}>
-              <Link href="/dashboard" style={{ color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textDecoration: 'none' }}>
+              <Link href="/dashboard" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textDecoration: 'none' }}>
                 Keep my current password
               </Link>
             </div>
@@ -248,7 +252,7 @@ export default function ResetPage() {
               {sending ? 'Sending...' : 'Send code →'}
             </button>
             <div style={{ textAlign: 'center' }}>
-              <Link href={loginHref(returnTo)} style={{ color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textDecoration: 'none' }}>
+              <Link href={loginHref(returnTo)} style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textDecoration: 'none' }}>
                 Back to sign in
               </Link>
             </div>
@@ -258,9 +262,9 @@ export default function ResetPage() {
         {mode === 'code' && step === 2 && (
           <div data-testid="reset-code">
             <h1 style={h1}>Enter your code</h1>
-            <div style={{ ...sub, marginBottom: '.35rem' }}>{CODE_SENT_COPY(email.trim())}</div>
+            <div style={{ ...sub, marginBottom: '.25rem' }}>{CODE_SENT_COPY(email.trim())}</div>
             <div style={fine}>An 8-digit code, not a link. It expires in 10 minutes. Nothing arrived? Check spam, or make sure this is the address you signed up with.</div>
-            <div style={{ marginBottom: '.85rem' }}>
+            <div style={{ marginBottom: '.75rem' }}>
               <label style={label} htmlFor="rs-code">8-digit code</label>
               <input
                 id="rs-code"

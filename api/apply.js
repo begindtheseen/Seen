@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import { rateLimit } from '../lib/server/ratelimit.js';
+import { escapeHtml } from '../lib/server/escapeHtml.js';
 import { normalizeClaimCompany } from '../lib/server/employerClaims.js';
 import { buildNotificationRow } from '../lib/server/employerNotificationsStore.js';
 import {
@@ -16,6 +17,7 @@ import {
   recomputeCompanyScoreFromReports,
 } from './_utils/reportWrite.js';
 import { extractUploadText } from '../lib/server/resumeUpload.js';
+import { readResumes, readPro, resumeListItem, sortResumes, resumeForApply } from '../lib/server/resumes.js';
 
 // Best-effort: record the observed apply CLICK (the only thing observable on a redirect apply) and
 // enqueue an "apply_activity" notification for the company's employer (migrations 057/058). NEVER
@@ -118,7 +120,7 @@ function buildResumeHTML(text, name, role, company, optimizedBullets = [], keywo
   for (let i = 1; i < Math.min(7, lines.length); i++) {
     const l = lines[i];
     const isContact = /@/.test(l) || /\d{3}[\-\.\s\(]\d{3}/.test(l) ||
-      /^[A-Za-z\s]+,\s*[A-Z]{2}/.test(l) || /linkedin\.com|github\.com/i.test(l) ||
+      /^[A-Za-z\s]+,\s*[A-Z]{2}/.test(l) || /\b(?:linkedin|github)\b/i.test(l) ||
       /^[\w\s,·\-\.\(\)@+]+$/.test(l) && l.length < 80;
     if (isContact) { contactLines.push(l); bodyStart = i + 1; }
     else if (contactLines.length > 0 && l.length < 100 && !/[A-Z]{3,}/.test(l)) {
@@ -286,12 +288,16 @@ async function seenApplyStatus(req, res, uid) {
   const jobId = String((req.body || {}).job_id || '');
   const { job } = await loadSeenJob(db, jobId);
   if (!job) return res.status(200).json({ ok: true, available: true, accepts_seen: false });
-  const [prof, dup, email] = await Promise.all([
+  const [prof, dup, email, saved, pro] = await Promise.all([
     db(`profiles?id=eq.${uid}&select=name,email,resume_text,resume_file_name&limit=1`).then(r => r.ok ? r.json() : []).catch(() => []),
     db(`seen_applications?job_id=eq.${encodeURIComponent(job.id)}&applicant_user_id=eq.${uid}&select=id,created_at,status&limit=1`).then(r => r.ok ? r.json() : []).catch(() => []),
     authUserEmail({ SUPABASE_URL, SERVICE_KEY, uid }),
+    readResumes(db, uid).catch(() => ({ error: true })),
+    readPro(db, uid).catch(() => false),
   ]);
   const p = prof[0] || {};
+  // Saved résumés (lib/server/resumes.js): offered as a choice only when there is more than one.
+  const resumes = saved.rows && saved.rows.length > 1 ? sortResumes(saved.rows).map(r => resumeListItem(r, pro)) : null;
   return res.status(200).json({
     ok: true,
     available: true,
@@ -304,6 +310,7 @@ async function seenApplyStatus(req, res, uid) {
       email: email || p.email || '',
       has_saved_resume: !!(p.resume_text && p.resume_text.length >= 50),
       saved_resume_file_name: p.resume_file_name || null,
+      resumes,
     },
   });
 }
@@ -339,7 +346,13 @@ async function seenApply(req, res, uid) {
   // Résumé: the saved Seen résumé (profiles.resume_text) or an uploaded file (kept as the original
   // file in the PRIVATE application-resumes bucket + its extracted text).
   let resumeText = null, resumePath = null, resumeFileName = null, resumeMime = null;
-  if (app.resumeSource === 'saved') {
+  if (app.resumeSource === 'saved' && body.resume_id) {
+    // One of the account's saved résumés; a non-default one only while Pro is on.
+    const pick = await resumeForApply(db, uid, String(body.resume_id));
+    if (pick.error) return res.status(pick.status).json({ error: pick.error, ...(pick.reason ? { reason: pick.reason } : {}) });
+    resumeText = pick.text;
+    resumeFileName = pick.fileName;
+  } else if (app.resumeSource === 'saved') {
     const pr = await db(`profiles?id=eq.${uid}&select=resume_text,resume_file_name&limit=1`);
     const p = pr.ok ? (await pr.json())[0] : null;
     if (!p || !p.resume_text || p.resume_text.length < 50) return res.status(400).json({ error: 'You don’t have a résumé saved on Seen — attach one instead' });
@@ -350,7 +363,7 @@ async function seenApply(req, res, uid) {
     if (base64Bytes(b64) > MAX_RESUME_BYTES) return res.status(400).json({ error: 'That file is over 3 MB — try a smaller PDF' });
     const fileName = String(body.file_name || 'resume.pdf').slice(0, 200);
     const extracted = await extractUploadText({ base64: b64, fileName, mimeType: body.mime_type });
-    if (!extracted.ok) return res.status(extracted.status || 400).json({ error: extracted.error });
+    if (!extracted.ok) return res.status(extracted.status || 400).json({ error: extracted.error, ...(extracted.code ? { code: extracted.code } : {}) });
     resumeText = extracted.text;
     resumeFileName = fileName;
     const obj = resumeObject({ applicantId: uid, jobId: job.id, fileName, nowMs: Date.now() });
@@ -580,16 +593,22 @@ export default async function handler(req, res) {
     return _action === 'withdraw' ? withdraw(req, res, uid) : withdrawReview(req, res, uid);
   }
 
-  const { allowed: rlOk } = await rateLimit(req, 'apply');
+  // Per ACCOUNT (a shared IP must not throttle strangers, and one account must not mail at will).
+  const { allowed: rlOk } = await rateLimit(req, 'apply', { bucketKey: `user:${uid}` });
   if (!rlOk) return res.status(429).json({ error: 'Too many requests — slow down.' });
 
   try {
     const {
-      applicantName, applicantEmail, role, company, location,
-      resumeLink, resumeText: rawResumeText, coverNote, applyEmail,
+      applicantName, role, company, location,
+      resumeLink, resumeText: rawResumeText, coverNote,
       optimizedBullets = [], keywords = [], wasOptimized = false,
       jobId, applyUrl,
     } = req.body || {};
+    // The confirmation goes to the SIGNED-IN account's own address, never one from the request body
+    // (security audit 2026-11-01: any account could send Seen-branded mail to any address). A
+    // body-supplied employer address (`applyEmail`) is no longer forwarded to at all — the app never
+    // sent one; Apply-on-Seen is the employer path.
+    const applicantEmail = await authUserEmail({ SUPABASE_URL: process.env.SUPABASE_URL, SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY, uid });
 
     // Validate the applicant email before it becomes a recipient / reply_to. It's
     // body-supplied and reflected into To: and Reply-To: of mail sent from
@@ -618,7 +637,8 @@ export default async function handler(req, res) {
     const topBullets = (wasOptimized && optimizedBullets.length)
       ? optimizedBullets.slice(0, 3).map(b => b.optimized || b)
       : [];
-    const esc = s => (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const esc = escapeHtml; // text and attribute values alike
+    const mailto = (to, subject) => esc(`mailto:${encodeURIComponent(to || '')}${subject ? `?subject=${encodeURIComponent(subject)}` : ''}`);
 
     const sends = [];
 
@@ -693,11 +713,11 @@ export default async function handler(req, res) {
     <div style="background:#f8f8fb;border:1px solid #e4e4ec;border-radius:8px;padding:16px;margin-bottom:20px">
       <div style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px">Applicant details</div>
       <div style="font-size:14px;color:#111;margin-bottom:6px"><strong>Name:</strong> ${esc(applicantName)}</div>
-      <div style="font-size:14px;color:#111;margin-bottom:6px"><strong>Email:</strong> <a href="mailto:${esc(applicantEmail)}" style="color:#1a1aff">${esc(applicantEmail)}</a></div>
+      <div style="font-size:14px;color:#111;margin-bottom:6px"><strong>Email:</strong> <a href="${mailto(applicantEmail)}" style="color:#1a1aff">${esc(applicantEmail)}</a></div>
       <div style="font-size:14px;color:#111;margin-bottom:6px"><strong>Resume:</strong> ${resumeHTML ? `✓ HTML attachment${wasOptimized ? ' (AI-tailored)' : ''}` : esc(resumeLink || 'On file')}</div>
       ${coverNote ? `<div style="font-size:14px;color:#111;margin-top:10px;padding-top:10px;border-top:1px solid #e4e4ec"><strong>Cover note:</strong><br><span style="color:#444;line-height:1.6">${esc(coverNote)}</span></div>` : ''}
     </div>
-    <a href="mailto:${esc(applicantEmail)}?subject=Re: Your application for ${esc(role)} at ${esc(company)}" style="display:inline-block;padding:11px 22px;background:#111;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600">Reply to applicant</a>
+    <a href="${mailto(applicantEmail, `Re: Your application for ${role || ''} at ${company || ''}`)}" style="display:inline-block;padding:11px 22px;background:#111;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600">Reply to applicant</a>
   </div>
   <p style="text-align:center;font-size:11px;color:#aaa;margin-top:16px">Seen · seenjobs.io</p>
 </td></tr>
@@ -707,33 +727,6 @@ export default async function handler(req, res) {
       })
     }));
 
-    // 3. Forward to company email if provided (strict validation to prevent header injection)
-    if (applyEmail && isValidEmail(applyEmail) && applyEmail !== NOTIFY_EMAIL) {
-      sends.push(fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          from: 'Seen Applications <noreply@seenjobs.io>',
-          to: [applyEmail],
-          reply_to: applicantEmail,
-          subject: `Application via Seen — ${role}`,
-          html: `<!DOCTYPE html><html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;padding:36px 28px;color:#111;background:#fff">
-<p style="font-size:15px;margin:0 0 6px;font-weight:700">${esc(applicantName)}</p>
-<p style="font-size:14px;color:#555;margin:0 0 18px">Applied for <strong style="color:#111">${esc(role)}</strong> at ${esc(company)}</p>
-<p style="font-size:14px;color:#555;margin:0 0 6px"><strong style="color:#111">Email:</strong> <a href="mailto:${esc(applicantEmail)}" style="color:#1a1aff">${esc(applicantEmail)}</a></p>
-${topBullets.length ? `
-<div style="border:1px solid #ddd;border-left:3px solid #111;border-radius:0 5px 5px 0;padding:12px 16px;margin:16px 0;background:#fafafa">
-  <div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-weight:700;margin-bottom:8px">Most relevant experience</div>
-  <ul style="list-style:disc;padding-left:18px;margin:0">${topBullets.map(b => `<li style="padding:3px 0;color:#222;font-size:13.5px;line-height:1.5">${esc(b)}</li>`).join('')}</ul>
-</div>` : ''}
-${resumeHTML ? `<p style="font-size:14px;color:#555;margin:0 0 6px"><strong style="color:#111">Resume:</strong> See attachment${wasOptimized ? ' (tailored for this role)' : ''}</p>` : ''}
-${coverNote ? `<p style="font-size:14px;color:#555;margin:0 0 6px"><strong style="color:#111">Note:</strong> ${esc(coverNote)}</p>` : ''}
-<p style="font-size:11px;color:#bbb;margin-top:24px;border-top:1px solid #eee;padding-top:12px">Sent via Seen · seenjobs.io</p>
-</body></html>`,
-          attachments: resumeAttachment,
-        })
-      }));
-    }
 
     const results = await Promise.allSettled(sends);
     const failed = results.filter(r => r.status === 'rejected');

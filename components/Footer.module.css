@@ -1,7 +1,7 @@
 .footer {
   position: relative; z-index: 2;
   background: var(--void); border-top: 1px solid var(--line);
-  padding: 2.6rem 1.5rem 1.4rem;
+  padding: 2.5rem 1.5rem 1.5rem;
 }
 .wrap {
   max-width: 1120px; margin: 0 auto;
@@ -13,18 +13,18 @@
   font-family: var(--display); font-size: var(--fs-lead); font-weight: 800; color: var(--white); letter-spacing: -0.02em; text-decoration: none;
 }
 .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--blue); box-shadow: 0 0 10px rgba(59, 130, 246, 0.8); }
-.tag { color: var(--sub); font-size: var(--fs-sm); line-height: 1.6; margin: 0.7rem 0 0.9rem; max-width: 34ch; font-weight: 400; }
+.tag { color: var(--sub); font-size: var(--fs-sm); line-height: 1.6; margin: .75rem 0 1rem; max-width: 34ch; font-weight: 400; }
 .cmd {
-  display: inline-flex; align-items: center; gap: 0.45rem;
-  background: none; border: 1px solid var(--line); border-radius: 8px; padding: 0.35rem 0.6rem;
+  display: inline-flex; align-items: center; gap: .5rem;
+  background: none; border: 1px solid var(--line); border-radius: 8px; padding: .25rem .5rem;
   color: var(--dim); font-family: var(--mono); font-size: var(--fs-meta); cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease;
 }
 .cmd:hover { color: var(--white); border-color: var(--line2); }
-.cmd kbd { font-family: var(--mono); font-size: var(--fs-meta); color: var(--sub); border: 1px solid var(--line2); border-bottom-width: 2px; border-radius: 4px; padding: 0.08rem 0.32rem; }
+.cmd kbd { font-family: var(--mono); font-size: var(--fs-meta); color: var(--sub); border: 1px solid var(--line2); border-bottom-width: 2px; border-radius: 4px; padding: .0625rem .25rem; }
 
-.col { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
-.colT { font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); margin-bottom: 0.45rem; }
+.col { display: flex; flex-direction: column; gap: .25rem; min-width: 0; }
+.colT { font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); margin-bottom: .5rem; }
 .link {
   color: var(--sub); font-size: var(--fs-sm); text-decoration: none; width: fit-content;
   transition: color 0.15s ease, transform 0.25s var(--ease-out);
@@ -46,7 +46,7 @@
   .cmd { display: none; } /* keyboard-only feature */
 }
 @media (max-width: 480px) {
-  .footer { padding: 2rem 1.25rem 1.2rem; }
+  .footer { padding: 2rem 1.25rem 1.25rem; }
   .wrap { gap: 1.5rem 1rem; }
 }
 @media (prefers-reduced-motion: reduce) {

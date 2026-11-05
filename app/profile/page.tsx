@@ -9,12 +9,16 @@ import { markIntentionalSignOut } from '@/lib/sessionExpired'
 import { offerLine } from '@/lib/pricing'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { ResumeStore } from '@/lib/stores/ResumeStore'
+import { ResumeDocStore } from '@/lib/stores/ResumeDocStore'
+import { parseResume } from '@/lib/resume/engine-client'
 import { parseResumeFile } from '@/lib/resumeUploadClient'
 import PageHeader from '@/components/shell/PageHeader'
+import Icon from '@/components/ui/Icon'
 import InviteCard from '@/components/growth/InviteCard'
+import JobAlertsCard from '@/components/settings/JobAlertsCard'
 import DangerConfirmDialog from '@/components/DangerConfirmDialog'
 import DeleteAccountDialog from '@/components/profile/DeleteAccountDialog'
-import { PROFILE_LIMITS, PROFILE_NAME_REQUIRED, clampProfileField } from '@/lib/profileLimits.js'
+import { PROFILE_LIMITS, clampProfileField } from '@/lib/profileLimits.js'
 import { loginHref } from '@/lib/safeHref.js'
 import styles from './profile.module.css'
 import { formatPacific } from '@/lib/time/pacific.js'
@@ -63,9 +67,16 @@ export default function ProfilePage() {
   // Interview Sprint). It ends on its own; nothing renews, so the subscription copy must not show.
   const [proUntil, setProUntil] = useState<string | null>(null)
   const [inviteReady, setInviteReady] = useState(false)
+  const [alertsReady, setAlertsReady] = useState(false)
   // Already "loaded" if we have a cached copy (instant render); otherwise show a skeleton
   // for the one-time first load rather than an empty flash.
   const [loaded, setLoaded] = useState(!!_cache)
+  // The DB answer has landed (or failed) — only then may the résumé's city be offered for an empty field.
+  const [profileSettled, setProfileSettled] = useState(false)
+  // The city the résumé on file names (parsed doc → basics.location). Shown as a SUGGESTION in an empty
+  // City field with a helper line, never written until "Save changes" (coordinator 2026-11-02: Maria's
+  // Phoenix and Dev's Austin stayed blank for résumés uploaded before the upload path started filling it).
+  const [resumeCity, setResumeCity] = useState('')
 
   const isDirty = name !== initName || city !== initCity || experience !== initExperience
 
@@ -99,10 +110,12 @@ export default function ProfilePage() {
     if (!isLoggedIn) { router.replace(loginHref(`${window.location.pathname}${window.location.search}${window.location.hash}`)); return }
     // Instant fill from this user's cache (now that the user id is known), then the DB wins.
     const fill = (p: CachedProfile) => {
-      if (!touched.current.name) setName(p.name)
+      // A name equal to the email's local part came from a sign-up default, not the person (round 1: FIRST NAME = email prefix).
+      const shownName = p.name && p.name.toLowerCase() === String(user?.email || '').split('@')[0].toLowerCase() ? '' : p.name
+      if (!touched.current.name) setName(shownName)
       if (!touched.current.city) setCity(p.city)
       if (!touched.current.experience) setExperience(p.experience)
-      setInitName(p.name); setInitCity(p.city); setInitExperience(p.experience)
+      setInitName(shownName); setInitCity(p.city); setInitExperience(p.experience)
     }
     const cached = readProfileCache(user?.id)
     if (cached) { fill(cached); setLoaded(true) }
@@ -113,7 +126,7 @@ export default function ProfilePage() {
         fill(loadedProfile)
         writeProfileCache(user?.id, loadedProfile)
       }
-    }).catch(() => {}).finally(() => setLoaded(true))
+    }).catch(() => {}).finally(() => { setLoaded(true); setProfileSettled(true) })
     // Subscription status — gates the Billing section + Manage/Cancel button. get_credits is one DB
     // read; this used to call `load` (the whole tracker: six reads) for one boolean.
     _sync('get_credits').then((res) => {
@@ -128,9 +141,24 @@ export default function ProfilePage() {
   useEffect(() => {
     if (!ready || !isLoggedIn) return
     ResumeStore.load(user?.id, isLoggedIn)
-      .then(data => { if (data) setResumeMeta({ fileName: data.fileName, wordCount: data.wordCount }) })
+      .then(data => {
+        if (!data) return
+        setResumeMeta({ fileName: data.fileName, wordCount: data.wordCount })
+        // The Studio's cached server parse when it matches this text, else the same parser in the browser.
+        try {
+          const doc = ResumeDocStore.getParsed(user?.id, data.text) || parseResume(data.text, data.fileName)
+          const loc = String(doc?.basics?.location || '').trim()
+          if (loc && loc.length <= PROFILE_LIMITS.city) setResumeCity(loc)
+        } catch { /* no suggestion */ }
+      })
       .catch(() => {})
   }, [ready, isLoggedIn, user?.id])
+
+  // Offer the résumé's city once the saved profile is known to have none — as a one-tap suggestion
+  // UNDER the field, never typed into it (round 3: a prefilled city made the form "unsaved" on load, and
+  // the Discard / Save bar sat over the first field before anyone touched anything).
+  const citySuggestion = profileSettled && !!resumeCity && !initCity && !city && !touched.current.city ? resumeCity : ''
+  const takeCitySuggestion = () => { touched.current.city = true; setCity(resumeCity) }
 
   // Add / replace the résumé — the SAME canonical upload path as the Résumé-AI page
   // (parseResumeFile → /api/resume parse → ResumeStore.save), never a fork. Passing the city
@@ -198,10 +226,11 @@ export default function ProfilePage() {
     // of saving one: signup requires a name and the dashboard greets by it (audit 2026-10-24, P1).
     const cleanName = clampProfileField('name', name)
     const cleanCity = clampProfileField('city', city)
-    if (!cleanName) { setSaveMsg(PROFILE_NAME_REQUIRED); setSaveMsgOk(false); return }
+    // A blank name (the email-prefix placeholder is shown as none) must not block saving the city or level
+    // (round 4: "Use Phoenix, AZ" → Save changes sent nothing). The name is sent only when there is one.
     setSaving(true)
     setSaveMsg('')
-    const result = await _sync('save_profile', { profile: { name: cleanName, city: cleanCity, experience } }) as { ok?: boolean; error?: string } | null
+    const result = await _sync('save_profile', { profile: { ...(cleanName ? { name: cleanName } : {}), city: cleanCity, experience } }) as { ok?: boolean; error?: string } | null
     if (!result || result.ok === false) {
       setSaveMsg(result?.error || 'Save failed — please try again.')
       setSaveMsgOk(false)
@@ -334,7 +363,7 @@ export default function ProfilePage() {
           tone="indigo"
           title="Settings"
           crumbLabel="Settings"
-          sub="Your profile, résumé, security and plan — one place. Changes save when you say so."
+          sub="Your profile, résumé, job alerts, security and plan — one place. Changes save when you say so."
         />
 
         <div className={styles.layout}>
@@ -343,19 +372,20 @@ export default function ProfilePage() {
             <div className={styles.me}>
               <div className={styles.avatar}>{initial}</div>
               <div className={styles.meT}>
-                <div className={styles.meName}>{name || 'Your name'}</div>
+                <div className={styles.meName}>{name || 'No name yet'}</div>
                 <div className={styles.meMail}>{user?.email}</div>
                 <span className={`${styles.plan} ${isPro ? styles.planPro : styles.planFree}`}>{isPro ? '★ Seen Pro' : 'Free plan'}</span>
               </div>
             </div>
             {/* div, not <nav>: globals.css styles every nav element as the fixed site bar */}
             <div className={styles.jumps} role="navigation" aria-label="Settings sections">
-              <a href="#profile" className={styles.jump}><span>👤</span>Profile</a>
-              <a href="#resume" className={styles.jump}><span>📄</span>Résumé</a>
-              <a href="#security" className={styles.jump}><span>🔒</span>Security</a>
-              <a href="#plan" className={styles.jump}><span>◈</span>Plan &amp; billing</a>
-              {inviteReady && <a href="#invite" className={styles.jump}><span>↗</span>Invite friends</a>}
-              <a href="#danger" className={`${styles.jump} ${styles.jumpDanger}`}><span>⚠</span>Delete account</a>
+              <a href="#profile" className={styles.jump}><span><Icon name="user" size={16} /></span>Profile</a>
+              <a href="#resume" className={styles.jump}><span><Icon name="file-text" size={16} /></span>Résumé</a>
+              {alertsReady && <a href="#alerts" className={styles.jump}><span><Icon name="bell" size={16} /></span>Job alerts</a>}
+              <a href="#security" className={styles.jump}><span><Icon name="lock" size={16} /></span>Security</a>
+              <a href="#plan" className={styles.jump}><span><Icon name="wallet" size={16} /></span>Plan &amp; billing</a>
+              {inviteReady && <a href="#invite" className={styles.jump}><span><Icon name="users" size={16} /></span>Invite friends</a>}
+              <a href="#danger" className={`${styles.jump} ${styles.jumpDanger}`}><span><Icon name="triangle-alert" size={16} /></span>Delete account</a>
             </div>
           </aside>
 
@@ -392,7 +422,11 @@ export default function ProfilePage() {
                       placeholder="e.g. Los Angeles, CA"
                     />
                   ) : <div className={styles.skeleton} />}
-                  <div className={styles.hint}>Auto-loads nearby listings on the Jobs page.</div>
+                  <div className={styles.hint}>
+                    {citySuggestion
+                      ? <>Your résumé says <button type="button" className={styles.suggest} onClick={takeCitySuggestion}>Use {citySuggestion}</button></>
+                      : 'Auto-loads nearby listings on the Jobs page.'}
+                  </div>
                 </div>
                 <div className={styles.field}>
                   <label className={styles.label} htmlFor="pf-level">Experience level</label>
@@ -422,10 +456,10 @@ export default function ProfilePage() {
               </div>
               {resumeMeta && (
                 <div className={styles.file}>
-                  <div className={styles.fileIco}>📄</div>
+                  <div className={styles.fileIco}><Icon name="file-text" size={18} /></div>
                   <div style={{ minWidth: 0 }}>
                     <div className={styles.fileName}>{resumeMeta.fileName}</div>
-                    <div className={styles.fileMeta}>✓ {resumeMeta.wordCount.toLocaleString()} words · matched to jobs</div>
+                    <div className={styles.fileMeta}>{resumeMeta.wordCount.toLocaleString()} words · matched to jobs</div>
                   </div>
                 </div>
               )}
@@ -446,6 +480,9 @@ export default function ProfilePage() {
               <div className={styles.hint}>PDF, Word or .txt. {RESUME_PARSE_COST === 0 ? 'Free — no AI credit used.' : `Parsing uses ${RESUME_PARSE_COST} AI credit.`}</div>
               {resumeMsg && <div className={`${styles.msg} ${resumeMsgOk ? styles.ok : styles.err}`}>{resumeMsg}</div>}
             </section>
+
+            {/* ── Job alerts: what the job-match email is about (hidden until its migration is applied) ── */}
+            {ready && isLoggedIn && <JobAlertsCard id="alerts" onReady={setAlertsReady} />}
 
             {/* ── Security ── */}
             <section id="security" className={styles.card}>
@@ -476,8 +513,8 @@ export default function ProfilePage() {
                     </div>
                   </div>
                   {passMsg && <div className={`${styles.msg} ${passMsgOk ? styles.ok : styles.err}`}>{passMsg}</div>}
-                  <div className={styles.btnRow} style={{ marginTop: '0.9rem' }}>
-                    <button type="button" className={styles.primary} onClick={updatePassword} disabled={updatingPass}>{updatingPass ? 'Updating…' : 'Update password →'}</button>
+                  <div className={styles.btnRow} style={{ marginTop: '1rem' }}>
+                    <button type="button" className={styles.ghost} onClick={updatePassword} disabled={updatingPass}>{updatingPass ? 'Updating…' : 'Update password →'}</button>
                     <button type="button" className={styles.ghost} onClick={() => { setShowPassForm(false); setPassMsg('') }}>Cancel</button>
                   </div>
                 </div>
@@ -488,14 +525,14 @@ export default function ProfilePage() {
                   <div className={styles.rowT}>Sign out of Seen</div>
                   <div className={styles.rowS}>On this device. Your applications stay synced to your account.</div>
                 </div>
-                <button type="button" className={`${styles.ghost} ${styles.danger}`} onClick={signOut}>Sign out</button>
+                <button type="button" className={styles.ghost} onClick={signOut}>Sign out</button>
               </div>
               <div className={styles.row}>
                 <div>
                   <div className={styles.rowT}>Sign out of all devices</div>
                   <div className={styles.rowS}>Ends every session on every phone and computer — use it if you signed in somewhere you don’t control.</div>
                 </div>
-                <button type="button" className={`${styles.ghost} ${styles.danger}`} onClick={() => setConfirmSignOutAll(true)} disabled={signingOutAll} aria-haspopup="dialog">{signingOutAll ? 'Signing out…' : 'Sign out everywhere'}</button>
+                <button type="button" className={styles.ghost} onClick={() => setConfirmSignOutAll(true)} disabled={signingOutAll} aria-haspopup="dialog">{signingOutAll ? 'Signing out…' : 'Sign out everywhere'}</button>
               </div>
               {signOutAllMsg && <div className={`${styles.msg} ${styles.err}`} role="alert">{signOutAllMsg}</div>}
               {confirmSignOutAll && (
@@ -557,7 +594,7 @@ export default function ProfilePage() {
                   </p>
                   <div className={styles.btnRow}>
                     {sub?.cancel_at_period_end ? (
-                      <button type="button" className={styles.primary} onClick={() => manageSubscription('resume_subscription')} disabled={portalLoading}>{portalLoading ? 'Working…' : 'Resume membership'}</button>
+                      <button type="button" className={styles.ghost} onClick={() => manageSubscription('resume_subscription')} disabled={portalLoading}>{portalLoading ? 'Working…' : 'Resume membership'}</button>
                     ) : (
                       <button type="button" className={`${styles.ghost} ${styles.danger}`} onClick={() => manageSubscription('cancel_subscription')} disabled={portalLoading || !sub} title={!sub ? 'No active Stripe subscription on file' : undefined}>{portalLoading ? 'Working…' : 'Cancel membership'}</button>
                     )}
@@ -581,7 +618,7 @@ export default function ProfilePage() {
                   </div>
                   <p className={styles.cardS} style={{ margin: '0 0 1rem' }}>{offerLine()}</p>
                   <div className={styles.btnRow}>
-                    <button type="button" className={styles.primary} onClick={() => router.push('/pricing')}>See what’s free and what’s paid →</button>
+                    <button type="button" className={styles.ghost} onClick={() => router.push('/pricing')}>See what’s free and what’s paid →</button>
                   </div>
                 </>
               )}
@@ -595,7 +632,7 @@ export default function ProfilePage() {
             <section id="danger" className={`${styles.card} ${styles.dangerCard}`}>
               <div className={styles.cardHead}>
                 <div>
-                  <div className={styles.eyebrow} style={{ color: '#f87185' }}>Danger zone</div>
+                  <div className={styles.eyebrow} style={{ color: 'var(--bad-text)' }}>Danger zone</div>
                   <h2 className={styles.cardT}>Delete your account</h2>
                   <p className={styles.cardS}>Permanently removes your profile, résumé, applications, saved jobs and credits (including purchased ones — not refunded). Reports you submitted stay published with no link to you. There is no undo.</p>
                 </div>

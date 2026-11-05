@@ -12,6 +12,7 @@ import { isGradeableScore } from '@/lib/gradeGate'
 import { sortByPriority, isMatch } from '@/lib/server/jobPriority.js'
 import { searchQueryString, readSearchQuery } from '@/lib/jobs/searchUrl.js'
 import { replaceSearchKeepingPlaces } from '@/lib/nav/urlState'
+import { radiusNotice, leadIds } from '@/lib/jobs/radiusNotice.js'
 
 // In-memory search cache: `${query}|${location}|${radius}` → the page as it was shown (rows, whether
 // the server has more, and the honest note/label it carried), so a repeat of the same search — Enter
@@ -214,6 +215,8 @@ export function useJobSearch() {
   const queryRef = useRef(query); queryRef.current = query
   const locationRef = useRef(location); locationRef.current = location
   const radiusRef = useRef(radius); radiusRef.current = radius
+  // The last fresh result per query|place, to tell a radius change that returned the very same rows apart from one that did not.
+  const lastResultRef = useRef<{ key: string; radius: string; ids: string } | null>(null)
   const jobsRef = useRef(jobs); jobsRef.current = jobs
   const filtersRef = useRef({ niche, level, jobType, posted }); filtersRef.current = { niche, level, jobType, posted }
   // The last COMMITTED search (Enter / Search / a pick / a link) — what the URL shows and "Show more"
@@ -548,16 +551,23 @@ export function useJobSearch() {
     if (commit) { committedRef.current = { q, loc, radius: rad }; setCommittedQuery(q); writeUrl({ radius: rad }) }
     if (inflightKeyRef.current === cacheKey) return // the same search is already on its way
     const cached = cachedSearch(cacheKey)
+    // The result the person is looking at NOW, for the "same listings at 50 mi as at 25 mi" comparison —
+    // captured before anything below shows a cached page for this radius (which would compare the new
+    // page with itself and say nothing: the round-3 "cached 25 → 50, identical rows, no notice").
+    const prevShown = lastResultRef.current
     const showCached = (c: CachedSearch, refreshing: boolean) => {
       if (abortRef.current) abortRef.current.abort() // drop any older in-flight search
       inflightKeyRef.current = null
       pagesRef.current = c.pages
       hasMoreRef.current = c.hasMore; setHasMore(c.hasMore)
       JobCache.setMany(c.jobs) // an open listing (?job=) is looked up here after a full page load
+      const ids = leadIds(c.jobs)
+      lastResultRef.current = { key: `${q}|${loc}`, radius: rad, ids }
       setJobs(c.jobs)
       updateDisplayRef.current(c.jobs, sortRef.current)
       setStatus('done')
-      setNotice(c.notice)
+      // The note the page carried, else the radius comparison against what was shown before (lib/jobs/radiusNotice.js).
+      setNotice(c.notice ?? radiusNotice({ q, loc, radius: rad, total: c.jobs.length, inRadius: null, prev: prevShown, ids }))
       if (c.label) setStatusMsg(c.label)
       else if (refreshing) setStatusMsg(`${c.jobs.length} result${c.jobs.length !== 1 ? 's' : ''} (from cache — refreshing…)`)
     }
@@ -615,7 +625,8 @@ export function useJobSearch() {
           return
         }
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const data = await res.json() as { jobs?: unknown[]; results?: unknown[]; widened?: boolean; fallback?: 'outside_radius' | 'unrelated' | 'remote_thin' | null; radius?: number | null; location?: string; topup?: string | null; in_radius?: number | null; has_more?: boolean }
+        type SearchResponse = { jobs?: unknown[]; results?: unknown[]; widened?: boolean; fallback?: 'outside_radius' | 'unrelated' | 'remote_thin' | null; radius?: number | null; location?: string; topup?: string | null; in_radius?: number | null; has_more?: boolean }
+        const data = await res.json() as SearchResponse
         if (seq !== searchSeqRef.current) return // a newer search took over
         done()
         const raw: Job[] = toJobs(data.jobs || data.results || [], loc)
@@ -631,20 +642,22 @@ export function useJobSearch() {
         //  remote_thin → few remote matches; non-remote roles fill the rest
         // For a place search the server counts the rows inside the radius (`in_radius`) and serves
         // them first; the note says how many — never "no jobs within 25 mi" above six Phoenix rows.
+        // The note itself — "Only N within R mi", or "Same listings lead at 50 mi as at 25 mi" when a radius change
+        // brought back the very same leading rows — is ONE helper (lib/jobs/radiusNotice.js), so the cached path and
+        // the top-up refresh below say exactly the same thing.
         const placeSearch = !!loc && data.location !== 'remote' && rad !== '0'
-        const inR = typeof data.in_radius === 'number' ? data.in_radius : null
+        const noteFor = (d: SearchResponse, rows: Job[]) => radiusNotice({
+          q, loc: placeSearch ? loc : '', radius: String(d.radius || rad), total: rows.length,
+          inRadius: typeof d.in_radius === 'number' ? d.in_radius : null, fallback: d.fallback ?? null, prev: prevShown, ids: leadIds(rows),
+        })
         let label: string | null = null
-        let note: string | null = null
         if (raw.length && data.fallback === 'unrelated') {
           label = `No matches for "${q}" — showing ${raw.length} other opening${raw.length !== 1 ? 's' : ''}${placeSearch ? ` near ${loc}` : ''}`
         } else if (raw.length && data.fallback === 'remote_thin') {
           label = `Few remote matches for "${q}" — also showing roles that aren't marked remote`
-        } else if (raw.length && placeSearch && inR !== null && inR < raw.length) {
-          const r = data.radius || rad
-          note = inR === 0
-            ? `No ${q} jobs within ${r} mi of ${loc} — showing the nearest and remote ones`
-            : `Only ${inR} within ${r} mi of ${loc} — the rest are further away or remote`
         }
+        const note = noteFor(data, raw)
+        lastResultRef.current = { key: `${q}|${loc}`, radius: rad, ids: leadIds(raw) }
         if (label) setStatusMsg(label)
         setNotice(note)
         cacheSearch(cacheKey, { jobs: raw, ts: Date.now(), hasMore: more, pages: 1, notice: note, label })
@@ -662,15 +675,20 @@ export function useJobSearch() {
                 body: JSON.stringify({ query: q, location: loc, radius: rad, db_only: true }),
               })
               if (!r2.ok || seq !== searchSeqRef.current || pagesRef.current > 1) return
-              const d2 = await r2.json() as { jobs?: unknown[]; has_more?: boolean }
+              const d2 = await r2.json() as SearchResponse
               const fresh = toJobs(d2.jobs || [], loc)
               if (seq !== searchSeqRef.current || pagesRef.current > 1 || fresh.length <= raw.length) return
               const more2 = d2.has_more === true
               hasMoreRef.current = more2; setHasMore(more2)
-              cacheSearch(cacheKey, { jobs: fresh, ts: Date.now(), hasMore: more2, pages: 1, notice: note, label })
+              // The note is recomputed for the rows now shown and set again — the refresh must never leave the
+              // page without the sentence it had a moment ago (round 3: "present at 1.6 s, absent at 3 s").
+              const note2 = noteFor(d2, fresh)
+              cacheSearch(cacheKey, { jobs: fresh, ts: Date.now(), hasMore: more2, pages: 1, notice: note2, label })
               JobCache.setMany(fresh)
+              lastResultRef.current = { key: `${q}|${loc}`, radius: rad, ids: leadIds(fresh) }
               setJobs(fresh)
               updateDisplayRef.current(fresh, sortRef.current)
+              setNotice(note2)
             } catch { /* keep the first page */ }
           }, 4000)
         }

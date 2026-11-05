@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useFocusTrap } from '@/lib/hooks/useFocusTrap'
 import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import { aiHeaders } from '@/lib/aiHeaders'
+import { notify } from '@/lib/notify'
 import { useAuth } from '@/lib/auth'
 import type { Job } from '@/lib/types'
 import ModalPortal from '@/components/ModalPortal'
@@ -13,11 +14,12 @@ import ApplyCheckpoint from '@/components/ApplyCheckpoint'
 import CreditConfirmDialog from '@/components/CreditConfirmDialog'
 import { trackApplyClick } from '@/lib/trackApply'
 import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
-import { JOB_INSIGHTS_COST, RESUME_OPTIMIZE_COST, creditCostLabel, dailyResetLabel, priceLabel, usageLine } from '@/lib/creditRules'
+import { JOB_INSIGHTS_COST, RESUME_OPTIMIZE_COST, creditCostLabel, dailyResetLabel, priceLabel, shortPriceLabel, usageLine } from '@/lib/creditRules'
 import { useProStatus } from '@/lib/hooks/useProStatus'
 import { displayCompanyName } from '@/lib/companyDisplay'
 import { displayPay, payLabel } from '@/lib/jobs/pay.js'
 import { paragraphs, isDescriptionPreview, stripDanglingEllipsis, endsCutOff } from '@/lib/jobs/descriptionText.js'
+import { displayLocation } from '@/lib/jobs/displayLocation.js'
 import { httpHref, loginHref } from '@/lib/safeHref.js'
 import { JobCache } from '@/lib/stores/JobCache'
 import { JOB_INSIGHTS_VERSION } from '@/lib/jobInsightsVersion.js'
@@ -64,7 +66,6 @@ interface InsightsResponse extends Partial<Insights> {
 type InsightsState = 'loading' | 'done' | 'unavailable' | 'no_desc' | 'uncached' | 'generating' | 'credits' | 'preview' | 'unread'
 
 const L1_TTL = 24 * 60 * 60 * 1000
-const OPTIMIZE_PRICE = creditCostLabel(RESUME_OPTIMIZE_COST)
 
 function Skeleton({ widths, h }: { widths: number[]; h: number }) {
   return (
@@ -115,7 +116,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
   // Esc closes the drawer, like the backdrop and ✕ (the Seen-apply modal on top handles its own).
   useEffect(() => {
     if (seenApplyOpen) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !document.querySelector('[data-apply-checkpoint]')) onClose() }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose, seenApplyOpen])
@@ -221,6 +222,32 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
     else { SavedJobsStore.save(job, isLoggedIn); setSaved(true) }
   }
 
+  // "Not active? Report it" (moved here from the card, 2026-11-02). A listing snapshot rides along so
+  // admin can see the report even for a live search result (j_<hash> id) never saved to the board.
+  const [reportedInactive, setReportedInactive] = useState(false)
+  const [reportingInactive, setReportingInactive] = useState(false)
+  useEffect(() => { setReportedInactive(false) }, [job.id])
+  async function reportInactive() {
+    if (!user) { notify({ title: 'Sign in to report listings', severity: 'info', duration: 2600 }); return }
+    setReportingInactive(true)
+    try {
+      await fetch('/api/user-sync', {
+        method: 'POST',
+        headers: await aiHeaders(),
+        body: JSON.stringify({
+          action: 'report_job_availability',
+          job_id: String(job.id),
+          status: 'expired',
+          snapshot: { company: job.company || null, title: job.title || null, city: job.location || null, apply_url: job.apply_url || null },
+        }),
+      })
+      setReportedInactive(true)
+      notify({ title: 'Thanks — reported', sub: 'We’ll review this listing', severity: 'success', duration: 2600 })
+    } catch { /* silent */ } finally {
+      setReportingInactive(false)
+    }
+  }
+
   const avail = job.availability_status
   const companyName = displayCompanyName(job.company) || job.company
   const preview = isDescriptionPreview(job)
@@ -273,17 +300,12 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
           <header className={d.head}>
             <div className={d.logo} aria-hidden="true">{(companyName || '?')[0].toUpperCase()}</div>
             <div className={d.headText}>
-              <h2 className={d.title}>{job.title}</h2>
+              <h2 className={`${d.title} ${w.title}`}>{job.title}</h2>
               <p className={d.meta}>
                 <span className={d.co}>{companyName}</span>
-                {job.location && <span className={d.place}><Icon name="map-pin" size={14} />{job.location}</span>}
+                {job.location && <span className={d.place} title={job.location}><Icon name="map-pin" size={14} />{displayLocation(job.location)}</span>}
                 {metaBits.map(m => <span key={m}>{m}</span>)}
               </p>
-              {externalApply && (
-                <a href={job.apply_url!} target="_blank" rel="noopener noreferrer" data-testid="posting-link" onClick={() => trackApplyClick(job)} className={w.postingLink}>
-                  Open the job posting <Icon name="arrow-up-right" size={14} />
-                </a>
-              )}
             </div>
             <ListingScoreRing score={job.score} size={40} />
           </header>
@@ -301,22 +323,29 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
             {avail === 'expired' && <p className={d.notice} data-tone="bad"><Icon name="circle-x" size={14} />Likely closed — check the company&apos;s careers page.</p>}
             {/* Factual freshness — literally-true observations of OUR data (never an employer verdict). */}
             {job.freshness?.label && <p className={d.fine}>{job.freshness.label}</p>}
+            {!reportedInactive ? (
+              <button type="button" onClick={reportInactive} disabled={reportingInactive} className={d.textBtn}>
+                <Icon name="flag" size={14} />{reportingInactive ? 'Reporting…' : 'Not active? Report it'}
+              </button>
+            ) : (
+              <span className={d.fine}><Icon name="check" size={14} /> Reported — thanks</span>
+            )}
           </div>
 
           {/* AI Insights — only when there is a posting to read (one "no description" message, below). */}
           {insightsState !== 'no_desc' && (
             <section className={d.card} aria-label={`What ${companyName || 'this company'} is hiring for`}>
               <h3 className="ui-eyebrow">What {companyName || 'this company'} is hiring for</h3>
+              {/* One sentence, then the paste button on its own line (the posting itself is the Apply button below). */}
               {insightsState === 'preview' && (
-                <div className={d.p}>
-                  This source gives Seen only a preview of the posting, so there is nothing to analyze yet.{' '}
-                  {postingHref ? <a href={postingHref} target="_blank" rel="noopener noreferrer" className={d.link}>Open the full posting</a> : 'The full posting is on the employer\'s site.'}
+                <div className={d.stack}>
+                  <p className={d.p}>This source gives Seen only a preview of the posting, so there is nothing to analyze yet. The full posting is on the employer&apos;s site.</p>
                   <PastePosting onAnalyze={analyzePasted} />
                 </div>
               )}
               {insightsState === 'unread' && (
-                <div className={d.p}>
-                  {insightNote || "This listing doesn't state what it requires, so there is nothing to analyze — no credit used."}
+                <div className={d.stack}>
+                  <p className={d.p}>{insightNote || "This listing doesn't state what it requires, so there is nothing to analyze — no credit used."}</p>
                   <PastePosting onAnalyze={analyzePasted} />
                 </div>
               )}
@@ -324,7 +353,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
               {insightsState === 'unavailable' && <p className={d.p}>AI insights are unavailable for this listing.</p>}
               {insightsState === 'uncached' && (
                 <div className={d.stack}>
-                  <p className={d.p}>Nobody has analyzed this listing yet. Generate what they really want, the unstated expectations and an insider tip.</p>
+                  <p className={d.p}>Read the posting against your résumé — {priceLabel(insightPrice, pro)}.</p>
                   <Button variant="secondary" full onClick={revealInsights} data-testid="reveal-insights" icon="sparkles">Reveal AI insights · {priceLabel(insightPrice, pro)}</Button>
                   <p className={d.fine}>Once generated it is free for everyone for 7 days.{pro === true ? '' : ` ${dailyResetLabel()}.`}</p>
                 </div>
@@ -403,24 +432,24 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
           <Button variant="ghost" size="sm" onClick={() => onCheckCompany(job.company)} icon="building-2" className={w.check}>Check {companyName}</Button>
           <div className={d.footRow}>
             <button type="button" onClick={toggleSave} aria-label={saved ? 'Remove from saved' : 'Save'} aria-pressed={saved} className={d.iconBtn} data-on={saved ? '1' : '0'}><Icon name="heart" size={18} /></button>
-            {seenApply && <Button variant="primary" onClick={() => setSeenApplyOpen(true)} className={d.grow} iconRight="arrow-right">Apply on Seen</Button>}
+            {seenApply && <Button variant="primary" onClick={() => setSeenApplyOpen(true)} className={d.main} iconRight="arrow-right">Apply on Seen</Button>}
             {externalApply
               ? <>
                   {/* FREE: opens the posting in a new tab, then the tracker checkpoint asks "Did you apply?" —
                       the existing add path. Nothing is spent. */}
                   <Button
                     variant={seenApply ? 'secondary' : 'primary'}
-                    href={job.apply_url!}
+                    href={postingHref ?? undefined}
                     target="_blank"
                     rel="noopener noreferrer"
                     data-testid="drawer-apply-link"
                     onClick={applyExternal}
-                    className={d.grow}
+                    className={seenApply ? d.grow : d.main}
                     iconRight="arrow-up-right"
-                  >{seenApply ? 'Apply on their site' : preview ? 'Open the full posting' : 'Apply'}</Button>
+                  >{seenApply ? 'Apply on their site' : preview ? 'Open posting' : 'Apply'}</Button>
                   {!seenApply && (
-                    <Button variant="secondary" data-testid="drawer-optimize-btn" onClick={() => { onClose(); onApply(job) }} title={`Optimize your résumé for this job · ${priceLabel(RESUME_OPTIMIZE_COST, pro)}`} className={d.grow}>
-                      Optimize · {priceLabel(RESUME_OPTIMIZE_COST, pro).replace(' ', ' ')}
+                    <Button variant="secondary" data-testid="drawer-optimize-btn" onClick={() => onApply(job)} title={`Optimize your résumé for this job · ${priceLabel(RESUME_OPTIMIZE_COST, pro)}`} className={d.grow}>
+                      <span className="ui-btn__stack"><span>Optimize</span><small>{shortPriceLabel(RESUME_OPTIMIZE_COST, pro)}</small></span>
                     </Button>
                   )}
                 </>

@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { LegalMeta, LegalFooter, LEGAL_CONTACT, LEGAL_OPERATOR } from '@/components/legal/LegalBits'
 
 // Privacy Policy. Reviewed against the code 2026-10-24; each item names what implements it:
-//   account + profile: profiles, auth (Supabase) · résumé: profiles.resume_text, resume_skills,
+//   account + profile: profiles, auth (Supabase) · résumé: resumes, profiles.resume_text, resume_skills,
 //   resumes bucket · Apply on Seen: seen_applications + application-resumes bucket, read by the employer
 //   (api/employer-listings.js); declined/withdrawn copies cleared after 30 days
 //   (lib/server/applicationRetention.js RETENTION_DAYS) · sign-in security: login_signals (IP + user
@@ -28,12 +28,12 @@ export const metadata: Metadata = pageMetadata({
 })
 
 const wrap = { maxWidth: 760, margin: '0 auto', padding: '4rem 2rem', width: '100%', boxSizing: 'border-box' as const }
-const h2 = { fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: '0 0 .65rem' } as const
-const h3 = { fontFamily: 'var(--body)', fontSize: 'var(--fs-ui)', fontWeight: 700, color: 'var(--white)', margin: '1rem 0 .4rem' } as const
-const p = { fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.8, margin: '0 0 .9rem' } as const
+const h2 = { fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: '0 0 .75rem' } as const
+const h3 = { fontFamily: 'var(--body)', fontSize: 'var(--fs-ui)', fontWeight: 700, color: 'var(--white)', margin: '1rem 0 .5rem' } as const
+const p = { fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.8, margin: '0 0 1rem' } as const
 const quote = { ...p, borderLeft: '2px solid var(--line2)', paddingLeft: '1rem' } as const
-const li = { fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.8, marginBottom: '.35rem' } as const
-const ul = { margin: '0 0 .9rem', paddingLeft: '1.1rem' } as const
+const li = { fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.8, marginBottom: '.25rem' } as const
+const ul = { margin: '0 0 1rem', paddingLeft: '1rem' } as const
 const section = { marginBottom: '2rem', scrollMarginTop: 80 } as const
 const link = { color: 'var(--blue)', textDecoration: 'none' } as const
 const mail = <a href={`mailto:${LEGAL_CONTACT}`} style={link}>{LEGAL_CONTACT}</a>
@@ -42,12 +42,12 @@ export default function PrivacyPage() {
   return (
     <div className="rise-in" style={{ minHeight: '100vh' }}>
       <div style={wrap}>
-        <h1 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-h2)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', margin: '0 0 .35rem' }}>
+        <h1 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-h2)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', margin: '0 0 .25rem' }}>
           Privacy Policy
         </h1>
         <LegalMeta label="Privacy questions or requests:" />
 
-        <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.65rem 1rem', marginBottom: '2rem', lineHeight: 1.6 }}>
+        <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--muted)', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.75rem 1rem', marginBottom: '2rem', lineHeight: 1.6 }}>
           The short version: we collect what we need to run Seen, we do not sell your data or use it for
           advertising, your résumé and tracker are private, and you can delete your account and data yourself
           in Settings at any time.
@@ -70,7 +70,7 @@ export default function PrivacyPage() {
             <li style={li}><strong>Account:</strong> your email address and password or sign-in link, handled by our authentication provider.</li>
             <li style={li}><strong>Profile:</strong> name, city, experience level and any optional survey answers you choose to give.</li>
             <li style={li}><strong>Your job search:</strong> applications you track (company, role, city, dates, stage and what happened), saved jobs, and companies you recently viewed.</li>
-            <li style={li}><strong>Résumé:</strong> the résumé text or file you upload or edit, and the job titles and skills we read from it to match you with listings.</li>
+            <li style={li}><strong>Résumé:</strong> the résumé text or file you upload or edit (more than one if you keep several), and the job titles and skills we read from it to match you with listings.</li>
             <li style={li}><strong>Applying through Seen:</strong> when you apply to a listing using Seen&apos;s own application form, the name, email, phone number (optional), résumé and answers you submit.</li>
             <li style={li}><strong>Reports:</strong> hiring outcomes you report about companies, and anything you write in them.</li>
             <li style={li}><strong>Inbox Autopilot</strong> (only if you turn it on): from emails you forward to your private Seen address we keep only the facts — company, role, what happened, the sender&apos;s name and domain, and the date — never the email&apos;s text, subject or attachments.</li>

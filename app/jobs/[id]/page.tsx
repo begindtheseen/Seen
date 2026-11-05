@@ -25,11 +25,12 @@ import SeenApplyModal from '@/components/jobs/SeenApplyModal'
 import { takesSeenApply } from '@/lib/seenApplyMode'
 import CreditConfirmDialog from '@/components/CreditConfirmDialog'
 import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
-import { JOB_INSIGHTS_COST, RESUME_OPTIMIZE_COST, creditCostLabel, priceLabel, usageLine } from '@/lib/creditRules'
+import { JOB_INSIGHTS_COST, RESUME_OPTIMIZE_COST, creditCostLabel, priceLabel, shortPriceLabel, usageLine } from '@/lib/creditRules'
 import { useProStatus } from '@/lib/hooks/useProStatus'
 import { displayCompanyName } from '@/lib/companyDisplay'
 import { displayPay, payLabel } from '@/lib/jobs/pay.js'
 import { paragraphs, isDescriptionPreview, stripDanglingEllipsis, endsCutOff } from '@/lib/jobs/descriptionText.js'
+import { displayLocation } from '@/lib/jobs/displayLocation.js'
 import { isGradeableScore } from '@/lib/gradeGate'
 import ListingScoreRing from '@/components/jobs/ListingScoreRing'
 import EmployerGradeChip from '@/components/jobs/EmployerGradeChip'
@@ -58,7 +59,6 @@ interface ScoreExplanation {
 }
 
 // The optimizer's price, rendered from the credit rules (same label as the search drawer).
-const OPTIMIZE_PRICE = creditCostLabel(RESUME_OPTIMIZE_COST)
 
 const L1_TTL = 24 * 60 * 60 * 1000 // localStorage TTL — matches old _INSIGHTS_L1_TTL (24h)
 
@@ -270,18 +270,20 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
   // The employer's Seen grade (how it treats applicants), from the same DB-only batch_scores read the
   // job list uses (api/reports.js). Shown only when gradeable — the listing ring grades the post.
-  const [employerScore, setEmployerScore] = useState<number | null>(null)
+  // null = still asking; false = asked, no grade (the slot collapses — it read as a dead gap under the
+  // meta line, design review 2026-11-02); a number = the grade.
+  const [employerScore, setEmployerScore] = useState<number | null | false>(null)
   useEffect(() => {
     const co = (job?.company || '').toLowerCase().trim()
-    if (!co) return
+    if (!co) { setEmployerScore(false); return }
     let alive = true
     fetch('/api/reports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'batch_scores', names: [co] }) })
       .then(r => (r.ok ? r.json() : { scores: {} }))
       .then((d: { scores?: Record<string, { overall_score?: number | null; gradeable?: boolean | null; first_party_report_count?: number | null }> }) => {
         const sc = d.scores?.[co]
-        if (alive && isGradeableScore(sc)) setEmployerScore(sc.overall_score)
+        if (alive) setEmployerScore(isGradeableScore(sc) ? sc.overall_score : false)
       })
-      .catch(() => {})
+      .catch(() => { if (alive) setEmployerScore(false) })
     return () => { alive = false }
   }, [job?.company])
 
@@ -415,11 +417,11 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             <h1 className={d.title}>{job.title}</h1>
             <p className={d.meta}>
               <span className={d.co}>{companyName}</span>
-              {job.location && <span className={d.place}><Icon name="map-pin" size={14} />{job.location}</span>}
+              {job.location && <span className={d.place} title={job.location}><Icon name="map-pin" size={14} />{displayLocation(job.location)}</span>}
               {metaBits.map(m => <span key={m}>{m}</span>)}
             </p>
             {/* Fixed-height slot: the employer's grade arrives after a fetch and must not push the page (CLS). */}
-            <div className={d.gradeSlot}>{employerScore != null && <EmployerGradeChip company={job.company} score={employerScore} compact />}</div>
+            {employerScore !== false && <div className={d.gradeSlot}>{typeof employerScore === 'number' && <EmployerGradeChip company={job.company} score={employerScore} compact />}</div>}
           </div>
           <ListingScoreRing score={job.score} size={44} />
         </header>
@@ -430,6 +432,19 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           {pay && <StatTile label={payLabel(pay)} value={pay} />}
           <StatTile label="Source" value={job.source || 'Job board'} />
         </div>
+
+        {/* Optimize (paid) and Share live here; the sticky bar below keeps Apply one tap away on a long page
+            with the company check beside it (phone tester 2026-11-02). */}
+        {!job.filled && (
+          <div className={d.inlineActions}>
+            {postingHref && !takesSeenApply(job) && (
+              <Button variant="secondary" size="sm" data-testid="detail-optimize-btn" onClick={() => setShowApplyModal(true)} icon="sparkles" title={`Optimize your résumé for this job · ${priceLabel(RESUME_OPTIMIZE_COST, pro)}`}>
+                Optimize · {shortPriceLabel(RESUME_OPTIMIZE_COST, pro)}
+              </Button>
+            )}
+            <Button variant="ghost" size="sm" onClick={() => setShowShareCard(true)} icon="share-2" aria-label="Share this listing" title="Share this listing">Share</Button>
+          </div>
+        )}
 
         {/* Why this score — the exact factors behind the posting score. Every number is explained. */}
         {scoreWhy && Array.isArray(scoreWhy.score_factors) && scoreWhy.score_factors.length > 0 && (
@@ -470,22 +485,22 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             <h2 id="jd-insights" className="ui-eyebrow">What {companyName || 'this company'} is hiring for</h2>
             {(insightsState === 'loading' || insightsState === 'generating') && <Skeleton widths={[80, 65, 72, 58, 68]} h={10} />}
             {insightsState === 'unavailable' && <p className={d.p}>AI insights are unavailable for this listing.</p>}
+            {/* One sentence, then the paste button on its own line (the posting itself is the Apply button below). */}
             {insightsState === 'preview' && (
-              <div className={d.p}>
-                This source gives Seen only a preview of the posting, so there is nothing to analyze yet.{' '}
-                {postingHref ? <a href={postingHref} target="_blank" rel="noopener noreferrer" className={d.link}>Open the full posting</a> : 'The full posting is on the employer\'s site.'}
+              <div className={d.stack}>
+                <p className={d.p}>This source gives Seen only a preview of the posting, so there is nothing to analyze yet. The full posting is on the employer&apos;s site.</p>
                 <PastePosting onAnalyze={analyzePasted} />
               </div>
             )}
             {insightsState === 'unread' && (
-              <div className={d.p} data-testid="insights-unread">
-                {insightNote || "This listing doesn't state what it requires, so there is nothing to analyze — no credit used."}
+              <div className={d.stack} data-testid="insights-unread">
+                <p className={d.p}>{insightNote || "This listing doesn't state what it requires, so there is nothing to analyze — no credit used."}</p>
                 <PastePosting onAnalyze={analyzePasted} />
               </div>
             )}
             {insightsState === 'uncached' && (
               <div className={d.stack}>
-                <p className={d.p}>Nobody has generated the insight for this listing yet. Once generated it is free for everyone for 7 days.</p>
+                <p className={d.p}>Read the posting against your résumé — {priceLabel(insightPrice, pro)}. Once generated it is free for everyone for 7 days.</p>
                 <Button variant="secondary" onClick={revealInsights} data-testid="reveal-insights" icon="sparkles">Reveal AI insights · {priceLabel(insightPrice, pro)}</Button>
               </div>
             )}
@@ -561,45 +576,37 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         </section>
       </div>
 
-      {/* Sticky footer — solid, one primary action. */}
+      {/* Sticky footer — solid, ONE row: ♡ · Check <company> (outlined) · Apply (the page's one filled button).
+          It sits above the phone tab bar (detail.module.css .foot), never under it. */}
       <div className={d.foot}>
-        <div className={d.footIn}>
-          <Button variant="ghost" size="sm" href={`/company/${companySlug(job.company)}`} prefetch={false} icon="building-2" className={d.check}>Check {companyName || 'company'}</Button>
-          <div className={d.footRow}>
-            <button type="button" onClick={toggleSave} aria-label={saved ? 'Remove from saved' : 'Save'} aria-pressed={saved} className={d.iconBtn} data-on={saved ? '1' : '0'}><Icon name="heart" size={18} /></button>
-            <button type="button" onClick={() => setShowShareCard(true)} aria-label="Share this listing" title="Share this listing" className={d.iconBtn}><Icon name="share-2" size={18} /></button>
-            {job.filled ? (
-              <Button variant="secondary" disabled className={d.grow}>Position filled</Button>
-            ) : <>
-              {takesSeenApply(job) && (
-                <Button variant="primary" onClick={() => setShowSeenApply(true)} className={d.grow} iconRight="arrow-right">Apply on Seen</Button>
-              )}
-              {/* Same two actions as the search drawer: "Apply" is FREE (opens the posting, then the tracker
-                  checkpoint offers to log it); "Optimize · 1 credit" is the paid optimizer. */}
-              {postingHref && job.apply_mode !== 'seen'
-                ? <>
-                    <Button
-                      variant={takesSeenApply(job) ? 'secondary' : 'primary'}
-                      href={postingHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      data-testid="detail-apply-link"
-                      onClick={() => { trackApplyClick(job); setCheckpointAuto(false); setShowCheckpoint(true) }}
-                      className={d.grow}
-                      iconRight="arrow-up-right"
-                    >
-                      {takesSeenApply(job) ? 'Apply on their site' : preview ? 'Open the full posting' : 'Apply'}
-                    </Button>
-                    {!takesSeenApply(job) && (
-                      <Button variant="secondary" data-testid="detail-optimize-btn" onClick={() => setShowApplyModal(true)} title={`Optimize your résumé for this job · ${priceLabel(RESUME_OPTIMIZE_COST, pro)}`} className={d.grow}>
-                        Optimize · {priceLabel(RESUME_OPTIMIZE_COST, pro).replace(' ', ' ')}
-                      </Button>
-                    )}
-                  </>
-                : !takesSeenApply(job) && <Button variant="secondary" disabled className={d.grow}>No apply link</Button>
-              }
-            </>}
-          </div>
+        <div className={d.footRow}>
+          <button type="button" onClick={toggleSave} aria-label={saved ? 'Remove from saved' : 'Save'} aria-pressed={saved} className={d.iconBtn} data-on={saved ? '1' : '0'}><Icon name="heart" size={18} /></button>
+          <Button variant="secondary" href={`/company/${companySlug(job.company)}`} prefetch={false} icon="building-2" className={d.check}>Check {companyName || 'company'}</Button>
+          {job.filled ? (
+            <Button variant="secondary" disabled className={d.grow}>Position filled</Button>
+          ) : <>
+            {takesSeenApply(job) && (
+              <Button variant="primary" onClick={() => setShowSeenApply(true)} className={d.main} iconRight="arrow-right">Apply on Seen</Button>
+            )}
+            {/* "Apply" is FREE: it opens the posting, then the tracker checkpoint offers to log it. */}
+            {postingHref && job.apply_mode !== 'seen'
+              ? (
+                  <Button
+                    variant={takesSeenApply(job) ? 'secondary' : 'primary'}
+                    href={postingHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-testid="detail-apply-link"
+                    onClick={() => { trackApplyClick(job); setCheckpointAuto(false); setShowCheckpoint(true) }}
+                    className={takesSeenApply(job) ? d.grow : d.main}
+                    iconRight="arrow-up-right"
+                  >
+                    {takesSeenApply(job) ? 'Apply on their site' : preview ? 'Open posting' : 'Apply'}
+                  </Button>
+                )
+              : !takesSeenApply(job) && <Button variant="secondary" disabled className={d.grow}>No apply link</Button>
+            }
+          </>}
         </div>
         {showSeenApply && job && (
           <SeenApplyModal job={job} onClose={() => setShowSeenApply(false)} />

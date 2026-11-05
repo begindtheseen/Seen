@@ -7,8 +7,12 @@
 .more { margin: var(--sp-3) 0 var(--sp-10); }
 .state { padding: var(--sp-6) 0 var(--sp-12); }
 @media (max-width: 560px) {
-  .tools { width: 100%; margin-left: 0; flex-wrap: wrap; }
-  .sort { flex: 1 1 9rem; min-width: 0; min-height: 44px; }
+  /* Two rows, not three: [count · copy · List/Swipe] then the sort on its own line — the tools
+     group dissolves into the toolbar's own flex row so the count shares a line with the view toggle. */
+  .toolbar { margin-bottom: var(--sp-2); gap: var(--sp-2); }
+  .count { flex: 1 1 auto; }
+  .tools { display: contents; }
+  .sort { flex: 1 1 100%; min-width: 0; min-height: 44px; }
   .hideSm { display: none; }
   /* After a search the page header shrinks to its title so results start near the top. */
   .searchedHead p { display: none; }

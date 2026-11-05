@@ -13,7 +13,7 @@ import styles from './LivePulse.module.css'
 import Icon, { type IconName } from '@/components/ui/Icon'
 import { displayCompanyName } from '@/lib/companyDisplay'
 
-type Row = { id: string; company_name?: string; role?: string; outcome: string; created_at: string }
+type Row = { id: string; company_name?: string; role?: string; outcome: string; created_at: string; graded?: boolean | null }
 
 const OUTCOME: Record<string, { icon: IconName; label: string; cls: string }> = {
   ghosted: { icon: 'ghost', label: 'ghosted', cls: 'red' },
@@ -37,7 +37,7 @@ function ago(iso: string): string {
   return `${Math.floor(s / (86400 * 30))}mo ago`
 }
 
-export default function LivePulse() {
+export default function LivePulse({ totals = null }: { totals?: { reports: number; companies: number } | null }) {
   const [rows, setRows] = useState<Row[]>([])
   const [total, setTotal] = useState(0)
 
@@ -56,6 +56,9 @@ export default function LivePulse() {
         const seen = new Set<string>()
         setRows(d.reports.filter(r => {
           if (!r.company_name || !OUTCOME[r.outcome]) return false
+          // Graded companies only (the server says which): a test company's report or a word stored as a
+          // company ("Backend") never scrolls across the homepage (round 3).
+          if (r.graded === false) return false
           const k = r.company_name.toLowerCase().trim()
           if (seen.has(k)) return false
           seen.add(k)
@@ -86,7 +89,7 @@ export default function LivePulse() {
       <div className={styles.head}>
         <span className={styles.live}><span className={styles.dot} />Live</span>
         <span className={styles.title}>Latest applicant accounts</span>
-        {total > 0 && <span className={styles.count}>{total.toLocaleString()} compiled applicant accounts</span>}
+        {totals ? <a className={styles.count} href="/data">{totals.reports.toLocaleString()} applicant accounts behind {totals.companies.toLocaleString()} graded companies · open data →</a> : total > 0 && <span className={styles.count}>{total.toLocaleString()} applicant accounts</span>}
         <Link href="/feed" className={styles.more}>Open the feed →</Link>
       </div>
       <div className={styles.rail} data-marquee>

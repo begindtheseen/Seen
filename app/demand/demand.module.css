@@ -1,0 +1,59 @@
+/* /demand — hiring demand by metro, on the /agencies pattern: ink labels, outlined status chips with an
+   icon, ONE bar colour (ink), figures as figures. Tokens only; text ≥ 12px; controls ≥ 44px on phones. */
+.wrap { max-width: var(--w-wide); margin: 0 auto; padding: 3.5rem 1.5rem 5rem; width: 100%; box-sizing: border-box; }
+
+/* Filters: one search field (inline icon) + two chip rows. */
+.filters { display: flex; flex-direction: column; gap: var(--sp-3); margin: 0 0 var(--sp-6); }
+.field { position: relative; max-width: 420px; }
+.fieldIcon { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--text-4); pointer-events: none; }
+.input { min-height: 48px; padding-left: 40px; }
+.chipRow { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+.chipLbl { font-family: var(--body); font-size: var(--fs-meta); font-weight: 600; letter-spacing: var(--ls-meta); text-transform: uppercase; color: var(--text-3); margin-right: var(--sp-1); }
+
+/* Stale notice: a caution state, with its icon and word. */
+.stale { display: flex; align-items: flex-start; gap: var(--sp-2); background: var(--caution-tint); border: 1px solid var(--caution-line); border-radius: var(--r-control); padding: var(--sp-3) var(--sp-4); margin: 0 0 var(--sp-4); font-family: var(--body); font-size: var(--fs-sm); color: var(--caution-text); line-height: 1.6; }
+.stale svg { flex-shrink: 0; margin-top: 4px; }
+
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-3); margin: 0 0 var(--sp-6); }
+@media (max-width: 768px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr)); gap: var(--sp-4); }
+.card { background: var(--surface-1); border: 1px solid var(--border-1); border-radius: var(--r-card); overflow: hidden; min-width: 0; }
+.cardHd { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-3); padding: var(--sp-4) var(--sp-5); border-bottom: 1px solid var(--border-1); }
+.cardWho { min-width: 0; flex: 1; }
+.city { font-family: var(--body); font-size: var(--fs-lead); font-weight: 600; color: var(--text-1); letter-spacing: -.01em; overflow-wrap: anywhere; }
+.chips { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; margin-top: var(--sp-2); }
+.src { font-family: var(--body); font-size: var(--fs-meta); color: var(--text-4); }
+.cardLink { display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--sp-1); font-family: var(--body); font-size: var(--fs-sm); font-weight: 500; color: var(--accent); text-decoration: none; white-space: nowrap; flex-shrink: 0; margin: -.5rem -.25rem -.5rem 0; }
+.cardLink:hover { text-decoration: underline; }
+.rows { padding: var(--sp-2) var(--sp-5) var(--sp-3); }
+.row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); padding: var(--sp-3) 0; border-bottom: 1px solid var(--border-1); }
+.row:last-child { border-bottom: none; }
+.rowMain { flex: 1; min-width: 0; }
+.rowTop { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+.job { font-family: var(--body); font-size: var(--fs-ui); font-weight: 600; color: var(--text-1); overflow-wrap: anywhere; }
+.find { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; font-family: var(--body); font-size: var(--fs-sm); color: var(--accent); text-decoration: none; white-space: nowrap; }
+.find:hover { text-decoration: underline; }
+.rowMeta { display: flex; align-items: center; gap: var(--sp-2); margin-top: var(--sp-1); min-width: 0; }
+.track { flex: 1 1 6rem; max-width: 160px; height: 4px; border-radius: var(--r-pill); background: var(--border-1); overflow: hidden; }
+.fill { height: 100%; border-radius: var(--r-pill); background: var(--text-3); }
+.level { font-family: var(--body); font-size: var(--fs-meta); color: var(--text-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.count { font-family: var(--body); font-size: var(--fs-ui); font-weight: 600; color: var(--text-1); flex-shrink: 0; font-variant-numeric: tabular-nums; text-align: right; }
+.countSub { display: block; font-size: var(--fs-meta); font-weight: 400; color: var(--text-4); }
+
+.sk { height: 180px; border-radius: var(--r-card); }
+.empty { padding: var(--sp-10) var(--sp-4); text-align: center; color: var(--text-3); font-size: var(--fs-body); display: flex; flex-direction: column; align-items: center; gap: var(--sp-3); border: 1px dashed var(--border-2); border-radius: var(--r-card); }
+.empty p { margin: 0; }
+.fine { margin: var(--sp-6) 0 0; font-family: var(--body); font-size: var(--fs-meta); color: var(--text-4); line-height: 1.7; max-width: 72ch; }
+
+@media (max-width: 768px) {
+  .find { min-height: 44px; }
+  .cardHd { flex-direction: column; align-items: stretch; }
+  .cardLink { margin: 0; }
+}
+@media (max-width: 480px) {
+  .wrap { padding: 1.5rem 16px 4rem; }
+  .cardHd { padding: var(--sp-4); }
+  .rows { padding: var(--sp-2) var(--sp-4) var(--sp-3); }
+  .track { max-width: none; }
+}

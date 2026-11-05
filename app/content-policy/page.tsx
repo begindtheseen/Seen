@@ -19,10 +19,10 @@ export const metadata: Metadata = pageMetadata({
 })
 
 const wrap = { maxWidth: 760, margin: '0 auto', padding: '4rem 2rem', width: '100%', boxSizing: 'border-box' as const }
-const h2 = { fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: '0 0 .65rem' } as const
-const p = { fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.8, margin: '0 0 .9rem' } as const
+const h2 = { fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: '0 0 .75rem' } as const
+const p = { fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.8, margin: '0 0 1rem' } as const
 const quote = { ...p, borderLeft: '2px solid var(--line2)', paddingLeft: '1rem' } as const
-const li = { fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.8, marginBottom: '.35rem' } as const
+const li = { fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--sub)', lineHeight: 1.8, marginBottom: '.25rem' } as const
 const section = { marginBottom: '2rem' } as const
 const link = { color: 'var(--blue)', textDecoration: 'none' } as const
 
@@ -30,7 +30,7 @@ export default function ContentPolicyPage() {
   return (
     <div className="rise-in" style={{ minHeight: '100vh' }}>
       <div style={wrap}>
-        <h1 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-h2)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', margin: '0 0 .35rem' }}>
+        <h1 style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-h2)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', margin: '0 0 .25rem' }}>
           Content Policy
         </h1>
         <LegalMeta />
@@ -106,7 +106,7 @@ export default function ContentPolicyPage() {
             Wherever a rate is shown, the honest reading is <em>&ldquo;X% of N self-reported outcomes,&rdquo;</em>
             {' '}a statistical signal based on a limited and self-selected sample. Aggregate figures:
           </p>
-          <ul style={{ margin: '0 0 .9rem', paddingLeft: '1.1rem' }}>
+          <ul style={{ margin: '0 0 1rem', paddingLeft: '1rem' }}>
             <li style={li}>are expressions of aggregated community experience, not verdicts or accusations;</li>
             <li style={li}>depend on sample size and may change as new reports arrive (scores update on a rolling basis);</li>
             <li style={li}>weight first-hand reports above imported public-discussion items; and</li>
@@ -140,14 +140,14 @@ export default function ContentPolicyPage() {
         <div style={section}>
           <h2 style={h2}>6. What we remove — and what we don&apos;t</h2>
           <p style={p}>We will remove content that:</p>
-          <ul style={{ margin: '0 0 .9rem', paddingLeft: '1.1rem' }}>
+          <ul style={{ margin: '0 0 1rem', paddingLeft: '1rem' }}>
             <li style={li}>identifies or targets a private individual, or includes personal contact information;</li>
             <li style={li}>contains threats, harassment, hate speech, or slurs;</li>
             <li style={li}>is demonstrably fabricated, or is the product of coordinated inauthentic activity;</li>
             <li style={li}>infringes third-party rights or violates applicable law.</li>
           </ul>
           <p style={p}>We generally will <strong>not</strong> remove content solely because it is unflattering, including:</p>
-          <ul style={{ margin: '0 0 .9rem', paddingLeft: '1.1rem' }}>
+          <ul style={{ margin: '0 0 1rem', paddingLeft: '1rem' }}>
             <li style={li}>honest accounts of not hearing back or being ghosted;</li>
             <li style={li}>genuine negative experiences with a hiring process;</li>
             <li style={li}>subjective assessments and criticism of a company&apos;s process.</li>

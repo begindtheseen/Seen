@@ -110,7 +110,7 @@ export default function TrackCta({ company, slug, responsePct = null }: {
         ) : (
           <p className={s.ok}>Tracked.</p>
         )}
-        <p className={s.small} style={{ marginTop: 0, marginBottom: '.6rem', color: 'var(--sub)' }}>
+        <p className={s.small} style={{ marginTop: 0, marginBottom: '.5rem', color: 'var(--sub)' }}>
           {app.role} · Day {day}{isLoggedIn ? '' : ' · saved on this device'}
         </p>
         {replyLine}
@@ -151,7 +151,7 @@ export default function TrackCta({ company, slug, responsePct = null }: {
             />
           </div>
           <AppliedWhen choice={choice} pickedDay={pickedDay} onChoice={c => { setChoice(c); setError('') }} onPickedDay={setPickedDay} />
-          {error && <p className={s.err} role="alert" style={{ marginTop: 0, marginBottom: '.6rem' }}>{error}</p>}
+          {error && <p className={s.err} role="alert" style={{ marginTop: 0, marginBottom: '.5rem' }}>{error}</p>}
           <button type="submit" className={s.primary} disabled={busy} data-testid="track-submit">{busy ? 'Saving…' : 'Track it'}</button>
           <div className={s.actions}>
             <button type="button" className={`${s.link} ${s.linkDim}`} onClick={() => { setStep('idle'); setError('') }}>Cancel</button>

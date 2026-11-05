@@ -47,7 +47,8 @@ const Button = forwardRef<HTMLButtonElement | HTMLAnchorElement, ButtonProps>(fu
   const inner = (
     <>
       {loading ? <span className="ui-btn__spin" aria-hidden="true" /> : icon ? <Icon name={icon} size={size === 'lg' ? 18 : 16} /> : null}
-      {children}
+      {/* The label shrinks with an ellipsis instead of spilling over the next button (owner 2026-11-01). */}
+      {children != null && children !== false && children !== '' ? <span className="ui-btn__label">{children}</span> : null}
       {iconRight && !loading ? <Icon name={iconRight} size={size === 'lg' ? 18 : 16} /> : null}
     </>
   )

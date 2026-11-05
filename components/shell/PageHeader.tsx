@@ -17,7 +17,7 @@ export type Crumb = { href: string; label: string }
 
 const TONES: Record<string, string> = {
   blue: 'var(--blue)', green: 'var(--green)', amber: 'var(--amber)',
-  indigo: '#a5b4fc', violet: '#c4b5fd', red: 'var(--red)', cyan: 'var(--cyan)',
+  indigo: 'var(--accent)', violet: 'var(--accent)', red: 'var(--red)', cyan: 'var(--cyan)',
 }
 
 function HomeIcon() {

@@ -70,16 +70,16 @@ export default function DangerConfirmDialog({
       <div role="dialog" aria-modal="true" aria-labelledby={`${testId}-title`} data-testid={testId}
         style={{ position: 'fixed', inset: 0, zIndex: 9950, background: 'rgba(0,0,0,.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
         onClick={() => { if (!busy) onCancel() }}>
-        <div ref={boxRef} tabIndex={-1} onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth, maxHeight: 'calc(100vh - 2rem)', overflowY: 'auto', background: '#0e111c', border: '1px solid rgba(239,68,68,.35)', borderRadius: 16, padding: '1.15rem 1.2rem 1rem', boxShadow: '0 30px 80px rgba(0,0,0,.7)', outline: 'none' }}>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: '#f87185', marginBottom: '.5rem' }}>{eyebrow}</div>
-          <h2 id={`${testId}-title`} style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', lineHeight: 1.3, margin: '0 0 .45rem' }}>{title}</h2>
+        <div ref={boxRef} tabIndex={-1} onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth, maxHeight: 'calc(100vh - 2rem)', overflowY: 'auto', background: 'var(--surface-overlay)', border: '1px solid rgba(239,68,68,.35)', borderRadius: 16, padding: '1.25rem 1.25rem 1rem', boxShadow: '0 30px 80px rgba(0,0,0,.7)', outline: 'none' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--bad-text)', marginBottom: '.5rem' }}>{eyebrow}</div>
+          <h2 id={`${testId}-title`} style={{ fontFamily: 'var(--display)', fontSize: 'var(--fs-lead)', fontWeight: 800, color: 'var(--white)', lineHeight: 1.3, margin: '0 0 .5rem' }}>{title}</h2>
           {paragraphs.map((p, i) => (
             <p key={i} style={{ fontSize: 'var(--fs-meta)', color: 'var(--sub)', lineHeight: 1.6, margin: i === paragraphs.length - 1 && !children ? '0 0 1rem' : '0 0 .5rem' }}>{p}</p>
           ))}
           {children}
           {typeToConfirm && !confirmDisabled && (
             <label style={{ display: 'block', marginBottom: '1rem' }}>
-              <span style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)', marginBottom: '.35rem' }}>Type {typeToConfirm} to confirm</span>
+              <span style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)', marginBottom: '.25rem' }}>Type {typeToConfirm} to confirm</span>
               <input
                 ref={inputRef}
                 type="text"
@@ -92,11 +92,11 @@ export default function DangerConfirmDialog({
                 onKeyDown={e => { if (e.key === 'Enter') fire() }}
                 placeholder={typeToConfirm}
                 aria-label={`Type ${typeToConfirm} to confirm`}
-                style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, background: 'var(--surface)', border: '1.5px solid var(--line2)', borderRadius: 8, padding: '.6rem .85rem', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-lead)', letterSpacing: '.08em', outline: 'none' }}
+                style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, background: 'var(--surface)', border: '1.5px solid var(--line2)', borderRadius: 8, padding: '.5rem .75rem', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-lead)', letterSpacing: '.08em', outline: 'none' }}
               />
             </label>
           )}
-          {error && <div role="alert" style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', lineHeight: 1.6, color: '#f87185', marginBottom: '.7rem' }}>{error}</div>}
+          {error && <div role="alert" style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', lineHeight: 1.6, color: 'var(--bad-text)', marginBottom: '.75rem' }}>{error}</div>}
           <div style={{ display: 'flex', gap: '.5rem', flexDirection: 'column' }}>
             <button
               ref={confirmRef}
@@ -105,11 +105,11 @@ export default function DangerConfirmDialog({
               disabled={!armed || busy}
               aria-disabled={!armed || busy}
               data-testid={confirmTestId || `${testId}-confirm`}
-              style={{ width: '100%', minHeight: 44, padding: '.75rem 1rem', background: armed ? 'linear-gradient(135deg,#ef4444 0%,#b91c1c 100%)' : 'rgba(239,68,68,.15)', color: armed ? '#fff' : 'rgba(255,255,255,.55)', border: 'none', borderRadius: 10, fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-ui)', cursor: armed && !busy ? 'pointer' : 'not-allowed', opacity: busy ? .7 : 1 }}
+              style={{ width: '100%', minHeight: 44, padding: '.75rem 1rem', background: armed ? 'var(--bad)' : 'rgba(239,68,68,.15)', color: armed ? 'var(--text-1)' : 'rgba(255,255,255,.55)', border: 'none', borderRadius: 10, fontFamily: 'var(--body)', fontWeight: 600, fontSize: 'var(--fs-ui)', cursor: armed && !busy ? 'pointer' : 'not-allowed', opacity: busy ? .7 : 1 }}
             >
               {busy ? (busyLabel || confirmLabel) : confirmLabel}
             </button>
-            <button type="button" onClick={onCancel} disabled={busy} style={{ width: '100%', minHeight: 44, padding: '.6rem 1rem', background: 'none', border: '1px solid var(--line2)', color: 'var(--muted)', borderRadius: 10, fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', cursor: busy ? 'not-allowed' : 'pointer' }}>
+            <button type="button" onClick={onCancel} disabled={busy} style={{ width: '100%', minHeight: 44, padding: '.5rem 1rem', background: 'none', border: '1px solid var(--line2)', color: 'var(--muted)', borderRadius: 10, fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', cursor: busy ? 'not-allowed' : 'pointer' }}>
               {cancelLabel}
             </button>
           </div>

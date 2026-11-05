@@ -8,18 +8,18 @@
 
 import Link from 'next/link'
 import { gradeLetter, displayCompanyName } from '@/lib/companyDisplay'
-import { companySlug } from '@/lib/searchRoute'
 import { gradeTone, toneText } from '@/lib/ui/tone.js'
 import s from './EmployerGradeChip.module.css'
+import { pathSegment } from '@/lib/safeHref.js'
 
-export default function EmployerGradeChip({ company, score, onClick, compact = false }: { company: string; score: number; onClick?: (e: React.MouseEvent) => void; /** Card size (24px tall; 44px on phones). */ compact?: boolean }) {
+export default function EmployerGradeChip({ company, score, onClick, compact = false }: { company: string; score: number; onClick?: (e: React.MouseEvent) => void; /** Card size (28px tall; 44px on phones). */ compact?: boolean }) {
   const name = displayCompanyName(company) || company
   return (
     <Link
-      href={`/company/${companySlug(company)}`}
+      href={`/company/${pathSegment(String(company).toLowerCase().trim().replace(/\s+/g, '-'))}`}
       prefetch={false}
       onClick={e => { e.stopPropagation(); onClick?.(e) }}
-      title={`${name}'s Seen Grade from applicant accounts — how it treats applicants, not this posting`}
+      title="This company's Seen Grade from applicant accounts — how it treats applicants, not this posting"
       className={compact ? `${s.chip} ${s.compact}` : s.chip}
     >
       <span className={s.name}>{compact ? 'Seen Grade' : `${name} · Seen Grade`}</span>

@@ -31,6 +31,16 @@ tailor → render → check**. Every stage is deterministic and keyless. No mode
 - **Credits/Pro (locked):** parse = 1 credit (unchanged), tailor = 1 credit, exports
   free with the "Optimized with Seen · seenjobs.io" line and unbranded for Pro; structure / health /
   rewrite / ATS check are free (CPU only, rate-limited).
+- **Exports are the résumé only.** No renderer prints Seen's optimizer notes (fit score, bullets to
+  review, "confirm before using", "add a bullet for …"); `renderPdf` has no `appendix` and
+  `download_resume` / `email_analysis` ignore the package for the PDF (the email body still shows it).
+  The owner's Starlink download printed them as a résumé section (2026-11-01).
+- **Two experience headings stay two.** A heading ending in an experience noun with any qualifier
+  ("Relevant Automotive and EV Experience", "Additional Professional Experience") is an experience
+  section; with ≥ 2 distinct ones every role carries `group` (its heading) and `experienceGroups(d)`
+  in `model.js` is the one grouping the serializer and every renderer use (the tailor variant clears
+  groups — it lays out its own sections). A list section never swallows roles: a date-range line in
+  SKILLS starts an experience section, and a sentence in SKILLS is kept whole, never comma-split.
 - **Fabrication firewall** guards every text-producing path: rewrites, the tailored summary, skill
   additions (résumé-own surfaces only).
 - **Vercel:** `vercel.json` adds `includeFiles: node_modules/pdfjs-dist/**` to `api/resume.js`
@@ -146,6 +156,20 @@ chronological with nothing dropped and nothing added.
 - `node lib/resume/fixtures/dumpPdf.mjs <file.pdf>` — print the extractor's rich lines with geometry.
 - `node lib/resume/fixtures/makePdfFixtures.mjs` — regenerate the checked-in PDF fixtures.
 - `node scripts/resume-studio-smoke.mjs` — the end-to-end browser smoke test (needs `next start`).
+
+## Saved résumés (2026-11-01)
+
+- `public.resumes` (migration `20261101140000_resumes.sql`, server-only, RLS on with no policies): up to
+  `MAX_RESUMES_FREE` (1) / `MAX_RESUMES_PRO` (5) per account (`lib/server/creditRules.js`). The DEFAULT row
+  is mirrored into `profiles.resume_text` (+ file name, word count, updated at) on every change, so every
+  reader of `profiles.resume_text` is unchanged. Studio, uploads and `save_resume` write the default.
+- Rules + store: `lib/server/resumes.js`; actions `resumes_list | resume_get | resume_create | resume_rename |
+  resume_delete | resume_set_default` in `api/user-sync.js`. Pro lapsed: nothing is deleted; only the
+  default is `usable` (optimize / apply); adding past the free cap is refused with the upsell.
+- Before the migration every action answers `{ ready: false }` and the UI shows the single résumé.
+- UI: "Your résumé(s)" panel + viewer on `/resume` (`components/resume/ResumeLibraryPanel.tsx`,
+  `ResumeView.tsx`), the "Résumé: <name>" picker (`ResumePicker.tsx`) on `/resume`, the Optimize sheet and
+  Apply on Seen (`resume_id`, checked server-side by `resumeForApply`).
 
 ## Follow-ups (not in this PR)
 

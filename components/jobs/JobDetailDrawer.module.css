@@ -10,9 +10,12 @@
 .barIcon { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: var(--r-control); border: 0; background: transparent; color: var(--text-3); cursor: pointer; text-decoration: none; }
 .barIcon:hover { color: var(--text-1); background: rgba(255, 255, 255, .06); }
 .scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: var(--sp-4); }
-.postingLink { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; margin-top: var(--sp-1); font-size: var(--fs-sm); font-weight: 600; color: var(--accent); text-decoration: none; }
 .h3 { margin: 0 0 var(--sp-2); font-size: var(--fs-lead); font-weight: 600; color: var(--text-1); }
+/* The drawer's title is a card title, not the screen's headline (the page behind it owns the one Syne h1):
+   body 600 at the lead size, balanced so a long title never leaves "(Python/FastAPI" + ")" on two lines (round 2). */
+.scroll .title { font-family: var(--body); font-weight: 600; font-size: var(--fs-h3); letter-spacing: -.01em; line-height: var(--lh-snug); text-wrap: balance; overflow-wrap: anywhere; }
 .foot { flex-shrink: 0; display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4) calc(var(--sp-3) + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--border-2); background: var(--surface-overlay); }
 .check { align-self: flex-start; }
 @media (prefers-reduced-motion: reduce) { .scrim, .panel { transition: none; } }
-@media (max-width: 768px) { .postingLink { min-height: 44px; } }
+.grow { flex: 1 1 auto; min-width: 0; } /* the secondary (Optimize) gives way */
+.main { flex: 1 1 auto; min-width: max-content; } /* the one filled button keeps its whole label (round 3: "Ap…" at 390 and 1280) */
