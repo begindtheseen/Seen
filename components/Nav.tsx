@@ -210,6 +210,8 @@ export default function Nav() {
   }, [pathname, isSeeker, isLoggedIn])
 
   const isActive = (path: string) => pathname === path || pathname.startsWith(path + '/')
+  // The auth pages: the form on screen is the only call to action.
+  const onAuthPage = /^\/(?:login|reset|signup)(?:\/|$)/.test(pathname || '')
 
   const handleSignOut = async () => {
     // scope 'local': THIS device only. The default (global) revoked every session the account
@@ -392,10 +394,12 @@ export default function Nav() {
             </Dropdown>
           )}
 
-          {!isLoggedIn && (
+          {!isLoggedIn && !onAuthPage && (
             <>
               {/* On phones the bottom tab bar and the drawer already carry Sign in: the top bar keeps
-                  wordmark + menu + ONE button (DESIGN.md §5). */}
+                  wordmark + menu + ONE button (DESIGN.md §5). On /login and /reset the page itself is the
+                  sign-in / sign-up, so the bar carries neither button (owner, 2026-11-05: "Get started" sat
+                  over the sign-up form). */}
               <Link href={signInHref} {...fresh} className={`btn btn-ghost ${styles.topSignIn}`}>Sign in</Link>
               {/* Primary CTA for a brand-new visitor = start as a job seeker (the default persona).
                   The employer path stays reachable via the "Employers" primary link + More menu, so
