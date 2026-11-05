@@ -93,7 +93,7 @@ async function setPro(uid, isPro, env) {
     body: JSON.stringify({ pro: isPro }),
   });
   // 404 or no rows matched (PostgREST returns 200 with count 0 when no rows found)
-  const text = await patch.text();
+  await patch.text().catch(() => {}); // drain the body; the status decides
   if (patch.status !== 200 && patch.status !== 204) {
     await q('ai_credits', {
       method: 'POST', headers: { Prefer: 'return=minimal' },
