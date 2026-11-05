@@ -5,7 +5,7 @@
 // Reliability fix: each row carries the listing snapshot captured at save time,
 // so opening it always resolves to the exact saved listing via /jobs/[id].
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useLayoutEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { SavedJobsStore } from '@/lib/stores/SavedJobs'
@@ -16,6 +16,7 @@ import PageHeader from '@/components/shell/PageHeader'
 import Link from 'next/link'
 import { pathSegment, httpHref } from '@/lib/safeHref.js'
 import { displayCompanyName } from '@/lib/companyDisplay'
+import { useScrollMemory } from '@/lib/nav/urlState'
 
 function savedAgo(iso?: string): string {
   if (!iso) return ''
@@ -34,14 +35,22 @@ export default function SavedPage() {
   const [items, setItems] = useState<SavedJob[]>([])
   const [loading, setLoading] = useState(true)
 
+  // This device's copy first (before the first paint), so Back from a listing shows the same rows at
+  // once and the scroll position can be restored; the account's list replaces it when it arrives.
+  // The copy is swept on sign-out (seen_saved_v1 in lib/sessionLocalKeys.js).
+  useLayoutEffect(() => {
+    const local = SavedJobsStore.loadSync()
+    if (Array.isArray(local) && local.length) { setItems(local); setLoading(false) }
+  }, [])
+
   const refresh = useCallback(async () => {
-    setLoading(true)
     try { setItems(await SavedJobsStore.load(isLoggedIn)) }
     catch { setItems(SavedJobsStore.loadSync()) }
     finally { setLoading(false) }
   }, [isLoggedIn])
 
   useEffect(() => { refresh() }, [refresh])
+  useScrollMemory(!loading)
 
   // Prime the session cache from the snapshot so the detail page loads instantly.
   function prime(s: SavedJob) {

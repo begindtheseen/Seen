@@ -33,7 +33,7 @@ export default function ConfirmDialog({ title, body, confirmLabel, busyLabel = '
   }
 
   return (
-    <ModalPortal>
+    <ModalPortal onBack={() => { if (!busy) onClose() }}>
       <div className={s.backdrop} onClick={e => { if (e.target === e.currentTarget && !busy) onClose() }}>
         <div role="alertdialog" aria-modal="true" aria-label={title} className={s.dialog}>
           <div className={s.dialogHead}>

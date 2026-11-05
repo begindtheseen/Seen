@@ -378,7 +378,7 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <ModalPortal>
+    <ModalPortal onBack={onClose}>
     <div
       style={backdropStyle}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}

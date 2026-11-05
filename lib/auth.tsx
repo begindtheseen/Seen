@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
 import type { User, Session } from '@supabase/supabase-js'
 import { supabase } from './supabase'
-import { SESSION_LOCAL_KEYS, SESSION_LOCAL_PREFIXES } from './sessionLocalKeys.js'
+import { SESSION_LOCAL_KEYS, SESSION_LOCAL_PREFIXES, SESSION_TAB_KEYS } from './sessionLocalKeys.js'
 import { _sync } from './sync'
 import { consumeIntentionalSignOut, handleSessionExpired, resetSessionExpiredGuard } from './sessionExpired'
 import type { UserProfile } from './types'
@@ -76,7 +76,15 @@ function clearSessionLocalData() {
       if (k && SESSION_LOCAL_PREFIXES.some(p => k.startsWith(p))) localStorage.removeItem(k)
     }
   } catch { /* ignore */ }
-  try { sessionStorage.removeItem('seen_job_cache_v1') } catch { /* ignore */ } // JobCache is sessionStorage
+  // sessionStorage: the tab's navigation memory, plus any per-person key kept there (résumé page
+  // state `seen_resume_nav_<uid>`, the Studio hand-off) — the next person in this tab starts clean.
+  try {
+    SESSION_TAB_KEYS.forEach(k => sessionStorage.removeItem(k))
+    for (let i = sessionStorage.length - 1; i >= 0; i--) {
+      const k = sessionStorage.key(i)
+      if (k && (SESSION_LOCAL_KEYS.includes(k) || SESSION_LOCAL_PREFIXES.some(p => k.startsWith(p)))) sessionStorage.removeItem(k)
+    }
+  } catch { /* ignore */ }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

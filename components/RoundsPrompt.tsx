@@ -15,7 +15,7 @@ export default function RoundsPrompt({ app, onSubmit, onSkip }: Props) {
   const [notes, setNotes] = useState('')
 
   return (
-    <ModalPortal>
+    <ModalPortal onBack={onSkip}>
     <div
       style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(0,0,0,.78)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
       onClick={e => { if (e.target === e.currentTarget) onSkip() }}

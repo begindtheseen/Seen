@@ -66,7 +66,7 @@ export default function DangerConfirmDialog({
   const fire = () => { if (armed && !busy) onConfirm() }
 
   return (
-    <ModalPortal>
+    <ModalPortal onBack={() => { if (!busy) onCancel() }}>
       <div role="dialog" aria-modal="true" aria-labelledby={`${testId}-title`} data-testid={testId}
         style={{ position: 'fixed', inset: 0, zIndex: 9950, background: 'rgba(0,0,0,.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
         onClick={() => { if (!busy) onCancel() }}>

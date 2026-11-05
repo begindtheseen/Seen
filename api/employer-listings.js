@@ -406,10 +406,21 @@ async function syncApplicantTracker(db, application, status, text = null) {
       }
     }
     if (m.email) {
-      await sendApplicationUpdateEmail({ to: application.applicant_email, company: application.company_name, role: application.job_title, label: m.label, text });
+      await sendApplicationUpdateEmail({ to: application.applicant_email, company: application.company_name, role: application.job_title, label: m.label, text, appId: app?.id || null });
     }
     return { synced, reason: app ? (synced ? 'updated' : 'write_failed') : 'not_in_tracker' };
   } catch { return { synced: false, reason: 'error' }; }
+}
+
+// The applicant's own tracker row for a Seen application (same match as syncApplicantTracker), so
+// an email can open that card. Best-effort: null on any miss, and the email links the tracker.
+async function applicantTrackerId(db, application) {
+  try {
+    if (!application?.applicant_user_id || !application?.job_id) return null;
+    const r = await db(`applications?user_id=eq.${encodeURIComponent(application.applicant_user_id)}&job_id=eq.${encodeURIComponent(String(application.job_id))}&select=id&limit=1`);
+    const rows = r.ok ? await r.json() : [];
+    return Array.isArray(rows) && rows[0]?.id ? rows[0].id : null;
+  } catch { return null; }
 }
 
 // ── application_message: write to one applicant on their application ───────────
@@ -424,7 +435,7 @@ async function applicationMessage(res, { db, body, claim }) {
   // Two writes racing on one row would drop a message, so the PATCH only lands if the row is
   // unchanged since it was read (updated_at), with one re-read on a lost race.
   for (let attempt = 0; attempt < 2; attempt++) {
-    const cur = await db(`${own}&select=id,thread,updated_at,applicant_email,company_name,job_title&limit=1`);
+    const cur = await db(`${own}&select=id,thread,updated_at,applicant_email,applicant_user_id,job_id,company_name,job_title&limit=1`);
     const row = cur.ok ? (await cur.json())[0] : null;
     if (!row) return res.status(404).json({ error: 'That application isn’t on your company’s listings' });
     const next = appendThreadEntry(row.thread, { from: 'e', text: body.text, nowMs: Date.now() });
@@ -438,7 +449,8 @@ async function applicationMessage(res, { db, body, claim }) {
     const rows = await up.json();
     if (!rows.length) continue; // someone else wrote first — re-read and append again
     const text = next.thread[next.thread.length - 1][2];
-    const mail = await sendEmployerMessageEmail({ to: row.applicant_email, company: row.company_name, role: row.job_title, text });
+    const appId = await applicantTrackerId(db, row);
+    const mail = await sendEmployerMessageEmail({ to: row.applicant_email, company: row.company_name, role: row.job_title, text, appId });
     return res.status(200).json({ ok: true, application: inboxItem(rows[0]), emailed: !!mail.ok });
   }
   return res.status(409).json({ error: 'The application changed while you were writing — please send again' });

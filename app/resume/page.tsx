@@ -25,11 +25,20 @@ import { RESUME_OPTIMIZE_COST, creditCostLabel, priceLabel } from '@/lib/creditR
 import { markQuiet } from '@/lib/quietWindow'
 import { MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
 import PageHeader from '@/components/shell/PageHeader'
+import { replaceParam, readParam, useScrollMemory } from '@/lib/nav/urlState'
 
 const ResumeSurveyModal = dynamic(() => import('@/components/ResumeSurveyModal'), { ssr: false })
 
 
 type Tab = 'fit' | 'rewrite' | 'humanproof' | 'strategy' | 'export'
+const TABS: Tab[] = ['fit', 'rewrite', 'humanproof', 'strategy', 'export']
+const isTab = (v: string): v is Tab => (TABS as string[]).includes(v)
+
+// The job and the results this tab last showed, per person (sessionStorage, key below + user id or
+// 'guest'; the seen_resume_ prefix is the résumé sweep in lib/sessionLocalKeys.js). Restored on the
+// way back (e.g. "Tailor in Studio" → Back); a restore only sets state, it never re-runs anything.
+const RESUME_NAV_PREFIX = 'seen_resume_nav_'
+const RESUME_NAV_TTL = 6 * 60 * 60 * 1000
 const OPTIMIZE_PRICE = creditCostLabel(RESUME_OPTIMIZE_COST)
 // Fallback for the server's 422 no_requirements message (lib/server/optimizePackage.js unoptimizableListing).
 const NO_REQUIREMENTS_NOTE = "This listing doesn't list its requirements, so there's nothing to optimize against — no credit used."
@@ -107,6 +116,18 @@ interface CompanyIntel {
   avg_wait_days?: number | null
   overall_score?: number | null
   report_count?: number | null
+}
+
+interface ResumeNavSnap {
+  t: number
+  jobTitle: string; jobCompany: string; jobJD: string; jobUrl: string; background: string
+  savedId: string; showManual: boolean; jobSource: string | null; previewLink: string; companyIntel: CompanyIntel | null
+  analyzed: boolean
+  fitOut: OptimizerOutput | null; fitState: 'idle' | 'done' | 'error' | 'disabled' | 'preview'
+  paid: PaidOptimize | null; paidState: 'idle' | 'done' | 'preview' | 'no_requirements'; paidNote: string
+  hp: HumanProofResult | null; hpState: 'idle' | 'done' | 'locked'
+  insights: Insights | null
+  advResult: CombinedResult | null; advState: 'idle' | 'done'
 }
 
 const areaStyle: React.CSSProperties = {
@@ -368,7 +389,7 @@ function ResumeInput({ resumeText, setResumeText, resumeMeta, onUpload, onClear,
 }
 
 function ResumePageInner() {
-  const { isLoggedIn, user, profile } = useAuth()
+  const { isLoggedIn, user, profile, ready } = useAuth()
   const params = useSearchParams()
   const router = useRouter()
 
@@ -451,6 +472,74 @@ function ResumePageInner() {
   }, [user?.id, isLoggedIn])
 
   useEffect(() => { SavedJobsStore.load(isLoggedIn).then(setSavedJobs).catch(() => {}) }, [isLoggedIn])
+
+  // ── Coming back keeps everything: the tab is in the URL (?tab=), the job + results in this tab's
+  //    sessionStorage for this person. Read once the session is known. ──
+  const navKey = `${RESUME_NAV_PREFIX}${user?.id || 'guest'}`
+  const [navRestored, setNavRestored] = useState(false)
+  // The person the restore was for: after a sign-out / account switch on this page nothing is saved,
+  // so one person's job never lands under another's key.
+  const navOwner = useRef('')
+  useEffect(() => {
+    if (!ready || navRestored) return
+    setNavRestored(true)
+    navOwner.current = navKey
+    const t = readParam('tab')
+    if (isTab(t)) setTab(t)
+    let snap: ResumeNavSnap | null = null
+    try { snap = JSON.parse(sessionStorage.getItem(navKey) || 'null') as ResumeNavSnap | null } catch { snap = null }
+    if (!snap || typeof snap !== 'object' || typeof snap.t !== 'number' || Date.now() - snap.t > RESUME_NAV_TTL) return
+    // A link that names a job (?role=&company=) is a new job, not the way back.
+    const urlRole = params?.get('role') ?? '', urlCo = params?.get('company') ?? ''
+    if ((urlRole && urlRole !== snap.jobTitle) || (urlCo && urlCo !== snap.jobCompany)) return
+    if (jobJD.trim() || analyzed) return // the person already started something here
+    setJobTitle(snap.jobTitle || ''); setJobCompany(snap.jobCompany || ''); setJobJD(snap.jobJD || ''); setJobUrl(snap.jobUrl || '')
+    setBackground(snap.background || ''); setSavedId(snap.savedId || ''); setShowManual(!!snap.showManual); setJobSource(snap.jobSource ?? null)
+    setPreviewLink(snap.previewLink || ''); setCompanyIntel(snap.companyIntel ?? null)
+    if (snap.analyzed) {
+      setAnalyzed(true)
+      setFitOut(snap.fitOut ?? null); setFitState(snap.fitState || 'idle')
+      setPaid(snap.paid ?? null); setPaidState(snap.paidState || 'idle'); setPaidNote(snap.paidNote || '')
+      setHp(snap.hp ?? null); setHpState(snap.hpState || 'idle')
+      setInsights(snap.insights ?? null)
+      setAdvResult(snap.advResult ?? null); setAdvState(snap.advState || 'idle')
+    }
+  }, [ready, navRestored, navKey]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Only finished states are kept: a request still running when the person left comes back idle.
+  const navSnap = (): ResumeNavSnap | null => {
+    const fitDone = fitState === 'done' || fitState === 'disabled' || fitState === 'preview' || fitState === 'error'
+    if (!jobTitle.trim() && !jobCompany.trim() && !jobJD.trim() && !(analyzed && fitDone)) return null
+    return {
+      t: Date.now(), jobTitle, jobCompany, jobJD, jobUrl, background, savedId, showManual, jobSource, previewLink, companyIntel,
+      analyzed: analyzed && fitDone,
+      fitOut, fitState: fitDone ? fitState : 'idle',
+      paid: paidState === 'done' ? paid : null,
+      paidState: paidState === 'done' || paidState === 'preview' || paidState === 'no_requirements' ? paidState : 'idle',
+      paidNote,
+      hp: hpState === 'done' ? hp : null, hpState: hpState === 'done' || hpState === 'locked' ? hpState : 'idle',
+      insights,
+      advResult: advState === 'done' ? advResult : null, advState: advState === 'done' ? 'done' : 'idle',
+    }
+  }
+  const writeNav = (snap: ResumeNavSnap | null) => {
+    try { if (snap) sessionStorage.setItem(navKey, JSON.stringify(snap)); else sessionStorage.removeItem(navKey) } catch { /* ignore */ }
+  }
+  const latestNav = useRef<() => void>(() => {})
+  latestNav.current = () => { if (navRestored && navOwner.current === navKey) writeNav(navSnap()) }
+  useEffect(() => {
+    if (!navRestored) return
+    const t = setTimeout(() => latestNav.current(), 400)
+    return () => clearTimeout(t)
+  }, [navRestored, navKey, jobTitle, jobCompany, jobJD, jobUrl, background, savedId, showManual, jobSource, previewLink, companyIntel, analyzed, fitOut, fitState, paid, paidState, paidNote, hp, hpState, insights, advResult, advState])
+  // Leaving the page (Studio, a link): write what is on screen now, not 400 ms ago.
+  useEffect(() => () => latestNav.current(), [])
+  useScrollMemory(navRestored)
+
+  function selectTab(t: Tab) {
+    setTab(t)
+    replaceParam('tab', t === 'fit' ? null : t)
+  }
   useEffect(() => { if (jobCompany.trim()) fetchIntel(jobCompany) }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Open the survey when the UpgradeModal's "earn credits" link fires.
@@ -536,7 +625,7 @@ function ResumePageInner() {
       setResumeMeta({ fileName: 'Pasted résumé', wordCount: wc })
     }
     setAnalyzed(true)
-    setTab('fit')
+    selectTab('fit')
     // Reset downstream tabs so they re-run against the new inputs.
     setHp(null); setHpState('idle'); setAdvResult(null); setAdvState('idle'); setPaid(null); setPaidState('idle')
     const ok = await runFit()
@@ -894,7 +983,7 @@ function ResumePageInner() {
               <>
                 <div className="ai-tabs" role="tablist">
                   {tabs.map(t => (
-                    <button key={t.id} role="tab" aria-selected={tab === t.id} className={`ai-tab${tab === t.id ? ' active' : ''}`} onClick={() => { setTab(t.id); setError('') }}>{t.label}</button>
+                    <button key={t.id} role="tab" aria-selected={tab === t.id} className={`ai-tab${tab === t.id ? ' active' : ''}`} onClick={() => { selectTab(t.id); setError('') }}>{t.label}</button>
                   ))}
                 </div>
 
@@ -938,7 +1027,7 @@ function ResumePageInner() {
                         {!paid ? (
                           <>
                             <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--amber)', lineHeight: 1.6, marginBottom: '.75rem' }} data-testid="hp-needs-plan">HumanProof works on the bullets your rewrite plan improves — build the plan first.</p>
-                            <button style={btnPrimary} onClick={() => setTab('rewrite')}>Go to the rewrite plan →</button>
+                            <button style={btnPrimary} onClick={() => selectTab('rewrite')}>Go to the rewrite plan →</button>
                           </>
                         ) : realBulletsOf(paid).length === 0 ? (
                           <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--amber)', lineHeight: 1.6, margin: 0 }} data-testid="hp-nothing">Your rewrite plan for this job has no rewritten bullets yet — only bullets for you to write. There is nothing for HumanProof to polish; write those bullets from real work, then come back.</p>

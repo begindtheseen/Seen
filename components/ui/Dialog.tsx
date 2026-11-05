@@ -9,7 +9,7 @@
 //     description (aria-describedby) when one is given;
 //   · focus moves inside on open, Tab cycles inside, focus returns to the opener on close
 //     (lib/hooks/useFocusTrap);
-//   · Escape closes; a click on the scrim closes unless `dismissable={false}`;
+//   · Escape, the scrim and the phone's Back close it unless `dismissable={false}`;
 //   · a SOLID surface (#0e111c, --surface-overlay) — never translucent glass over content;
 //   · rendered at <body> with the page scroll locked (components/ModalPortal).
 import { useEffect, useId, useRef, type ReactNode, type Ref } from 'react'
@@ -88,7 +88,7 @@ export default function Dialog({ open, onClose, dismissable = true, ...rest }: D
 
   if (!open) return null
   return (
-    <ModalPortal>
+    <ModalPortal onBack={dismissable ? onClose : undefined}>
       <div className="ui-dialog__scrim" onClick={() => { if (dismissable) onClose() }}>
         <DialogSurface {...rest} onClose={onClose} titleId={titleId} descId={descId} panelRef={panel} />
       </div>

@@ -175,7 +175,7 @@ export default function ResumeSurveyModal({ onClose, onCreditsEarned, onExhauste
         .rs-anim { animation: rsFade .25s ease forwards; }
       `}</style>
 
-      <ModalPortal>
+      <ModalPortal onBack={onClose}>
       <div style={backdrop} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
         <div style={modal}>
           <button style={close} onClick={onClose} aria-label="Close">×</button>

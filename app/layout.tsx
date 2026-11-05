@@ -10,6 +10,7 @@ import ReferralHost from '@/components/growth/ReferralHost'
 import TabBar from '@/components/shell/TabBar'
 import CommandPalette from '@/components/shell/CommandPalette'
 import RouteProgress from '@/components/shell/RouteProgress'
+import NavMemory from '@/components/shell/NavMemory'
 import { Syne, Instrument_Sans, DM_Mono } from 'next/font/google'
 import './globals.css'
 import '@/components/ui/ui.css'
@@ -94,6 +95,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
           {/* The connected shell: route progress hairline, nav, page, footer, phone tab bar, ⌘K palette. */}
           <RouteProgress />
+          <NavMemory />
           <Nav />
           {/* The ONE <main> landmark (audit 2026-10-24: `.site-main` was a div, so there was no main
               landmark and the nav's "Skip to content" link had nowhere to land). tabIndex -1 lets the

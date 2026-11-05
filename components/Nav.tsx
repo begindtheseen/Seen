@@ -15,6 +15,9 @@ import { dailyResetLabel } from '@/lib/creditRules'
 import { useFocusTrap } from '@/lib/hooks/useFocusTrap'
 import Icon from '@/components/ui/Icon'
 import styles from './Nav.module.css'
+import { loginHref } from '@/lib/safeHref.js'
+import { lastJobsHref } from '@/lib/nav/backTrail'
+import { useBackDismiss, afterPendingBack } from '@/lib/nav/urlState'
 
 // The earn-credits flow: the résumé survey (asks about the user's past employers).
 const ResumeSurveyModal = dynamic(() => import('./ResumeSurveyModal'), { ssr: false })
@@ -88,6 +91,25 @@ export default function Nav() {
   // Modal contract (lib/hooks/useFocusTrap): Tab cycles inside the open drawer, focus lands on the close
   // button, and closing returns focus to the hamburger that opened it.
   useFocusTrap(drawerRef, menuOpen, { initialFocus: drawerCloseRef })
+  // Phone Back closes the drawer instead of leaving the page.
+  const closeMenu = useCallback(() => setMenuOpen(false), [])
+  useBackDismiss(menuOpen, closeMenu)
+  // A drawer link to another page lets the route change close the drawer (closing first would race
+  // the drawer's history Back against the navigation); a link to this same page closes it now.
+  const closeIfHere = (path: string) => { if (pathname === path) setMenuOpen(false) }
+  // Sign in / Get started come back to this page; Jobs goes back to the last search in this tab.
+  // Server render uses the plain links; the real ones are read after mount and again on press.
+  const [here, setHere] = useState('')
+  const [jobsHref, setJobsHref] = useState('/jobs')
+  const syncLinks = useCallback(() => {
+    setHere(`${window.location.pathname}${window.location.search}`)
+    setJobsHref(lastJobsHref())
+  }, [])
+  useEffect(() => { syncLinks() }, [pathname, syncLinks])
+  // loginHref decides itself when there is nothing to come back to (home, sign-in pages, unsafe paths).
+  const signInHref = loginHref(here)
+  const getStartedHref = signInHref.replace(/^\/login\??/, '/login?signup=1&').replace(/&$/, '')
+  const fresh = { onPointerDown: syncLinks, onFocus: syncLinks }
 
   const fetchBalance = useCallback(async () => {
     if (!isSeeker) { setCreditBalance(null); return }
@@ -195,7 +217,8 @@ export default function Nav() {
     // "Sign out of all devices" lives in Settings → Security, on purpose.
     markIntentionalSignOut()
     await supabase.auth.signOut({ scope: 'local' })
-    router.push('/')
+    // The drawer may be taking its history entry back; push after that lands.
+    afterPendingBack(() => router.push('/'))
   }
 
   const handlePasswordReset = async () => {
@@ -238,7 +261,7 @@ export default function Nav() {
           {isSeeker ? (
             <>
               <Link href="/dashboard" className={linkCls('/dashboard')}>Dashboard</Link>
-              <Link href="/jobs" className={linkCls('/jobs')}>Jobs</Link>
+              <Link href={jobsHref} {...fresh} className={linkCls('/jobs')}>Jobs</Link>
               <Link href="/companies" className={linkCls('/companies')}>Companies</Link>
               <Link href="/tracker" className={linkCls('/tracker')}>Track</Link>
               <Link href="/resume" className={linkCls('/resume')}>Résumé</Link>
@@ -246,7 +269,7 @@ export default function Nav() {
           ) : (
             <>
               <Link href="/companies" className={linkCls('/companies')}>Companies</Link>
-              <Link href="/jobs" className={linkCls('/jobs')}>Jobs</Link>
+              <Link href={jobsHref} {...fresh} className={linkCls('/jobs')}>Jobs</Link>
               {/* Public employer portal (#200) — kept prominent for logged-out visitors. */}
               <Link href="/employers" className={linkCls('/employers')}>Employers</Link>
               <Link href="/pricing" className={linkCls('/pricing')}>Pricing</Link>
@@ -371,11 +394,11 @@ export default function Nav() {
 
           {!isLoggedIn && (
             <>
-              <Link href="/login" className="btn btn-ghost">Sign in</Link>
+              <Link href={signInHref} {...fresh} className="btn btn-ghost">Sign in</Link>
               {/* Primary CTA for a brand-new visitor = start as a job seeker (the default persona).
                   The employer path stays reachable via the "Employers" primary link + More menu, so
                   this no longer misdirects new seekers into employer login. */}
-              <Link href="/login?signup=1" className="btn btn-nav-cta">Get started</Link>
+              <Link href={getStartedHref} {...fresh} className="btn btn-nav-cta">Get started</Link>
             </>
           )}
         </div>
@@ -405,7 +428,7 @@ export default function Nav() {
         </div>
         {/* Credit balance — always visible at the top of the mobile drawer for signed-in seekers */}
         {isSeeker && isPro && (
-          <Link href="/pricing" onClick={() => setMenuOpen(false)} className={`${styles.drawerCredit} ${styles.drawerCreditPro}`}>
+          <Link href="/pricing" onClick={() => closeIfHere('/pricing')} className={`${styles.drawerCredit} ${styles.drawerCreditPro}`}>
             <span><Icon name="star" size={14} /> Seen Pro</span>
             <span>What&apos;s included</span>
           </Link>
@@ -423,14 +446,14 @@ export default function Nav() {
         {/* Grouped so the drawer reads as sections, not a flat wall of links. */}
         {isSeeker && <div className="side-menu-label">Your job search</div>}
         {isSeeker && <Link href="/dashboard" className={`side-menu-item${isActive('/dashboard') ? ' active' : ''}`}><span className="side-menu-icon"><Icon name="layout-dashboard" size={18} /></span>Dashboard</Link>}
-        {isSeeker && <Link href="/jobs" className={`side-menu-item${isActive('/jobs') ? ' active' : ''}`}><span className="side-menu-icon"><Icon name="briefcase" size={18} /></span>Jobs</Link>}
+        {isSeeker && <Link href={jobsHref} {...fresh} className={`side-menu-item${isActive('/jobs') ? ' active' : ''}`}><span className="side-menu-icon"><Icon name="briefcase" size={18} /></span>Jobs</Link>}
         {isSeeker && <Link href="/companies" className={`side-menu-item${isActive('/companies') ? ' active' : ''}`}><span className="side-menu-icon"><Icon name="building-2" size={18} /></span>Companies</Link>}
         {isSeeker && <Link href="/tracker" className={`side-menu-item${isActive('/tracker') ? ' active' : ''}`}><span className="side-menu-icon"><Icon name="list-checks" size={18} /></span>Track</Link>}
         {isSeeker && <Link href="/resume" className={`side-menu-item${isActive('/resume') ? ' active' : ''}`}><span className="side-menu-icon"><Icon name="file-text" size={18} /></span>Résumé</Link>}
         {isSeeker && <Link href="/saved" className={`side-menu-item${isActive('/saved') ? ' active' : ''}`}><span className="side-menu-icon"><Icon name="bookmark" size={18} /></span>Saved jobs</Link>}
 
         <div className="side-menu-label">Explore</div>
-        {!isSeeker && <Link href="/jobs" className={`side-menu-item${isActive('/jobs') ? ' active' : ''}`}><span className="side-menu-icon"><Icon name="briefcase" size={18} /></span>Jobs</Link>}
+        {!isSeeker && <Link href={jobsHref} {...fresh} className={`side-menu-item${isActive('/jobs') ? ' active' : ''}`}><span className="side-menu-icon"><Icon name="briefcase" size={18} /></span>Jobs</Link>}
         {!isSeeker && <Link href="/companies" className={`side-menu-item${isActive('/companies') ? ' active' : ''}`}><span className="side-menu-icon"><Icon name="building-2" size={18} /></span>Companies</Link>}
         <Link href="/agencies" className={`side-menu-item${isActive('/agencies') ? ' active' : ''}`}><span className="side-menu-icon"><Icon name="ghost" size={18} /></span>Agency ghost index</Link>
         <Link href="/demand" className={`side-menu-item${isActive('/demand') ? ' active' : ''}`}><span className="side-menu-icon"><Icon name="chart-column" size={18} /></span>Hiring demand</Link>
@@ -443,7 +466,7 @@ export default function Nav() {
         <div className={styles.drawerFoot}>
           {isSeeker ? (
             <>
-              <Link href="/profile" onClick={() => setMenuOpen(false)} className={styles.drawerGhost}><Icon name="settings" size={16} /> Profile &amp; settings</Link>
+              <Link href="/profile" onClick={() => closeIfHere('/profile')} className={styles.drawerGhost}><Icon name="settings" size={16} /> Profile &amp; settings</Link>
               <button type="button" onClick={() => { handleSignOut(); setMenuOpen(false) }} className={styles.drawerDanger}>Sign out</button>
             </>
           ) : isLoggedIn ? (
@@ -452,8 +475,8 @@ export default function Nav() {
             <>
               {/* A guest's first move is an account, not a login — the nav's "Get started" button is
                   hidden under 480px (globals.css), so until now the drawer's only CTA was Sign in. */}
-              <Link href="/login?signup=1" className={`btn btn-solid ${styles.drawerCta}`}>Create free account</Link>
-              <Link href="/login" className={`btn btn-ghost ${styles.drawerCta}`}>Sign in</Link>
+              <Link href={getStartedHref} {...fresh} className={`btn btn-solid ${styles.drawerCta}`}>Create free account</Link>
+              <Link href={signInHref} {...fresh} className={`btn btn-ghost ${styles.drawerCta}`}>Sign in</Link>
             </>
           )}
         </div>

@@ -9,11 +9,13 @@
  */
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '@/lib/auth'
 import styles from './TabBar.module.css'
 import Icon from '@/components/ui/Icon'
 import type { IconName } from '@/components/ui/icons'
+import { loginHref } from '@/lib/safeHref.js'
+import { lastJobsHref } from '@/lib/nav/backTrail'
 
 type Tab = { href: string; label: string; icon: 'grid' | 'briefcase' | 'check' | 'building' | 'file' | 'home' | 'tag' | 'user' }
 
@@ -45,6 +47,18 @@ export default function TabBar() {
   const tabs = isSeeker ? SEEKER : isLoggedIn ? [] : GUEST
   const show = !hidden && tabs.length > 0
 
+  // Jobs goes back to the last search in this tab; Sign in comes back to this page. The server
+  // renders the plain links; the real ones are read after mount and again on press.
+  const [here, setHere] = useState('')
+  const [jobsHref, setJobsHref] = useState('/jobs')
+  const syncLinks = useCallback(() => {
+    setHere(`${window.location.pathname}${window.location.search}`)
+    setJobsHref(lastJobsHref())
+  }, [])
+  useEffect(() => { syncLinks() }, [pathname, syncLinks])
+  const hrefFor = (href: string) =>
+    href === '/jobs' ? jobsHref : href === '/login' ? loginHref(here) : href
+
   // Pages pad their bottom for the bar via html.tabbar (globals.css); the keyboard hides it.
   useEffect(() => {
     const root = document.documentElement
@@ -69,7 +83,7 @@ export default function TabBar() {
   return (
     <div className={styles.bar} role="navigation" aria-label="Primary">
       {tabs.map(t => (
-        <Link key={t.href} href={t.href} className={`${styles.item}${active(t.href) ? ' ' + styles.on : ''}`} aria-current={active(t.href) ? 'page' : undefined}>
+        <Link key={t.href} href={hrefFor(t.href)} onPointerDown={syncLinks} onFocus={syncLinks} className={`${styles.item}${active(t.href) ? ' ' + styles.on : ''}`} aria-current={active(t.href) ? 'page' : undefined}>
           <span className={styles.ico}><Icon name={TAB_ICON[t.icon]} size={22} strokeWidth={1.9} /></span>
           <span className={styles.label}>{t.label}</span>
         </Link>

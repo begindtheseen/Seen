@@ -436,7 +436,7 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
         }
       `}</style>
 
-      <ModalPortal>
+      <ModalPortal onBack={onClose}>
       <div style={backdropStyle} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
         <div style={modalStyle}>
 

@@ -221,7 +221,7 @@ export default function ListingCard({ data, onClose }: { data: ListingCardData; 
   }
 
   return (
-    <ModalPortal>
+    <ModalPortal onBack={onClose}>
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(2,4,10,0.97)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '1.5rem 1.25rem 2.5rem', overflowY: 'auto' }}>
       <div style={{ width: '100%', maxWidth: 480 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>

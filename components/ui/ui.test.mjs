@@ -96,7 +96,7 @@ test('Dialog: a solid overlay surface, no glass, focus trapped via the shared ho
   assert.doesNotMatch(css, /backdrop-filter/)
   const src = readFileSync(fileURLToPath(new URL('./Dialog.tsx', import.meta.url)), 'utf8')
   assert.match(src, /useFocusTrap\(panel, open\)/)
-  assert.match(src, /<ModalPortal>/)
+  assert.match(src, /<ModalPortal onBack=\{dismissable \? onClose : undefined\}>/) // the phone's Back closes it
 })
 
 test('Icon: decorative by default, role=img with a name when labelled', async () => {

@@ -14,6 +14,8 @@ import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
 import { trackApplyClick } from '@/lib/trackApply'
 import type { Job } from '@/lib/types'
 import ModalPortal from '@/components/ModalPortal'
+import { loginHref } from '@/lib/safeHref.js'
+import { afterPendingBack } from '@/lib/nav/urlState'
 import { uniqueKeywords } from '@/lib/optimizer/rewriteGuard.js'
 import { markQuiet } from '@/lib/quietWindow'
 import { markOptimized } from '@/lib/optimizedJobs'
@@ -635,7 +637,7 @@ export default function ApplyOptimizeModal({
         onCancel={() => setStep('choose')}
       />
     )}
-    <ModalPortal>
+    <ModalPortal onBack={onClose}>
     <div style={overlay} onClick={onClose}>
       <div ref={sheetRef} role="dialog" aria-modal="true" aria-label={title} style={sheet} onClick={e => e.stopPropagation()}>
         {/* Header — the job posting link lives here so it is visible above the fold on every step. */}
@@ -723,7 +725,12 @@ export default function ApplyOptimizeModal({
                 </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-                <button style={btnPrimary} onClick={() => { onClose(); router.push('/login') }}>Sign in to apply →</button>
+                <button style={btnPrimary} onClick={() => {
+                  // Come back to this page (and its open listing) after signing in.
+                  const dest = loginHref(`${window.location.pathname}${window.location.search}`)
+                  onClose()
+                  setTimeout(() => afterPendingBack(() => router.push(dest)), 0)
+                }}>Sign in to apply →</button>
                 {job.apply_url && (
                   <a
                     href={job.apply_url}

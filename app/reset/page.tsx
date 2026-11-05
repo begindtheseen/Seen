@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { internalPath, loginHref } from '@/lib/safeHref.js'
 
 const inp: React.CSSProperties = {
   width: '100%',
@@ -55,9 +56,14 @@ export default function ResetPage() {
   const [verifying, setVerifying] = useState(false)
   const [msg, setMsg] = useState('')
   const [ok, setOk] = useState(false)
+  // Where sign-in was headed before "Forgot password?" (/login passes ?return=). Read once, before a
+  // recovery link's hash is cleaned out of the address bar.
+  const [returnTo, setReturnTo] = useState<string | null>(null)
 
   useEffect(() => {
     let alive = true
+    const ret = internalPath(new URLSearchParams(window.location.search).get('return'))
+    setReturnTo(ret && !/^\/(login|reset)(?=$|[/?#])/.test(ret) ? ret : null)
     // supabase-js (detectSessionInUrl) reads the hash itself; we only look at it to know what to wait for.
     const params = new URLSearchParams((window.location.hash || '').replace(/^#/, ''))
     const linkError = params.get('error') || params.get('error_code')
@@ -132,7 +138,7 @@ export default function ResetPage() {
     setOk(true)
     setTimeout(async () => {
       await supabase.auth.signInWithPassword({ email: email.trim(), password: np })
-      router.push('/dashboard')
+      router.replace(returnTo || '/dashboard')
     }, 900)
   }
 
@@ -242,7 +248,7 @@ export default function ResetPage() {
               {sending ? 'Sending...' : 'Send code →'}
             </button>
             <div style={{ textAlign: 'center' }}>
-              <Link href="/login" style={{ color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textDecoration: 'none' }}>
+              <Link href={loginHref(returnTo)} style={{ color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', textDecoration: 'none' }}>
                 Back to sign in
               </Link>
             </div>

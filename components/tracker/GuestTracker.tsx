@@ -54,6 +54,14 @@ export function GuestTrackerShell() {
 /** `still`: no page entrance — this replaces GuestTrackerShell, which already played it. */
 export default function GuestTracker({ still = false }: { still?: boolean } = {}) {
   const params = useSearchParams()
+  // Sign in comes back to this tracker view (?app=, ?prep=). The add-form params are dropped: the
+  // card a guest added here moves to the account, so reopening the form would offer it twice.
+  const returnPath = useMemo(() => {
+    const q = new URLSearchParams(params?.toString() || '')
+    for (const k of ['add', 'company', 'stage']) q.delete(k)
+    const qs = q.toString()
+    return `/tracker${qs ? `?${qs}` : ''}`
+  }, [params])
   const [apps, setApps] = useState<Application[]>([])
   const [loaded, setLoaded] = useState(false)
   const [showForm, setShowForm] = useState(false)
@@ -188,7 +196,7 @@ export default function GuestTracker({ still = false }: { still?: boolean } = {}
         )}
 
         <p className={s.small} style={{ marginTop: '1.5rem' }}>
-          Already have an account? <Link href={loginHref('/tracker')} style={{ color: 'var(--green)' }}>Sign in</Link> and these move to it.
+          Already have an account? <Link href={loginHref(returnPath)} style={{ color: 'var(--green)' }}>Sign in</Link> and these move to it.
         </p>
       </div>
     </div>

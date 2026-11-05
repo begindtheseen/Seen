@@ -14,6 +14,8 @@ import { useFocusTrap } from '@/lib/hooks/useFocusTrap'
 import styles from './CommandPalette.module.css'
 import Icon from '@/components/ui/Icon'
 import { ICONS, type IconName } from '@/components/ui/icons'
+import { loginHref, pathSegment } from '@/lib/safeHref.js'
+import { useBackDismiss, afterPendingBack } from '@/lib/nav/urlState'
 
 // icon: a name from the shared set (components/ui/icons.ts) or a single letter (an application / company initial).
 type Item = { id: string; label: string; hint?: string; group: string; href: string; keys?: string; icon: string; kw?: string }
@@ -68,12 +70,18 @@ export default function CommandPalette() {
   // Tab stays in the palette; Escape/close returns focus to whatever opened it (the nav "Jump to…"
   // pill or the footer button) instead of dropping it on <body>.
   useFocusTrap(panelRef, open, { initialFocus: inputRef })
+  // Phone/browser Back closes the palette instead of leaving the page.
+  const close = useCallback(() => setOpen(false), [])
+  useBackDismiss(open, close)
 
   const go = useCallback((href: string) => {
+    // Sign in comes back to the page the palette was opened on.
+    const dest = href === '/login' ? loginHref(`${window.location.pathname}${window.location.search}`) : href
     setOpen(false)
-    const target = href.split(/[?#]/)[0]
+    const target = dest.split(/[?#]/)[0]
     if (target !== pathname) window.dispatchEvent(new Event('seen:nav-start'))
-    router.push(href)
+    // Closing takes the palette's history entry back first; navigate once that has landed.
+    setTimeout(() => afterPendingBack(() => router.push(dest)), 0)
   }, [router, pathname])
 
   // Shortcuts: ⌘K / Ctrl+K toggles; "g" then a letter jumps (never while typing in a field).
@@ -105,7 +113,7 @@ export default function CommandPalette() {
     if (isSeeker) {
       try {
         for (const a of AppStore.loadSync().slice().sort((x, y) => (y.updatedAt || 0) - (x.updatedAt || 0))) {
-          items.push({ id: 'app_' + a.id, label: a.company, hint: `${a.role || 'Role'} · ${a.status === 'active' ? a.stage : a.status}`, group: 'Your applications', href: `/tracker#app_${a.id}`, icon: (a.company || '?').charAt(0).toUpperCase(), kw: 'application tracked' })
+          items.push({ id: 'app_' + a.id, label: a.company, hint: `${a.role || 'Role'} · ${a.status === 'active' ? a.stage : a.status}`, group: 'Your applications', href: `/tracker?app=${pathSegment(a.id)}`, icon: (a.company || '?').charAt(0).toUpperCase(), kw: 'application tracked' })
         }
       } catch { /* device-local store unavailable */ }
     }
