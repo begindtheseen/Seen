@@ -57,6 +57,28 @@ Editor — comments stripped, one block per migration, and say which to run firs
 - **Skill:** `.claude/skills/ui-ux-pro-max/` (UX rules, patterns, charts, WCAG — Python search over local CSVs) is for
   decisions INSIDE this system; never use its `--design-system` output to pick a palette or font.
 
+## Session 2026-11-08: the optimizer reads the whole listing (branch claude/kind-noether-8wj48e)
+- **Owner:** "most of the time the optimizer can't read the whole listing so it doesn't optimize anything." Measured
+  with `scripts/optimizer-corpus.mjs` (+ `optimizer-corpus-pull.mjs`, read-only) on 324 live postings: 58.6% optimizable,
+  median 5 requirements read. After: 85.5%, median 12. Fresh second sample (363): 64% → 78.5% before the Adzuna fetch.
+- **Fetch never worked:** `fetchFullPosting` read `.description` off `resolveListing`'s `{ fields, rungs, blocked }`
+  (the test faked the bare shape) → every teaser went to the paste box. `validateListingUrl` stripped Adzuna's
+  `utm_source`; Adzuna answers 405 without it (kept for adzuna hosts only). Adzuna rows read `/details/<id>` first
+  (JobPosting JSON-LD); a 404/410 there = reason `gone` → "This listing looks closed" (22 of 25 unreadable Adzuna rows
+  in the sample were taken down — about a third of live Adzuna rows are dead listings; NOT acted on, owner's call).
+- **Resolver rule:** a description is complete only at ≥700 chars and never from `via:'meta'` (an 805-char Lever meta
+  summary had stopped the ladder before the ATS API). EU Lever boards → `api.eu.lever.co`.
+- **Ingest kept only the intro for Lever** (`descriptionPlain`; requirements live in `lists`). `lib/jobs/atsText.js`
+  builds the whole posting (ingest + importer); SmartRecruiters keeps section titles; Ashby prefers HTML. The dedupe
+  trigger never refreshes a stored description, so `previewOnlyOrFetch` re-reads a saved posting that reads as no
+  requirements (once per job per instance per 6 h, kept only when ≥300 chars longer). Old Lever rows heal on use.
+- **Reader:** `lib/optimizer/postingTerms.js` — requirement objects, example lists (alternatives, linked to the
+  requirement they illustrate), acronyms + long form; never benefits/schedule/degree/licence rows, the title, the
+  employer, negations, adverbs or run-ons. Facts carry `term` + `normalizedLabel 'term:…'`, matched by stems on one
+  résumé line (`matchTerm`), `hard:false`. jobInsights shows them as written, after the recognised skills.
+  `ENGINE_VERSION` seenfit-2.2.0. Non-software postings keep a plainly named language (C++, Python, SQL).
+- NOT verified live: a production fetch from Vercel (sandbox only), the Optimize sheet's "closed" copy in a browser.
+
 ## Session 2026-11-02: design system locked + persona acceptance rounds (PR #389, branch claude/alerts-radius-security)
 - **Owner asks, in order:** ditch the purple gradient ("vibecode slop") → do it with the ui-ux-pro-max skill and the five
   anti-slop rules without losing the look → "run the whole layout through the skill… test with agents until they approve
