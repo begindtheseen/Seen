@@ -78,6 +78,17 @@ Editor — comments stripped, one block per migration, and say which to run firs
   résumé line (`matchTerm`), `hard:false`. jobInsights shows them as written, after the recognised skills.
   `ENGINE_VERSION` seenfit-2.2.0. Non-software postings keep a plainly named language (C++, Python, SQL).
 - NOT verified live: a production fetch from Vercel (sandbox only), the Optimize sheet's "closed" copy in a browser.
+- **Round 2 (owner: "must parse any and every application… state of the art"):** live bench over 14 career-site
+  systems → `lib/server/pageText.js` (posting from script data incl. Taleo `api.fillList` URL-encoded HTML, a
+  description container, or the body — container/body need real section headings; job lists and sign-in pages
+  rejected); Oracle `recruitingCEJobRequisitionDetails` JSON (empty items = closed); Workable api/v2 (unverified:
+  sandbox IP rate-limited); iCIMS `?in_iframe=1`; closed = ATS API 404/410, redirect to `?error=404` (Jobvite), or a
+  "no longer available" page. Any paste box takes a LINK (`postingLink`/`readPostingLink`, 30-min cache).
+  `lib/optimizer/pastedText.js` strips copy artefacts (quotes, email headers, markdown, board UI lines, odd bullets,
+  hard wraps, inline bullets) — `scripts/optimizer-paste-stress.mjs`: 0 loss on 6 of 7 formats. Sparse postings
+  (<5 stated) read duty objects (`extractDutyTerms`). 682 postings: 83% optimizable, the rest mostly closed Adzuna ads.
+  Not handled: LinkedIn/Indeed/SAP-jobs pages (datacenter walls; the r.jina.ai rung is untestable from the sandbox),
+  Workday tenants answering 403, non-English postings.
 
 ## Session 2026-11-02: design system locked + persona acceptance rounds (PR #389, branch claude/alerts-radius-security)
 - **Owner asks, in order:** ditch the purple gradient ("vibecode slop") → do it with the ui-ux-pro-max skill and the five
