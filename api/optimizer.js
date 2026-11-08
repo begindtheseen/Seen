@@ -21,6 +21,7 @@ import { runOptimizer, ENGINE_VERSION } from '../lib/optimizer/index.js';
 import { previewOnlyOrFetch } from '../lib/server/postingGate.js';
 import { freeDiagnostic } from '../lib/server/optimizePackage.js';
 import { extractJobFacts } from '../lib/optimizer/extractJobFacts.js';
+import { termFromLabel } from '../lib/optimizer/postingTerms.js';
 import { runHumanProof, HUMANPROOF_ENGINE_VERSION } from '../lib/humanizer/index.js';
 import { buildHumanProofPackage, normalizeBulletList } from '../lib/server/humanizePackage.js';
 import { loadSkillTaxonomy } from '../lib/server/skillTaxonomy.js';
@@ -163,6 +164,8 @@ async function getCachedJobFacts(db, jobId) {
       importance: row.importance || 'required',
       weight: Number(row.weight) || (row.importance === 'preferred' ? 0.6 : 1),
       confidence: Number(row.confidence) || 0.8,
+      // a requirement in the posting's own words is matched by its words (lib/optimizer/postingTerms.js)
+      ...(String(row.normalized_label || '').startsWith('term:') ? { term: termFromLabel(row.label), hard: false } : {}),
     }));
   } catch { return null; }
 }
@@ -295,7 +298,7 @@ export default async function handler(req, res) {
       let jobFacts = null;
       if (haveDb && jobId) jobFacts = await getCachedJobFacts(db, jobId);
       if (!jobFacts && jobDescription) {
-        jobFacts = extractJobFacts(jobDescription, { jobTitle });
+        jobFacts = extractJobFacts(jobDescription, { jobTitle, company: body.company });
       }
 
       const extraRules = haveDb ? await loadPhraseRules(db) : null;
@@ -485,7 +488,7 @@ export default async function handler(req, res) {
       if (jobFacts) factsSource = 'cache';
     }
     if (!jobFacts) {
-      jobFacts = extractJobFacts(jobDescription || '', { jobTitle, taxonomy: taxonomy || undefined });
+      jobFacts = extractJobFacts(jobDescription || '', { jobTitle, company, taxonomy: taxonomy || undefined });
       if (haveDb && jobId && jobFacts.length) cacheJobFacts(db, jobId, jobFacts).catch(() => {});
     }
 

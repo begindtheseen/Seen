@@ -107,6 +107,8 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
         // re-serialized from a parsed URL (lib/safeHref.js) — the link came back from the server
         const link = httpHref((data as { apply_url?: string | null }).apply_url || job.url || '') || ''
         setPreviewLink(link)
+        const gone = (data as { reason?: string }).reason === 'gone'
+        if (gone) { setError('The site Seen got this listing from says the job was taken down, so there is no posting left to read. If you still have it, paste it into the Job description box above and press again. No credit was used.'); setState('idle'); return }
         setError(link ? 'Seen could only read a summary of this listing, and its page would not open from here. Open the listing, copy the posting, paste it into the Job description box above, and press again.' : (data.message || 'This listing only has a summary. Paste the full posting into the Job description box above, then press again.'))
         setState('idle'); return
       }

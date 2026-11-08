@@ -233,6 +233,8 @@ export default function ApplyOptimizeModal({
   const [diag, setDiag] = useState<FreeDiagnosis | null>(null)
   const [posting, setPosting] = useState<string | null>(null)
   const [pasteDraft, setPasteDraft] = useState('')
+  // the source took the job down (fullPosting.js reason 'gone') — said plainly instead of "paste it"
+  const [postingGone, setPostingGone] = useState(false)
   // The posting states too few requirements to optimize against: the server refuses it free (422
   // no_requirements) before any credit — this is its message.
   const [noReqNote, setNoReqNote] = useState('')
@@ -316,9 +318,9 @@ export default function ApplyOptimizeModal({
         fetch('/api/resume', { method: 'POST', headers, body: JSON.stringify({ tool: 'optimize', probe: true, job: job.title, company: job.company, resume: text, ...postingBody(pasted) }) }),
         fetch('/api/optimizer', { method: 'POST', headers, body: JSON.stringify({ action: 'optimize', resumeText: text, jobTitle: job.title, company: job.company, ...postingBody(pasted), remoteOk: /remote/i.test(pasted || job.description || '') }) }),
       ])
-      const probe = await probeRes.json().catch(() => ({})) as OptimizeResult & { error?: string; message?: string }
+      const probe = await probeRes.json().catch(() => ({})) as OptimizeResult & { error?: string; message?: string; reason?: string }
       const d = await diagRes.json().catch(() => ({})) as FreeDiagnosis & { error?: string }
-      if (probe.error === 'preview_only' || d.error === 'preview_only') { setStep('needs-posting'); return }
+      if (probe.error === 'preview_only' || d.error === 'preview_only') { setPostingGone(probe.reason === 'gone' || (d as { reason?: string }).reason === 'gone'); setStep('needs-posting'); return }
       if (probe.error === 'no_requirements') { setNoReqNote(probe.message || NO_REQUIREMENTS_NOTE); setStep('no-requirements'); return }
       if (probe.error === 'RESUME_CORRUPTED') { setStep('resume-corrupted'); return }
       if (probeRes.ok && probe.cached) { showResult(probe); return }
@@ -416,7 +418,7 @@ export default function ApplyOptimizeModal({
         }),
       })
       if (!r.ok) {
-        const e = await r.json().catch(() => ({})) as { error?: string; message?: string; credits_required?: boolean; pro_required?: boolean }
+        const e = await r.json().catch(() => ({})) as { error?: string; message?: string; reason?: string; credits_required?: boolean; pro_required?: boolean }
         if (r.status === 402 || e.credits_required || e.pro_required) {
           setUpgradeReason('credits'); setUpgradeFeature(undefined)
           setShowUpgrade(true)
@@ -424,7 +426,7 @@ export default function ApplyOptimizeModal({
           return
         }
         // A preview-only listing: nothing was charged — ask for the full posting.
-        if (e.error === 'preview_only') { setStep('needs-posting'); return }
+        if (e.error === 'preview_only') { setPostingGone(e.reason === 'gone'); setStep('needs-posting'); return }
         // Nothing to optimize against: refused before the credit gate — nothing was charged.
         if (e.error === 'no_requirements') { setNoReqNote(e.message || NO_REQUIREMENTS_NOTE); setStep('no-requirements'); return }
         // Saved résumé couldn't be read (often a phone PDF that didn't convert to clean text).
@@ -713,9 +715,11 @@ export default function ApplyOptimizeModal({
           {step === 'needs-posting' && (
             <div className="ai-stack">
               <div style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.22)', borderRadius: 10, padding: '.75rem 1rem' }}>
-                <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: 'var(--fs-ui)', marginBottom: '.25rem' }}>Seen could not read the full posting</div>
-                <div style={{ fontSize: 'var(--fs-72)', color: 'var(--sub)', lineHeight: 1.6 }}>
-                  This source gives Seen only a short preview, and the listing&apos;s own page would not hand over the rest just now. No credit was used. Open the listing, select all of its text, and paste it here — the check is free.
+                <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: 'var(--fs-ui)', marginBottom: '.25rem' }}>{postingGone ? 'This listing looks closed' : 'Seen could not read the full posting'}</div>
+                <div style={{ fontSize: 'var(--fs-72)', color: 'var(--sub)', lineHeight: 1.6 }} data-testid="needs-posting-why">
+                  {postingGone
+                    ? 'The site Seen got it from says the job was taken down, so there is no posting left to read. No credit was used. If you still have the posting, paste it here — the check is free.'
+                    : <>Seen tried the listing&apos;s own page and could not get the rest of the posting just now. No credit was used. Open the listing, select all of its text, and paste it here — the check is free.</>}
                 </div>
                 {job.apply_url && (
                   <a href={httpHref(job.apply_url) ?? undefined} target="_blank" rel="noopener noreferrer" data-testid="needs-posting-link"
