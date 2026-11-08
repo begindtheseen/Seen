@@ -177,7 +177,7 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
           <div><span className={s.label}>Company</span><input autoComplete="off" className={s.input} value={job.company} onChange={(e) => setJob({ ...job, company: e.target.value })} placeholder="Company" /></div>
         </div>
         <span className={s.label}>Job description</span>
-        <textarea autoComplete="off" className={`${s.input} ${s.area}`} rows={5} value={job.description} onChange={(e) => { setJob({ ...job, description: e.target.value }); if (previewLink || error) { setPreviewLink(''); setError('') } }} placeholder="Paste the posting — requirements, responsibilities, the lot." />
+        <textarea autoComplete="off" className={`${s.input} ${s.area}`} rows={5} value={job.description} onChange={(e) => { setJob({ ...job, description: e.target.value }); if (previewLink || error) { setPreviewLink(''); setError('') } }} placeholder="Paste the posting (requirements, responsibilities, the lot) or its link." />
         <div className={s.opts} style={{ marginTop: '.5rem', justifyContent: 'flex-end' }}>
           {/* one filled button per screen: once a plan is on screen, "Use this version" is it and a re-run is outlined */}
           <button type="button" className={plan ? s.btnOutline : s.btnPrimary} onClick={run} disabled={state === 'loading'}>

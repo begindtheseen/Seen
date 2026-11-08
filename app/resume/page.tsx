@@ -1,5 +1,6 @@
 'use client'
 
+import { isPostingLink } from '@/lib/postingPaste'
 import { httpHref } from '@/lib/safeHref.js'
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -765,7 +766,7 @@ function ResumePageInner() {
   // see api/job-insights.js). A listing nobody has analyzed yet simply shows no bonus here; the
   // price-tagged "Reveal AI insights" button on the Jobs page is the one place that spends.
   async function loadInsights() {
-    if (!jobJD || jobJD.length < 80) { setInsights(null); return }
+    if (!jobJD || (jobJD.length < 80 && !isPostingLink(jobJD))) { setInsights(null); return }
     try {
       const res = await fetch('/api/job-insights', {
         method: 'POST', headers: await aiHeaders(),
@@ -1032,7 +1033,7 @@ function ResumePageInner() {
                   {label('Job URL (optional)')}
                   <input autoComplete="off" type="url" placeholder="https://…" value={jobUrl} onChange={e => setJobUrl(e.target.value)} style={inputStyle} />
                   {label('Job description')}
-                  <textarea autoComplete="off" placeholder="Paste the job description..." value={jobJD} onChange={e => { setJobJD(e.target.value); setJobSource(null) }} rows={4} style={{ ...areaStyle, marginBottom: '.75rem' }} />
+                  <textarea autoComplete="off" placeholder="Paste the job description, or its link..." value={jobJD} onChange={e => { setJobJD(e.target.value); setJobSource(null) }} rows={4} style={{ ...areaStyle, marginBottom: '.75rem' }} />
                   {label('Your background (for Strategy) — optional')}
                   <textarea autoComplete="off" placeholder="What draws you to this role? Any unique experience?" value={background} onChange={e => setBackground(e.target.value)} rows={3} style={{ ...areaStyle, marginBottom: '.75rem' }} />
                 </div>

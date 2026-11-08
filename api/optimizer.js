@@ -455,7 +455,7 @@ export default async function handler(req, res) {
     }
 
     // ── optimize ────────────────────────────────────────────────────────────────
-    const { resumeText, jobId, jobTitle, company } = body;
+    const { resumeText, jobId, jobTitle: reqTitle, company: reqCompany } = body;
     if (!resumeText || String(resumeText).trim().length < 40) {
       return res.status(400).json({ error: 'RESUME_REQUIRED', message: 'Provide résumé text (at least 40 characters).' });
     }
@@ -466,6 +466,9 @@ export default async function handler(req, res) {
       if (preview) return res.status(preview.status).json({ ...preview.body, charged: false });
     }
     const jobDescription = body.jobDescription;
+    // a pasted link may have named the job (lib/server/postingGate.js)
+    const jobTitle = body.jobTitle || body.job || reqTitle;
+    const company = body.company || reqCompany;
 
     const uid = haveDb ? await resolveUid(req, SUPABASE_URL, SERVICE_KEY) : null;
 

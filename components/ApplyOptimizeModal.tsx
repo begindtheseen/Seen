@@ -1,5 +1,6 @@
 'use client'
 
+import { postingPasteReady } from '@/lib/postingPaste'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Icon from '@/components/ui/Icon'
 import { useFocusTrap } from '@/lib/hooks/useFocusTrap'
@@ -235,6 +236,8 @@ export default function ApplyOptimizeModal({
   const [pasteDraft, setPasteDraft] = useState('')
   // the source took the job down (fullPosting.js reason 'gone') — said plainly instead of "paste it"
   const [postingGone, setPostingGone] = useState(false)
+  // the pasted link could not be read (it was not closed — a wall, or no posting on the page)
+  const [postingLinkFailed, setPostingLinkFailed] = useState(false)
   // The posting states too few requirements to optimize against: the server refuses it free (422
   // no_requirements) before any credit — this is its message.
   const [noReqNote, setNoReqNote] = useState('')
@@ -318,9 +321,14 @@ export default function ApplyOptimizeModal({
         fetch('/api/resume', { method: 'POST', headers, body: JSON.stringify({ tool: 'optimize', probe: true, job: job.title, company: job.company, resume: text, ...postingBody(pasted) }) }),
         fetch('/api/optimizer', { method: 'POST', headers, body: JSON.stringify({ action: 'optimize', resumeText: text, jobTitle: job.title, company: job.company, ...postingBody(pasted), remoteOk: /remote/i.test(pasted || job.description || '') }) }),
       ])
-      const probe = await probeRes.json().catch(() => ({})) as OptimizeResult & { error?: string; message?: string; reason?: string }
+      const probe = await probeRes.json().catch(() => ({})) as OptimizeResult & { error?: string; message?: string; reason?: string; from_link?: boolean }
       const d = await diagRes.json().catch(() => ({})) as FreeDiagnosis & { error?: string }
-      if (probe.error === 'preview_only' || d.error === 'preview_only') { setPostingGone(probe.reason === 'gone' || (d as { reason?: string }).reason === 'gone'); setStep('needs-posting'); return }
+      if (probe.error === 'preview_only' || d.error === 'preview_only') {
+        const dd = d as { reason?: string; from_link?: boolean }
+        setPostingGone(probe.reason === 'gone' || dd.reason === 'gone')
+        setPostingLinkFailed(!!(probe.from_link || dd.from_link))
+        setStep('needs-posting'); return
+      }
       if (probe.error === 'no_requirements') { setNoReqNote(probe.message || NO_REQUIREMENTS_NOTE); setStep('no-requirements'); return }
       if (probe.error === 'RESUME_CORRUPTED') { setStep('resume-corrupted'); return }
       if (probeRes.ok && probe.cached) { showResult(probe); return }
@@ -418,7 +426,7 @@ export default function ApplyOptimizeModal({
         }),
       })
       if (!r.ok) {
-        const e = await r.json().catch(() => ({})) as { error?: string; message?: string; reason?: string; credits_required?: boolean; pro_required?: boolean }
+        const e = await r.json().catch(() => ({})) as { error?: string; message?: string; reason?: string; from_link?: boolean; credits_required?: boolean; pro_required?: boolean }
         if (r.status === 402 || e.credits_required || e.pro_required) {
           setUpgradeReason('credits'); setUpgradeFeature(undefined)
           setShowUpgrade(true)
@@ -426,7 +434,7 @@ export default function ApplyOptimizeModal({
           return
         }
         // A preview-only listing: nothing was charged — ask for the full posting.
-        if (e.error === 'preview_only') { setPostingGone(e.reason === 'gone'); setStep('needs-posting'); return }
+        if (e.error === 'preview_only') { setPostingGone(e.reason === 'gone'); setPostingLinkFailed(!!e.from_link); setStep('needs-posting'); return }
         // Nothing to optimize against: refused before the credit gate — nothing was charged.
         if (e.error === 'no_requirements') { setNoReqNote(e.message || NO_REQUIREMENTS_NOTE); setStep('no-requirements'); return }
         // Saved résumé couldn't be read (often a phone PDF that didn't convert to clean text).
@@ -719,7 +727,9 @@ export default function ApplyOptimizeModal({
                 <div style={{ fontSize: 'var(--fs-72)', color: 'var(--sub)', lineHeight: 1.6 }} data-testid="needs-posting-why">
                   {postingGone
                     ? 'The site Seen got it from says the job was taken down, so there is no posting left to read. No credit was used. If you still have the posting, paste it here — the check is free.'
-                    : <>Seen tried the listing&apos;s own page and could not get the rest of the posting just now. No credit was used. Open the listing, select all of its text, and paste it here — the check is free.</>}
+                    : postingLinkFailed
+                      ? 'Seen could not read the posting at that link. No credit was used. Open it, select all of its text, and paste the text here — the check is free.'
+                      : <>Seen tried the listing&apos;s own page and could not get the rest of the posting just now. No credit was used. Paste the listing&apos;s link or its full text here — the check is free.</>}
                 </div>
                 {job.apply_url && (
                   <a href={httpHref(job.apply_url) ?? undefined} target="_blank" rel="noopener noreferrer" data-testid="needs-posting-link"
@@ -730,11 +740,11 @@ export default function ApplyOptimizeModal({
                 )}
               </div>
               <label style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.08em' }}>
-                Full job posting
-                <textarea autoComplete="off" data-testid="posting-paste" value={pasteDraft} onChange={e => setPasteDraft(e.target.value)} rows={7} placeholder="Paste the whole posting: duties, requirements, schedule…"
+                Full job posting or its link
+                <textarea autoComplete="off" data-testid="posting-paste" value={pasteDraft} onChange={e => setPasteDraft(e.target.value)} rows={7} placeholder="Paste the whole posting, or its link (https://…)"
                   style={{ display: 'block', width: '100%', marginTop: '.25rem', background: 'var(--surface)', border: '1.5px solid var(--line2)', borderRadius: 8, padding: '.75rem .75rem', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-sm)', lineHeight: 1.55, boxSizing: 'border-box', textTransform: 'none', letterSpacing: 0 }} />
               </label>
-              <button style={{ ...btnPrimary, opacity: pasteDraft.trim().length < 200 ? 0.55 : 1 }} disabled={pasteDraft.trim().length < 200}
+              <button style={{ ...btnPrimary, opacity: !postingPasteReady(pasteDraft) ? 0.55 : 1 }} disabled={!postingPasteReady(pasteDraft)}
                 onClick={() => { const t = pasteDraft.trim(); setPosting(t); prepare(resumeText, t) }}>
                 Check this posting · free
               </button>
@@ -751,10 +761,10 @@ export default function ApplyOptimizeModal({
               </div>
               <label style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.08em' }}>
                 Have the full posting with its requirements? Paste it
-                <textarea autoComplete="off" value={pasteDraft} onChange={e => setPasteDraft(e.target.value)} rows={6} placeholder="Paste the whole posting: duties, requirements, schedule…"
+                <textarea autoComplete="off" value={pasteDraft} onChange={e => setPasteDraft(e.target.value)} rows={6} placeholder="Paste the whole posting, or its link (https://…)"
                   style={{ display: 'block', width: '100%', marginTop: '.25rem', background: 'var(--surface)', border: '1.5px solid var(--line2)', borderRadius: 8, padding: '.75rem .75rem', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-sm)', lineHeight: 1.55, boxSizing: 'border-box', textTransform: 'none', letterSpacing: 0 }} />
               </label>
-              <button style={{ ...btnPrimary, opacity: pasteDraft.trim().length < 200 ? 0.55 : 1 }} disabled={pasteDraft.trim().length < 200}
+              <button style={{ ...btnPrimary, opacity: !postingPasteReady(pasteDraft) ? 0.55 : 1 }} disabled={!postingPasteReady(pasteDraft)}
                 onClick={() => { const t = pasteDraft.trim(); setPosting(t); prepare(resumeText, t) }}>
                 Check this posting · free
               </button>
