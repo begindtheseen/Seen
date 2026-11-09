@@ -9,6 +9,7 @@
 //   cost   credits this call charged (0 or JOB_INSIGHTS_COST)
 //   charged  true only when a credit was actually consumed
 //   price  on a probe miss: what a real call would cost
+import { postingLink, readPostingLink } from '../lib/server/fullPosting.js';
 import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { gateAI } from '../lib/server/credits.js';
 import { JOB_INSIGHTS_COST } from '../lib/server/creditRules.js';
@@ -37,9 +38,17 @@ export default async function handler(req, res) {
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch(e) { body = {}; } }
   if (!body || typeof body !== 'object') body = {};
 
-  const { jobId, job, company, jobDescription, needsSummary } = body;
+  const { jobId, job, company, needsSummary } = body;
+  let { jobDescription } = body;
   const probe = body.probe === true;
   if (!jobId) return res.status(400).json({ error: 'jobId required' });
+  // A pasted link is read as its posting (any career site or board — lib/server/fullPosting.js).
+  const link = postingLink(jobDescription);
+  if (link) {
+    const got = await readPostingLink(link).catch(() => null);
+    if (got && got.ok) jobDescription = got.description;
+    else return res.status(200).json({ what_they_want: [], hidden_requirements: [], insider_tip: '', description_summary: '', _src: 'empty', link_failed: true, reason: got?.reason || 'unreachable', cost: 0, charged: false });
+  }
 
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;

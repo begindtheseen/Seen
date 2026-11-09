@@ -7,6 +7,7 @@
 import { useState } from 'react'
 import Button from '@/components/ui/Button'
 import s from './PastePosting.module.css'
+import { postingPasteReady, isPostingLink } from '@/lib/postingPaste'
 
 export default function PastePosting({ onAnalyze, busy = false, label = 'Analyze the pasted posting' }: {
   onAnalyze: (text: string) => void
@@ -15,7 +16,7 @@ export default function PastePosting({ onAnalyze, busy = false, label = 'Analyze
 }) {
   const [open, setOpen] = useState(false)
   const [text, setText] = useState('')
-  const enough = text.trim().length >= 200
+  const enough = postingPasteReady(text)
   if (!open) {
     return (
       <div className={s.row}>
@@ -28,7 +29,7 @@ export default function PastePosting({ onAnalyze, busy = false, label = 'Analyze
   return (
     <div className={s.form}>
       <label htmlFor="paste-posting" className={s.label}>
-        Copy the whole posting from the employer&apos;s site (requirements included) and paste it here.
+        Paste the listing&apos;s link, or copy the whole posting from the employer&apos;s site (requirements included) and paste it here.
       </label>
       <textarea id="paste-posting" value={text} onChange={(e) => setText(e.target.value)} rows={6} data-testid="paste-posting-text" className={s.text} />
       <div className={s.row}>
@@ -36,7 +37,7 @@ export default function PastePosting({ onAnalyze, busy = false, label = 'Analyze
           {busy ? 'Reading…' : label}
         </Button>
       </div>
-      {!enough && text.trim().length > 0 && <p className={s.hint}>That looks too short to be the whole posting.</p>}
+      {!enough && text.trim().length > 0 && !isPostingLink(text) && <p className={s.hint}>That looks too short to be the whole posting — paste its link or all of its text.</p>}
     </div>
   )
 }

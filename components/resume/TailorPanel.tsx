@@ -107,6 +107,8 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
         // re-serialized from a parsed URL (lib/safeHref.js) — the link came back from the server
         const link = httpHref((data as { apply_url?: string | null }).apply_url || job.url || '') || ''
         setPreviewLink(link)
+        const gone = (data as { reason?: string }).reason === 'gone'
+        if (gone) { setError('The site Seen got this listing from says the job was taken down, so there is no posting left to read. If you still have it, paste it into the Job description box above and press again. No credit was used.'); setState('idle'); return }
         setError(link ? 'Seen could only read a summary of this listing, and its page would not open from here. Open the listing, copy the posting, paste it into the Job description box above, and press again.' : (data.message || 'This listing only has a summary. Paste the full posting into the Job description box above, then press again.'))
         setState('idle'); return
       }
@@ -175,7 +177,7 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
           <div><span className={s.label}>Company</span><input autoComplete="off" className={s.input} value={job.company} onChange={(e) => setJob({ ...job, company: e.target.value })} placeholder="Company" /></div>
         </div>
         <span className={s.label}>Job description</span>
-        <textarea autoComplete="off" className={`${s.input} ${s.area}`} rows={5} value={job.description} onChange={(e) => { setJob({ ...job, description: e.target.value }); if (previewLink || error) { setPreviewLink(''); setError('') } }} placeholder="Paste the posting — requirements, responsibilities, the lot." />
+        <textarea autoComplete="off" className={`${s.input} ${s.area}`} rows={5} value={job.description} onChange={(e) => { setJob({ ...job, description: e.target.value }); if (previewLink || error) { setPreviewLink(''); setError('') } }} placeholder="Paste the posting (requirements, responsibilities, the lot) or its link." />
         <div className={s.opts} style={{ marginTop: '.5rem', justifyContent: 'flex-end' }}>
           {/* one filled button per screen: once a plan is on screen, "Use this version" is it and a re-run is outlined */}
           <button type="button" className={plan ? s.btnOutline : s.btnPrimary} onClick={run} disabled={state === 'loading'}>
