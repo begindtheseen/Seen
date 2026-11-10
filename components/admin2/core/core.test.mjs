@@ -6,7 +6,7 @@ import { parseItem, parseSection, formatItem, sectionFilters, searchForSection, 
 import { toResult, createAdminApi, createReauthGate, createAdminDownload, filenameFrom } from './api.ts'
 import { QueryCache, keyMatches, mergeListRefresh } from './cache.ts'
 import { createActionRunner, createUndoBus } from './action.ts'
-import { createJobManager, jobKey, jobProgressText, jobSummary } from './jobs.ts'
+import { createJobManager, jobKey, jobProgressText, jobSummary, JOB_STATUS_KIND } from './jobs.ts'
 const untilJ = async (fn, ms = 2000) => { const t = Date.now(); while (!fn()) { if (Date.now() - t > ms) throw new Error('timeout'); await new Promise((r) => setTimeout(r, 0)) } }
 import { readLogin } from './login.ts'
 
@@ -427,7 +427,7 @@ test('action: an Undo that answers in rounds continues as a visible, resumable j
   await untilJ(() => jobs.get(st.jobId).status === 'done')
   const j = jobs.get(st.jobId)
   assert.equal(j.changed, 1200); assert.equal(j.remaining, 0)
-  assert.deepEqual(sent.slice(2).map((c) => c.body), [{ audit_id: '7', cursor: 'c400' }, { audit_id: '7', cursor: 'c800' }], 'same audit_id, cursor passed back')
+  assert.deepEqual(sent.slice(2).map((c) => ({ audit_id: c.body.audit_id, cursor: c.body.cursor, round: c.body.round })), [{ audit_id: '7', cursor: 'c400', round: 2 }, { audit_id: '7', cursor: 'c800', round: 3 }], 'same audit_id, cursor passed back, rounds named')
   assert.match(j.message, /^Restored 1,200 rows in 3 rounds\./)
 })
 
@@ -510,7 +510,7 @@ test('jobs: a multi-round job keeps the server Undo when every round carried one
   assert.deepEqual(m.get(id).undo, { action: 'undo', args: { audit_id: 'a3' }, label: 'Undo' }, 'the last round\'s undo covers the press')
   const uid = m.undo(id)
   await until(() => m.get(uid).status === 'done')
-  assert.deepEqual(sent.at(-1), { action: 'undo', body: { audit_id: 'a3' } }); assert.equal(m.get(id).undone, true); assert.equal(m.undo(id), null, 'no second Undo')
+  assert.equal(sent.at(-1).action, 'undo'); assert.equal(sent.at(-1).body.audit_id, 'a3'); assert.equal(m.get(id).undone, true); assert.equal(m.undo(id), null, 'no second Undo')
   // two request_ids → no Undo offered
   let k = 0
   const api2 = async () => { k++; return toResult(200, JSON.stringify({ ok: true, changed: 5, complete: k === 2, cursor: `d${k}`, request_id: `r${k}`, undo: { action: 'undo', args: { audit_id: 'x' }, label: 'Undo' } })) }
@@ -570,4 +570,55 @@ test('action: undoing an audit id anywhere clears every line still offering that
   assert.ok(review.state('r1').result.undo)
   await log.run({ audit_id: '42' }, 'a42')
   assert.equal(review.state('r1').result.undo, undefined); assert.equal(review.state('r1').undone, true)
+})
+
+test('round 7: every job call names its round; a lost answer\'s retry is a replay counted once', async () => {
+  // server: real work per round; answer of round 2 is lost once (empty body) though the round ran; the retry is a replay
+  let stale = 9000, lostOnce = false
+  const done = new Map()
+  const bodies = []
+  const api = async (a, b) => {
+    bodies.push({ ...b })
+    const key = `${b.request_id}:${b.round}`
+    if (done.has(key)) return toResult(200, JSON.stringify({ ...done.get(key), changed: 0, replayed: true, recorded_changed: done.get(key).changed }))
+    const d = Math.min(stale, 4000); stale -= d
+    const ans = { ok: true, changed: d, remaining: stale, complete: stale === 0, cursor: `c${stale}`, message: `Cleared ${d}.` }
+    done.set(key, ans)
+    if (b.round === 2 && !lostOnce) { lostOnce = true; return toResult(200, '') }
+    return toResult(200, JSON.stringify(ans))
+  }
+  const m = createJobManager({ api, sleep: async () => {} })
+  const id = m.start(SPEC)
+  await until(() => m.get(id).status !== 'running')
+  assert.equal(m.get(id).status, 'done'); assert.equal(m.get(id).changed, 9000, 'exactly the true total: not 5,000 (replay as 0), not 13,000 (twice)')
+  assert.deepEqual(bodies.map((b) => b.round), [1, 2, 2, 3], 'the retry repeats round 2')
+  assert.equal(new Set(bodies.map((b) => b.request_id)).size, 1)
+})
+
+test('round 7: auto-merge sums groups AND companies and says both the same way', async () => {
+  const rounds = [{ changed: 40, merged: 42, remaining: 29 }, { changed: 29, merged: 30, remaining: 0 }]
+  const api = async () => { const r = rounds.shift(); return toResult(200, JSON.stringify({ ok: true, ...r, complete: r.remaining === 0, cursor: 'x' })) }
+  const m = createJobManager({ api, sleep: async () => {} })
+  const id = m.start({ action: 'auto_merge', label: 'Merging names', past: 'Merged', noun: 'groups' })
+  await until(() => m.get(id).status === 'done')
+  assert.match(m.get(id).message, /^Merged 69 groups \(72 companies\) in 2 rounds\.$/)
+})
+
+test('round 7: after a reload the job asks job_status { kind } and computes "done" as total − remaining', async () => {
+  const store = memStorage()
+  store.set(JSON.stringify([{ id: 'j9', key: 'purge_stale_jobs|{}', action: 'purge_stale_jobs', args: {}, label: 'Clearing', past: 'Deleted', noun: 'listings', status: 'running', changed: 1000, remaining: 3000, total: 4000, rounds: 1, message: '', skipped: [], lost_rounds: 0, started_at: '' }]))
+  const asked = []
+  const statusRead = async (job) => { asked.push(JOB_STATUS_KIND[job.action]); return { remaining: 1500, done: null, complete: false } }
+  const m = createJobManager({ api: async () => toResult(200, '{}'), storage: store, statusRead })
+  await until(() => !m.get('j9').checking)
+  assert.deepEqual(asked, ['clear_stale'])
+  assert.equal(m.get('j9').remaining, 1500); assert.equal(m.get('j9').changed, 2500); assert.equal(m.get('j9').resumable, true)
+  assert.match(m.get('j9').message, /deleted 2,500 listings so far, 1,500 left/)
+})
+
+test('round 7: a single write\'s replay shows the recorded sentence and its recorded count, never "0 changed"', () => {
+  const r = toResult(200, JSON.stringify({ ok: true, changed: 0, replayed: true, recorded_changed: 5, message: 'Added 5 credits · balance 10.' }))
+  assert.equal(r.changed, 5); assert.equal(r.message, 'Added 5 credits · balance 10.')
+  const busy = toResult(409, JSON.stringify({ ok: false, code: 'in_progress', retryable: true, error: 'Still running from the first press.' }))
+  assert.equal(busy.code, 'in_progress')
 })
