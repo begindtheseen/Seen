@@ -18,18 +18,13 @@ import { EmptyState } from '../../ui/states.tsx'
 import {
   FLAG_TEXT, GROUP_TEXT, HELD_VIEWS, MAX_BULK, approvableIds, filterNote, fmt, groupOf, heldHasRules, heldSearchFields,
   heldViewCounts, heldWhy, isDuplicate, label, matchesHeldView, matchesQuery, newRequestId, outcomeTone, parseHeldView,
-  plural, approvePlan, pruneSelection, rememberDuplicates, withKnownDuplicates, nothingToPublishLine, snippet, when, type HeldRow, type HeldView,
+  plural, approvePlan, pruneSelection, nothingToPublishLine, snippet, when, type HeldRow, type HeldView,
 } from './adapter.ts'
 import { Chips, Choice, CursorRow, KeysHint, Line, Meta, RecomputeLine } from './parts.tsx'
 import { useListKeys } from './reviewHooks.tsx'
 import styles from './review.module.css'
 
 const PAGE = 200
-const KNOWN_KEY = 'seen_admin_review_known_dupes_v1'
-const KNOWN_DUPES: Set<string> = (() => {
-  try { return new Set(JSON.parse((typeof window !== 'undefined' && window.sessionStorage.getItem(KNOWN_KEY)) || '[]') as string[]) } catch { return new Set<string>() }
-})()
-function saveKnown() { try { window.sessionStorage.setItem(KNOWN_KEY, JSON.stringify([...KNOWN_DUPES].slice(-20000))) } catch { /* private window: kept for this page only */ } }
 const SORTS = [
   { value: 'needs_eyes', label: 'Needs eyes first' },
   { value: 'newest', label: 'Newest' },
@@ -64,10 +59,8 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
   // The score count the decision's answer gave, so progress reads "0 of 71" before the job's first round.
   const [recomputeQueued, setRecomputeQueued] = useState<number | null>(null)
 
-  // Copies the server stopped flagging once their original went live stay possible duplicates (adapter.ts).
-  const [knownVer, setKnownVer] = useState(0)
-  useEffect(() => { if (rememberDuplicates(list.rows, KNOWN_DUPES)) { saveKnown(); setKnownVer((v) => v + 1) } }, [list.rows])
-  const rows = useMemo(() => withKnownDuplicates(list.rows, KNOWN_DUPES), [list.rows, knownVer]) // eslint-disable-line react-hooks/exhaustive-deps
+  // The server flags copies of held AND published reports (review.duplicate_of_live) — no client memory needed.
+  const rows = list.rows
   const rowsRef = useRef(rows)
   rowsRef.current = rows
   const truncated = !!(list.data as { truncated?: boolean } | undefined)?.truncated
@@ -91,8 +84,10 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
 
   const recomputeJob = [...allJobs].reverse().find((j) => j.action === 'recompute_queue_drain')
   const recomputeRunning = !!recomputeJob && (recomputeJob.status === 'running' || recomputeJob.status === 'cancelling')
-  const startRecompute = (cursor?: string) => {
-    jobs.start({ action: 'recompute_queue_drain', args: cursor ? { cursor } : {}, label: 'Updating company scores', past: 'Updated', noun: 'company scores' })
+  const startRecompute = (cursor?: string, total?: number) => {
+    // The decision's answer already says how many scores are queued: the job carries that total from the start,
+    // so this line and the global job bar both read "0 of 58".
+    jobs.start({ action: 'recompute_queue_drain', args: cursor ? { cursor } : {}, label: 'Updating company scores', past: 'Updated', noun: 'company scores', ...(total ? { total } : {}) })
   }
   // A second decision while scores are still updating: its companies wait for the running job (only one at a time).
   useEffect(() => {
@@ -108,7 +103,7 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
     // Rows the server will change leave at once; possible duplicates stay (a bulk approve skips them).
     optimistic: (tx, args) => {
       const ids = args.ids as string[]
-      const leaving = args.decision === 'approve' ? approvableIds(rowsRef.current, ids, args.include_duplicates === true) : ids
+      const leaving = args.decision === 'approve' ? approvableIds(rowsRef.current, ids, (args.include_ids as string[] | undefined) || []) : ids
       tx.removeRows('held', leaving)
     },
     onSettled: (res, args) => {
@@ -125,7 +120,7 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
         const rc = (res as AdminOk & { recompute?: Recompute }).recompute
         if (rc && (rc.remaining || 0) > 0) {
           setRecomputeQueued((q) => (recomputeRunning && q ? q + (rc.remaining || 0) : rc.remaining || 0))
-          if (recomputeRunning) { if (rc.cursor) pendingCursors.current.push(rc.cursor) } else startRecompute(rc.cursor)
+          if (recomputeRunning) { if (rc.cursor) pendingCursors.current.push(rc.cursor) } else startRecompute(rc.cursor, rc.remaining)
         }
       }
       setConfirmReject(false)
@@ -141,7 +136,8 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
     if (target === 'bulk' && !decide.busy('bulk')) { bulkBusyRef.current = true; bulkArgsRef.current = args; snapRef.current = fromSelection ? new Set(selected) : null }
     void decide.run(args, target)
   }
-  const one = (decision: 'approve' | 'reject', r: HeldRow) => run(decision, [r.id], r.id, decision === 'approve' && isDuplicate(r) ? { include_duplicates: true } : {})
+  // A single report is never filtered by the server's bulk guard: approving one row is the owner naming it.
+  const one = (decision: 'approve' | 'reject', r: HeldRow) => run(decision, [r.id], r.id)
   const byId = (id: string) => rows.find((r) => r.id === id)
 
   const toggle = (id: string) => {
@@ -169,6 +165,7 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
   const setView = (v: string) => { setViewRaw(v === 'all' ? '' : v); setLimit(PAGE) }
   const skipLinks = {
     possible_duplicate: { label: 'Review them', onSelect: () => setView('duplicates') },
+    anti_gaming_hold: { label: 'Review the holds', onSelect: () => setView('anti_gaming') },
   }
   const bulkState = decide.state('bulk')
   const lastRowState = lastRow ? decide.state(lastRow) : null
@@ -306,7 +303,7 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
             confirmLabel={`Publish ${fmt(Math.min(selectionPlan.ids.length, MAX_BULK))}`}
             busy={decide.busy('bulk')}
             onCancel={() => setConfirmApprove(null)}
-            onConfirm={() => { if (selectionPlan.ids.length) run('approve', selectionPlan.ids, 'bulk', selectionPlan.includeDuplicates ? { include_duplicates: true } : {}, true) }}
+            onConfirm={() => { if (selectionPlan.ids.length) run('approve', selectionPlan.sendIds, 'bulk', selectionPlan.includeIds.length ? { include_ids: selectionPlan.includeIds } : {}, true) }}
           />
         ) : confirmReject ? (
           <ConfirmStep

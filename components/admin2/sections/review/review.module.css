@@ -74,20 +74,6 @@
   .kinds { margin-bottom: var(--sp-3); }
 }
 
-/* The row checkbox is itself the 44px target; the drawn box (20px) sits in its middle. */
-.rowWrap :global(input[type='checkbox']) {
-  appearance: none; -webkit-appearance: none; display: grid; place-items: center; width: 44px; height: 44px; margin: 0;
-  border: 0; border-radius: var(--r-control); background: transparent; cursor: pointer;
-}
-.rowWrap :global(input[type='checkbox'])::before {
-  content: ''; grid-area: 1 / 1; width: 20px; height: 20px; box-sizing: border-box;
-  border: 2px solid var(--border-3); border-radius: var(--r-chip); background: var(--surface-1);
-}
-.rowWrap :global(input[type='checkbox']:checked)::before { background: var(--accent-strong); border-color: var(--accent-strong); }
-.rowWrap :global(input[type='checkbox']:checked)::after {
-  content: ''; grid-area: 1 / 1; width: 6px; height: 11px; margin-top: -2px; border: solid var(--text-1); border-width: 0 2px 2px 0; transform: rotate(45deg);
-}
-.rowWrap :global(input[type='checkbox']:focus-visible) { outline: none; box-shadow: var(--sh-focus); }
 @media (max-width: 767px) {
   .hidePhone { display: none !important; }
   .grow { flex-basis: 160px; }

@@ -271,6 +271,12 @@ async function run(req, res, { loadGeo, fetchFull = fetchFullPosting }) {
           if (dry) summary.picked.push({ user: uid.slice(0, 8), reason: m.reason, matches: [] });
           continue;
         }
+        // "We don't know yet": the current job could not be placed — no email (never a wrong headline).
+        if (m.keys?.no_direction) {
+          skip('no_direction');
+          if (dry) summary.picked.push({ user: uid.slice(0, 8), reason: 'no_direction', unplaced_title: m.keys.no_direction.title, matches: [] });
+          continue;
+        }
         found = m.ranked;
         city = m.city;
         keys = m.keys;

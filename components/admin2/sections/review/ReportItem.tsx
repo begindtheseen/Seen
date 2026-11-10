@@ -5,6 +5,7 @@
 // rules check, the audit history for this row, and every decision the server offers for its state
 // (Approve / Reject / Hold / Restore) with Undo in the result line.
 import { useEffect, useState } from 'react'
+import { useAdminAction } from '../../core/hooks.tsx'
 import Button from '@/components/ui/Button'
 import type { AdminActivityRow } from '../../contract.ts'
 import { useAdminQuery, useApi } from '../../core/hooks.tsx'
@@ -12,7 +13,7 @@ import type { ItemViewProps } from '../../core/items.tsx'
 import { ItemNotFound } from '../../core/SheetHost.tsx'
 import { ErrorState, RefreshFailed, Skeleton } from '../../ui/states.tsx'
 import {
-  DECISION_TEXT, FLAG_TEXT, GROUP_TEXT, STATE_TEXT, heldWhy, historyText, label, moderationFor, outcomeTone, sourceHref, when,
+  CORRECTABLE_OUTCOMES, DECISION_TEXT, FLAG_TEXT, rulesReadings, GROUP_TEXT, STATE_TEXT, heldWhy, historyText, label, moderationFor, outcomeTone, sourceHref, when,
   type ModDecision, type ReportRow,
 } from './adapter.ts'
 import { Block, Chips, Facts, Line } from './parts.tsx'
@@ -28,6 +29,12 @@ export default function ReportItem({ kind, id, setTitle, open }: ItemViewProps) 
   // The decision's touched keys re-read the lists; this sheet re-reads its own row.
   const mod = useModerate((res) => { if (res.ok) void q.refresh() })
   const r = q.data?.rows?.[0]
+  // Correct outcome: the select starts on the report's own outcome; the reason is optional and goes to the audit row.
+  const [outcome, setOutcome] = useState('')
+  const [reason, setReason] = useState('')
+  const correct = useAdminAction('correct_report_outcome', { onSettled: (res) => { if (res.ok) { setReason(''); void q.refresh() } } })
+  const correctUndone = !!correct.state(id).undone
+  useEffect(() => { if (correctUndone) void q.refresh() }, [correctUndone]) // eslint-disable-line react-hooks/exhaustive-deps
   // An Undo pressed here changes this row too: read it again once the Undo has landed.
   const undone = !!mod.state(id).undone
   useEffect(() => { if (undone) void q.refresh() }, [undone]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -71,10 +78,33 @@ export default function ReportItem({ kind, id, setTitle, open }: ItemViewProps) 
       ]} />
       <Block title="Rules check" testId="report-rules">
         <p className={styles.note}>
-          {r.rules === 'passes' ? <><strong>Passes.</strong> Seen’s strict first-hand rules accept it, read as a comment or as the post itself.</>
-            : r.rules === 'fails' ? <><strong>Fails.</strong> Seen’s strict first-hand rules reject it both as a comment and as the post itself. A flag for you, not a decision.</>
+          {r.rules === 'passes' ? <><strong>Passes.</strong> Seen’s strict first-hand rules accept it.</>
+            : r.rules === 'fails' ? <><strong>Fails.</strong> Seen’s strict first-hand rules reject it. A flag for you, not a decision.</>
               : 'Does not apply: this is not an imported public account, or it has too little text to judge.'}
         </p>
+        {(() => { const rd = rulesReadings(r.rules_detail); return rd ? <ul className={styles.history} data-testid="report-rules-readings"><li>{rd.comment}</li><li>{rd.post}</li></ul> : null })()}
+      </Block>
+      <Block title="Correct the outcome" testId="report-correct">
+        <div className={styles.toolRow}>
+          <label className={styles.selectLabel}>
+            <span>Outcome</span>
+            <select className={`ui-input ${styles.select}`} value={outcome || String(r.outcome || '')} onChange={(e) => setOutcome(e.target.value)} data-testid="report-correct-outcome">
+              {!CORRECTABLE_OUTCOMES.includes(String(r.outcome) as never) && r.outcome ? <option value={String(r.outcome)}>{label(r.outcome)} (not a value the database accepts)</option> : null}
+              {CORRECTABLE_OUTCOMES.map((o) => <option key={o} value={o}>{label(o)}</option>)}
+            </select>
+          </label>
+        </div>
+        <label className={styles.field}>
+          <span>Reason (optional, kept in the activity log)</span>
+          <textarea className="ui-input" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} data-testid="report-correct-reason" />
+        </label>
+        <div className={styles.itemActions}>
+          <Button variant="ghost" onClick={() => void correct.run({ id, outcome: outcome || r.outcome, ...(reason.trim() ? { reason: reason.trim() } : {}) }, id)}
+            disabled={correct.busy(id) || !outcome || outcome === r.outcome} loading={correct.busy(id)} data-testid="report-correct-go">
+            {outcome && outcome !== r.outcome ? `Change to “${label(outcome)}”` : 'Choose a different outcome'}
+          </Button>
+        </div>
+        <Line state={correct.state(id)} onUndo={() => correct.undo(id)} onRetry={() => correct.retry(id)} onDismiss={() => correct.dismiss(id)} runningText="Correcting the outcome…" />
       </Block>
       <Block title="History" testId="report-history">
         {r.history?.length ? (

@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 import {
   KINDS, parseKind, kindCount, waitingLine, matchesHeldView, heldViewCounts, positiveIds, approvableIds, filterNote,
   pruneSelection, moderationFor, patchRows, sourceHref, when, newRequestId, ticketSummary, signalText, heldHasRules,
-  parseHeldView, label, snippet, outcomeTone, approvePlan, reviewQueues, withKnownDuplicates, rememberDuplicates, nothingToPublishLine, tidyMessage,
+  parseHeldView, label, snippet, outcomeTone, approvePlan, reviewQueues, nothingToPublishLine, tidyMessage, rulesReadings,
 } from './adapter.ts'
 
 const row = (id, group, flags = [], extra = {}) => ({ id, company_name: 'Acme', outcome: group === 'positive' ? 'interview' : 'ghosted', review: { group, flags }, ...extra })
@@ -63,7 +63,9 @@ test('saved filters cover exactly the rows they name', () => {
 test('approve all positive sends every positive (duplicates too: the server names them); only the rest leave at once', () => {
   assert.deepEqual(positiveIds(ROWS), ['a', 'b'])
   assert.deepEqual(approvableIds(ROWS, ['a', 'b']), ['a'])
-  assert.deepEqual(approvableIds(ROWS, ['a', 'b'], true), ['a', 'b'])
+  assert.deepEqual(approvableIds(ROWS, ['a', 'b'], ['b']), ['a', 'b'])
+  assert.deepEqual(approvableIds(ROWS, ['b']), ['b'], 'a single id is never filtered')
+  assert.deepEqual(approvableIds(ROWS, ['a', 'd']), ['a'], 'anti-gaming holds are skipped too')
 })
 
 test('the filter line never claims more than is loaded', () => {
@@ -147,7 +149,8 @@ test('bulk approve never publishes anti-gaming holds or possible duplicates unle
   ]
   const pos = approvePlan(rows, 'positive')
   assert.deepEqual(pos.ids, ['p1', 'p2'])
-  assert.equal(pos.includeDuplicates, false)
+  assert.deepEqual(pos.includeIds, [])
+  assert.deepEqual(pos.sendIds, ['p1', 'p2'])
   assert.equal(pos.sentence, '2 clear positives will be published · 1 possible duplicate, 1 anti-gaming hold, 1 that needs your eyes and 1 employee review stay for you to read.')
   const all = new Set(rows.map((r) => r.id))
   const sel = approvePlan(rows, 'selection', all)
@@ -155,7 +158,8 @@ test('bulk approve never publishes anti-gaming holds or possible duplicates unle
   assert.match(sel.sentence, /^4 reports will be published · 1 possible duplicate and 1 anti-gaming hold stay for you to read \(tick one yourself to include it\)\.$/)
   const mine = approvePlan(rows, 'selection', all, new Set(['ag', 'pd']))
   assert.deepEqual(mine.ids.sort(), ['ag', 'e1', 'n1', 'p1', 'p2', 'pd'])
-  assert.equal(mine.includeDuplicates, true)
+  assert.deepEqual(mine.includeIds.sort(), ['ag', 'pd'])
+  assert.equal(mine.sendIds.length, 6)
   assert.equal(approvePlan(rows, 'selection', new Set(['ag'])).sentence, 'Nothing here can be published in bulk · 1 anti-gaming hold stays for you to read (tick one yourself to include it).')
 })
 
@@ -170,20 +174,20 @@ test('the header sentence adds up exactly what the shell badge adds up (queues w
   assert.deepEqual(reviewQueues(undefined), [])
 })
 
-test('copies stay possible duplicates after their original is published (the server stops flagging them)', () => {
-  const known = new Set()
-  const before = [row('o', 'positive'), row('c', 'positive', ['possible_duplicate'])]
-  assert.equal(rememberDuplicates(before, known), true)
-  // the original is approved; the server now reads the copy as a clean positive
-  const after = [row('c', 'positive')]
-  const seen = withKnownDuplicates(after, known)
-  assert.deepEqual(approvePlan(seen, 'positive').ids, [], 'the bulk button counts only what it will publish')
-  assert.equal(nothingToPublishLine(approvePlan(seen, 'positive')), 'No clear positives left · 1 possible duplicate')
-  assert.equal(withKnownDuplicates(after, new Set()), after)
+test('when nothing is left to publish, one line says what is left', () => {
+  const rows = [row('c', 'positive', ['possible_duplicate'])]
+  assert.deepEqual(approvePlan(rows, 'positive').ids, [])
+  assert.equal(nothingToPublishLine(approvePlan(rows, 'positive')), 'No clear positives left · 1 possible duplicate')
 })
 
 test('a result sentence never repeats the status word beside it', () => {
   assert.equal(tidyMessage('Undid it: 140 reports are back in the review queue.'), '140 reports are back in the review queue.')
   assert.equal(tidyMessage('Approved 140 of 140.'), 'Approved 140 of 140.')
   assert.equal(tidyMessage('Done: cleared 3.'), 'Cleared 3.')
+})
+
+test('the rules check is told both ways', () => {
+  assert.deepEqual(rulesReadings({ verdict: 'passes', comment: false, post: true }), { comment: 'Read as a comment: fails.', post: 'Read as the post itself (its first sentence as the title): passes.' })
+  assert.equal(rulesReadings({ verdict: null, comment: null, post: null }), null)
+  assert.equal(rulesReadings(undefined), null)
 })

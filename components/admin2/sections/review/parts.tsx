@@ -102,7 +102,7 @@ export function KeysHint({ keys }: { keys: Array<[string, string]> }) {
 
 /** Wraps a Row so the keyboard cursor can find it and ring it. */
 export function CursorRow({ id, cursor, children }: { id: string; cursor: boolean; children: ReactNode }) {
-  return <div data-rowid={id} className={cursor ? `${styles.rowWrap} ${styles.cursor}` : styles.rowWrap} data-cursor={cursor ? 'true' : undefined}>{children}</div>
+  return <div data-rowid={id} className={cursor ? styles.cursor : undefined} data-cursor={cursor ? 'true' : undefined}>{children}</div>
 }
 
 /** A labelled block inside a sheet. */
@@ -145,7 +145,7 @@ export function Line(props: ResultLineProps) {
  */
 export function RecomputeLine({ job, queued, onCancel, onResume, onDismiss }: { job: Job; queued: number | null; onCancel: () => void; onResume: () => void; onDismiss: () => void }) {
   const live = job.status === 'running' || job.status === 'cancelling'
-  const total = typeof job.remaining === 'number' ? job.changed + job.remaining : queued
+  const total = typeof job.total === 'number' ? job.total : typeof job.remaining === 'number' ? job.changed + job.remaining : queued
   const count = total != null ? `${fmt(job.changed)} of ${fmt(Math.max(total, job.changed))} company scores updated` : `${fmt(job.changed)} company scores updated so far`
   const text = live ? count : job.message
   return (

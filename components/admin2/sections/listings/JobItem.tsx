@@ -14,6 +14,7 @@ import ConfirmStep from '../../ui/ConfirmStep.tsx'
 import ResultLine from '../../ui/ResultLine.tsx'
 import { ErrorState, RefreshFailed, Skeleton } from '../../ui/states.tsx'
 import { buildPatch, EDIT_FIELDS, fmt, formValues, historyWord, holdersLine, jobState, jobTitle, readJobDetail } from './adapter.ts'
+import { httpHref } from '../../../../lib/safeHref.js'
 import styles from './listings.module.css'
 
 const when = (iso?: string | null) => (iso ? formatPacific(iso) : '—')
@@ -24,6 +25,8 @@ export default function JobItem({ kind, id, setTitle }: ItemViewProps) {
   const q = useAdminQuery<Record<string, unknown>>(`job:${id}`, () => api<Record<string, unknown>>('job_detail', { job_id: id }), { staleMs: 15_000 })
   const d = q.data ? readJobDetail(q.data) : null
   const job = d?.job
+  // a stored apply URL is data: only a real http(s) address becomes a link (lib/safeHref.js)
+  const applyHref = job && job.apply_url ? httpHref(String(job.apply_url)) : null
   useEffect(() => { if (job) setTitle(jobTitle(job), `listing ${job.id}`) }, [job, setTitle])
 
   const edit = useAdminAction('job_edit', { onSettled: (res) => { if (res.ok) setEditing(false) } })
@@ -56,7 +59,9 @@ export default function JobItem({ kind, id, setTitle }: ItemViewProps) {
           <div className={styles.fact}><dt className={styles.factLabel}>Last seen by its source</dt><dd className={styles.factValue}>{when(job.last_seen_at)}</dd></div>
           <div className={styles.fact}><dt className={styles.factLabel}>{d.onSite ? 'Leaves the site' : 'Left the site'}</dt><dd className={styles.factValue}>{when(job.expires_at)}</dd></div>
         </dl>
-        {job.apply_url ? <p className={styles.text}>Apply link: <a className={styles.link} href={String(job.apply_url)} target="_blank" rel="noopener noreferrer">{String(job.apply_url)}</a></p> : null}
+        {job.apply_url ? (applyHref
+          ? <p className={styles.text}>Apply link: <a className={styles.linkRow} href={applyHref} target="_blank" rel="noopener noreferrer">{String(job.apply_url)}</a></p>
+          : <p className={styles.text}>Apply link (not a web address, shown as stored): {String(job.apply_url)}</p>) : null}
         <p className={styles.text} data-testid="job-holders">{holdersLine(d.holders)}</p>
         {d.suppressed ? <p className={styles.text}>Its apply link is blocked{d.suppressed.reason ? ` (${d.suppressed.reason})` : ''}{d.suppressed.created_at ? ` since ${when(d.suppressed.created_at)}` : ''}: a source cannot bring it back.</p> : null}
       </div>

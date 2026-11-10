@@ -206,18 +206,25 @@ export function heldViewCounts(rows: HeldRow[]): Record<HeldView, number> {
 /** Ids "Approve all positive" sends (duplicates included — the server skips and names them). */
 export const positiveIds = (rows: HeldRow[]) => rows.filter((r) => groupOf(r) === 'positive').map((r) => r.id)
 
-/** Rows a bulk approve will actually change (the server skips possible duplicates unless asked). */
-export function approvableIds(rows: HeldRow[], ids: string[], includeDuplicates = false): string[] {
-  if (includeDuplicates) return ids
-  const dup = new Set(rows.filter(isDuplicate).map((r) => r.id))
-  return ids.filter((id) => !dup.has(id))
+/**
+ * Rows a bulk approve will actually change — the server's guard (SHAPES.md review_held): an approval of more
+ * than one id skips anti-gaming holds and possible duplicates unless the id is in `include_ids`; a single id is
+ * never filtered. Used for the optimistic removal, so a skipped row never flickers away.
+ */
+export function approvableIds(rows: HeldRow[], ids: string[], includeIds: string[] = []): string[] {
+  if (ids.length <= 1) return ids
+  const inc = new Set(includeIds)
+  const guarded = new Set(rows.filter((r) => isDuplicate(r) || flagsOf(r).includes('anti_gaming_hold')).map((r) => r.id))
+  return ids.filter((id) => !guarded.has(id) || inc.has(id))
 }
 
 export type ApprovePlan = {
   /** Ids that will be published. */
   ids: string[]
-  /** Send include_duplicates (only when the owner ticked a possible duplicate himself). */
-  includeDuplicates: boolean
+  /** Every id the press sends (the server's guard skips the flagged ones and says so). */
+  sendIds: string[]
+  /** Flagged rows the owner ticked himself: sent as `include_ids` so the server publishes them. */
+  includeIds: string[]
   /** What stays for the owner to read, by reason. */
   heldBack: { duplicates: number; antiGaming: number; needsEyes: number; employee: number }
   /** "140 clear positives will be published · 24 possible duplicates and 29 anti-gaming holds stay for you to read." */
@@ -234,12 +241,13 @@ export function approvePlan(rows: HeldRow[], scope: 'positive' | 'selection', se
   const pool = scope === 'positive' ? rows.filter((r) => groupOf(r) === 'positive') : rows.filter((r) => selected.has(r.id))
   const ids: string[] = []
   const heldBack = { duplicates: 0, antiGaming: 0, needsEyes: 0, employee: 0 }
-  let includeDuplicates = false
+  const includeIds: string[] = []
   for (const r of pool) {
     const own = picked.has(r.id)
+    const flagged = flagsOf(r).includes('anti_gaming_hold') || isDuplicate(r)
     if (flagsOf(r).includes('anti_gaming_hold') && !own) { heldBack.antiGaming++; continue }
     if (isDuplicate(r) && !own) { heldBack.duplicates++; continue }
-    if (isDuplicate(r)) includeDuplicates = true
+    if (flagged) includeIds.push(r.id)
     ids.push(r.id)
   }
   if (scope === 'positive') {
@@ -261,7 +269,8 @@ export function approvePlan(rows: HeldRow[], scope: 'positive' | 'selection', se
   const head = pub ? `${fmt(pub)} ${what} will be published` : 'Nothing here can be published in bulk'
   const stays = heldBack.duplicates + heldBack.antiGaming + heldBack.needsEyes + heldBack.employee === 1 ? 'stays' : 'stay'
   const tail = stay.length ? ` · ${listWords(stay)} ${stays} for you to read${scope === 'selection' && (heldBack.duplicates || heldBack.antiGaming) ? ' (tick one yourself to include it)' : ''}` : ''
-  return { ids, includeDuplicates, heldBack, sentence: `${head}${tail}.` }
+  const sendIds = scope === 'positive' ? ids : pool.map((r) => r.id)
+  return { ids, sendIds, includeIds, heldBack, sentence: `${head}${tail}.` }
 }
 
 /** What the held list shows under its filters: "Showing 120 of 343 held reports (all loaded)". */
@@ -321,7 +330,18 @@ export function heldWhy(r: HeldRow): string {
 // ── Recent reports ───────────────────────────────────────────────────────────────────────────────
 
 export type ReportState = 'live' | 'held' | 'rejected' | 'duplicate'
-export type ReportRow = HeldRow & { state?: ReportState; counted?: boolean; employeeReview?: boolean; rules?: 'passes' | 'fails' | null }
+export type RulesDetail = { verdict?: 'passes' | 'fails' | null; comment?: boolean | null; post?: boolean | null }
+export type ReportRow = HeldRow & { state?: ReportState; counted?: boolean; employeeReview?: boolean; rules?: 'passes' | 'fails' | null; rules_detail?: RulesDetail | null }
+
+/** The outcomes `correct_report_outcome` accepts (the database's own check, SHAPES.md). */
+export const CORRECTABLE_OUTCOMES = ['ghosted', 'rejected', 'autoreject', 'hired', 'offer', 'interview', 'interviewing', 'human', 'waiting'] as const
+
+/** The two readings of the strict first-hand rules, in words. */
+export function rulesReadings(d: RulesDetail | null | undefined): { comment: string; post: string } | null {
+  if (!d || (d.comment == null && d.post == null)) return null
+  const word = (v: boolean | null | undefined) => (v === true ? 'passes' : v === false ? 'fails' : 'does not apply')
+  return { comment: `Read as a comment: ${word(d.comment)}.`, post: `Read as the post itself (its first sentence as the title): ${word(d.post)}.` }
+}
 
 export const STATE_TEXT: Record<ReportState, { label: string; tone: Tone }> = {
   live: { label: 'Live', tone: 'good' },
@@ -431,31 +451,6 @@ export function newRequestId(): string {
   b[6] = (b[6] & 15) | 64; b[8] = (b[8] & 63) | 128
   const h = [...b].map((x) => x.toString(16).padStart(2, '0')).join('')
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`
-}
-
-// ── Copies the server stops flagging ─────────────────────────────────────────────────────────────
-// The server flags a held row as a possible duplicate only against OTHER HELD rows: once the original is
-// published, its copies read as clean "clear positives" (rig: after Approve all positive, the 24 copies
-// came back as "Approve all positive (24)"). Until the server compares against live reports too, Review
-// remembers every id it has seen flagged in this tab and keeps treating it as a possible duplicate.
-
-/** Rows with the remembered duplicate flag put back. Returns the same array when nothing changes. */
-export function withKnownDuplicates(rows: HeldRow[], known: Set<string>): HeldRow[] {
-  if (!known.size) return rows
-  let changed = false
-  const out = rows.map((r) => {
-    if (!known.has(r.id) || isDuplicate(r)) return r
-    changed = true
-    return { ...r, review: { ...(r.review || {}), flags: [...flagsOf(r), 'possible_duplicate'] } }
-  })
-  return changed ? out : rows
-}
-
-/** Add every currently flagged id to the remembered set; true when it grew. */
-export function rememberDuplicates(rows: HeldRow[], known: Set<string>): boolean {
-  let grew = false
-  for (const r of rows) if (isDuplicate(r) && !known.has(r.id)) { known.add(r.id); grew = true }
-  return grew
 }
 
 /** "No clear positives left · 24 possible duplicates" — what the filled button's place says when it has nothing to publish. */
