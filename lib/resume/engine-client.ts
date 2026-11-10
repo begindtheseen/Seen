@@ -10,7 +10,7 @@ import { rewriteDoc as _rewriteDoc, rewriteBullet as _rewriteBullet, suggestVerb
 import { listTemplates as _listTemplates } from './render/templates.js'
 import { renderText as _renderText, renderMarkdown as _renderMarkdown } from './render/text.js'
 import { applyPlan as _applyPlan, bulletFromAnswer as _bulletFromAnswer } from './tailor/optimizer.js'
-import { composeDetailAnswer as _composeDetailAnswer, composeGapAnswer as _composeGapAnswer, composeLineAnswer as _composeLineAnswer } from './tailor/questions.js'
+import { composeAnswer as _composeAnswer } from './tailor/questions.js'
 import type { ResumeDoc, Health, RewriteLogEntry, TemplateInfo, TailorPlan, TailorOverrides, TailorPrompt } from './types'
 
 export const normalizeDoc = (input: unknown): ResumeDoc => _normalizeDoc(input) as unknown as ResumeDoc
@@ -56,7 +56,7 @@ export const withExpected = (e: { end?: string; dateText?: string }, label: stri
 /** A question's answer → the line it would become (in the person's words) or the plain reason it cannot — the engine's
  *  own composers (questions.js), by kind: a detail question, a gap, or a number in one of their lines. */
 export function composeAnswer(prompt: Record<string, unknown>, raw: string): { line: string; problem: string | null } {
-  const p = prompt as { kind?: string; facet?: string; unit?: string }
-  const r = (p.facet || p.kind === 'detail') ? _composeDetailAnswer(p, raw) : p.kind === 'gap' ? _composeGapAnswer(p, raw) : p.unit === 'line' ? _composeLineAnswer(p, raw) : { line: _bulletFromAnswer(p as unknown as TailorPrompt, raw), problem: null }
+  // ONE composer for every kind (round 7): a line from the person's words, or one sentence saying what it needs
+  const r = _composeAnswer(prompt, raw)
   return { line: String((r && r.line) || ''), problem: (r && r.problem) || null }
 }

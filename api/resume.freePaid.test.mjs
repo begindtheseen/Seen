@@ -84,6 +84,17 @@ test('free == paid == Studio: each statement\'s status, evidence lines and candi
       for (const x of got) assert.ok(Array.isArray(x.evidence), `${j.title}: ${name} evidence is an array`);
       assert.deepEqual(shape(got), f, `${j.title}: ${name} statements differ from the free check`);
     }
+    // round 7: the same package parts reach every screen — the fit read and what is already right (free, paid, Studio);
+    // the tailoring parts (blocked, field match, charge) on both tailoring screens
+    const READ_PARTS = ['fit_score', 'fit_band', 'verdict', 'statements', 'matched_requirements', 'unsupported_requirements', 'constraints', 'hard_gates', 'already_right'];
+    const TAILOR_PARTS = ['blocked', 'field_match', 'charge'];
+    const has = (b, keys) => keys.filter((k) => b && Object.prototype.hasOwnProperty.call(b, k));
+    assert.deepEqual(has(free.body, READ_PARTS), READ_PARTS, `${j.title}: free parts`);
+    assert.deepEqual(has(paid.body, [...READ_PARTS, ...TAILOR_PARTS]), [...READ_PARTS, ...TAILOR_PARTS], `${j.title}: paid parts`);
+    assert.deepEqual(has(studio.body, [...READ_PARTS, ...TAILOR_PARTS]), [...READ_PARTS, ...TAILOR_PARTS], `${j.title}: Studio parts`);
+    // and the same reading of what is already right where none of them is blocked
+    const counts = [free.body.already_right, paid.body.already_right, studio.body.already_right].map((x) => (x ? x.count : null));
+    if (!paid.body.blocked && !studio.body.blocked && counts.every((c) => c != null)) assert.equal(new Set(counts).size, 1, `${j.title}: already right ${counts.join(' / ')}`);
     compared++;
   }
   assert.ok(compared >= 4, `compared ${compared}`);

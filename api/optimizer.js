@@ -18,7 +18,8 @@ import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { gateAI } from '../lib/server/credits.js';
 import { runOptimizer, ENGINE_VERSION } from '../lib/optimizer/index.js';
-import { freeDiagnostic, listedRequirements, listedCoverage, postingInfo } from '../lib/server/optimizePackage.js';
+import { freeDiagnostic, listedRequirements, listedCoverage, postingInfo, alreadyRightOf } from '../lib/server/optimizePackage.js';
+import { parseResume } from '../lib/resume/parse/index.js';
 import { postingTextForReader } from '../lib/server/jobInsights.js';
 import { employerDisplayName } from '../lib/text/employerName.js';
 import { readPosting } from '../lib/server/postingRead.js';
@@ -570,6 +571,8 @@ export default async function handler(req, res) {
       requirements_listed: typeof output.requirement_count === 'number' ? output.requirement_count : listedRequirements(output).length,
       ats_coverage: listedCoverage(output),
       posting: postingInfo(posting, { job: jobTitle, company: employerDisplayName({ company: company || '', postingText: jobDescription || '' }) || company }),
+      // what the page ALREADY does right, read with the same first-read measure the paid result and the Studio use
+      already_right: (() => { try { return alreadyRightOf(output, parseResume({ text: canonicalResumeText(String(resumeText)), source: 'text' }), employerDisplayName({ company: company || '', postingText: jobDescription || '' }) || company); } catch { return null; } })(),
       legacy_seenfit_compatible: true,
       run_id: runId, _facts_source: factsSource, _engine_version: ENGINE_VERSION,
     });

@@ -50,7 +50,8 @@ async function call(body) {
 test('list_held_reports returns the pending queue, needs-your-eyes first, with group counts', async () => {
   const { res, calls } = await call({ action: 'list_held_reports' });
   assert.equal(res.statusCode, 200);
-  assert.deepEqual(res.jsonBody.counts, { total: 3, needs_eyes: 1, positive: 1, employee_review: 1 });
+  assert.deepEqual(res.jsonBody.counts, { total: 3, needs_eyes: 1, positive: 1, employee_review: 1, clear_positives: 1, possible_duplicates: 0, unchecked: 0 });
+  assert.deepEqual({ n: res.jsonBody.checked.n, of: res.jsonBody.checked.of, complete: res.jsonBody.checked.complete }, { n: 3, of: 3, complete: true });
   assert.equal(res.jsonBody.reports[0].id, B, 'the rejection is first');
   const q = calls.find((c) => c.u.includes('/rest/v1/reports?')).u;
   assert.match(q, /needs_review=is\.true/);
@@ -87,7 +88,7 @@ test('reject keeps the row (hidden, unscored, reversible); the old approve butto
   assert.equal(res.jsonBody.changed, 1);
   const p = calls.find((c) => c.method === 'PATCH' && c.u.includes('/rest/v1/reports?'));
   assert.deepEqual(p.body, { needs_review: true, trust_reason: 'admin_rejected', outcome_weight: 0 });
-  assert.ok(!calls.some((c) => c.method === 'DELETE'), 'nothing is deleted');
+  assert.ok(!calls.some((c) => c.method === 'DELETE' && c.u.includes('/rest/v1/reports')), 'no report is deleted (only the company\'s remembered duplicate checks are cleared)');
   const old = await call({ action: 'approve_report', id: A });
   const op = old.calls.find((c) => c.method === 'PATCH' && c.u.includes('/rest/v1/reports?'));
   assert.deepEqual(op.body, { needs_review: false });

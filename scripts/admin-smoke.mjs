@@ -452,6 +452,35 @@ async function run(vp) {
     !!slotBox && slotBox.y >= 0 && slotBox.y + slotBox.height <= vp.h && await slot.getByTestId('result-undo').count() === 1, JSON.stringify(slotBox))
   check(tag('…and in the pinned result dock'), /Approved the/.test(await page.locator('[data-testid=result-dock]:visible').innerText()))
   await shot(page, `${vp.name}-07c-row-result`)
+  // The dock never covers a control: with a selection's bulk bar up and the dock open, no enabled button's centre is
+  // under the dock (desktop: the dock lives in the rail; phone: the bulk bar sits above it). (round 8)
+  await page.getByTestId('lab-row-r005').locator('input[type=checkbox]').check()
+  await page.getByTestId('lab-row-r006').locator('input[type=checkbox]').check()
+  await page.getByTestId('bulk-bar').waitFor()
+  for (const where of ['middle', 'bottom']) {
+    if (where === 'bottom') await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+    await page.waitForTimeout(300)
+    const cover = await page.evaluate(() => {
+      const dock = [...document.querySelectorAll('[data-testid=result-dock]')].find((e) => e.offsetParent)
+      if (!dock) return { dock: false }
+      const d = dock.getBoundingClientRect()
+      const out = []
+      for (const b of document.querySelectorAll('button:not([disabled]), a[href]')) {
+        if (dock.contains(b) || !b.offsetParent) continue
+        const r = b.getBoundingClientRect(); if (r.bottom <= 0 || r.top >= innerHeight) continue
+        const x = r.left + r.width / 2, y = r.top + r.height / 2
+        const hit = document.elementFromPoint(x, y)
+        const inBulk = !!b.closest('[data-testid=bulk-bar]')
+        if (hit && dock.contains(hit)) out.push({ text: (b.textContent || '').trim().slice(0, 20), inBulk })
+      }
+      return { dock: true, covered: out }
+    })
+    const bulkCovered = (cover.covered || []).filter((c) => c.inBulk)
+    const anyCovered = cover.covered || []
+    check(tag(`dock open + bulk bar (${where}): no bulk-bar button under the dock`), cover.dock && bulkCovered.length === 0, JSON.stringify(cover))
+    if (!phone || where === 'bottom') check(tag(`dock open (${where}): no enabled button anywhere under the dock`), anyCovered.length === 0, JSON.stringify(anyCovered))
+  }
+  await page.getByTestId('bulk-bar').getByRole('button', { name: 'Clear' }).click()
   await page.locator('[data-testid=result-dock]:visible').getByTestId('result-undo').click()
   await page.getByTestId('lab-row-r020').waitFor()
   check(tag('Undo from the dock puts the row back'), true)
