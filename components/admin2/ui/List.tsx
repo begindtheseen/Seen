@@ -5,7 +5,9 @@
 // table on a phone and nothing scrolls sideways. "Load more" asks for the next page after the last row
 // on screen; new rows the server has are announced ("3 new — show") instead of being pushed in above
 // what the owner is reading.
-import type { ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import type { ActionView } from '../core/hooks.tsx'
+import ResultLine from './ResultLine.tsx'
 import Button from '@/components/ui/Button'
 import type { AdminErr } from '../contract.ts'
 import { EmptyState, ErrorState, RefreshFailed, Skeleton } from './states.tsx'
@@ -30,12 +32,22 @@ export type ListProps<Row> = {
   onLoadMore?: () => void
   newCount?: number
   onShowNew?: () => void
+  /**
+   * The row actions (keyed by row id as their target). A row that leaves the list because one of them ran
+   * keeps its place for a few seconds as that action's result line — with Undo — so the owner sees what
+   * happened where he tapped (judge F2). The result dock holds it after that.
+   */
+  actions?: ActionView[]
 }
 
-export function List<Row>({ rows, idOf, renderRow, noun, loading, error, onRetry, empty, total, hasMore, loadingMore, onLoadMore, newCount = 0, onShowNew }: ListProps<Row>) {
+/** How long a row that left keeps its slot as a result line. */
+export const SLOT_MS = 6000
+
+export function List<Row>({ rows, idOf, renderRow, noun, loading, error, onRetry, empty, total, hasMore, loadingMore, onLoadMore, newCount = 0, onShowNew, actions }: ListProps<Row>) {
+  const slots = useLeavingSlots(rows, idOf, actions)
   if (loading && !rows.length) return <Skeleton rows={5} label={`Loading ${noun}`} />
   if (error && !rows.length) return <ErrorState what={noun} error={error} onRetry={onRetry} />
-  if (!rows.length) return <>{empty ?? <EmptyState title={`No ${noun}.`} />}</>
+  if (!rows.length && !slots.list.length) return <>{empty ?? <EmptyState title={`No ${noun}.`} />}</>
   return (
     <div className={styles.listWrap}>
       {error && onRetry ? <RefreshFailed error={error} onRetry={onRetry} /> : null}
@@ -45,7 +57,12 @@ export function List<Row>({ rows, idOf, renderRow, noun, loading, error, onRetry
         </button>
       ) : null}
       <ul className={styles.list} aria-label={noun}>
-        {rows.map((r) => <li key={idOf(r)} className={styles.listItem}>{renderRow(r)}</li>)}
+        {withSlots(rows, idOf, slots.list).map((x) => x.row !== undefined
+          ? <li key={idOf(x.row)} className={styles.listItem}>{renderRow(x.row)}</li>
+          : <li key={`slot:${x.slot!.id}`} className={styles.listItem} data-testid="row-result-slot">
+              <ResultLine state={x.slot!.action.state(x.slot!.id)} onUndo={() => x.slot!.action.undo(x.slot!.id)}
+                onRetry={() => x.slot!.action.retry(x.slot!.id)} onDismiss={() => slots.drop(x.slot!.id)} />
+            </li>)}
       </ul>
       <div className={styles.listFoot}>
         <span className={styles.listCount}>
@@ -114,4 +131,44 @@ export function BulkBar({ count, noun, children, onClear }: { count: number; nou
       </div>
     </div>
   )
+}
+
+type Slot = { id: string; index: number; action: ActionView; until: number }
+
+/** Rows that just left because a row action ran keep their index for SLOT_MS. */
+function useLeavingSlots<Row>(rows: Row[], idOf: (r: Row) => string, actions: ActionView[] | undefined) {
+  const prev = useRef<string[]>([])
+  const [list, setList] = useState<Slot[]>([])
+  const ids = rows.map(idOf)
+  const key = ids.join('|')
+  useEffect(() => {
+    const before = prev.current
+    prev.current = ids
+    if (!actions?.length) return
+    const now = Date.now()
+    const present = new Set(ids)
+    const added: Slot[] = []
+    before.forEach((id, index) => {
+      if (present.has(id)) return
+      const action = actions.find((a) => a.state(id).status !== 'idle')
+      if (action) added.push({ id, index, action, until: now + SLOT_MS })
+    })
+    setList((cur) => [...cur.filter((s) => !present.has(s.id) && s.until > now && !added.some((a) => a.id === s.id)), ...added])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key])
+  useEffect(() => {
+    if (!list.length) return
+    const next = Math.min(...list.map((s) => s.until)) - Date.now()
+    const t = setTimeout(() => setList((cur) => cur.filter((s) => s.until > Date.now())), Math.max(50, next))
+    return () => clearTimeout(t)
+  }, [list])
+  return { list, drop: (id: string) => setList((cur) => cur.filter((s) => s.id !== id)) }
+}
+
+/** Interleave the slots at the index their row had. Pure. */
+export function withSlots<Row>(rows: Row[], idOf: (r: Row) => string, slots: Slot[]): Array<{ row?: Row; slot?: Slot }> {
+  const out: Array<{ row?: Row; slot?: Slot }> = rows.map((row) => ({ row }))
+  const live = new Set(rows.map(idOf))
+  for (const s of [...slots].filter((x) => !live.has(x.id)).sort((a, b) => a.index - b.index)) out.splice(Math.min(s.index, out.length), 0, { slot: s })
+  return out
 }

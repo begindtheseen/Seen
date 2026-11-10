@@ -54,6 +54,66 @@ modifiers (Dice ≥ 0.8) → the partial readings (one side of a comma/slash, a 
 occupation whose task statements the lines share ≥4 specific words with. A weak title match alone returns **null** (on real postings
 such guesses were wrong 9 times in 14). Title-only answers are cached (5k).
 
+## Round 3: the activity index (`lib/occupations/activities.js`)
+
+O*NET maps every task statement (24k mappings) to one of 2,087 Detailed Work Activities (DWA), each under an Intermediate
+(IWA, 332) and a Generalized (GWA, 41) activity. `data/activities.json` (0.9 MB: stems + ids, plain-words titles) turns
+that hierarchy into a retrieval index; `scripts/occupations/build-activities.mjs` builds it.
+
+```js
+import { activitiesOf, relateActivities, activityTitle } from '../occupations/activities.js';
+activitiesOf('Drew blood from patients')
+// → [{ dwa: '4.A.3.a.2.al.1', iwa: '4.A.3.a.2.al', gwa: '4.A.3.a.2', title: 'collecting biological specimens from patients', score: 0.8, via: [...] }, …]
+relateActivities('Ran the register and handled cash', 'Operate cash registers')
+// → { relation: 'same', via: { dwa, iwa, title: 'operating cash registers' }, confidence: 'exact' }
+relateActivities('Manage inventory', 'Manage a sales pipeline')   // → { relation: null, … }
+```
+
+**Contract.**
+- `same` — one DWA among both phrases' top three. `exact` (top for both, score ≥ 0.7): may be said as "the same kind of
+  work". `close`: use it, but a contradicting reading wins.
+- `related` — one IWA, the same family of work but not the same duty. It is never proof; at most PARTLY.
+- `guess` — never a reason. It is only a tie-break.
+- `null` — says nothing either way.
+- `activitiesOf` returns `[]` below the floor. It never offers a weak nearest neighbour.
+- In a browser `relateActivities` → null and `activitiesOf` → [].
+- Copy: `via.title` is a lower-case gerund phrase ("loading or unloading materials").
+
+**Measured.**
+- Labelled set: 203 pairs, written before any code; it was looked at while choosing rules.
+  - same-or-related precision 97.6%, recall 32%.
+  - unrelated pairs kept unrelated: 74 of 75. The one miss is a `guess`.
+  - `exact`/`close` only: 100% precision, 24% recall.
+- Fresh holdout: 79 pairs.
+  - precision 100%, recall 14%.
+  - unrelated kept: 22 of 22.
+- Recall by field (labelled set):
+  - office 8/13, healthcare 7/14, trades 6/15, retail 5/11
+  - food 3/13, education 3/9, tech 3/15
+  - warehouse 1/14, sales 1/11
+- **Recall is low.** Use a `null` as "not known", never as "different".
+- Speed: cold load ≈ 130 ms, then about 1.1 ms per uncached `relateActivities`.
+
+## Round 2 (2026-11-10)
+
+- **Browser-safe.** No module here imports a Node built-in; data loads lazily through `process.getBuiltinModule`
+  (`lib/text/knowledgeData.js`). In a browser bundle every function answers "no knowledge": `occupationOf`, `impliedDuties`,
+  `militaryOccupation` → null; **`relation` → null**; `relatePhrases` → `{ same: false, how: 'no knowledge' }`;
+  `sameWorkWord` → null; `sameWord` → false (identical strings excepted). `levelOf` needs no data and works everywhere.
+  `hasOccupationData()` says whether the data is loaded. On the server a failed load logs one `console.error` per file.
+- **Modern titles** (`lib/occupations/modern.js`): rules over role noun + modifiers for software / data / ML / DevOps / SRE /
+  security, product and program management, design / UX, customer success / support / solutions, SDR / account executive /
+  revenue operations, marketing operations / growth / content, people ops / talent, finance ops / FP&A, clinical titles with
+  unit names, skilled-trade rungs, retail / warehouse / production floors; each family pinned by ≥10 titles
+  (`modern.test.mjs`). A strong O*NET filing of the whole title still answers first; a rule hit is `close`. Paid AI-training
+  tasks and survey panels ("… - AI Training - …", "Survey Participants") return null.
+- **relation** first compares the titles' own core words with level words set aside ("Plumbing Apprentice" / "Journeyman
+  Plumber"; "Assistant Store Manager" / "Store Manager") and takes the rung from `levelOf`; then any shared occupation among
+  the readings (same / ladder by level); then O*NET supervisor / helper / related tiers / groups. It never answers
+  "different" for two titles that share an occupation or differ only by a level word.
+- **Shipping guard** (`shipping.test.mjs`): walks the import graph from every `api/*.js` and fails when a function that
+  reaches this data lacks `lib/occupations/data/**` and `lib/text/data/**` in its `includeFiles`.
+
 ## When to trust it (the contract)
 
 | `confidence` | meaning | how to use |

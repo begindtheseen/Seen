@@ -39,7 +39,7 @@ function makeStore() {
   }
   return {
     held, gone: new Map(), batches: new Map(), batchSeq: 0,
-    token: null, logins: 0, faults: [], slowMs: 0, degraded: false,
+    token: null, logins: 0, faults: [], slowMs: 0, degraded: false, replies: new Map(), decideWrites: 0,
     stale: 20982, staleDelayMs: 400, requests: [],
   }
 }
@@ -77,9 +77,19 @@ async function answer(req) {
     if (f.kind === '503') return json(503, { ok: false, code: 'upstream', retryable: true, error: "Couldn't reach the server — the session check timed out. Try again." })
     if (f.kind === 'empty') return { status: 200, contentType: 'application/json', body: '' }
     if (f.kind === 'html') return { status: 502, contentType: 'text/html', body: '<html><body>Bad gateway</body></html>' }
-    if (f.kind === 'timeout') { await sleep(32_000); return json(200, { ok: true }) }
+    if (f.kind === 'timeout') { const done = await answerNow(body); await sleep(32_000); return done } // the write happens; the answer never arrives in time
   }
   if (S.slowMs) await sleep(S.slowMs)
+  return answerNow(body)
+}
+
+async function answerNow(body) {
+  const action = body.action
+  // Idempotency like the real server: the same request_id answers the first result again, marked replayed.
+  if (action === 'lab_decide' && body.request_id && S.replies.has(body.request_id)) {
+    S.replayed = (S.replayed || 0) + 1
+    return json(200, { ...S.replies.get(body.request_id), replayed: true })
+  }
 
   switch (action) {
     case 'whoami': return json(200, { ok: true, changed: 0, skipped: [], message: 'Signed in as owner.', touched: [], rows: [{ admin_id: '1', username: 'owner', role: 'super_admin' }] })
@@ -131,14 +141,17 @@ async function answer(req) {
       ids = ids.filter((id) => !S.gone.has(id))
       if (already.length) skipped.push({ reason: 'already_decided', count: already.length })
       for (const id of ids) S.gone.set(id, body.decision)
+      S.decideWrites += ids.length
       const batch = `b${++S.batchSeq}`
       S.batches.set(batch, ids)
       const verb = body.decision === 'reject' ? 'Rejected' : body.decision === 'delete' ? 'Deleted' : 'Approved'
       const n = ids.length
       const total = n + skipped.reduce((a, s) => a + s.count, 0)
       const message = all ? `${verb} ${n} of ${total} held reports.` : n === 1 ? `${verb} the ${S.held.find((r) => r.id === ids[0]).company} report.` : `${verb} ${n} reports.`
-      return json(200, { ok: true, changed: n, skipped, message, touched: ['lab_held', 'overview', ...ids.map((id) => `report:${id}`)],
-        undo: body.decision === 'delete' ? undefined : { action: 'lab_undo', args: { batch }, label: 'Undo' } })
+      const reply = { ok: true, changed: n, skipped, message, touched: ['lab_held', 'overview', ...ids.map((id) => `report:${id}`)],
+        undo: body.decision === 'delete' ? undefined : { action: 'lab_undo', args: { batch }, label: 'Undo' } }
+      if (body.request_id) S.replies.set(body.request_id, reply)
+      return json(200, reply)
     }
     case 'lab_undo': {
       // Like the real server: a big undo answers in rounds (≤100 per round, running totals, cursor).
@@ -318,6 +331,12 @@ async function run(vp) {
   check(tag('a queue row opens its section with its filter in the URL'), url(page).searchParams.get('s') === 'review' && url(page).searchParams.get('review.kind') === 'held', page.url())
   await page.waitForFunction(() => document.querySelector('[data-section-active] h1')?.textContent?.trim() === 'Review')
   check(tag('the queue row lands on the Review section'), true)
+  // Back walks back through the sections visited and stays in /admin (judge F1)
+  await go('listings'); await page.waitForFunction(() => new URLSearchParams(location.search).get('s') === 'listings')
+  await go('people'); await page.waitForFunction(() => new URLSearchParams(location.search).get('s') === 'people')
+  const trail = []
+  for (let i = 0; i < 3; i++) { await page.goBack(); await page.waitForTimeout(300); trail.push(`${url(page).pathname}?s=${url(page).searchParams.get('s') || 'today'}`) }
+  check(tag('Back walks People → Listings → Review → Today, all inside /admin'), trail.join(' ') === '/admin?s=listings /admin?s=review /admin?s=today' && await sentinelAlive(page), trail.join(' '))
 
   // 3 · A section whose code cannot be downloaded shows ErrorState + Retry inside it; the shell stays
   let blockChunks = true
@@ -371,7 +390,8 @@ async function run(vp) {
     await page.getByTestId('login-pass').fill('right'); await page.getByTestId('login-submit').click()
     const d2 = await dlP
     check(tag('a 401 during a download → sign in → the file still arrives'), d2.suggestedFilename() === 'acme-logistics-audit.pdf' && await sentinelAlive(page))
-    await page.locator('[data-testid=result-dismiss]').first().click().catch(() => {})
+    await page.getByTestId('section-lab').locator('[data-testid=result-dismiss]').first().click().catch(() => {})
+    await page.getByTestId('result-dock').getByTestId('result-dismiss').click().catch(() => {})
   }
 
   // Scroll memory never fights the person: switch kind, scroll 400px at 100 ms, still there at 1.5 s
@@ -390,19 +410,25 @@ async function run(vp) {
   // 4 · Approve all → result line, rows leave in place, Undo restores, a second press cannot double-run
   await page.getByTestId('lab-approve-all').click()
   await page.getByTestId('confirm-step').waitFor()
+  await page.goBack()
+  await page.getByTestId('confirm-step').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {})
+  check(tag('Back closes an open confirm step and stays on the section'), await page.getByTestId('confirm-step').count() === 0 && url(page).searchParams.get('s') === 'lab' && await sentinelAlive(page), page.url())
+  await page.getByTestId('lab-approve-all').click()
+  await page.getByTestId('confirm-step').waitFor()
   await shot(page, `${vp.name}-06-confirm`)
   const before = S.requests.filter((a) => a === 'lab_decide').length
   await page.getByTestId('confirm-go').dblclick().catch(() => {})
-  await page.waitForFunction(() => document.querySelector('[data-testid=result-line]')?.getAttribute('data-state') === 'done')
-  const line = await page.getByTestId('result-line').first().innerText()
+  await page.waitForFunction(() => document.querySelector('[data-testid=section-lab] [data-testid=result-line]')?.getAttribute('data-state') === 'done')
+  const line = await page.getByTestId('section-lab').getByTestId('result-line').first().innerText()
   check(tag('Approve all: one request even on a double tap'), S.requests.filter((a) => a === 'lab_decide').length - before === 1)
   check(tag('Approve all: the result line says what changed with counts'), /Approved 258 of 300 held reports/.test(line), line.replace(/\s+/g, ' '))
-  check(tag('Approve all: skipped duplicates are offered as a link'), await page.getByRole('button', { name: 'Review them' }).count() === 1)
+  check(tag('Approve all: skipped duplicates are offered as a link'), await page.getByTestId('section-lab').getByRole('button', { name: 'Review them' }).count() === 1)
+  check(tag('the result is also pinned in the result dock'), /Approved 258 of 300/.test(await page.getByTestId('result-dock').innerText()))
   await page.getByTestId('section-lab').getByTestId('lab-row-r007').waitFor()
   check(tag('Approve all: approved rows left the list without a reload'), await page.getByTestId('lab-row-r001').count() === 0 && await sentinelAlive(page))
   await shot(page, `${vp.name}-07-approved`)
-  await page.getByTestId('result-undo').click()
-  await page.waitForFunction(() => /Undo is running: 100 of 258 restored so far/.test(document.querySelector('[data-testid=result-line]')?.textContent || ''))
+  await page.getByTestId('section-lab').getByTestId('result-undo').first().click()
+  await page.waitForFunction(() => /Undo is running: 100 of 258 restored so far/.test(document.querySelector('[data-testid=section-lab] [data-testid=result-line]')?.textContent || ''))
   await page.locator('[data-testid=job-chip]:visible').waitFor()
   const chipU = await page.locator('[data-testid=job-chip]:visible').innerText()
   check(tag('a big Undo runs as a visible job ("Restoring rows · N of 258")'), /Restoring rows/.test(chipU) && /of 258/.test(chipU), chipU.replace(/\s+/g, ' '))
@@ -411,33 +437,68 @@ async function run(vp) {
   await page.getByTestId('lab-row-r001').waitFor()
   check(tag('the Undo job puts every row back, in place, without a reload'), S.batches.size === 0 && await page.getByTestId('lab-row-r001').count() === 1 && await sentinelAlive(page))
   await page.locator('[data-testid=job-chip]:visible').click(); await page.getByTestId('sheet-panel').getByTestId('job-dismiss').click(); await page.getByTestId('sheet-close').click()
-  await page.getByTestId('result-dismiss').first().click()
+  await page.getByTestId('section-lab').getByTestId('result-dismiss').first().click()
+  await page.getByTestId('result-dock').getByTestId('result-dismiss').click().catch(() => {})
 
-  // 5 · Row action: optimistic removal, then forced failures
-  await page.getByTestId('lab-approve-r001').click()
-  await page.waitForFunction(() => !document.querySelector('[data-testid=lab-row-r001]'))
-  check(tag('a row approve removes the row at once'), true)
-  await page.getByTestId('result-undo').click(); await page.getByTestId('lab-row-r001').waitFor()
+  // 5 · Row action deep in the list: the result appears in the row's place AND in the dock (judge F2)
+  await page.getByTestId('lab-row-r020').scrollIntoViewIfNeeded()
+  await page.getByTestId('lab-approve-r020').click()
+  await page.waitForFunction(() => !document.querySelector('[data-testid=lab-row-r020]'))
+  const slot = page.getByTestId('section-lab').getByTestId('row-result-slot')
+  await slot.waitFor()
+  await page.waitForFunction(() => /Approved the/.test(document.querySelector('[data-testid=row-result-slot]')?.textContent || ''))
+  const slotBox = await slot.boundingBox()
+  check(tag('a row action\'s result shows in the row\'s place, on screen, with Undo'),
+    !!slotBox && slotBox.y >= 0 && slotBox.y + slotBox.height <= vp.h && await slot.getByTestId('result-undo').count() === 1, JSON.stringify(slotBox))
+  check(tag('…and in the pinned result dock'), /Approved the/.test(await page.getByTestId('result-dock').innerText()))
+  await shot(page, `${vp.name}-07c-row-result`)
+  await page.getByTestId('result-dock').getByTestId('result-undo').click()
+  await page.getByTestId('lab-row-r020').waitFor()
+  check(tag('Undo from the dock puts the row back'), true)
+  await page.getByTestId('result-dock').getByTestId('result-dismiss').click().catch(() => {})
+  await page.evaluate(() => window.scrollTo(0, 0))
 
-  const forced = [['500', /database refused the write/i], ['empty', /answer was empty/i], ['html', /server failed \(HTTP 502\)/i]]
-  if (!SKIP_TIMEOUT) forced.push(['timeout', /No answer from the server after 30 seconds/])
-  for (const [kind, re] of forced) {
-    S.faults.push({ kind, action: 'lab_decide' })
-    await page.getByTestId('lab-approve-r002').click()
+  // Forced failures. A definite failure (500) → "Not done" + Retry, row back. An UNKNOWN outcome (empty answer,
+  // bare 502, no answer in 30 s) → "Checking…": the same request_id is asked again and the true answer shown.
+  S.faults.push({ kind: '500', action: 'lab_decide' })
+  await page.getByTestId('lab-approve-r002').click()
+  {
     const errLine = page.getByTestId('lab-row-r002').getByTestId('result-line')
-    await errLine.waitFor({ timeout: 40_000 })
+    await errLine.waitFor()
     const txt = await errLine.innerText()
-    check(tag(`forced ${kind}: a true sentence, the row is back, the page is usable`), re.test(txt) && await page.getByTestId('lab-row-r002').count() === 1 && await sentinelAlive(page), txt.replace(/\s+/g, ' '))
-    if (kind === '500') await shot(page, `${vp.name}-08-error-500`)
+    check(tag('forced 500: "Not done", a true sentence, the row is back'), /Not done/.test(txt) && /database refused the write/i.test(txt) && await page.getByTestId('lab-row-r002').count() === 1 && await sentinelAlive(page), txt.replace(/\s+/g, ' '))
+    await shot(page, `${vp.name}-08-error-500`)
     await errLine.getByTestId('result-retry').click()
     await page.waitForFunction(() => !document.querySelector('[data-testid=lab-row-r002]'))
-    check(tag(`forced ${kind}: Retry then works`), true)
-    await page.getByTestId('result-undo').click(); await page.getByTestId('lab-row-r002').waitFor()
-    await page.getByTestId('result-dismiss').first().click().catch(() => {})
+    check(tag('forced 500: Retry then works'), true)
+    await page.getByTestId('result-dock').getByTestId('result-undo').click(); await page.getByTestId('lab-row-r002').waitFor()
   }
+  const unknown = ['empty', 'html']
+  if (!SKIP_TIMEOUT) unknown.push('timeout')
+  for (const kind of unknown) {
+    const writes = S.decideWrites
+    S.faults.push({ kind, action: 'lab_decide' })
+    await page.getByTestId('lab-approve-r002').click()
+    if (kind !== 'timeout') await page.waitForFunction(() => /Checking/.test(document.body.textContent || ''), null, { timeout: 10_000 })
+    await page.waitForFunction(() => /Approved the/.test(document.querySelector('[data-testid=result-dock]')?.textContent || ''), null, { timeout: 60_000 })
+    const dockTxt = await page.getByTestId('result-dock').innerText()
+    check(tag(`unknown outcome (${kind}): checked with the same request_id, then "Done" — written once, never "Not done"`),
+      S.decideWrites - writes === 1 && !/Not done|refresh|reload/i.test(dockTxt) && await page.getByTestId('lab-row-r002').count() === 0, `${S.decideWrites - writes} writes · ${dockTxt.replace(/\s+/g, ' ')}`)
+    await page.getByTestId('result-dock').getByTestId('result-undo').click(); await page.getByTestId('lab-row-r002').waitFor()
+  }
+  await page.getByTestId('result-dock').getByTestId('result-dismiss').click().catch(() => {})
+
+  // A declined sign-in puts an optimistically removed row back (judge F4)
+  S.token = 'expired-by-test'
+  await page.getByTestId('lab-approve-r003').click()
+  await page.getByTestId('sheet-session').waitFor()
+  await page.getByTestId('session-cancel').click()
+  await page.getByTestId('lab-row-r003').waitFor({ timeout: 5000 }).catch(() => {})
+  check(tag('declining the sign-in brings the removed row back'), await page.getByTestId('lab-row-r003').count() === 1 && !S.gone.has('r003'))
+  await page.getByTestId('result-dock').getByTestId('result-dismiss').click().catch(() => {})
 
   // 401 mid-action: the sign-in step replays the action; the page stays
-  S.faults.push({ kind: '401', action: 'lab_decide' })
+  // (the token is still the expired one from the declined sign-in: the next action meets the 401)
   await page.getByTestId('lab-approve-r003').click()
   await page.getByTestId('sheet-session').waitFor()
   await screenCheck(page, tag('session-ended sheet'), { sheet: true })
@@ -448,6 +509,7 @@ async function run(vp) {
   await page.getByTestId('sheet-session').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {})
   check(tag('401: sign in, and the pressed action finishes'), await sentinelAlive(page) && await page.getByTestId('sheet-session').count() === 0,
     `sentinel ${await sentinelAlive(page)}, session sheets ${await page.getByTestId('sheet-session').count()}, url ${page.url()}`)
+  await page.getByTestId('result-dock').getByTestId('result-dismiss').click().catch(() => {})
 
   // 6 · The item sheet: four ways out, focus back, refresh reopens, replace + Back
   const opener = page.getByTestId('lab-row-r004').locator('button').first()
@@ -586,10 +648,25 @@ async function run(vp) {
   await page.locator('[data-testid=job-chip]:visible').click()
   // A finished multi-round job offers the server's Undo for the whole press (one request_id on every round)
   await page.getByTestId('sheet-panel').getByTestId('job-undo').click()
-  await page.waitForFunction(() => [...document.querySelectorAll('[data-testid=sheet-panel] [data-testid=job-progress]')].some((e) => /Put back 20,982 rows/.test(e.textContent || '')), null, { timeout: 10000 })
+  await page.waitForFunction(() => [...document.querySelectorAll('[data-testid=sheet-panel] [data-testid=job-progress]')].some((e) => /Put back 20,982 stale listings/.test(e.textContent || '')), null, { timeout: 10000 })
   check(tag('a finished job offers Undo, and the Undo runs (every listing back)'), S.stale === 20982 && await page.getByTestId('sheet-panel').getByTestId('job-undo').count() === 0)
   for (let i = 0; i < 2; i++) await page.getByTestId('sheet-panel').getByTestId('job-dismiss').first().click()
   await page.getByTestId('sheet-close').click()
+
+  // While a job runs, leaving asks the browser's own "Leave site?" (judge F1)
+  S.staleDelayMs = 800
+  await go('lab'); await page.getByTestId('lab-job').click()
+  await page.locator('[data-testid=job-chip]:visible').waitFor()
+  await page.evaluate(() => { window.__seenSentinel = 'alive' })
+  let dialogType = ''
+  page.once('dialog', (d) => { dialogType = d.type(); void d.dismiss() })
+  await page.close({ runBeforeUnload: true })
+  await page.waitForTimeout(600)
+  check(tag('leaving while a job runs asks "Leave site?" first (and staying keeps the page)'), dialogType === 'beforeunload' && !page.isClosed() && await sentinelAlive(page), dialogType || 'no dialog')
+  await page.locator('[data-testid=job-chip]:visible').click(); await page.getByTestId('sheet-panel').getByTestId('job-cancel').click()
+  await page.waitForFunction(() => document.querySelector('[data-testid=sheet-panel] [data-testid=job-progress]')?.getAttribute('data-status') === 'cancelled', null, { timeout: 8000 })
+  await page.getByTestId('sheet-panel').getByTestId('job-dismiss').click(); await page.getByTestId('sheet-close').click()
+  S.staleDelayMs = 30
 
   // 9 · No document navigation happened except the reloads/gotos the test made itself
   const extra = docNavs.length - navsAtStart - 4 // 4 = the reloads/gotos above (lab reload, item reload, two gotos)

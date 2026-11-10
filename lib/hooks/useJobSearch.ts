@@ -133,7 +133,9 @@ export type SortMode = 'best' | 'transparency' | 'waste' | 'recent' | 'nearest'
 // `in_radius` (false = a fill-in from further away / remote, which never sorts above an in-radius row).
 // `related` (false = an opening that only shares a word with the search — listed under "Other openings").
 export interface SearchJob extends Job { relevance?: number | null; in_radius?: boolean; related?: boolean; distance_miles?: number | null; distance_by?: string | null; near_place?: string | null; remote?: boolean }
-export type RecReason = 'no_resume' | 'no_signal' | 'no_city' | 'no_matches' | 'unavailable' | null
+export type RecReason = 'no_resume' | 'no_signal' | 'no_city' | 'no_matches' | 'no_direction' | 'unavailable' | null
+/** The résumé's current title gives no direction to match on (api/jobs.js `no_direction`). */
+export type RecNoDirection = { title: string; company: string | null } | null
 export type NicheFilter = '' | 'tech' | 'healthcare' | 'retail' | 'logistics' | 'finance' | 'other'
 export type LevelFilter = '' | 'entry' | 'mid' | 'senior'
 export type TypeFilter = '' | 'Full-time' | 'Part-time' | 'Contract'
@@ -228,6 +230,7 @@ export function useJobSearch() {
   const [recHasResume, setRecHasResume] = useState<boolean | null>(null)
   // Why the rail is empty ('no_city' → the page asks for a city) and the city it matched near.
   const [recReason, setRecReason] = useState<RecReason>(null)
+  const [recNoDirection, setRecNoDirection] = useState<RecNoDirection>(null)
   const [recCity, setRecCity] = useState<string | null>(null)
   // Where the rail's city came from: the profile, or the résumé's own contact line.
   const [recCitySource, setRecCitySource] = useState<'profile' | 'resume' | null>(null)
@@ -464,7 +467,7 @@ export function useJobSearch() {
 
   // Fetch resume-powered recommendations when logged in
   useEffect(() => {
-    if (!isLoggedIn) { setRecHasResume(null); setRecReason(null); setRecCity(null); setRecCitySource(null); return }
+    if (!isLoggedIn) { setRecHasResume(null); setRecReason(null); setRecNoDirection(null); setRecCity(null); setRecCitySource(null); return }
     setRecStatus('loading')
     setRecHasResume(null)
     setRecReason(null)
@@ -474,9 +477,12 @@ export function useJobSearch() {
       body: JSON.stringify({ action: 'recommended' }),
     }))
     .then(r => r.ok ? r.json() : {})
-    .then((data: { jobs?: unknown[]; skills?: string[]; has_resume?: boolean | null; reason?: RecReason; city?: string | null; city_source?: 'profile' | 'resume' | null }) => {
+    .then((data: { jobs?: unknown[]; skills?: string[]; has_resume?: boolean | null; reason?: RecReason; city?: string | null; city_source?: 'profile' | 'resume' | null; no_direction?: { title?: unknown; company?: unknown } | null }) => {
       if (typeof data.has_resume === 'boolean') setRecHasResume(data.has_resume)
       setRecReason(data.reason ?? null)
+      // feature-detected: an older API sends no `no_direction`
+      const nd = data.no_direction && typeof data.no_direction.title === 'string' && data.no_direction.title.trim() ? { title: data.no_direction.title.trim(), company: typeof data.no_direction.company === 'string' && data.no_direction.company.trim() ? data.no_direction.company.trim() : null } : null
+      setRecNoDirection(nd)
       setRecCity(typeof data.city === 'string' && data.city ? data.city : null)
       setRecCitySource(data.city_source === 'resume' || data.city_source === 'profile' ? data.city_source : null)
       if (Array.isArray(data.jobs) && data.jobs.length) {
@@ -1008,6 +1014,7 @@ export function useJobSearch() {
     recStatus,
     recHasResume,
     recReason,
+    recNoDirection,
     recCity,
     recCitySource,
     coScores,

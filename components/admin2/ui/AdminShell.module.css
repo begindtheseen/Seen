@@ -2,7 +2,6 @@
 .root {
   --admin-rail: 240px;
   --admin-bar: 56px;
-  --admin-jobbar: 52px; /* the phone job bar: a 44px chip + 4px padding top and bottom */
   --admin-bottom-offset: calc(var(--admin-bar) + env(safe-area-inset-bottom, 0px) + var(--sp-2));
   min-height: 100dvh; width: 100%; min-width: 0; background: var(--bg); color: var(--text-2);
 }
@@ -51,15 +50,20 @@
 .tabIcon .badge { position: absolute; top: calc(-1 * var(--sp-1)); left: 60%; }
 
 /* ── Phone job bar: one line, solid, directly above the bottom bar ──────────────────────────────── */
-.jobBar {
+.stack {
   position: fixed; left: 0; right: 0; z-index: 49; bottom: calc(var(--admin-bar) + env(safe-area-inset-bottom, 0px));
-  padding: var(--sp-1) var(--sp-2); background: var(--surface-1); border-top: 1px solid var(--border-1);
+  display: flex; flex-direction: column; pointer-events: none;
   transition: transform var(--dur-state) var(--ease-out);
 }
+.stack > * { pointer-events: auto; }
+.kb .stack { transform: translateY(calc(100% + var(--admin-bar) + env(safe-area-inset-bottom, 0px))); }
+.dock { padding: var(--sp-2) var(--sp-2) 0; background: var(--bg); }
+/* Solid card under the line's tint: never see-through over the page. */
+.dockCard { border-radius: var(--r-control); background: var(--surface-overlay); box-shadow: var(--sh-raised); }
+.jobBar { padding: var(--sp-1) var(--sp-2); background: var(--surface-1); border-top: 1px solid var(--border-1); }
 .jobBar > * { width: 100%; }
-.kb .jobBar { transform: translateY(calc(100% + var(--admin-bar) + env(safe-area-inset-bottom, 0px))); }
-.hasJob { --admin-bottom-offset: calc(var(--admin-bar) + env(safe-area-inset-bottom, 0px) + var(--admin-jobbar) + var(--sp-2)); }
-.hasJob .main { padding-bottom: calc(var(--admin-bar) + env(safe-area-inset-bottom, 0px) + var(--admin-jobbar) + var(--sp-8)); }
+.root { --admin-bottom-offset: calc(var(--admin-bar) + env(safe-area-inset-bottom, 0px) + var(--admin-stack, 0px) + var(--sp-2)); }
+.main { padding-bottom: calc(var(--admin-bar) + env(safe-area-inset-bottom, 0px) + var(--admin-stack, 0px) + var(--sp-8)) !important; }
 
 /* ── Badge ───────────────────────────────────────────────────────────────────────────────────── */
 .badge { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 var(--sp-1); border-radius: var(--r-pill); background: var(--accent-strong); color: var(--text-1); font-size: var(--fs-meta); font-weight: 600; line-height: 1; }
@@ -69,8 +73,11 @@
 .rail { display: none; }
 @media (min-width: 900px) {
   .top, .bottom, .jobBar { display: none; }
-  .root, .hasJob { --admin-bottom-offset: var(--sp-4); }
-  .hasJob .main { padding-bottom: var(--sp-16); }
+  .root { --admin-bottom-offset: var(--sp-4); }
+  .main { padding-bottom: var(--sp-16) !important; }
+  /* Desktop: the result dock sits bottom-right, clear of the rail. */
+  .stack { left: auto; right: var(--sp-8); bottom: var(--sp-6); width: min(480px, calc(100vw - var(--admin-rail) - var(--sp-16))); }
+  .dock { padding: 0; background: transparent; }
   .rail {
     position: fixed; top: 0; bottom: 0; left: 0; z-index: 50; width: var(--admin-rail);
     display: flex; flex-direction: column; gap: var(--sp-4); padding: var(--sp-6) var(--sp-3) var(--sp-4);
@@ -111,3 +118,8 @@
 .signOut:hover { color: var(--text-1); }
 
 @media (prefers-reduced-motion: reduce) { .bottom { transition: none; } }
+
+/* Selects inside the admin keep their label whole: they size to their content and never shrink below it in
+   a row (the search beside them shrinks instead); on a very narrow row they take the full width. */
+.root :global(select.ui-input) { width: auto; max-width: 100%; flex: 0 0 auto; min-width: 0; }
+@media (max-width: 559px) { .root :global(select.ui-input) { flex: 1 1 100%; width: 100%; } }

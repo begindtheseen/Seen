@@ -56,7 +56,8 @@ function StatementRow({ r, answer, answerLine, onAnswer, quoted, dense = false }
   // The row says what the SERVER decided. An answer changes it only when the server sends the row back `by: 'you'`;
   // until then a Yes leaves the question standing (the screen never claims what the server did not accept). A No on a
   // close line takes the question away: the row is then a plain "not on your résumé".
-  const askCandidate = !!r.candidate && !r.byYou && answer !== 'no'
+  // on the first screen (dense) the close-line question is asked in the questions panel below, not inline
+  const askCandidate = !!r.candidate && !r.byYou && answer !== 'no' && !dense
   return (
     <li className={dense ? s.dense : s.row} data-state={r.state} data-testid="fit-row">
       {!dense && <StateMark state={r.state} />}
@@ -69,7 +70,9 @@ function StatementRow({ r, answer, answerLine, onAnswer, quoted, dense = false }
       )}
       {r.line && !ref && !r.byYou && <p className={dense ? `${s.quote} ${s.clamp}` : s.quote}>{r.lineIsJob ? 'On your résumé' : 'Your line'}: “{clip(r.line, 200)}”</p>}
       {r.line && ref && !r.byYou && <p className={s.quote}>Shown by the same {r.lineIsJob ? 'job' : 'line'} as “{clip(ref, 60)}” above.</p>}
-      {r.state === 'partly' && r.missing.map((m, i) => <p key={i} className={s.note}>{m}</p>)}
+      {r.state === 'partly' && r.missing.length > 0 && (dense
+        ? <p className={`${s.note} ${s.clamp}`}>{r.missing.map((m, i) => <span key={i} className={s.miss}>{m}</span>)}</p>
+        : r.missing.map((m, i) => <p key={i} className={s.note}>{m}</p>))}
       {r.state === 'partly' && !r.missing.length && <p className={s.note}>{partlySentence(r)}</p>}
       {askCandidate && (
         <div className={s.candidate} data-testid="fit-candidate">
@@ -117,7 +120,10 @@ export default function FitRead({ data, note, compact = false, brief = false, an
   const gates = gateRows(data.constraints || [])
   const band = diff ? 'Different field' : (v?.band || (v?.score == null ? 'No score' : ''))
   const sentence = diff ? diff.sentence : verdictSentence(v)
-  const asks = model ? ((model.groups.find((g) => g.key === 'ask') || { rows: [] }).rows as Row[]) : []
+  const askRows = model ? ((model.groups.find((g) => g.key === 'ask') || { rows: [] }).rows as Row[]) : []
+  // the questions panel: what only the person can say, and every "Closest line we found — does this show it?"
+  const candRows = model ? (model.groups.filter((g) => g.key !== 'ask').flatMap((g) => g.rows) as Row[]).filter((r) => r.candidate && !r.byYou && answers?.[r.id] !== 'no') : []
+  const asks = [...askRows, ...candRows]
   const answered = asks.filter((r) => answers?.[r.id]).length
   const gateList = (list: typeof gates) => list.length > 0 && (
     <div className={s.group} data-group="gates">
@@ -165,9 +171,12 @@ export default function FitRead({ data, note, compact = false, brief = false, an
       )}
       {model && asks.length > 0 && !open && onAnswer && (
         asking
-          ? <Group g={{ key: 'ask', rows: asks }} answers={answers} answerLines={answerLines} onAnswer={onAnswer} />
+          ? <div className={s.group} data-group="questions">
+              <p className={s.gHead}><span className={s.gLabel}>Questions only you can answer</span><span className={s.gTally}>{asks.length}</span></p>
+              <ul className={s.list}>{asks.map((r) => <StatementRow key={r.id} r={r} answer={answers?.[r.id]} answerLine={answerLines?.[r.id]} onAnswer={onAnswer} />)}</ul>
+            </div>
           : <button type="button" className={s.more} onClick={() => setAsking(true)} data-testid="fit-ask-open">
-              {answered ? `You answered ${answered} of ${asks.length} questions only you can answer — review` : `Answer ${asks.length} question${asks.length === 1 ? '' : 's'} only you can answer (lifting, hours, eligibility)`}
+              {answered ? `You answered ${answered} of ${asks.length} questions only you can answer — review` : `Answer ${asks.length} question${asks.length === 1 ? '' : 's'} only you can answer${candRows.length ? ' (incl. lines of yours that may show what they ask)' : ' (lifting, hours, eligibility)'}`}
             </button>
       )}
       {model && open && everything}

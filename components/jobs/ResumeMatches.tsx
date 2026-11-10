@@ -24,7 +24,7 @@ export default function ResumeMatches({ jobs, loading, skills, city, citySource,
   citySource?: 'profile' | 'resume' | null
   onOpen: (job: Job) => void
   /** The server's `no_direction` state: the person's current title could not be placed (feature-detected; the page passes it). */
-  noDirection?: { title?: string | null } | null
+  noDirection?: { title?: string | null; company?: string | null } | null
 }) {
   const rows = jobs.slice(0, 5)
   return (
@@ -37,9 +37,15 @@ export default function ResumeMatches({ jobs, loading, skills, city, citySource,
         )}
       </div>
       {noDirection ? (
-        <p data-testid="rail-no-direction" style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--text-2)', lineHeight: 1.5, margin: 0 }}>
-          We couldn&apos;t place {noDirection.title ? `“${noDirection.title}”` : 'your current title'} yet — <a href="/jobs?focus=search" style={{ color: 'var(--accent)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>search by title or place</a>.
-        </p>
+        <div data-testid="rail-no-direction" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-1)' }}>
+          <p style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--text-2)', lineHeight: 1.5, margin: 0 }}>
+            Seen couldn&apos;t tell what kind of work {noDirection.title ? `“${noDirection.title}”${noDirection.company ? ` at ${noDirection.company}` : ''}` : 'your current job'} is, so it has nothing to match jobs on yet. A line under that job on your résumé saying what you do there fixes it.
+          </p>
+          <span style={{ display: 'flex', flexWrap: 'wrap', columnGap: 'var(--sp-4)' }}>
+            <a href="/resume/studio" style={{ color: 'var(--accent)', fontWeight: 600, fontSize: 'var(--fs-sm)', display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>Add it in Résumé Studio</a>
+            <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-3)', display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>or search by title above</span>
+          </span>
+        </div>
       ) : loading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
           {[0, 1].map(i => <div key={i} style={{ height: 46, background: 'var(--raised)', borderRadius: 10, animation: `pulse 1.4s ${i * 0.15}s ease infinite` }} />)}

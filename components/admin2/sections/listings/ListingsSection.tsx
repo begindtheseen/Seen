@@ -19,10 +19,11 @@ import ResultLine from '../../ui/ResultLine.tsx'
 import { EmptyState, ErrorState, RefreshFailed, Skeleton } from '../../ui/states.tsx'
 import {
   activeFilterCount, browseFilters, browseKey, classifyQuery, countWords, EMPLOYER_OPTIONS, fmt, jobMeta, jobState, jobSub, jobTitle,
-  planSentence, readListingCounts, readSourceRow, SINCE_OPTIONS, sourceCounts, SORT_OPTIONS, SOURCE_STATE, STATUS_OPTIONS, VISIBLE_OPTIONS,
-  type BrowseUrl, type JobRow, type SourceRow,
+  planSentence, readListingCounts, staleConfirm, readSourceRow, SINCE_OPTIONS, sourceCounts, SORT_OPTIONS, SOURCE_STATE, STATUS_OPTIONS, VISIBLE_OPTIONS,
+  type BrowseUrl, type JobRow, type ListingCounts, type SourceRow,
 } from './adapter.ts'
 import { useSectionKeys } from './sectionKeys.ts'
+import { isUnknownAnswer } from './unknown.ts'
 import { useDupeScan } from './useDupeScan.ts'
 import styles from './listings.module.css'
 
@@ -37,7 +38,7 @@ export default function ListingsSection({ active }: SectionProps) {
     <div className={styles.wrap} data-testid="section-listings">
       <SectionHeader
         title="Listings"
-        sub={c ? `${c.total === null ? 'The total couldn’t be read' : `${fmt(c.total)} listings stored`}${read ? ` · counted at ${read}` : ''}.` : counts.loading ? 'Counting…' : undefined}
+        sub={c ? `${c.total === null ? 'The total couldn’t be read' : `${fmt(c.total)} ${c.total === 1 ? 'listing' : 'listings'} stored`}${read ? ` · counted at ${read}` : ''}.` : counts.loading ? 'Counting…' : undefined}
         fetching={counts.fetching && !!counts.data}
         actions={<Button variant="ghost" icon="refresh-cw" onClick={() => void counts.refresh()} disabled={counts.fetching} data-testid="listings-refresh">Refresh counts</Button>}
       />
@@ -51,11 +52,11 @@ export default function ListingsSection({ active }: SectionProps) {
             <StatTile label="Live" value={c.active} sub="state “active” — shown in search" testId="lc-active" />
             <StatTile label="Added today" value={c.added_today} sub="since midnight, California time" testId="lc-today" />
             <StatTile label="Stale" value={c.stale_clearable} sub={c.stale_overdue === null ? 'unseen by their source 7+ days' : `unseen 7+ days · ${fmt(c.stale_overdue)} for 15+`} testId="lc-stale" />
-            <StatTile label="Expired, stored" value={c.expired_kept} sub="off the site; kept when someone saved or tracked it" testId="lc-kept" />
+            <StatTile label="Expired, kept" value={c.plan ? c.plan.expiredKept : null} sub="off the site; kept because someone saved or tracked it" testId="lc-kept" />
           </StatStrip>
         </div>
       ) : null}
-      <StaleBlock stale={c?.stale_clearable ?? null} kept={c?.expired_kept ?? null} />
+      <StaleBlock counts={c} countsAt={counts.updatedAt} />
       <Browser active={active} />
       <DupesBlock />
       <TargetBlock />
@@ -65,36 +66,47 @@ export default function ListingsSection({ active }: SectionProps) {
 }
 
 // ── Clear stale (a long job) ─────────────────────────────────────────────────────────────────────
-function StaleBlock({ stale, kept }: { stale: number | null; kept: number | null }) {
-  const job = useAdminJob({ action: 'purge_stale_jobs', label: 'Clearing stale listings', past: 'Cleared', noun: 'listings (stale, or expired and nobody kept them)' })
+function StaleBlock({ counts, countsAt }: { counts: ListingCounts | null; countsAt: number }) {
+  const stale = counts?.stale_clearable ?? null
+  const job = useAdminJob({ action: 'purge_stale_jobs', label: 'Clearing stale listings', past: 'Deleted', noun: 'listings nobody saved', total: counts?.plan?.will ?? undefined })
   const [confirming, setConfirming] = useState(false)
   // The confirm stays on screen (busy) through the first round, so a double tap lands on a disabled button.
   useEffect(() => { if (confirming && job.job && (job.job.rounds > 0 || !job.running)) setConfirming(false) }, [confirming, job.job, job.running])
   const busyConfirm = confirming && job.running
   const done = job.job?.status === 'done'
+  // The kept line: the server's exact kept count, or — after a finished clear, once the counts were read again —
+  // the expired listings still stored (only the kept ones survive a complete clear). Never a pre-clear number.
+  const endedAt = job.job?.ended_at ? Date.parse(job.job.ended_at) : NaN
+  const kept = done && countsAt > endedAt ? counts?.plan?.expiredKept ?? null : null
+  // A job stopped by a reload offers Resume only while the server still has something to clear (judge F5; the core
+  // also asks job_status first).
+  const will = counts?.plan?.will ?? null
+  const nothingLeft = will !== null ? will === 0 : stale === 0
+  const confirm = staleConfirm(counts?.plan ?? null, stale)
   return (
     <section className={styles.block} aria-labelledby="ls-stale" data-testid="stale-block">
       <div className={styles.blockHead}><h2 id="ls-stale" className={styles.h2}>Stale listings</h2></div>
       <p className={styles.text}>
-        A listing turns stale when its source hasn&apos;t shown it for 7 days. Clearing deletes stale listings and expired ones nobody kept.
-        A listing someone saved, tracked or applied to is kept, hidden from search. Employer-posted listings are never touched.
+        A listing turns stale when its source hasn&apos;t shown it for 7 days. Clearing deletes stale and expired listings (and live ones
+        their source hasn&apos;t shown for 7 days) that nobody saved or tracked; those are kept, hidden from search. Employer-posted listings are never touched.
       </p>
-      {job.job ? <JobProgress job={job.job} onCancel={job.cancel} onResume={job.resume} onDismiss={job.dismiss} /> : null}
-      {done && kept !== null ? (
+      {job.job ? <JobProgress job={job.job} onCancel={job.cancel} onResume={nothingLeft ? undefined : job.resume} onDismiss={job.dismiss} /> : null}
+      {job.job && !job.running && job.job.status !== 'done' && nothingLeft ? <p className={styles.quiet} data-testid="stale-nothing-left">The server has nothing left to clear: the stopped run finished its work before the page reloaded.</p> : null}
+      {done && kept !== null && kept !== undefined ? (
         <p className={styles.quiet} data-testid="stale-kept-line">{fmt(kept)} expired {kept === 1 ? 'listing stays' : 'listings stay'} stored and off the site because someone saved, tracked or applied to {kept === 1 ? 'it' : 'them'}.</p>
       ) : null}
       {confirming ? (
         <ConfirmStep
-          title={stale === null ? 'Clear stale listings?' : `Clear ${fmt(stale)} stale ${stale === 1 ? 'listing' : 'listings'}?`}
-          body="It runs in rounds and keeps going if you open another section. You can cancel between rounds."
+          title={confirm.title}
+          body={`${confirm.body} It runs in rounds and keeps going if you open another section; you can cancel between rounds.`}
           irreversible="A deleted listing comes back only if its source lists it again."
           confirmLabel="Clear stale" tone="primary" busy={busyConfirm}
           onCancel={() => setConfirming(false)} onConfirm={() => { job.start() }}
         />
       ) : (
         <div className={styles.actions}>
-          <Button variant="primary" icon="trash-2" onClick={() => (job.running ? job.start() : setConfirming(true))} disabled={!job.running && stale === 0} data-testid="stale-clear">
-            {job.running ? 'Clearing… (show progress)' : stale === 0 ? 'Nothing stale to clear' : 'Clear stale listings'}
+          <Button variant="primary" icon="trash-2" onClick={() => (job.running ? job.start() : setConfirming(true))} disabled={!job.running && nothingLeft} data-testid="stale-clear">
+            {job.running ? 'Clearing… (show progress)' : nothingLeft ? 'Nothing stale to clear' : 'Clear stale listings'}
           </Button>
         </div>
       )}
@@ -138,7 +150,7 @@ function Browser({ active }: { active: boolean }) {
   const nFilters = activeFilterCount(u)
   // Take a listing down straight from the list (one nobody reported, too), with an inline confirm and Undo.
   const [confirmDown, setConfirmDown] = useState<string | null>(null)
-  const takeDown = useAdminAction('delete_listing', { onSettled: () => setConfirmDown(null) })
+  const takeDown = useAdminAction('delete_listing', { onSettled: (res) => { setConfirmDown(null); if (!res.ok && isUnknownAnswer(res as never)) void list.refresh() } })
   const clearFilters = () => { setStatus(''); setVisible(''); setEmployer(''); setSince(''); setSort(''); setSource('') }
 
   const row = (r: JobRow) => {
@@ -160,7 +172,7 @@ function Browser({ active }: { active: boolean }) {
         below={confirmDown === r.id ? (
           <ConfirmStep inline title="Take this listing down?" body="It leaves search now and its apply link is blocked so a source cannot bring it back. Undo puts it back."
             confirmLabel="Take it down" busy={takeDown.busy(r.id)} onCancel={() => setConfirmDown(null)} onConfirm={() => { void takeDown.run({ job_id: r.id }, r.id) }} />
-        ) : ts.status !== 'idle' ? <ResultLine state={ts} onUndo={() => takeDown.undo(r.id)} onRetry={() => takeDown.retry(r.id)} onDismiss={() => takeDown.dismiss(r.id)} runningText="Taking it down…" /> : undefined}
+        ) : ts.status !== 'idle' ? <ResultLine state={ts} onUndo={() => takeDown.undo(r.id)} onRetry={isUnknownAnswer(ts.error) ? undefined : () => takeDown.retry(r.id)} onDismiss={() => takeDown.dismiss(r.id)} runningText="Taking it down…" /> : undefined}
       />
     )
   }

@@ -104,7 +104,6 @@ export default function KindPanel({ cfg, on, visible }: { cfg: KindConfig<AnyRow
     onUndo: () => { if (last) acts.all[last.name]?.undo(last.id) },
     searchRef,
   })
-  const lastState = last ? acts.all[last.name]?.state(last.id) : null
 
   return (
     <div className={styles.panel} data-testid={`panel-${cfg.kind}`}>
@@ -117,9 +116,6 @@ export default function KindPanel({ cfg, on, visible }: { cfg: KindConfig<AnyRow
         <p className={styles.note} data-testid={`${cfg.kind}-filter-note`}>
           {`${rows.length.toLocaleString('en-US')} of the ${byStatus.length.toLocaleString('en-US')} loaded ${cfg.noun} match “${q.trim()}”${list.hasMore ? ' — more are not loaded yet; Load more to search them too.' : ' — every one in this list is loaded.'}`}
         </p>
-      ) : null}
-      {last && lastState && lastState.status === 'done' ? (
-        <Line state={lastState} onUndo={() => acts.all[last.name].undo(last.id)} onDismiss={() => { acts.all[last.name].dismiss(last.id); setLast(null) }} />
       ) : null}
       <List<AnyRow>
         rows={rows}
@@ -170,22 +166,6 @@ export default function KindPanel({ cfg, on, visible }: { cfg: KindConfig<AnyRow
           )
         }}
       />
-      {cfg.kind === 'clusters' ? <ClusterScan /> : null}
-    </div>
-  )
-}
-
-/** People's "Scan signals" lives here too: it is how new clusters appear in this queue. */
-function ClusterScan() {
-  const scan = useAdminAction('detect_duplicates_by_signals', { timeoutMs: 60_000 })
-  return (
-    <div className={styles.lines}>
-      <div className={styles.actions}>
-        <Button variant="ghost" icon="search" onClick={() => void scan.run({}, 'scan')} loading={scan.busy('scan')} disabled={scan.busy('scan')} data-testid="clusters-scan">
-          Scan sign-in signals for new clusters
-        </Button>
-      </div>
-      <Line state={scan.state('scan')} onRetry={() => scan.retry('scan')} onDismiss={() => scan.dismiss('scan')} runningText="Reading the last month of sign-ins…" />
     </div>
   )
 }

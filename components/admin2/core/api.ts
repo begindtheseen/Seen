@@ -36,6 +36,14 @@ export type AdminApi = <T = Record<string, unknown>>(action: string, body?: Reco
 
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
 
+/**
+ * Marks an error whose outcome is UNKNOWN (no answer, an empty or unreadable answer, a bare gateway error,
+ * "still in progress"): the write may or may not have happened. The action pipeline then checks — asks again
+ * with the same request_id — instead of saying "not done".
+ */
+export function unknownOutcome(e: AdminErr): AdminErr { (e as AdminErr & { unknown?: boolean }).unknown = true; return e }
+export const isUnknownOutcome = (e: AdminErr | undefined): boolean => !!e && (e as AdminErr & { unknown?: boolean }).unknown === true
+
 export function err(code: string, error: string, retryable: boolean, extra: Partial<AdminErr> = {}): AdminErr {
   return { ok: false, code, error, retryable, ...extra }
 }
@@ -52,8 +60,8 @@ function statusSentence(status: number): string {
   if (status === 404) return 'The server does not know this request (HTTP 404).'
   if (status === 429) return 'Too many requests in a short time. Wait a minute, then try again.'
   if (status === 503) return "Couldn't reach the server just now (HTTP 503). Try again in a moment."
-  if (status === 504) return 'The server ran out of time (HTTP 504). Part of it may have finished — refresh to see what changed.'
-  if (status >= 500) return `The server failed (HTTP ${status}). It is not known whether anything was changed — refresh to check.`
+  if (status === 504) return 'The server ran out of time (HTTP 504). Part of it may have finished.'
+  if (status >= 500) return `The server failed (HTTP ${status}) and did not say what was changed.`
   return `The server refused the request (HTTP ${status}).`
 }
 
@@ -74,14 +82,20 @@ export function toResult<T = Record<string, unknown>>(status: number, text: stri
   const okStatus = status >= 200 && status < 300
   if (!json) {
     if (okStatus) {
-      return err('upstream', trimmed
-        ? `The server's answer could not be read (HTTP ${status}). It is not known whether this went through — refresh to check.`
-        : `The server's answer was empty (HTTP ${status}). It is not known whether this went through — refresh to check.`, true)
+      return unknownOutcome(err('upstream', trimmed
+        ? `The server's answer could not be read (HTTP ${status}), so it is not known yet whether this went through.`
+        : `The server's answer was empty (HTTP ${status}), so it is not known yet whether this went through.`, true))
     }
     if (status === 401 || status === 403) return err(CODE_BY_STATUS[status], statusSentence(status), false)
-    return err(CODE_BY_STATUS[status] || (status >= 500 ? 'upstream' : 'bad_request'), statusSentence(status), status >= 500 || status === 429)
+    const e = err(CODE_BY_STATUS[status] || (status >= 500 ? 'upstream' : 'bad_request'), statusSentence(status), status >= 500 || status === 429)
+    // A gateway error with no body (502/504 from the platform) says nothing about what the function did.
+    return status === 502 || status === 504 ? unknownOutcome(e) : e
   }
 
+  // Idempotent replay: the first run with this request_id is still going (server answers either shape).
+  if (json.in_progress === true || json.code === 'in_progress') {
+    return unknownOutcome(err('in_progress', typeof json.message === 'string' && json.message ? json.message : 'Still working on it on the server.', true))
+  }
   if (!okStatus || json.ok === false) {
     const code = typeof json.code === 'string' && json.code ? json.code
       : CODE_BY_STATUS[status] || (status >= 500 ? 'upstream' : okStatus ? 'bad_request' : 'bad_request')
@@ -134,11 +148,11 @@ export function createAdminApi(deps: AdminApiDeps): AdminApi {
     } catch (e) {
       if (timedOut) {
         const secs = Math.round(timeoutMs / 1000)
-        return err('timeout', `No answer from the server after ${secs} seconds. It may still finish — refresh to see what changed before trying again.`, true)
+        return unknownOutcome(err('timeout', `No answer from the server after ${secs} seconds; it may still be working on it.`, true))
       }
       if (opts.signal?.aborted) return err('cancelled', 'Cancelled.', false)
       void e
-      return err('network', "Couldn't reach the server. Check the connection, then try again.", true)
+      return unknownOutcome(err('network', "Couldn't reach the server. Check the connection, then try again.", true))
     } finally {
       clearTimeout(timer)
       opts.signal?.removeEventListener('abort', onOuterAbort)

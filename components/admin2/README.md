@@ -109,6 +109,12 @@ const decide = useAdminAction('review_held', {
   account and for the credit-system flag.
 - Never reload the page, never `router.refresh()`, never re-read what the server did not touch.
 
+## Results, history and unknown outcomes (round 6 — read core/READY.md "Round 6")
+
+- Pass your row actions to `<List actions={[…]} />`; every action result is also pinned to the result dock.
+- Every write carries a `request_id` automatically; an unknown outcome is checked ("Checking…"), never "Not done".
+- Section changes push history; an open ConfirmStep owns a Back; a running job guards against leaving.
+
 ## Long jobs ("until done")
 
 ```tsx

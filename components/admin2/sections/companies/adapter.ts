@@ -1,6 +1,7 @@
 // Companies, made safe for the screen (pure — companies.test.mjs). A count the server could not read is
 // null ("couldn't read"), never 0.
 import { formatPacific } from '../../../../lib/time/pacific.js'
+import { displayCompanyName } from '../../../../lib/companyNames.js'
 
 export const fmt = (n: number) => Math.round(n).toLocaleString('en-US')
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v)) ? Number(v) : null)
@@ -28,10 +29,7 @@ export function companyLine(c: CompanyRow): string {
 
 /** Display name: stored names are lower-case keys ("walmart"); show them as a name. */
 export function displayName(name: string): string {
-  const n = name.trim()
-  if (!n) return 'Unnamed company'
-  if (n !== n.toLowerCase()) return n
-  return n.replace(/(^|[\s\-/&(])(\p{L})/gu, (_, a, b) => `${a}${b.toUpperCase()}`)
+  return displayCompanyName(name) || 'Unnamed company'
 }
 
 // ── One company (company_detail) ─────────────────────────────────────────────────────────────────

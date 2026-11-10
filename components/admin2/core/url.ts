@@ -67,7 +67,8 @@ export function sectionFilters(search: string, section: string): Record<string, 
 export function searchForSection(search: string, section: string, filter?: Record<string, string>): string {
   const p = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search)
   const prefix = `${section}.`
-  for (const k of [...p.keys()]) if (k.startsWith(prefix)) p.delete(k)
+  // With a filter (a queue row) the section opens with exactly it; without one its own filters are kept.
+  if (filter) for (const k of [...p.keys()]) if (k.startsWith(prefix)) p.delete(k)
   if (section === 'today') p.delete('s')
   else p.set('s', section)
   for (const [k, v] of Object.entries(filter || {})) if (v) p.set(prefix + k, v)

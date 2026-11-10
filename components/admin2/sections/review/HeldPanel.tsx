@@ -17,8 +17,8 @@ import { BulkBar, List, Row, RowActions } from '../../ui/List.tsx'
 import { EmptyState } from '../../ui/states.tsx'
 import {
   FLAG_TEXT, GROUP_TEXT, HELD_VIEWS, MAX_BULK, approvableIds, filterNote, fmt, groupOf, heldHasRules, heldSearchFields,
-  heldViewCounts, heldWhy, label, matchesHeldView, matchesQuery, newRequestId, outcomeTone, parseHeldView,
-  plural, approvePlan, pruneSelection, nothingToPublishLine, snippet, when, type HeldRow, type HeldView,
+  heldViewCounts, matchesHeldView, matchesQuery, newRequestId, outcomeTone, parseHeldView,
+  plural, approvePlan, pruneSelection, nothingToPublishLine, snippet, when, outcomeWord, sourceWord, type HeldRow, type HeldView,
 } from './adapter.ts'
 import { Chips, Choice, CursorRow, KeysHint, Line, Meta, RecomputeLine } from './parts.tsx'
 import { useListKeys } from './reviewHooks.tsx'
@@ -26,7 +26,7 @@ import styles from './review.module.css'
 
 const PAGE = 200
 const SORTS = [
-  { value: 'needs_eyes', label: 'Needs eyes first' },
+  { value: 'needs_eyes', label: 'Needs eyes' },
   { value: 'newest', label: 'Newest' },
   { value: 'oldest', label: 'Oldest' },
   { value: 'company', label: 'Company A–Z' },
@@ -52,7 +52,6 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
   const [confirmApprove, setConfirmApprove] = useState<'positive' | 'selection' | null>(null)
   // Rows the owner ticked one by one: only these can bring an anti-gaming hold or a possible duplicate into a bulk approve.
   const [picked, setPicked] = useState<Set<string>>(new Set())
-  const [lastRow, setLastRow] = useState<string | null>(null)
   const [lastTarget, setLastTarget] = useState<string | null>(null)
   const [limit, setLimit] = useState(PAGE)
   const pendingCursors = useRef<string[]>([])
@@ -69,6 +68,7 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
   const filtered = useMemo(() => rows.filter((r) => matchesHeldView(r, view) && matchesQuery(heldSearchFields(r), q)), [rows, view, q])
   const isFiltered = view !== 'all' || !!q.trim()
   const shown = filtered.slice(0, limit)
+  const pendingCheck = useMemo(() => rows.filter((r) => r.review?.duplicate_check === 'pending').length, [rows])
   const positivePlan = useMemo(() => approvePlan(rows, 'positive'), [rows])
   const selectionPlan = useMemo(() => approvePlan(rows, 'selection', selected, picked), [rows, selected, picked])
 
@@ -131,7 +131,6 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
   const run = (decision: 'approve' | 'reject', ids: string[], target: string, extra: Record<string, unknown> = {}, fromSelection = false) => {
     if (!ids.length) return
     setLastTarget(target)
-    if (target !== 'bulk') setLastRow(target)
     const args = { decision, request_id: newRequestId(), ...extra, ids: ids.slice(0, MAX_BULK) }
     if (target === 'bulk' && !decide.busy('bulk')) { bulkBusyRef.current = true; bulkArgsRef.current = args; snapRef.current = fromSelection ? new Set(selected) : null }
     void decide.run(args, target)
@@ -166,9 +165,9 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
   const skipLinks = {
     possible_duplicate: { label: 'Review them', onSelect: () => setView('duplicates') },
     anti_gaming_hold: { label: 'Review the holds', onSelect: () => setView('anti_gaming') },
+    not_checked_for_duplicates: { label: 'Check again', onSelect: () => void list.refresh() },
   }
   const bulkState = decide.state('bulk')
-  const lastRowState = lastRow ? decide.state(lastRow) : null
 
   return (
     <div className={styles.panel} data-testid="panel-held">
@@ -176,7 +175,7 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
         <Choice label="Saved filters" options={viewOptions} value={view} onChange={setView} testId="held-view" />
         <div className={styles.toolRow}>
           <div className={styles.grow}>
-            <SearchField ref={searchRef} value={q} onChange={(v) => { setQ(v); setLimit(PAGE) }} label="Search held reports" placeholder="Search company, role, text" testId="held-search" />
+            <SearchField ref={searchRef} value={q} onChange={(v) => { setQ(v); setLimit(PAGE) }} label="Search held reports" placeholder="Search reports" testId="held-search" />
           </div>
           <label className={styles.selectLabel}>
             <span className={styles.hidePhone}>Sort</span>
@@ -223,12 +222,15 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
       <div className={styles.lines}>
         <Line state={bulkState} onUndo={() => decide.undo('bulk')} onRetry={() => decide.retry('bulk')} onDismiss={() => decide.dismiss('bulk')}
           runningText={`${bulkState.args?.decision === 'reject' ? 'Rejecting' : 'Approving'} ${plural((bulkState.args?.ids as string[] | undefined)?.length || 0, 'report')}…`} skipLinks={skipLinks} />
-        {lastRow && lastRowState && lastRowState.status === 'done' ? (
-          <Line state={lastRowState} onUndo={() => decide.undo(lastRow)} onDismiss={() => { decide.dismiss(lastRow); setLastRow(null) }} skipLinks={skipLinks} />
-        ) : null}
         {recomputeJob ? <RecomputeLine job={recomputeJob} queued={recomputeQueued} onCancel={() => jobs.cancel(recomputeJob.id)} onResume={() => jobs.resume(recomputeJob.id)} onDismiss={() => jobs.dismiss(recomputeJob.id)} /> : null}
       </div>
 
+      {pendingCheck ? (
+        <p className={styles.leftLine} role="status" data-testid="held-pending-check">
+          {plural(pendingCheck, 'report is', 'reports are')} still being checked against published reports for copies; they stay out of every bulk approve until checked.
+          <button type="button" className={styles.inlineLink} onClick={() => void list.refresh()}>Check again</button>
+        </p>
+      ) : null}
       {rows.length && (isFiltered || truncated) ? (
         <p className={styles.note} data-testid="held-note">
           {filterNote(filtered.length, rows.length, { total: list.total, truncated, filtered: isFiltered, noun: 'held reports' })}
@@ -258,16 +260,16 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
             <CursorRow id={r.id} cursor={keys.cursor === r.id}>
               <Row
                 testId={`held-row-${r.id}`}
-                title={`${r.company_name || 'Unknown company'} — ${label(r.outcome) || 'no outcome'}`}
+                title={`${r.company_name || 'Unknown company'} — ${outcomeWord(r)}`}
                 onOpen={() => shell.openItem('report', r.id)}
                 sub={snippet(r.report_text) || 'No text.'}
                 status={<Chips items={[
-                  { tone: outcomeTone(r.outcome), label: label(r.outcome) || 'No outcome' },
+                  { tone: outcomeTone(r.outcome), label: outcomeWord(r) },
                   group !== 'needs_eyes' ? { tone: group === 'positive' ? 'good' : 'info', label: GROUP_TEXT[group] } : { tone: 'neutral', label: GROUP_TEXT.needs_eyes },
                   ...flags.filter((f) => f.label !== GROUP_TEXT[group]),
                   r.rules === 'fails' ? { tone: 'bad', label: 'Fails the rules check' } : r.rules === 'passes' ? { tone: 'good', label: 'Passes the rules check' } : null,
                 ]} />}
-                meta={<Meta parts={[r.platform || r.source, r.role, when(r.created_at), heldWhy(r)]} />}
+                meta={<Meta parts={[sourceWord(r), r.role, when(r.created_at)]} />}
                 selected={selected.has(r.id)}
                 onToggle={() => toggle(r.id)}
                 selectLabel={`Select the ${r.company_name || ''} report`}

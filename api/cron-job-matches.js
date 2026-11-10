@@ -142,7 +142,12 @@ export async function confirmFullPostings(rows, keys, { db, deadline, fetchFull 
     fetched++;
     let full = null;
     try { full = await fetchFull({ jobId: id, db, timeoutMs: FETCH_TIMEOUT_MS }); } catch { full = null; }
-    if (!full || !full.ok) { _unreadable.set(id, Date.now()); dropped.push({ id, why: full?.reason === 'gone' ? 'gone' : 'unreadable' }); continue; }
+    if (!full || !full.ok) {
+      _unreadable.set(id, Date.now());
+      // the same title at the same level as a job they hold or held: kept as a non-headline line, said as a summary
+      if (j._sameRung && full?.reason !== 'gone') { out.push({ ...j, _noHeadline: true, _reason: `${j._reason} Seen could only read a summary of this listing — check its requirements before you apply.` }); continue; }
+      dropped.push({ id, why: full?.reason === 'gone' ? 'gone' : 'unreadable' }); continue;
+    }
     const row = { ...j, description: full.description };
     const m = matchListing(row, keys, { now, mode: 'email' });
     if (!m.ok || m.summaryOnly || !m.reason) { dropped.push({ id, why: m.ok ? 'still_summary' : `full_posting:${m.why}` }); continue; }

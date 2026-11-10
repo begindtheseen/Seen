@@ -2,10 +2,11 @@
 
 // The new admin, top to bottom: runtime → sign-in gate → shell (sections + the one sheet + jobs).
 // app/admin/page.tsx renders <AdminApp />.
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import type { AdminItemKind, AdminOverview } from '../contract.ts'
 import AdminShell from '../ui/AdminShell.tsx'
 import { JobChip } from '../ui/Job.tsx'
+import ResultLine from '../ui/ResultLine.tsx'
 import { Loadable } from './Boundary.tsx'
 import { AdminRuntimeProvider, useAdminJobs, useAdminQuery, useRuntime } from './hooks.tsx'
 import LoginForm from './LoginForm.tsx'
@@ -201,6 +202,19 @@ function Shell({ username: initialUser, onSignedOut }: { username: string; onSig
   }, [overview.data])
 
   const jobList = useAdminJobs()
+  const dockStore = rt.dock
+  const dockEntry = useSyncExternalStore(
+    useCallback((fn: () => void) => (dockStore ? dockStore.subscribe(fn) : () => {}), [dockStore]),
+    () => dockStore?.get() ?? null, () => null)
+  // While a job runs, leaving /admin (Back from the first section, closing the tab) asks the browser's own
+  // "Leave site?" first; the job's state is already saved, so a return offers to resume it (judge F1).
+  const jobRunning = jobList.some((j) => j.status === 'running' || j.status === 'cancelling')
+  useEffect(() => {
+    if (!jobRunning) return
+    const onBeforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [jobRunning])
 
   return (
     <ShellContext.Provider value={shell}>
@@ -211,6 +225,9 @@ function Shell({ username: initialUser, onSignedOut }: { username: string; onSig
         badges={badges}
         jobChip={jobList.length ? <JobChip jobs={jobList} onOpen={() => setPanel({ kind: 'jobs' })} /> : null}
         jobBar={jobList.length ? <JobChip bar jobs={jobList} onOpen={() => setPanel({ kind: 'jobs' })} /> : null}
+        dock={dockEntry && dockEntry.state.status !== 'idle'
+          ? <ResultLine state={dockEntry.state} onUndo={dockEntry.onUndo} onRetry={dockEntry.onRetry} onDismiss={() => dockStore?.dismiss()} />
+          : null}
         onSearch={() => setPanel({ kind: 'search' })}
         onMore={() => setPanel({ kind: 'more' })}
         onSignOut={() => { void signOut() }}

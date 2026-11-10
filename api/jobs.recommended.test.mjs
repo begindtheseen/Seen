@@ -237,3 +237,12 @@ test('summaries: the rail shows a teaser only for the person\'s own current titl
   assert.equal(res.body.jobs[0].summary_only, true);
   assert.match(res.body.jobs[0].match_reason, /You're a Valet Attendant at Towne Park/);
 });
+
+test('a current title nothing can place → no_direction with that title, no older field promoted, nothing padded', async () => {
+  state.resumeText = `Sam Ortiz\nTemecula, CA\n\nEXPERIENCE\nWorld Builder III — Zentrix Labs | Mar 2025 – Present\n• Owned the quarterly zorbing roadmap across four pods.\n\nValet Attendant — Towne Park | Oct 2022 – Jan 2025\n• Safely parked and retrieved high volumes of vehicles for hotel guests.`;
+  const r = await call();
+  assert.equal(r.code, 200);
+  assert.deepEqual(r.body.no_direction, { title: 'World Builder III', company: 'Zentrix Labs' }, JSON.stringify(r.body));
+  assert.ok(!r.body.jobs.some((j) => /valet/i.test(j.title)), 'the older valet field is not promoted');
+  if (!r.body.jobs.length) assert.equal(r.body.reason, 'no_direction');
+});

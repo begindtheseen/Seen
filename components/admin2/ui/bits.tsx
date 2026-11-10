@@ -2,7 +2,7 @@
 
 // Small admin primitives: the section header (the screen's one <h1>), the stat strip, a work-queue row,
 // a status chip (tint + word + icon — never colour alone), key hints, the search field and filter chips.
-import { forwardRef, type ReactNode } from 'react'
+import { forwardRef, useEffect, useState, type ReactNode } from 'react'
 import Icon, { type IconName } from '@/components/ui/Icon'
 import { RefreshHairline } from './states.tsx'
 import styles from './ui.module.css'
@@ -75,9 +75,36 @@ export function KeyHint({ keys }: { keys: string }) {
   return <kbd className={styles.kbd} aria-hidden="true">{keys}</kbd>
 }
 
+/**
+ * The placeholder for a narrow field: whole words only, at most `max` characters, never cut mid-word
+ * ("Search companies, roles…" → "Search companies…"). Pure for the test.
+ */
+export function shortPlaceholder(text: string, max = 18): string {
+  if (text.length <= max) return text
+  const words = text.replace(/[,.;:]+/g, ' ').split(/\s+/).filter(Boolean)
+  let out = ''
+  for (const w of words) { if ((out ? out.length + 1 : 0) + w.length > max) break; out = out ? `${out} ${w}` : w }
+  return `${out || words[0]}…`
+}
+
+/** True on phones (under 560px), following resizes. */
+function useNarrow(): boolean {
+  const [narrow, setNarrow] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 559px)')
+    const on = () => setNarrow(mq.matches)
+    on(); mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
+  return narrow
+}
+
 export const SearchField = forwardRef<HTMLInputElement, {
   value: string; onChange: (v: string) => void; placeholder: string; label: string; onEnter?: () => void; onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>; testId?: string
-}>(function SearchField({ value, onChange, placeholder, label, onEnter, onKeyDown, testId }, ref) {
+  /** The placeholder on a phone; by default the long one shortened at a word boundary (never "Search comp"). */
+  placeholderShort?: string
+}>(function SearchField({ value, onChange, placeholder, label, onEnter, onKeyDown, testId, placeholderShort }, ref) {
+  const narrow = useNarrow()
   return (
     <div className={styles.search}>
       <Icon name="search" size={18} className={styles.searchIcon} />
@@ -86,7 +113,7 @@ export const SearchField = forwardRef<HTMLInputElement, {
         type="search"
         className={`ui-input ${styles.searchInput}`}
         value={value}
-        placeholder={placeholder}
+        placeholder={narrow ? (placeholderShort || shortPlaceholder(placeholder)) : placeholder}
         aria-label={label}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter' && onEnter) { e.preventDefault(); onEnter() } onKeyDown?.(e) }}

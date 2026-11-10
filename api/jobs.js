@@ -1085,9 +1085,11 @@ async function handleRecommended(req, res, _body) {
     const m = await findResumeMatches({ supabaseUrl: SUPABASE_URL, serviceKey: SUPABASE_SERVICE_KEY, userId: user_id });
     const hasResume = m.hasResume;
     const heal = m.heal;
+    // The current title nothing could place ("unknown is not a direction"): the screen says so and offers a search.
+    const nd = m.keys && m.keys.no_direction ? { title: String(m.keys.no_direction.title || '').slice(0, 120), company: m.keys.no_direction.company ? String(m.keys.no_direction.company).slice(0, 120) : null } : null;
     if (m.reason) {
       if (heal) await heal;
-      return res.status(200).json({ ok: true, jobs: [], skills: [], has_resume: hasResume, city: m.city || null, city_source: m.citySource || null, reason: m.reason });
+      return res.status(200).json({ ok: true, jobs: [], skills: [], has_resume: hasResume, city: m.city || null, city_source: m.citySource || null, reason: m.reason, no_direction: nd });
     }
     const { ranked, city, citySource } = m;
 
@@ -1123,7 +1125,7 @@ async function handleRecommended(req, res, _body) {
     }, names));
 
     if (heal) await heal; // rebuilt keys land before the function returns
-    return res.status(200).json({ ok: true, jobs, skills: [], seniority: null, function: null, has_resume: hasResume, city, city_source: citySource, matched_total: ranked.length, reason: jobs.length ? null : 'no_matches' });
+    return res.status(200).json({ ok: true, jobs, skills: [], seniority: null, function: null, has_resume: hasResume, city, city_source: citySource, matched_total: ranked.length, reason: jobs.length ? null : (nd ? 'no_direction' : 'no_matches'), no_direction: nd });
   } catch (e) {
     logError('jobs/recommended', e.message, { user_id });
     return res.status(500).json({ error: e.message, jobs: [] });

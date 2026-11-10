@@ -7,6 +7,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import Button from '@/components/ui/Button'
 import Icon from '@/components/ui/Icon'
+import { usePanelEntry } from '../core/place.ts'
 import styles from './ui.module.css'
 
 export type ConfirmStepProps = {
@@ -42,6 +43,13 @@ export default function ConfirmStep({ title, body, irreversible, confirmLabel, c
   const cancel = useRef<HTMLButtonElement>(null)
   useEffect(() => { (typeToConfirm ? field.current : cancel.current)?.focus() }, [typeToConfirm])
   const ready = typedMatches(typed, typeToConfirm) && !busy
+  // The open step owns one history entry, like a sheet: the phone's Back closes the step (judge F1),
+  // never the page. Closed by its buttons, the entry is taken back.
+  const cancelRef = useRef(onCancel)
+  cancelRef.current = onCancel
+  const busyRef = useRef(busy)
+  busyRef.current = busy
+  usePanelEntry(true, () => { if (!busyRef.current) cancelRef.current() })
   return (
     <div
       role="group"

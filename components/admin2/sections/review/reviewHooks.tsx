@@ -8,7 +8,7 @@
 //                        / searches this list. Never while typing, never while a sheet is open.
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { createAdminApi, type AdminApi } from '../../core/api.ts'
-import { createActionRunner, IDLE, type ActionOptions } from '../../core/action.ts'
+import { createActionRunner, IDLE, type ActionOptions, type ActionRunner } from '../../core/action.ts'
 import { useRuntime, type ActionView } from '../../core/hooks.tsx'
 import { tokenStore } from '../../core/runtime.ts'
 
@@ -29,12 +29,17 @@ export function useClaimsApi(): AdminApi {
   }, [gate])
 }
 
-/** useAdminAction, for an api other than the shell's admin-stats one (same runner, same states). */
+/**
+ * useAdminAction, for an api other than the shell's admin-stats one: the same core runner, wired to the same
+ * job manager, undo bus (a line whose batch was undone elsewhere loses its Undo) and result dock (every
+ * result is pinned where the owner is looking) — mirrors core/hooks.tsx useAdminAction.
+ */
 export function useEndpointAction(api: AdminApi, action: string, options: ActionOptions = {}): ActionView {
-  const { cache } = useRuntime()
+  const { cache, jobs, undoBus, dock } = useRuntime()
   const optsRef = useRef(options)
   optsRef.current = options
   const [, setTick] = useState(0)
+  const runnerRef = useRef<ActionRunner | null>(null)
   const runner = useMemo(() => createActionRunner({
     api, cache, action,
     options: {
@@ -44,8 +49,17 @@ export function useEndpointAction(api: AdminApi, action: string, options: Action
       get partialTouched() { return optsRef.current.partialTouched },
       get timeoutMs() { return optsRef.current.timeoutMs },
     },
-    onChange: () => setTick((n) => n + 1),
-  }), [api, cache, action])
+    onChange: (target, s) => {
+      setTick((n) => n + 1)
+      if (!dock || optsRef.current.dock === false) return
+      const entry = { key: `${action}:${target}`, state: s, onUndo: () => { void runnerRef.current?.undo(target) }, onRetry: () => { void runnerRef.current?.retry(target) } }
+      if ((s.status === 'done' || s.status === 'error') && !s.undoing && !s.undone && !s.checking) dock.set(entry)
+      else if (s.status !== 'idle') dock.update(entry)
+    },
+    jobs,
+    undoBus,
+  }), [api, cache, jobs, undoBus, dock, action])
+  runnerRef.current = runner
   return useMemo(() => ({
     run: (args = {}, target = '*') => runner.run(args, target),
     state: (target = '*') => runner.state(target) || IDLE(target),

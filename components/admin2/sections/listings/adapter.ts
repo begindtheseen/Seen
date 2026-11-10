@@ -8,6 +8,8 @@ const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFi
 const str = (v: unknown): string => (typeof v === 'string' ? v : v == null ? '' : String(v))
 
 // ── Counts ───────────────────────────────────────────────────────────────────────────────────────
+export type ClearPlan = { will: number | null; stale: number | null; expired: number | null; aging: number | null; kept: number | null; expiredKept: number | null }
+
 export type ListingCounts = {
   total: number | null
   active: number | null
@@ -15,6 +17,8 @@ export type ListingCounts = {
   stale_clearable: number | null
   expired_kept: number | null
   stale_overdue: number | null
+  /** What Clear stale will do, from the server's exact reads (`clear_plan`); null when it could not be read. */
+  plan: ClearPlan | null
   failed: string[]
 }
 
@@ -26,7 +30,9 @@ export function readListingCounts(raw: unknown): ListingCounts {
     stale_clearable: num(c.stale_clearable), expired_kept: num(c.expired_kept), stale_overdue: num(c.stale_overdue),
   }
   const failed = Object.entries(out).filter(([, v]) => v === null).map(([k]) => k)
-  return { ...out, failed }
+  const p = (o.clear_plan && typeof o.clear_plan === 'object' ? o.clear_plan : null) as Record<string, unknown> | null
+  const plan = p ? { will: num(p.will_delete), stale: num(p.stale_delete), expired: num(p.expired_delete), aging: num(p.aging_delete), kept: num(p.kept_referenced), expiredKept: num(p.expired_kept_referenced) } : null
+  return { ...out, plan, failed }
 }
 
 const COUNT_WORDS: Record<string, string> = {
@@ -256,4 +262,17 @@ export function sourceCounts(r: SourceRow): string {
 
 export const SOURCE_STATE: Record<SourceRow['state'], { word: string; tone: Tone }> = {
   ok: { word: 'Working', tone: 'good' }, failing: { word: 'Failing', tone: 'bad' }, unknown: { word: 'Couldn’t read', tone: 'neutral' },
+}
+
+/** The Clear-stale confirm: the total AND its parts, from the server's plan; without a plan, it says what is not counted. */
+export function staleConfirm(plan: ClearPlan | null, stale: number | null): { title: string; body: string } {
+  const pl = (n: number, one: string, many: string) => `${fmt(n)} ${n === 1 ? one : many}`
+  if (plan && plan.will !== null) {
+    const parts = [plan.stale ? pl(plan.stale, 'stale listing', 'stale listings') : '', plan.expired ? pl(plan.expired, 'expired listing', 'expired listings') : '', plan.aging ? pl(plan.aging, 'live listing its source hasn’t shown for 7 days', 'live listings their source hasn’t shown for 7 days') : '']
+      .filter(Boolean)
+    const list = parts.length <= 1 ? parts.join('') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
+    const keep = plan.kept === null ? 'Listings someone saved or tracked are kept, hidden.' : plan.kept ? `${pl(plan.kept, 'listing someone saved or tracked is', 'listings someone saved or tracked are')} kept, hidden.` : 'Nobody saved or tracked any of them.'
+    return { title: `Delete ${pl(plan.will, 'listing', 'listings')}?`, body: `${list ? `${list}, none of them saved by anyone. ` : ''}${keep}` }
+  }
+  return { title: stale === null ? 'Clear stale listings?' : `Clear ${pl(stale, 'stale listing', 'stale listings')} and any expired ones nobody saved?`, body: 'The full plan couldn’t be read, so the number deleted can be larger. Listings someone saved or tracked are kept, hidden.' }
 }

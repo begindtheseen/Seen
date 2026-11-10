@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { parseItem, parseSection, formatItem, sectionFilters, searchForSection, filterParam } from './url.ts'
 import { toResult, createAdminApi, createReauthGate, createAdminDownload, filenameFrom } from './api.ts'
 import { QueryCache, keyMatches, mergeListRefresh } from './cache.ts'
-import { createActionRunner } from './action.ts'
+import { createActionRunner, createUndoBus } from './action.ts'
 import { createJobManager, jobKey, jobProgressText, jobSummary } from './jobs.ts'
 const untilJ = async (fn, ms = 2000) => { const t = Date.now(); while (!fn()) { if (Date.now() - t > ms) throw new Error('timeout'); await new Promise((r) => setTimeout(r, 0)) } }
 import { readLogin } from './login.ts'
@@ -58,6 +58,7 @@ test('url: filters are namespaced per section; a queue row opens its section wit
   assert.equal(p.get('review.sort'), null, 'the section’s old filters are cleared')
   assert.equal(p.get('listings.q'), 'x', 'other sections keep theirs')
   assert.equal(new URLSearchParams(searchForSection('s=review', 'today')).get('s'), null)
+  assert.equal(new URLSearchParams(searchForSection('s=today&review.kind=held', 'review')).get('review.kind'), 'held', 'a plain section switch keeps that section’s filters')
 })
 
 // ── The api: every failure is a contract error with a true sentence (defect 12, class g) ──────────
@@ -385,6 +386,9 @@ test('jobs: Cancel stops after the current round; a reload offers Resume from th
   // the page dies here; a new manager reads storage
   const fresh = jobServer({ backlog: 16982 })
   const m3 = createJobManager({ api: fresh.api, storage: store2, sleep: async () => {} })
+  assert.equal(m3.get(id2).checking, true, 'nothing is said about counts before the server is asked')
+  assert.equal(m3.get(id2).message, 'Checking what was done…')
+  await until(() => !m3.get(id2).checking)
   const back = m3.get(id2)
   assert.equal(back.status, 'cancelled'); assert.equal(back.stopped, 'reload'); assert.equal(back.resumable, true)
   assert.equal(jobProgressText(back), '4,000 of 20,982')
@@ -513,4 +517,57 @@ test('jobs: a multi-round job keeps the server Undo when every round carried one
   const m2 = createJobManager({ api: api2, sleep: async () => {} })
   const id2 = m2.start({ ...SPEC, action: 'x' }); await until(() => m2.get(id2).status === 'done')
   assert.equal(m2.get(id2).undo, undefined)
+})
+
+test('jobs: after a reload the server\'s truth decides — finished there means done, no Resume, never "cleared 0"', async () => {
+  const store = memStorage()
+  store.set(JSON.stringify([{ id: 'j1', key: 'purge_stale_jobs|{}', action: 'purge_stale_jobs', args: {}, label: 'Clearing stale listings', past: 'Cleared', noun: 'stale listings', status: 'running', changed: 0, remaining: null, rounds: 0, message: '', skipped: [], lost_rounds: 0, started_at: '2026-11-10T00:00:00Z' }]))
+  const m = createJobManager({ api: async () => toResult(200, '{}'), storage: store, statusRead: async () => ({ remaining: 0, done: 1325, complete: true }) })
+  await until(() => !m.get('j1').checking)
+  const j = m.get('j1')
+  assert.equal(j.status, 'done'); assert.equal(j.resumable, false); assert.equal(j.changed, 1325)
+  assert.match(j.message, /^Finished on the server while the page was closed\. Cleared 1,325 stale listings/)
+  // no status read available: an honest "not known", never "cleared 0"
+  const store2 = memStorage(); store2.set(store.raw().replace('"status":"done"', '"status":"running"'))
+  store2.set(JSON.stringify([{ ...JSON.parse(store.raw())[0], status: 'running', changed: 0, remaining: null, checking: false }]))
+  const m2 = createJobManager({ api: async () => toResult(200, '{}'), storage: store2 })
+  await until(() => !m2.get('j1').checking)
+  assert.doesNotMatch(m2.get('j1').message, /cleared 0/i); assert.match(m2.get('j1').message, /not known yet/)
+})
+
+test('no result or error sentence tells the owner to refresh or reload', () => {
+  const texts = []
+  for (const [st, body] of [[200, ''], [200, '<x>'], [500, ''], [502, ''], [503, ''], [504, ''], [401, ''], [403, ''], [429, ''], [404, '']]) texts.push(toResult(st, body).error)
+  const base = { id: 'x', key: 'k', action: 'a', args: {}, label: 'Clearing', past: 'Cleared', noun: 'rows', changed: 5, remaining: 3, rounds: 2, message: '', skipped: [], lost_rounds: 0, started_at: '' }
+  for (const status of ['done', 'cancelled', 'error']) for (const stopped of ['cancel', 'cap', 'reload', 'no_progress', 'error']) texts.push(jobSummary({ ...base, status, stopped }, 'x'))
+  for (const t of texts) assert.doesNotMatch(t, /refresh|reload/i, t)
+})
+
+test('action: every write carries a request_id, reused on Retry; an unknown outcome is checked, never "not done"', async () => {
+  const bodies = []
+  const answers = [[504, ''], [200, ''], [200, JSON.stringify({ ok: true, changed: 5, replayed: true, message: 'Added 5 credits · balance 10.', touched: ['user:u1'] })]]
+  const api = async (a, b) => { bodies.push(b); const [s, t] = answers.shift(); return toResult(s, t) }
+  const r = createActionRunner({ api, cache: new QueryCache(), action: 'grant_credits', sleep: async () => {} })
+  await r.run({ user_id: 'u1', amount: 5 }, 'u1')
+  assert.equal(r.state('u1').status, 'done'); assert.match(r.state('u1').result.message, /balance 10/)
+  assert.equal(new Set(bodies.map((b) => b.request_id)).size, 1, 'the same request_id on every ask'); assert.ok(bodies[0].request_id)
+  // never an answer: a plain "not known" with Check again, then Retry reuses the id
+  const api2 = async (a, b) => { bodies.push(b); return toResult(504, '') }
+  const r2 = createActionRunner({ api: api2, cache: new QueryCache(), action: 'grant_credits', sleep: async () => {}, checkDelaysMs: [1, 1] })
+  bodies.length = 0
+  await r2.run({ user_id: 'u1', amount: 5 }, 'u1')
+  assert.equal(r2.state('u1').error.code, 'unknown_outcome'); assert.match(r2.state('u1').error.error, /not known/)
+  await r2.retry('u1')
+  assert.equal(new Set(bodies.map((b) => b.request_id)).size, 1, 'Check again reuses the id')
+})
+
+test('action: undoing an audit id anywhere clears every line still offering that Undo', async () => {
+  const bus = createUndoBus()
+  const api = async (a) => toResult(200, JSON.stringify(a === 'undo' ? { ok: true, changed: 1, message: 'Undid it.' } : { ok: true, changed: 1, message: 'Rejected.', undo: { action: 'undo', args: { audit_id: '42' }, label: 'Undo' } }))
+  const review = createActionRunner({ api, cache: new QueryCache(), action: 'moderate_report', undoBus: bus })
+  const log = createActionRunner({ api, cache: new QueryCache(), action: 'undo', undoBus: bus })
+  await review.run({ id: 'r1' }, 'r1')
+  assert.ok(review.state('r1').result.undo)
+  await log.run({ audit_id: '42' }, 'a42')
+  assert.equal(review.state('r1').result.undo, undefined); assert.equal(review.state('r1').undone, true)
 })

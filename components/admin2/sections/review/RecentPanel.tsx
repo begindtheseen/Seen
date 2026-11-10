@@ -14,8 +14,8 @@ import { SearchField } from '../../ui/bits.tsx'
 import { List, Row, RowActions } from '../../ui/List.tsx'
 import { EmptyState } from '../../ui/states.tsx'
 import {
-  DECISION_TEXT, RECENT_STATES, STATE_TEXT, label, moderationFor, outcomeTone, patchRows, snippet, when,
-  type ModDecision, type ReportRow,
+  DECISION_TEXT, RECENT_STATES, STATE_TEXT, moderationFor, outcomeTone, patchRows, snippet, when,
+  outcomeWord, sourceWord, type ModDecision, type ReportRow,
 } from './adapter.ts'
 import { Chips, Choice, CursorRow, KeysHint, Meta, Line } from './parts.tsx'
 import { useListKeys } from './reviewHooks.tsx'
@@ -60,7 +60,6 @@ export default function RecentPanel({ on, visible }: { on: boolean; visible: boo
     onUndo: () => { if (lastRow) mod.undo(lastRow) },
     searchRef,
   })
-  const lastState = lastRow ? mod.state(lastRow) : null
 
   return (
     <div className={styles.panel} data-testid="panel-recent">
@@ -69,10 +68,7 @@ export default function RecentPanel({ on, visible }: { on: boolean; visible: boo
         <SearchField ref={searchRef} value={q} onChange={setQ} label="Search recent reports by company" placeholder="Company name contains…" testId="recent-search" />
         <KeysHint keys={[['j k', 'move'], ['Enter', 'open'], ['a', 'approve'], ['r', 'reject'], ['u', 'undo'], ['/', 'search this list']]} />
       </div>
-      <p className={styles.note}>Newest first, every report Seen holds{query ? `, company contains “${query}”` : ''}. Hold sends a live report back to the queue; Restore brings back a rejected one as it was.</p>
-      {lastRow && lastState && lastState.status === 'done' ? (
-        <Line state={lastState} onUndo={() => mod.undo(lastRow)} onDismiss={() => { mod.dismiss(lastRow); setLastRow(null) }} />
-      ) : null}
+      <p className={styles.note}>Newest first, every report Seen has stored{query ? `, company contains “${query}”` : ''}. Hold sends a live report back to the queue; Restore brings back a rejected one as it was.</p>
       <List<ReportRow>
         rows={list.rows}
         idOf={(r) => r.id}
@@ -94,17 +90,17 @@ export default function RecentPanel({ on, visible }: { on: boolean; visible: boo
             <CursorRow id={r.id} cursor={keys.cursor === r.id}>
               <Row
                 testId={`recent-row-${r.id}`}
-                title={`${r.company_name || 'Unknown company'} — ${label(r.outcome) || 'no outcome'}`}
+                title={`${r.company_name || 'Unknown company'} — ${outcomeWord(r)}`}
                 onOpen={() => shell.openItem('report', r.id)}
                 sub={snippet(r.report_text) || 'No text.'}
                 status={<Chips items={[
                   st ? { tone: st.tone, label: st.label } : null,
                   r.counted ? { tone: 'info', label: 'Counts in grade' } : { tone: 'neutral', label: 'Not counted' },
-                  { tone: outcomeTone(r.outcome), label: label(r.outcome) || 'No outcome' },
+                  { tone: outcomeTone(r.outcome), label: outcomeWord(r) },
                   r.employeeReview ? { tone: 'info', label: 'Employee review' } : null,
                   r.rules === 'fails' ? { tone: 'bad', label: 'Fails the rules check' } : r.rules === 'passes' ? { tone: 'good', label: 'Passes the rules check' } : null,
                 ]} />}
-                meta={<Meta parts={[r.platform, r.role, when(r.created_at)]} />}
+                meta={<Meta parts={[sourceWord(r), r.role, when(r.created_at)]} />}
                 pending={mod.busy(r.id)}
                 actions={options.length ? (
                   <RowActions>

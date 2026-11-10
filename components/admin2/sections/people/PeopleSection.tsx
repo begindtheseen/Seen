@@ -14,10 +14,12 @@ import { List, Row } from '../../ui/List.tsx'
 import ResultLine from '../../ui/ResultLine.tsx'
 import { EmptyState, ErrorState, RefreshFailed, Skeleton } from '../../ui/states.tsx'
 import { useSectionKeys } from '../listings/sectionKeys.ts'
+import { readApps } from '../system/adapter.ts'
+import { formatPacific } from '@/lib/time/pacific'
 import styles from '../listings/listings.module.css'
 import { CLUSTER_STATUSES, CLUSTER_WORDS, FILTERS, fmt, readAttribution, readCluster, readUser, signalWords, userSub, type Cluster, type SourceGroup, type UserRow } from './adapter.ts'
 
-const VIEWS = [{ value: 'accounts', label: 'Accounts' }, { value: 'sources', label: 'Sign-up sources' }, { value: 'clusters', label: 'Account clusters' }]
+const VIEWS = [{ value: 'accounts', label: 'Accounts' }, { value: 'apps', label: 'Tracked applications' }, { value: 'sources', label: 'Sign-up sources' }, { value: 'clusters', label: 'Account clusters' }]
 
 export default function PeopleSection({ active }: SectionProps) {
   const [view, setView] = useUrlFilter('people', 'view', 'accounts')
@@ -25,7 +27,7 @@ export default function PeopleSection({ active }: SectionProps) {
     <div className={styles.wrap} data-testid="section-people">
       <SectionHeader title="People" sub="Accounts, where sign-ups come from, and accounts that look like one person." />
       <FilterChips label="Show" value={VIEWS.some((v) => v.value === view) ? view : 'accounts'} onChange={(v) => setView(v === 'accounts' ? '' : v)} options={VIEWS} />
-      {view === 'sources' ? <SourcesView /> : view === 'clusters' ? <ClustersView /> : <AccountsView active={active} />}
+      {view === 'sources' ? <SourcesView /> : view === 'clusters' ? <ClustersView /> : view === 'apps' ? <AppsView /> : <AccountsView active={active} />}
     </div>
   )
 }
@@ -150,13 +152,44 @@ function ClustersView() {
         rows={list.rows} idOf={(c) => c.id} noun="clusters" loading={list.loading} error={list.error} onRetry={() => void list.refresh()} total={list.total}
         empty={<EmptyState icon="users" title={st === 'suspected' ? 'No clusters waiting for a decision.' : 'No clusters with this status.'} />}
         renderRow={(c) => (
-          <Row testId={`cluster-row-${c.id}`} title={<span data-row-title>{`${fmt(c.users.length)} accounts · risk ${c.risk === null ? 'unknown' : c.risk}`}</span>}
+          <Row testId={`cluster-row-${c.id}`} title={<span data-row-title>{`${fmt(c.users.length)} ${c.users.length === 1 ? 'account' : 'accounts'} · risk ${c.risk === null ? 'unknown' : c.risk}`}</span>}
             sub={c.users.map((u) => u.email || `account ${u.id.slice(0, 8)}…`).join(', ')}
             status={<StatusChip tone={c.status === 'safe' ? 'good' : c.status === 'suspected' ? 'caution' : 'neutral'} label={CLUSTER_WORDS[c.status] || c.status} />}
             meta={<span>{c.signals.map(signalWords).join(' · ')}</span>}
             onOpen={() => shell.openItem('cluster', c.id)} />
         )}
       />
+    </section>
+  )
+}
+
+// The newest tracked applications, read-only (the old admin's "Recent tracker applications"). The server's read
+// (get_kpi_detail apps_total) returns the newest 100 and no total, so the list says it is the newest 100 at most.
+function AppsView() {
+  const api = useApi()
+  const q = useAdminQuery<Record<string, unknown>>('apps:recent', () => api<Record<string, unknown>>('get_kpi_detail', { metric: 'apps_total' }), { staleMs: 60_000 })
+  const rows = q.data ? readApps(q.data) : []
+  return (
+    <section className={styles.blockFlat} aria-label="Tracked applications" data-testid="people-apps">
+      <p className={styles.quiet}>The newest applications people track, newest first — read-only. The server returns the newest 100 and no total.</p>
+      {q.loading ? <Skeleton rows={4} label="Reading tracked applications" /> : null}
+      {q.error && !q.data ? <ErrorState what="tracked applications" error={q.error} onRetry={() => void q.refresh()} retrying={q.fetching} /> : null}
+      {q.data ? (
+        <>
+          <RefreshFailed error={q.error} onRetry={() => void q.refresh()} />
+          <p className={styles.text} data-testid="people-apps-count">{rows.length ? `Showing the newest ${fmt(rows.length)} ${rows.length === 1 ? 'application' : 'applications'}${rows.length >= 100 ? ' (the server’s limit)' : ''}.` : 'No tracked applications.'}</p>
+          {rows.length ? (
+            <ul className={styles.lines} aria-label="Applications">
+              {rows.map((a) => (
+                <li key={a.id} className={styles.lineItem}>
+                  <span className={styles.lineMain}><span className={styles.strong}>{a.company || 'Unnamed company'}</span>{a.role ? ` · ${a.role}` : ''}{a.stage ? ` · ${a.stage}` : ''}{a.status ? ` (${a.status})` : ''}</span>
+                  <span className={styles.lineSide}>{a.created_at ? formatPacific(a.created_at, { dateStyle: 'medium' }) : ''}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </>
+      ) : null}
     </section>
   )
 }

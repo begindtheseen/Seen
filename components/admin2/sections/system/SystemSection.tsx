@@ -11,6 +11,8 @@ import type { ActionState } from '../../core/action.ts'
 import { createAdminApi } from '../../core/api.ts'
 import { useAdminAction, useAdminJob, useAdminList, useAdminQuery, useApi, useRuntime } from '../../core/hooks.tsx'
 import { tokenStore } from '../../core/runtime.ts'
+import { saveText } from '../../core/api.ts'
+import { isUnknownAnswer } from '../listings/unknown.ts'
 import { useUrlFilter } from '../../core/place.ts'
 import type { SectionProps } from '../../core/sections.tsx'
 import { useShell } from '../../core/shellContext.ts'
@@ -24,7 +26,7 @@ import { EmptyState, ErrorState, RefreshFailed, Skeleton } from '../../ui/states
 import { useSectionKeys } from '../listings/sectionKeys.ts'
 import styles from '../listings/listings.module.css'
 import {
-  ACTION_FILTERS, canOpen, cronDetail, cronInWords, cronLines, cronState, cronSummary, dbSizeLine, dbSizeTone, readDbSize, dangerConsequence, flagDoes, flagEnv, flagIsOn, flagStateWords,
+  ACTION_FILTERS, canOpen, cronDetail, scheduleText, readSearchDemand, cronLines, cronState, cronSummary, dbSizeLine, dbSizeTone, readDbSize, dangerConsequence, flagDoes, flagEnv, flagIsOn, flagStateWords,
   fmt, money, readActivity, readCron, readFlags, readFunnel, readRevenue, readRoutes, type ActivityRow, type CronRow, type Flag,
 } from './adapter.ts'
 
@@ -38,6 +40,8 @@ export default function SystemSection({ active }: SectionProps) {
       <CronsBlock />
       <ErrorsBlock />
       <StorageBlock />
+      <ExportBlock />
+      <SearchDemandBlock />
       <FlagsBlock undoRef={flagsUndo} />
       <ActivityBlock />
       <RevenueBlock />
@@ -70,7 +74,7 @@ function CronsBlock() {
               const detail = cronDetail(c)
               return (
                 <li key={c.path || c.name} className={st.tone === 'bad' ? `${styles.tr} ${styles.trBad}` : styles.tr} data-testid={`cron-${c.name}`}>
-                  <span className={styles.trName}>{c.name}<span className={styles.quiet}><br />{cronInWords(c.schedule)}</span></span>
+                  <span className={styles.trName}>{c.name}<span className={styles.quiet}><br />{scheduleText(c)}</span></span>
                   <span className={styles.trBody}>
                     {cronLines(c).map((l) => <span key={l}>{l}</span>)}
                     {detail ? <span className={styles.quiet}>{detail}</span> : null}
@@ -113,7 +117,7 @@ function refreshJobsMessage(r: Record<string, unknown>): string {
 }
 
 function RefreshJobsRun() {
-  const { gate } = useRuntime()
+  const { gate, cache } = useRuntime()
   const [, tick] = useState(0)
   useEffect(() => { const f = () => tick((x) => x + 1); refreshJobsSubs.add(f); return () => { refreshJobsSubs.delete(f) } }, [])
   const st = refreshJobsState
@@ -124,14 +128,20 @@ function RefreshJobsRun() {
     refreshJobsInFlight = (async () => {
       const res = await call<Record<string, unknown>>('refresh_jobs', {})
       if (res.ok) setRefreshJobs({ status: 'done', target: 'refresh-jobs', result: { ...res, message: refreshJobsMessage(res as Record<string, unknown>) } })
-      else setRefreshJobs({ status: 'error', target: 'refresh-jobs', error: res })
+      else {
+        setRefreshJobs({ status: 'error', target: 'refresh-jobs', error: res })
+        // No answer is not "not done": the refresh may still be running. Re-read the scheduled jobs in a minute
+        // (refresh-jobs records its runs) instead of offering a Retry that would start a second one.
+        if (isUnknownAnswer(res)) setTimeout(() => cache.invalidate(['crons']), 60_000)
+      }
       refreshJobsInFlight = null
     })()
   }
   return (
     <span className={styles.blockFlat} data-testid="run-refresh-jobs-wrap">
-      <ResultLine state={st} onRetry={start} onDismiss={() => setRefreshJobs({ status: 'idle', target: 'refresh-jobs' })}
+      <ResultLine state={st} onRetry={isUnknownAnswer(st.error) ? undefined : start} onDismiss={() => setRefreshJobs({ status: 'idle', target: 'refresh-jobs' })}
         runningText="Refreshing listings… This can take up to 5 minutes. You can leave this screen." />
+      {isUnknownAnswer(st.error) ? <span className={styles.quiet} data-testid="refresh-jobs-unknown">Checking: no answer came back, so the refresh may still be running on the server. This row is read again in a minute; dismiss the message to run it again.</span> : null}
       {st.status === 'idle' || st.status === 'done' ? <span className={styles.actions}><Button variant="secondary" icon="refresh-cw" onClick={start} data-testid="run-refresh-jobs">Run now</Button></span> : null}
     </span>
   )
@@ -200,6 +210,61 @@ function StorageBlock() {
           <p className={styles.quiet}>Past the guard, new aggregated listings are skipped (existing ones still refresh; employer posts are allowed).</p>
         </>
       ) : null}
+    </section>
+  )
+}
+
+// ── Metrics export (CSV) ─────────────────────────────────────────────────────────────────────────
+function ExportBlock() {
+  const exp = useAdminAction('export_csv', { onSettled: (res) => { const r = res as Record<string, unknown>; if (res.ok && typeof r.csv === 'string' && r.csv) saveText(r.csv, typeof r.filename === 'string' && r.filename ? r.filename : 'seen-metrics.csv', 'text/csv;charset=utf-8') } })
+  const st = exp.state()
+  const empty = st.status === 'done' && !(st.result as Record<string, unknown> | undefined)?.csv
+  return (
+    <section className={styles.block} aria-labelledby="sy-export" data-testid="sy-export">
+      <div className={styles.blockHead}><h2 id="sy-export" className={styles.h2}>Metrics export</h2></div>
+      <p className={styles.quiet}>A CSV of exact counts: accounts, Pro now, new accounts in 7 days, reports, applications, companies scored, one-time revenue in 30 days, and new accounts and reports per California day for 30 days. A count that couldn’t be read says “unreadable” in the file.</p>
+      <ResultLine state={empty ? { ...st, status: 'error', error: { ok: false, code: 'upstream', error: 'The server answered with an empty file, so nothing was saved.', retryable: true } } : st}
+        onRetry={() => exp.retry()} onDismiss={() => exp.dismiss()} runningText="Counting for the export…" />
+      <div className={styles.actions}><Button variant="secondary" icon="download" onClick={() => void exp.run({})} loading={exp.busy()} data-testid="sy-export-csv">Download metrics CSV</Button></div>
+    </section>
+  )
+}
+
+// ── Search demand (Search Console / Bing) ───────────────────────────────────────────────────────
+function SearchDemandBlock() {
+  const api = useApi()
+  const [asked, setAsked] = useState(false)
+  const q = useAdminQuery<Record<string, unknown>>('search_demand', () => api<Record<string, unknown>>('search_opportunities', {}, { timeoutMs: 45_000 }), { enabled: asked, staleMs: 10 * 60_000 })
+  const d = q.data ? readSearchDemand(q.data) : null
+  return (
+    <section className={styles.block} aria-labelledby="sy-search" data-testid="sy-search">
+      <div className={styles.blockHead}><h2 id="sy-search" className={styles.h2}>Search demand</h2></div>
+      <p className={styles.quiet}>What people searched on Google (Search Console) and Bing in the last 28 days, and queries where a Seen page sits just off the first page.</p>
+      {!asked ? <div className={styles.actions}><Button variant="secondary" icon="search" onClick={() => setAsked(true)} data-testid="sy-search-load">Read search demand</Button></div>
+        : q.loading ? <Skeleton rows={3} label="Reading search demand" />
+        : q.error && !q.data ? <ErrorState what="search demand" error={q.error} onRetry={() => void q.refresh()} retrying={q.fetching} />
+        : !d ? <ErrorState what="search demand" error="The server could not read the search data." onRetry={() => void q.refresh()} />
+        : !d.ready ? <p className={styles.text} data-testid="sy-search-notready">Search data is not stored yet{d.reason ? ` (${d.reason})` : ''}.</p>
+        : (
+          <>
+            <RefreshFailed error={q.error} onRetry={() => void q.refresh()} />
+            <p className={styles.text} data-testid="sy-search-total">
+              {d.totals ? [d.totals.impressions === null ? 'impressions couldn’t be read' : `${fmt(d.totals.impressions)} ${d.totals.impressions === 1 ? 'impression' : 'impressions'}`, d.totals.clicks === null ? 'clicks couldn’t be read' : `${fmt(d.totals.clicks)} ${d.totals.clicks === 1 ? 'click' : 'clicks'}`, d.totals.queries === null ? '' : `${fmt(d.totals.queries)} ${d.totals.queries === 1 ? 'query' : 'queries'}`].filter(Boolean).join(' · ') : ''}
+              {` · Google data to ${d.google ? formatPacific(`${d.google}T12:00:00Z`, { dateStyle: 'medium' }) : 'none'}, Bing to ${d.bing ? formatPacific(`${d.bing}T12:00:00Z`, { dateStyle: 'medium' }) : 'none'}.`}
+            </p>
+            {d.stale ? <p className={styles.quiet}><StatusChip tone="caution" label="Stale" /> The daily pull looks stopped (Google more than 5 days old, or Bing more than 14).</p> : null}
+            {d.rows.length ? (
+              <ul className={styles.lines} aria-label="Queries just off the first page">
+                {d.rows.slice(0, 15).map((r, i) => (
+                  <li key={`${r.source}-${r.query}-${i}`} className={styles.lineItem}>
+                    <span className={styles.lineMain}><span className={styles.strong}>{r.query}</span>{r.company ? ` · ${r.company}` : ''} — {r.advice}</span>
+                    <span className={styles.lineSide}>{r.source} · position {r.position === null ? '?' : r.position.toFixed(1)} · {r.impressions === null ? '?' : fmt(r.impressions)} seen · {r.clicks === null ? '?' : fmt(r.clicks)} clicked</span>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className={styles.quiet}>No query sits just off the first page.</p>}
+          </>
+        )}
     </section>
   )
 }

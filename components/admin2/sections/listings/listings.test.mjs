@@ -6,7 +6,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   readListingCounts, browseFilters, browseKey, classifyQuery, activeFilterCount, jobState, jobTitle, formValues, buildPatch,
-  readJobDetail, holdersLine, readDupePlan, planSentence, readSourceRow, sourceCounts,
+  readJobDetail, holdersLine, readDupePlan, planSentence, readSourceRow, sourceCounts, staleConfirm,
 } from './adapter.ts'
 
 const U = { q: '', status: 'all', visible: '', employer: '', since: '', sort: 'newest', source: '' }
@@ -81,4 +81,16 @@ test('source health: the server’s failing flag and why; an unread count is "co
   const unk = readSourceRow({ source: 'x', live: null, added_24h: 3, failing: null })
   assert.equal(unk.state, 'unknown')
   assert.equal(sourceCounts(unk), 'live couldn’t be read · 3 added in 24 h · added today couldn’t be read')
+})
+
+test('Clear stale confirm: the total AND its parts from the server plan; the kept count alone for the tile', () => {
+  const c = readListingCounts({ counts: { stale_clearable: 1000, expired_kept: 350 }, clear_plan: { will_delete: 1325, stale_delete: 1000, expired_delete: 325, aging_delete: 0, kept_referenced: 50, expired_kept_referenced: 50 } })
+  assert.equal(c.plan.expiredKept, 50)
+  const t = staleConfirm(c.plan, c.stale_clearable)
+  assert.equal(t.title, 'Delete 1,325 listings?')
+  assert.equal(t.body, '1,000 stale listings and 325 expired listings, none of them saved by anyone. 50 listings someone saved or tracked are kept, hidden.')
+  const none = staleConfirm(null, 1000)
+  assert.match(none.title, /^Clear 1,000 stale listings and any expired ones nobody saved\?$/)
+  assert.match(none.body, /can be larger/)
+  assert.equal(readListingCounts({ counts: {} }).plan, null)
 })

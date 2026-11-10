@@ -7,7 +7,7 @@ import { httpHref } from '../../../../lib/safeHref.js'
 
 // ── Kinds ────────────────────────────────────────────────────────────────────────────────────────
 
-export type KindKey = 'held' | 'recent' | 'dupes' | 'tickets' | 'disputes' | 'claims' | 'replies' | 'purchases' | 'issues' | 'clusters'
+export type KindKey = 'held' | 'recent' | 'dupes' | 'tickets' | 'disputes' | 'claims' | 'replies' | 'purchases' | 'issues'
 
 export type KindDef = {
   key: KindKey
@@ -28,14 +28,13 @@ export const KINDS: KindDef[] = [
   { key: 'replies', label: 'Employer replies', queue: 'employer_replies', item: 'reply' },
   { key: 'purchases', label: 'Purchases to fulfil', queue: 'purchases_to_fulfil', item: 'purchase' },
   { key: 'issues', label: 'Data issues', queue: 'data_issues', item: 'issue' },
-  { key: 'clusters', label: 'Account clusters', queue: 'account_clusters', item: 'cluster' },
 ]
 
 // Older links and the fixture used other words for the same kinds; never land on nothing.
 const KIND_ALIAS: Record<string, KindKey> = {
   reports: 'held', held_reports: 'held', listings: 'tickets', listing_tickets: 'tickets', reddit: 'disputes',
   reddit_disputes: 'disputes', employers: 'claims', employer_claims: 'claims', employer_replies: 'replies',
-  purchases_to_fulfil: 'purchases', data_issues: 'issues', account_clusters: 'clusters', duplicates: 'dupes',
+  purchases_to_fulfil: 'purchases', data_issues: 'issues', duplicates: 'dupes',
 }
 
 export function parseKind(raw: string | null | undefined): KindKey {
@@ -112,6 +111,20 @@ export function label(s: unknown): string {
   return w ? w.charAt(0).toUpperCase() + w.slice(1) : ''
 }
 
+// The public site's outcome words (the server sends them as `outcome_label`; this mirror of
+// lib/server/admin/words.js OUTCOME_LABEL only stands in for a row that lacks it). Never print the raw enum.
+export const OUTCOME_WORDS: Record<string, string> = {
+  ghosted: 'Ghosted', autoreject: 'Auto-rejected', rejected: 'Rejected', human: 'Got a response',
+  interview: 'Interview', interviewing: 'Interviewing', offer: 'Offer', hired: 'Hired', waiting: 'Waiting',
+}
+export const outcomeWordOf = (o: unknown) => OUTCOME_WORDS[String(o || '').toLowerCase()] || label(o) || 'No outcome'
+/** A report row's outcome in the site's words. */
+export const outcomeWord = (r: { outcome?: unknown; outcome_label?: unknown } | null | undefined) =>
+  (typeof r?.outcome_label === 'string' && r.outcome_label) || outcomeWordOf(r?.outcome)
+/** Where a report came from, in the server's words ("Imported · LinkedIn"), else the platform. */
+export const sourceWord = (r: { source_label?: unknown; platform?: unknown; source?: unknown } | null | undefined) =>
+  (typeof r?.source_label === 'string' && r.source_label) || String(r?.platform || r?.source || '')
+
 export type Tone = 'good' | 'caution' | 'bad' | 'info' | 'neutral'
 
 const GOOD_OUTCOMES = new Set(['hired', 'offer', 'offer_received', 'interview', 'interview_received', 'interview_completed', 'responded', 'response_received', 'human', 'screening'])
@@ -148,12 +161,16 @@ export type HeldRow = {
   needs_review?: boolean
   /** Present when the server runs the strict first-hand rules on held rows too. */
   rules?: 'passes' | 'fails' | null
-  review?: { kind?: string; positive?: boolean; group?: 'needs_eyes' | 'positive' | 'employee_review'; sourceUrl?: string | null; flags?: string[] } | null
+  outcome_label?: string
+  source_label?: string
+  review?: { kind?: string; positive?: boolean; group?: 'needs_eyes' | 'positive' | 'employee_review'; sourceUrl?: string | null; flags?: string[]; duplicate_of?: string | null; duplicate_of_live?: boolean; duplicate_check?: 'done' | 'pending' } | null
 }
 
 export const flagsOf = (r: HeldRow): string[] => (Array.isArray(r.review?.flags) ? r.review!.flags! : [])
 export const isDuplicate = (r: HeldRow) => flagsOf(r).includes('possible_duplicate')
 export const groupOf = (r: HeldRow) => r.review?.group || 'needs_eyes'
+/** The server could not yet check this row against published reports (it will skip it in a bulk approve). */
+export const isUnchecked = (r: HeldRow) => r.review?.duplicate_check === 'pending'
 
 export type HeldView = 'all' | 'needs_eyes' | 'positive' | 'duplicates' | 'anti_gaming' | 'employee' | 'no_source' | 'rules_fail'
 
@@ -175,7 +192,8 @@ export function parseHeldView(raw: string | null | undefined): HeldView {
 export function matchesHeldView(r: HeldRow, view: HeldView): boolean {
   switch (view) {
     case 'needs_eyes': return groupOf(r) === 'needs_eyes'
-    case 'positive': return groupOf(r) === 'positive'
+    // "Clear positives" counts what Approve all positive publishes: possible duplicates are their own filter.
+    case 'positive': return groupOf(r) === 'positive' && !isDuplicate(r)
     case 'duplicates': return isDuplicate(r)
     case 'anti_gaming': return flagsOf(r).includes('anti_gaming_hold')
     case 'employee': return groupOf(r) === 'employee_review'
@@ -226,7 +244,7 @@ export type ApprovePlan = {
   /** Flagged rows the owner ticked himself: sent as `include_ids` so the server publishes them. */
   includeIds: string[]
   /** What stays for the owner to read, by reason. */
-  heldBack: { duplicates: number; antiGaming: number; needsEyes: number; employee: number }
+  heldBack: { duplicates: number; antiGaming: number; needsEyes: number; employee: number; unchecked: number }
   /** "140 clear positives will be published · 24 possible duplicates and 29 anti-gaming holds stay for you to read." */
   sentence: string
 }
@@ -240,13 +258,14 @@ export type ApprovePlan = {
 export function approvePlan(rows: HeldRow[], scope: 'positive' | 'selection', selected: Set<string> = new Set(), picked: Set<string> = new Set()): ApprovePlan {
   const pool = scope === 'positive' ? rows.filter((r) => groupOf(r) === 'positive') : rows.filter((r) => selected.has(r.id))
   const ids: string[] = []
-  const heldBack = { duplicates: 0, antiGaming: 0, needsEyes: 0, employee: 0 }
+  const heldBack = { duplicates: 0, antiGaming: 0, needsEyes: 0, employee: 0, unchecked: 0 }
   const includeIds: string[] = []
   for (const r of pool) {
     const own = picked.has(r.id)
     const flagged = flagsOf(r).includes('anti_gaming_hold') || isDuplicate(r)
     if (flagsOf(r).includes('anti_gaming_hold') && !own) { heldBack.antiGaming++; continue }
     if (isDuplicate(r) && !own) { heldBack.duplicates++; continue }
+    if (isUnchecked(r) && !own) { heldBack.unchecked++; continue }
     if (flagged) includeIds.push(r.id)
     ids.push(r.id)
   }
@@ -265,9 +284,10 @@ export function approvePlan(rows: HeldRow[], scope: 'positive' | 'selection', se
     heldBack.antiGaming ? plural(heldBack.antiGaming, 'anti-gaming hold') : '',
     heldBack.needsEyes ? `${fmt(heldBack.needsEyes)} that ${heldBack.needsEyes === 1 ? 'needs' : 'need'} your eyes` : '',
     heldBack.employee ? plural(heldBack.employee, 'employee review') : '',
+    heldBack.unchecked ? `${fmt(heldBack.unchecked)} not yet checked for copies` : '',
   ].filter(Boolean)
   const head = pub ? `${fmt(pub)} ${what} will be published` : 'Nothing here can be published in bulk'
-  const stays = heldBack.duplicates + heldBack.antiGaming + heldBack.needsEyes + heldBack.employee === 1 ? 'stays' : 'stay'
+  const stays = heldBack.duplicates + heldBack.antiGaming + heldBack.needsEyes + heldBack.employee + heldBack.unchecked === 1 ? 'stays' : 'stay'
   const tail = stay.length ? ` · ${listWords(stay)} ${stays} for you to read${scope === 'selection' && (heldBack.duplicates || heldBack.antiGaming) ? ' (tick one yourself to include it)' : ''}` : ''
   const sendIds = scope === 'positive' ? ids : pool.map((r) => r.id)
   return { ids, sendIds, includeIds, heldBack, sentence: `${head}${tail}.` }
@@ -416,7 +436,7 @@ export const hasOpenDispute = (t: Ticket) => !!t.dispute && t.dispute.status ===
 
 export type Dispute = { id: number | string; company_name?: string | null; company_key?: string | null; reason?: string | null; detail?: string | null; permalink?: string | null; contact?: string | null; status?: string; created_at?: string }
 export type Claim = { id: string; user_id?: string; company_name?: string | null; company_display_name?: string | null; status?: string; created_at?: string; reviewed_at?: string | null; reviewed_by?: string | null; note?: string | null; email?: string | null; email_verified?: boolean | null; employer_name?: string | null }
-export type Reply = { id: string; report_id?: string; company_key?: string | null; body?: string | null; status?: string; created_at?: string; reviewed_at?: string | null; reviewed_by?: string | null; report?: { role?: string | null; outcome?: string | null; report_text?: string | null; company_name?: string | null } | null }
+export type Reply = { id: string; report_id?: string; company_key?: string | null; body?: string | null; status?: string; created_at?: string; reviewed_at?: string | null; reviewed_by?: string | null; report?: { role?: string | null; outcome?: string | null; outcome_label?: string; outcome_phrase?: string; report_text?: string | null; company_name?: string | null } | null }
 export type Purchase = { id: string; company?: string | null; email?: string | null; employer_sku?: string | null; amount_cents?: number | null; status?: string; created_at?: string; fulfilled_at?: string | null }
 export type Issue = { id: string | number; type?: string | null; target_type?: string | null; target_name?: string | null; notes?: string | null; status?: string; created_at?: string; resolved_at?: string | null }
 export type Cluster = { id: number | string; user_ids?: string[]; users?: Array<{ id: string; email: string | null }>; signals?: unknown; risk_score?: number | null; status?: string; admin_note?: string | null; created_at?: string }
@@ -460,6 +480,7 @@ export function nothingToPublishLine(plan: ApprovePlan): string {
     plan.heldBack.antiGaming ? plural(plan.heldBack.antiGaming, 'anti-gaming hold') : '',
     plan.heldBack.needsEyes ? `${fmt(plan.heldBack.needsEyes)} that ${plan.heldBack.needsEyes === 1 ? 'needs' : 'need'} your eyes` : '',
     plan.heldBack.employee ? plural(plan.heldBack.employee, 'employee review') : '',
+    plan.heldBack.unchecked ? `${fmt(plan.heldBack.unchecked)} not yet checked for copies` : '',
   ].filter(Boolean)
   return `No clear positives left${left.length ? ` · ${left.join(' · ')}` : ''}`
 }

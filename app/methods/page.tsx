@@ -183,7 +183,7 @@ export default function MethodsPage() {
             the <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a> license. Seen has modified all or some of this
             information. USDOL/ETA has not approved, endorsed, or tested these modifications. O*NET&reg; is a trademark of USDOL/ETA.
             Seen keeps each occupation&rsquo;s title, job zone, related occupations, up to 15 task statements and 10 technology examples,
-            its alternate and reported job titles, and the military occupation crosswalk, and turns titles into lookup keys.
+            its alternate and reported job titles, the military occupation crosswalk and the work-activity hierarchy with the task statements mapped to it, and turns titles and tasks into lookup keys.
           </p>
           <p className={styles.p}>
             Word families and synonyms come from <a href="https://wordnet.princeton.edu/">WordNet 3.1</a>, narrowed to the common senses of

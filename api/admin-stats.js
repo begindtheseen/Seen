@@ -13,6 +13,7 @@ import { checkAdmin, adminDenied } from '../lib/server/admin/auth.js';
 import { makeDb } from '../lib/server/admin/batch.js';
 import { login, logout } from '../lib/server/admin/session.js';
 import { legacyDashboard } from '../lib/server/admin/legacyDashboard.js';
+import { runOnce } from '../lib/server/admin/idempotency.js';
 import { actions as overviewActions } from '../lib/server/admin/overview.js';
 import { actions as reviewActions } from '../lib/server/admin/review.js';
 import { actions as listingActions } from '../lib/server/admin/listings.js';
@@ -103,5 +104,6 @@ async function route(req, res) {
   const fn = Object.prototype.hasOwnProperty.call(ACTIONS, action) ? ACTIONS[action] : null;
   if (!fn) return fail(res, 400, action ? `Unknown action: ${action.slice(0, 60)}` : 'action required', { code: 'unknown_action', actions: Object.keys(ACTIONS).sort() });
   ctx.action = action;
-  return fn(ctx);
+  // One press = one execution: a write carrying `request_id` runs at most once (lib/server/admin/idempotency.js).
+  return runOnce(ctx, fn);
 }

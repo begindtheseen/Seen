@@ -13,6 +13,7 @@ import { StatusChip } from '../../ui/bits.tsx'
 import ConfirmStep from '../../ui/ConfirmStep.tsx'
 import ResultLine from '../../ui/ResultLine.tsx'
 import { ErrorState, RefreshFailed, Skeleton } from '../../ui/states.tsx'
+import { isUnknownAnswer } from './unknown.ts'
 import { buildPatch, EDIT_FIELDS, fmt, formValues, historyWord, holdersLine, jobState, jobTitle, readJobDetail } from './adapter.ts'
 import { httpHref } from '../../../../lib/safeHref.js'
 import styles from './listings.module.css'
@@ -29,9 +30,10 @@ export default function JobItem({ kind, id, setTitle }: ItemViewProps) {
   const applyHref = job && job.apply_url ? httpHref(String(job.apply_url)) : null
   useEffect(() => { if (job) setTitle(jobTitle(job), `listing ${job.id}`) }, [job, setTitle])
 
-  const edit = useAdminAction('job_edit', { onSettled: (res) => { if (res.ok) setEditing(false) } })
-  const restore = useAdminAction('job_restore')
-  const takeDown = useAdminAction('delete_listing', { onSettled: () => setConfirmDown(false) })
+  const reread = (res: { ok: boolean }) => { if (!res.ok && isUnknownAnswer(res as never)) void q.refresh() }
+  const edit = useAdminAction('job_edit', { onSettled: (res) => { if (res.ok) setEditing(false); reread(res) } })
+  const restore = useAdminAction('job_restore', { onSettled: reread })
+  const takeDown = useAdminAction('delete_listing', { onSettled: (res) => { setConfirmDown(false); reread(res) } })
   const [editing, setEditing] = useState(false)
   const [confirmDown, setConfirmDown] = useState(false)
   const start = useMemo(() => (job ? formValues(job) : {}), [job])
@@ -67,9 +69,9 @@ export default function JobItem({ kind, id, setTitle }: ItemViewProps) {
       </div>
 
       <div className={styles.itemPart} aria-live="polite">
-        <ResultLine state={edit.state()} onUndo={() => edit.undo()} onRetry={() => edit.retry()} onDismiss={() => edit.dismiss()} runningText="Saving…" />
-        <ResultLine state={restore.state()} onRetry={() => restore.retry()} onDismiss={() => restore.dismiss()} runningText="Putting it back…" />
-        <ResultLine state={takeDown.state()} onUndo={() => takeDown.undo()} onRetry={() => takeDown.retry()} onDismiss={() => takeDown.dismiss()} runningText="Taking it down…" />
+        <ResultLine state={edit.state()} onUndo={() => edit.undo()} onRetry={isUnknownAnswer(edit.state().error) ? undefined : () => edit.retry()} onDismiss={() => edit.dismiss()} runningText="Saving…" />
+        <ResultLine state={restore.state()} onRetry={isUnknownAnswer(restore.state().error) ? undefined : () => restore.retry()} onDismiss={() => restore.dismiss()} runningText="Putting it back…" />
+        <ResultLine state={takeDown.state()} onUndo={() => takeDown.undo()} onRetry={isUnknownAnswer(takeDown.state().error) ? undefined : () => takeDown.retry()} onDismiss={() => takeDown.dismiss()} runningText="Taking it down…" />
       </div>
 
       {editing ? (

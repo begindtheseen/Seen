@@ -574,6 +574,21 @@ function AnswerEditor({ a, company, values, notes, onSave, defaultOpen, title, t
   )
 }
 
+// "Closest line we found" on a job-match row (shown only when the prep server sends `candidate`): the same Yes / No question
+// as the fit read. The prep API takes no answers yet, so the answer is shown as the person's own words ("You said …") and
+// never as "your résumé shows"; it is not sent anywhere.
+function PrepCandidate({ line, why }: { line: string; why?: string }) {
+  const [said, setSaid] = useState<'yes' | 'no' | null>(null)
+  if (said) return <span className={s.why}>{said === 'yes' ? `You said “${line}” shows this.` : `You said “${line}” does not show this.`} <button type="button" className={s.linkBtn} onClick={() => setSaid(null)}>Change</button></span>
+  return (
+    <span className={s.why}>
+      Closest line we found: “{line}”. Does this show it?{why ? ` (${why})` : ''}{' '}
+      <button type="button" className={s.linkBtn} onClick={() => setSaid('yes')}>Yes</button>{' '}
+      <button type="button" className={s.linkBtn} onClick={() => setSaid('no')}>No</button>
+    </span>
+  )
+}
+
 function PackView({ pack, company, fu, onFill, onRebuild, building }: { pack: Pack; company: string; fu: FollowUp | null | undefined; onFill: (q: string, values: string[], urgent?: boolean) => void; onRebuild: (posting: string) => void; building: boolean }) {
   const intro = pack.intro
   const fills = pack.fills || {}
@@ -651,7 +666,7 @@ function PackView({ pack, company, fu, onFill, onRebuild, building }: { pack: Pa
               <li key={i}>
                 <b>{m.label}</b> <span className={s.dim}>· {MATCH_WORD[m.status] || m.status}</span>
                 {m.proof && <span className={s.why}>Your line: “{m.proof}”</span>}
-                {!m.proof && m.candidate?.line && <span className={s.why}>Closest line we found: “{m.candidate.line}”{m.candidate.why ? ` — ${m.candidate.why}` : ''}</span>}
+                {!m.proof && m.candidate?.line && <PrepCandidate line={m.candidate.line} why={m.candidate.why} />}
                 {m.say && <span className={s.why}>{m.say}</span>}
               </li>
             ))}

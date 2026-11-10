@@ -4,7 +4,7 @@
 //                                                  Seen's reports, the pay range from its listings, and a
 //                                                  follow-up schedule. Shown on every tracker card that
 //                                                  reaches an interview.
-//   POST {action:'build', company, role, application_id?, job_text?, interview_at?}
+//   POST {action:'build', company, role, application_id?, job_text?, interview_at?, confirmed?: [{statementId, answer, line?}]}
 //                                                  signed in + Pro access (an Interview Prep purchase
 //                                                  grants 14 days of it): questions, answers built only
 //                                                  from the résumé, intro, emails. Cached per user +
@@ -28,6 +28,7 @@
 //                                                  funnel counters (funnel_events) — lib/server/funnelEvents.js
 //                                                  holds the allow-listed names, surfaces and SKUs.
 
+import { cleanConfirmations, confirmationsKey } from '../lib/optimizer/confirmations.js';
 import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { gateAI } from '../lib/server/credits.js';
 import { localPack, PREP_ENGINE } from '../lib/server/prepLocal.js';
@@ -71,7 +72,7 @@ export function needsHeal(pack) {
  */
 export async function healStoredPack(pack, { company, role, resumeText, save = async () => {}, taxonomy = null }) {
   if (!pack || pack.pending || !needsHeal(pack) || !readableResume(resumeText)) return pack;
-  const rebuilt = localPack({ company, role, resumeText, jobText: cleanPostingText(pack.job_text), pay: pack.pay || null, stage: pack.stage || '', taxonomy });
+  const rebuilt = localPack({ company, role, resumeText, jobText: cleanPostingText(pack.job_text), pay: pack.pay || null, stage: pack.stage || '', taxonomy, confirmed: cleanConfirmations(pack.confirmed) });
   const full = { ...pack, ...rebuilt, built_at: new Date().toISOString(), posting_pay: rebuilt.posting_pay || null, fills: {}, notes: {} };
   // the emails name the posting's work the rebuilt pack chose; the sign-off name is the one the old emails carried
   if (pack.emails && pack.emails.thankYou) {
@@ -284,6 +285,9 @@ export default async function handler(req, res) {
 
   if (action === 'build') {
     if (await applyRateLimit(req, res, 'interview-prep')) return;
+    // the person's Yes / No answers (request field `confirmed`, the same array the free check takes): only well-formed
+    // entries pass here, and the verdict's applyConfirmations validates each against THIS reading and résumé
+    const confirmed = cleanConfirmations(body.confirmed);
     if (!company) return res.status(400).json({ error: 'company required' });
     let prior = null;
     let priorJobText = '';
@@ -296,7 +300,9 @@ export default async function handler(req, res) {
         const text = Array.isArray(pr) && pr[0] ? String(pr[0].resume_text || '') : '';
         cached = await healStoredPack(cached, { company, role, resumeText: text, save: (full) => savePack(owner, full), taxonomy: await prepTaxonomy() });
       }
-      if (cached && !body.refresh) return res.status(200).json({ ok: true, cached: true, pack: cached });
+      // the person's answers are part of the cache key (the same hash the paid cache uses): a pack built with other
+      // answers is rebuilt, never served (round 7)
+      if (cached && !body.refresh && String(cached.answers_key || '') === confirmationsKey(confirmed)) return res.status(200).json({ ok: true, cached: true, pack: cached });
       // a rebuild keeps what the person already typed (pinned to the sentence it finished — prepFills.js), and
       // the posting they pasted before: on the earlier build, or stashed before checkout
       if (cached) prior = cached;
@@ -337,7 +343,7 @@ export default async function handler(req, res) {
     // Seen's own engine, no model API (owner decision 2026-10-26): résumé lines told out loud, the
     // posting's requirements and your answer to each, questions to ask them.
     const taxonomy = jobText ? await prepTaxonomy() : null;
-    const pack = localPack({ company, role, resumeText, jobText, pay, stage, taxonomy });
+    const pack = localPack({ company, role, resumeText, jobText, pay, stage, taxonomy, confirmed });
 
     const name = signOffName(resumeText, clean(prof?.name, 80));
     const full = {
@@ -351,6 +357,8 @@ export default async function handler(req, res) {
       // the posting the prep was built from (so "Add the posting and rebuild" works on any device), and the
       // person's own words for the blanks, keyed by question
       job_text: jobText || '',
+      // the answers it was built with (a heal rebuilds with the same answers)
+      confirmed,
       // the posting's own pay, when it states one, shown beside Seen's range from other employers
       posting_pay: pack.posting_pay || null,
       fills: {},

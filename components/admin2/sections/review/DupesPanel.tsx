@@ -26,20 +26,11 @@ export default function DupesPanel() {
   // One press = one request_id on EVERY round, so the server's single batch Undo covers the whole press.
   const job = [...all].reverse().find((j) => j.action === 'dedupe_reports')
   const running = !!job && (job.status === 'running' || job.status === 'cancelling')
-  const undoJob = [...all].reverse().find((j) => j.action === 'undo' && j.args?.from === 'dedupe_reports')
-  const [undoErr, setUndoErr] = useState<string | null>(null)
+  // The core keeps the press's Undo on the job (one request_id on every round); its Undo runs as a job too.
+  const undoJob = job ? [...all].reverse().find((j) => j.action === 'undo' && j.started_at >= job.started_at) : undefined
   const startMark = () => {
     if (running) return
     jobs.start({ action: 'dedupe_reports', args: { request_id: newRequestId() }, label: 'Marking duplicate copies', past: 'Marked', noun: 'duplicate copies', ...(suspected ? { total: suspected } : {}) })
-  }
-  // The job manager keeps no Undo handle, so the press's batch row is read from the activity log (newest
-  // dedupe_reports row — the last round's, which covers every copy of the press) and undone as a job.
-  const undoMarks = async () => {
-    setUndoErr(null)
-    const log = await api<{ rows?: Array<{ id: string; undoable: boolean }> }>('activity_log', { filter_action: 'dedupe_reports', limit: 1 })
-    const row = log.ok ? log.rows?.[0] : null
-    if (!row || !row.undoable) { setUndoErr(log.ok ? 'There is no mark left to undo — it was already undone or has expired.' : log.error); return }
-    jobs.start({ action: 'undo', args: { audit_id: row.id, from: 'dedupe_reports' }, label: 'Putting the copies back', past: 'Put back', noun: 'copies', ...(job?.changed ? { total: job.changed } : {}) })
   }
   const data = scan.data
   const suspected = typeof data?.suspected === 'number' ? data.suspected : null
@@ -72,14 +63,8 @@ export default function DupesPanel() {
           onConfirm={() => { startMark(); setConfirm(false) }}
         />
       ) : null}
-      {job ? <JobProgress job={job} onCancel={() => jobs.cancel(job.id)} onResume={() => jobs.resume(job.id)} onDismiss={() => jobs.dismiss(job.id)} /> : null}
-      {job && job.status === 'done' && job.changed > 0 && (!undoJob || undoJob.started_at < job.started_at) ? (
-        <div className={styles.actions}>
-          <Button variant="ghost" icon="undo-2" onClick={() => void undoMarks()} data-testid="dupes-undo">Undo all {plural(job.changed, 'mark')}</Button>
-        </div>
-      ) : null}
-      {undoErr ? <p className={styles.note} role="status">{undoErr}</p> : null}
-      {undoJob && job && undoJob.started_at >= job.started_at ? <JobProgress job={undoJob} onCancel={() => jobs.cancel(undoJob.id)} onResume={() => jobs.resume(undoJob.id)} onDismiss={() => jobs.dismiss(undoJob.id)} /> : null}
+      {job ? <JobProgress job={job} onCancel={() => jobs.cancel(job.id)} onResume={() => jobs.resume(job.id)} onDismiss={() => jobs.dismiss(job.id)} onUndo={() => { jobs.undo(job.id) }} /> : null}
+      {undoJob ? <JobProgress job={undoJob} onCancel={() => jobs.cancel(undoJob.id)} onResume={() => jobs.resume(undoJob.id)} onDismiss={() => jobs.dismiss(undoJob.id)} /> : null}
 
       {scan.fetching && !data ? (
         <p className={styles.scanning} role="status" data-testid="dupes-scanning"><span className="ui-btn__spin" aria-hidden="true" />Reading every report — this can take up to 20 seconds.</p>

@@ -7,6 +7,7 @@
 import Icon from '@/components/ui/Icon'
 import type { AdminSkipped } from '../contract.ts'
 import type { ActionState } from '../core/action.ts'
+import type { Job } from '../core/jobs.ts'
 import styles from './ui.module.css'
 
 export type SkipLink = { label: string; onSelect: () => void }
@@ -28,18 +29,37 @@ export type ResultLineProps = {
   onDismiss?: () => void
   /** Per skip reason, a link that shows those rows (sets the filter). */
   skipLinks?: Record<string, SkipLink>
-  /** While running: "Approving 188 reports…" (default "Working…"). */
+  /** While running: "Approving 188 reports…" (default "Working…"). Never shown while undoing or checking. */
   runningText?: string
+  /**
+   * A follow-up job this result announced ("… · 53 company scores still updating"). When the job finishes the
+   * line is REPLACED by the finished sentence — the "still updating" part is never left on screen.
+   */
+  followUp?: Job
 }
 
-export default function ResultLine({ state, onUndo, onRetry, onDismiss, skipLinks, runningText }: ResultLineProps) {
+/** What the line says while the Undo runs: never the original action's "Approving…". Pure for the test. */
+export function undoingText(state: ActionState): string {
+  const n = state.result?.changed || 0
+  return n > 0 ? `Undoing — putting ${fmt(n)} back…` : 'Undoing…'
+}
+
+/** The done sentence with a finished follow-up job: the part before " · " plus the job's own summary. */
+export function withFollowUp(message: string, job: Job | undefined): string {
+  if (!job || job.status === 'running' || job.status === 'cancelling') return message
+  const head = message.split(' · ')[0].replace(/[.\s]+$/, '')
+  return `${head}. ${job.message}`
+}
+
+export default function ResultLine({ state, onUndo, onRetry, onDismiss, skipLinks, runningText, followUp }: ResultLineProps) {
   if (state.status === 'idle') return null
   const running = state.status === 'running' || state.undoing
   const err = state.error
   const failed = state.status === 'error' || (!!err && !running)
   const res = state.result
   const tone = running ? styles.lineRun : failed ? styles.lineBad : styles.lineGood
-  const word = running ? (state.undoing ? 'Undoing' : 'Working') : failed ? (state.status === 'done' ? 'Undo failed' : 'Not done') : state.undone ? 'Undone' : 'Done'
+  const unknown = failed && err?.code === 'unknown_outcome'
+  const word = running ? (state.undoing ? 'Undoing' : state.checking ? 'Checking' : 'Working') : failed ? (state.status === 'done' ? 'Undo failed' : unknown ? 'Not known yet' : 'Not done') : state.undone ? 'Undone' : 'Done'
   const skipped: AdminSkipped[] = !failed && res ? res.skipped.filter((s) => s.count > 0) : []
   return (
     <div className={`${styles.line} ${tone}`} role="status" aria-live="polite" data-testid="result-line" data-state={running ? 'running' : failed ? 'error' : 'done'}>
@@ -48,12 +68,12 @@ export default function ResultLine({ state, onUndo, onRetry, onDismiss, skipLink
         {word}
       </span>
       <span className={styles.lineText}>
-        {running ? (runningText || 'Working…') : failed ? (
+        {running ? (state.undoing ? undoingText(state) : state.checking ? 'No answer yet — asking the server whether it went through…' : (runningText || 'Working…')) : failed ? (
           <>
             {err?.error}
             {err && (err.changed || 0) > 0 ? ` ${fmt(err.changed!)} ${err.changed === 1 ? 'row was' : 'rows were'} changed before it stopped.` : ''}
           </>
-        ) : (res?.message || 'Done.')}
+        ) : withFollowUp(res?.message || 'Done.', followUp)}
         {skipped.map((s) => {
           const link = skipLinks?.[s.reason]
           const already = res?.message.includes(fmt(s.count)) || res?.message.includes(String(s.count))
@@ -74,7 +94,7 @@ export default function ResultLine({ state, onUndo, onRetry, onDismiss, skipLink
         ) : null}
         {!running && state.status === 'error' && err?.retryable && onRetry ? (
           <button type="button" className={styles.lineBtn} onClick={onRetry} data-testid="result-retry">
-            <Icon name="refresh-cw" size={16} />Retry
+            <Icon name="refresh-cw" size={16} />{unknown ? 'Check again' : 'Retry'}
           </button>
         ) : null}
         {!running && onDismiss ? (

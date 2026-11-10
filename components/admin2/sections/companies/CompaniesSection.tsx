@@ -75,12 +75,12 @@ function DuplicatesBlock() {
   const shell = useShell()
   const [asked, setAsked] = useState(false)
   const q = useAdminQuery<Record<string, unknown>>('company_dupes', () => api<Record<string, unknown>>('find_duplicates', {}, { timeoutMs: 60_000 }), { enabled: asked, staleMs: 60_000 })
-  const job = useAdminJob({ action: 'auto_merge', label: 'Merging names that differ only by Inc, LLC and the like', past: 'Merged', noun: 'companies' })
-  const [confirming, setConfirming] = useState(false)
-  useEffect(() => { if (confirming && job.job && (job.job.rounds > 0 || !job.running)) setConfirming(false) }, [confirming, job.job, job.running])
   const view = q.data ? readDupeGroups(q.data) : null
   const auto = view?.groups.filter((g) => g.auto) || []
   const look = view?.groups.filter((g) => !g.auto) || []
+  const job = useAdminJob({ action: 'auto_merge', label: 'Merging names that differ only by Inc, LLC and the like', past: 'Merged', noun: 'groups of duplicate names', total: auto.length || undefined })
+  const [confirming, setConfirming] = useState(false)
+  useEffect(() => { if (confirming && job.job && (job.job.rounds > 0 || !job.running)) setConfirming(false) }, [confirming, job.job, job.running])
   return (
     <section className={styles.block} aria-labelledby="co-dupes" data-testid="co-dupes">
       <div className={styles.blockHead}><h2 id="co-dupes" className={styles.h2}>Duplicate names</h2></div>
@@ -121,7 +121,7 @@ function DuplicatesBlock() {
                     <li key={g.key} className={styles.lineItem} data-testid="co-lookalike">
                       <span className={styles.lineMain}>
                         {g.companies.map((c, i) => (
-                          <span key={c.id || c.name}>{i ? ' · ' : ''}<button type="button" className={styles.linkBtn} onClick={() => shell.openItem('company', c.name)}>{displayName(c.name)}</button>{c.report_count !== null ? ` (${fmt(c.report_count)} reports)` : ''}</span>
+                          <span key={c.id || c.name}>{i ? ' · ' : ''}<button type="button" className={styles.linkBtn} onClick={() => shell.openItem('company', c.name)}>{displayName(c.name)}</button>{c.report_count !== null ? ` (${fmt(c.report_count)} ${c.report_count === 1 ? 'report' : 'reports'})` : ''}</span>
                         ))}
                       </span>
                     </li>
@@ -166,7 +166,7 @@ function MergesBlock() {
         renderRow={(m) => (
           <Row testId={`merge-row-${m.id}`}
             title={`${displayName(m.secondary_name)} → ${displayName(m.primary_name)}`}
-            sub={`${m.moved_reports === null || m.moved_reports === undefined ? '' : `${fmt(m.moved_reports)} reports moved · `}${m.created_at ? formatPacific(m.created_at) : ''}`}
+            sub={`${m.moved_reports === null || m.moved_reports === undefined ? '' : `${fmt(m.moved_reports)} ${m.moved_reports === 1 ? 'report' : 'reports'} moved · `}${m.created_at ? formatPacific(m.created_at) : ''}`}
             status={m.undone_at ? <StatusChip tone="neutral" label={`Separated ${formatPacific(m.undone_at, { dateStyle: 'medium' })}`} /> : undefined}
             actions={!m.undone_at && confirm !== m.id ? (
               <div className={styles.actions}>

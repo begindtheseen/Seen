@@ -6,7 +6,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { proLine, endOfPacificDay, readUserDetail, ledgerWords, signupWords, readAttribution, readCluster, signalWords, userSub } from './adapter.ts'
 import { companyLine, displayName, evidence, readCompanyDetail, readDupeGroups } from '../companies/adapter.ts'
-import { cronOneInWords, cronInWords, cronState, readCron, cronSummary, readFlags, flagIsOn, flagStateWords, dangerConsequence, readRevenue, readActivity, canOpen } from '../system/adapter.ts'
+import { scheduleText, cronDetail, cronState, readCron, cronSummary, readFlags, flagIsOn, flagStateWords, dangerConsequence, readRevenue, readActivity, canOpen } from '../system/adapter.ts'
 
 const now = Date.parse('2026-11-10T20:00:00Z')
 
@@ -58,17 +58,9 @@ test('companies: names, lines and evidence that say what they count', () => {
   assert.equal(g.groups.length, 1); assert.equal(g.total, 1774)
 })
 
-test('cron schedules read as words in California time', () => {
-  const ref = new Date('2026-11-10T12:00:00Z') // PST
-  assert.equal(cronOneInWords('0 15 * * *', ref), 'Every day at 7:00 AM')
-  assert.equal(cronOneInWords('35 * * * *', ref), 'Every hour at :35')
-  assert.equal(cronOneInWords('0 8 * * 1', ref), 'Every Monday at 12:00 AM')
-  assert.equal(cronOneInWords('0 2,14 * * *', ref), 'Every day at 6:00 AM and 6:00 PM')
-  assert.equal(cronOneInWords('0 */4 * * *', ref), 'Every 4 hours')
-  assert.equal(cronOneInWords('0 3 1 * *', ref), 'On day 1 of each month at 7:00 PM')
-  assert.equal(cronInWords('0 15 * * *; 35 * * * *', ref), 'Every day at 7:00 AM; Every hour at :35')
-  assert.equal(cronOneInWords('weird', ref), 'weird')
-  assert.equal(cronInWords('0 2 * * *; 0 14 * * *', ref), 'Every day at 6:00 AM and 6:00 PM')
+test('the schedule is printed as the server words it; the raw expression only as a fallback, marked UTC', () => {
+  assert.equal(scheduleText(readCron({ name: 'x', schedule: '0 4 1 * *', schedule_label: 'Last day of each month at 8:00 PM (California)' })), 'Last day of each month at 8:00 PM (California)')
+  assert.equal(scheduleText(readCron({ name: 'x', schedule: '*/15 * * * *' })), '*/15 * * * * (UTC)')
 })
 
 test('cron rows: unknown stays "No run recorded yet", overdue is bad, the summary never says on time without a record', () => {
@@ -76,7 +68,7 @@ test('cron rows: unknown stays "No run recorded yet", overdue is bad, the summar
   assert.equal(cronState(unknown).word, 'No run recorded yet')
   assert.equal(cronState(readCron({ name: 'r', last_result: 'ok', overdue: true })).word, 'Overdue')
   assert.match(cronSummary([unknown]), /None of the 1 scheduled jobs records its runs yet/)
-  assert.match(cronSummary([unknown, readCron({ name: 'r', last_result: 'ok' })]), /^1 of 2 scheduled jobs record their runs and none of those is late\. 1 record nothing yet\.$/)
+  assert.match(cronSummary([unknown, readCron({ name: 'r', last_result: 'ok' })]), /^1 of 2 scheduled jobs records its runs and none of those is late\. 1 records nothing yet\.$/)
 })
 
 test('flags: on/off as the reader decides; the credit flag unset means free for everyone', () => {
@@ -108,4 +100,10 @@ test('the ledger carries the grant reason and who; the sign-up source reads as w
   assert.equal(u.earned, null); assert.equal(u.spent, 12)
   assert.match(signupWords(u.signup), /^First page \/company\/walmart from google\.com\.$/)
   assert.match(signupWords(null), /^Not recorded/)
+})
+
+test('the cron detail drops what the row already says (label, next run, "nothing records")', () => {
+  const c = readCron({ name: 'x', schedule: '15 * * * *', schedule_label: 'Every hour at :15', detail: "Every hour at :15 · next Nov 10, 2026, 1:15 PM PT · Nothing records this cron's runs yet" })
+  assert.equal(cronDetail(c), '')
+  assert.equal(cronDetail(readCron({ name: 'y', schedule_label: 'Daily', detail: 'Daily · next soon · from cron_runs · duration_ms 4200' })), 'from cron_runs')
 })

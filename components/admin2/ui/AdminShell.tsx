@@ -22,6 +22,8 @@ export type AdminShellProps = {
   jobChip?: ReactNode
   /** Phone: the same job, as a one-line bar above the bottom bar. */
   jobBar?: ReactNode
+  /** The last action's result (the result dock): above the job bar on a phone, bottom-right on a desktop. */
+  dock?: ReactNode
   onSearch: () => void
   onMore: () => void
   onSignOut: () => void
@@ -36,8 +38,18 @@ function Badge({ n }: { n: number | null | undefined }) {
   return <span className={styles.badge} aria-label={`${fmt(n)} waiting`}>{n > 999 ? '999+' : fmt(n)}</span>
 }
 
-export default function AdminShell({ sections, active, onSelect, badges, jobChip, jobBar, onSearch, onMore, onSignOut, username, children }: AdminShellProps) {
+export default function AdminShell({ sections, active, onSelect, badges, jobChip, jobBar, dock, onSearch, onMore, onSignOut, username, children }: AdminShellProps) {
   const root = useRef<HTMLDivElement>(null)
+  const stack = useRef<HTMLDivElement>(null)
+  // The page reserves exactly the height of what sits above the phone bar (dock + job bar), so they cover
+  // nothing and appearing never shifts what is above (the reservation is at the bottom of the page).
+  useEffect(() => {
+    const el = stack.current, r = root.current
+    if (!el || !r || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => r.style.setProperty('--admin-stack', `${Math.round(el.getBoundingClientRect().height)}px`))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
   // The phone bar ducks while a field has focus (the keyboard is up).
   useEffect(() => {
     const el = root.current
@@ -55,7 +67,7 @@ export default function AdminShell({ sections, active, onSelect, badges, jobChip
   const moreActive = more.some((s) => s.key === active)
 
   return (
-    <div ref={root} className={jobBar ? `${styles.root} ${styles.hasJob}` : styles.root} data-testid="admin-shell">
+    <div ref={root} className={styles.root} data-testid="admin-shell">
       <a href="#admin-main" className={styles.skip}>Skip to content</a>
       {/* Desktop rail */}
       <aside className={styles.rail} aria-label="Admin">
@@ -99,7 +111,10 @@ export default function AdminShell({ sections, active, onSelect, badges, jobChip
       {/* Phone: the job chip has its own slim bar just above the bottom bar — never in the header, where it
           covered the wordmark (director, 2026-11-10). Solid and fixed: it overlays nothing the owner needs
           (the page reserves its height at the bottom while a job is shown) and never shifts the page. */}
-      {jobBar ? <div className={styles.jobBar} data-testid="job-bar">{jobBar}</div> : null}
+      <div ref={stack} className={styles.stack} data-testid="bottom-stack">
+        {dock ? <div className={styles.dock} data-testid="result-dock"><div className={styles.dockCard}>{dock}</div></div> : null}
+        {jobBar ? <div className={styles.jobBar} data-testid="job-bar">{jobBar}</div> : null}
+      </div>
       {/* Not a <nav>: globals.css styles every nav element as the site bar. */}
       <div role="navigation" className={styles.bottom} aria-label="Sections">
         {bar.map((s) => (

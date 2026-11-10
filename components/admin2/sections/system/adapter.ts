@@ -1,64 +1,18 @@
 // System, made safe for the screen (pure — system.test.mjs): cron schedules in plain words (California
 // time), cron rows, flags, errors, the activity log, revenue. Unknown stays unknown — never a guess.
-import { formatPacific, pacificParts } from '../../../../lib/time/pacific.js'
+import { formatPacific } from '../../../../lib/time/pacific.js'
 
 export const fmt = (n: number) => Math.round(n).toLocaleString('en-US')
+const list = (xs: string[]) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`)
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null)
 const str = (v: unknown): string => (typeof v === 'string' ? v : v == null ? '' : String(v))
 
-// ── Cron schedules in words ──────────────────────────────────────────────────────────────────────
-const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-
-/** A UTC hour:minute as a California clock time on `ref`'s date ("7:20 AM"). */
-export function pacificClock(hourUtc: number, minute: number, ref = new Date()): string {
-  const d = new Date(Date.UTC(ref.getUTCFullYear(), ref.getUTCMonth(), ref.getUTCDate(), hourUtc, minute))
-  const p = pacificParts(d)
-  const h12 = ((p.hour + 11) % 12) + 1
-  return `${h12}:${String(p.minute).padStart(2, '0')} ${p.hour < 12 ? 'AM' : 'PM'}`
-}
-
-const list = (xs: string[]) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`)
-const ints = (f: string) => (f.split(',').every((x) => /^\d+$/.test(x)) ? f.split(',').map(Number) : null)
-
-/** One 5-field cron (UTC, Vercel's clock) in words, times in California. Anything unusual is shown as written. */
-export function cronOneInWords(expr: string, ref = new Date()): string {
-  const f = expr.trim().split(/\s+/)
-  if (f.length !== 5) return expr
-  const [mi, hr, dom, mon, dow] = f
-  const minutes = ints(mi)
-  if (!minutes || mon !== '*') return `${expr} (UTC)`
-  if (hr === '*' && dom === '*' && dow === '*') return minutes.length === 1 ? `Every hour at :${String(minutes[0]).padStart(2, '0')}` : `Every hour at ${list(minutes.map((m) => `:${String(m).padStart(2, '0')}`))}`
-  const step = /^\*\/(\d+)$/.exec(hr)
-  if (step && dom === '*' && dow === '*' && minutes.length === 1) return `Every ${step[1]} hours`
-  const hours = ints(hr)
-  if (!hours || minutes.length !== 1) return `${expr} (UTC)`
-  // In California order (the UTC hours wrap past midnight).
-  const pt = (h: number) => { const p = pacificParts(new Date(Date.UTC(ref.getUTCFullYear(), ref.getUTCMonth(), ref.getUTCDate(), h, minutes[0]))); return p.hour * 60 + p.minute }
-  const times = list([...hours].sort((a, b) => pt(a) - pt(b)).map((h) => pacificClock(h, minutes[0], ref)))
-  if (dom === '*' && dow === '*') return `Every day at ${times}`
-  const days = ints(dow)
-  if (dom === '*' && days) return `Every ${list(days.map((d) => DAYS[d % 7]))} at ${times}`
-  const doms = ints(dom)
-  if (doms && dow === '*') return `On day ${list(doms.map(String))} of each month at ${times}`
-  return `${expr} (UTC)`
-}
-
-/** The server joins several schedules for one path with ";" (or puts several hours in one field). */
-export function cronInWords(schedule: string, ref = new Date()): string {
-  let parts = schedule.split(';').map((s) => s.trim()).filter(Boolean)
-  if (!parts.length) return 'No schedule'
-  // Several daily schedules at the same minute ("0 2 * * *; 0 6 * * *") read as one line of times.
-  const daily = parts.map((p) => /^(\d+) (\d+) \* \* \*$/.exec(p))
-  if (parts.length > 1 && daily.every(Boolean) && daily.every((m) => m![1] === daily[0]![1])) parts = [`${daily[0]![1]} ${daily.map((m) => m![2]).join(',')} * * *`]
-  return parts.map((p) => cronOneInWords(p, ref)).join('; ')
-}
-
 // ── Cron rows ────────────────────────────────────────────────────────────────────────────────────
-export type CronRow = { name: string; path: string; schedule: string; last_run: string | null; last_result: 'ok' | 'failed' | 'partial' | 'unknown'; next_run: string | null; overdue: boolean; detail: string; duration_ms: number | null }
+export type CronRow = { name: string; path: string; schedule: string; schedule_label: string | null; last_run: string | null; last_result: 'ok' | 'failed' | 'partial' | 'unknown'; next_run: string | null; overdue: boolean; detail: string; duration_ms: number | null }
 export function readCron(r: unknown): CronRow {
   const o = (r && typeof r === 'object' ? r : {}) as Record<string, unknown>
   const lr = str(o.last_result)
-  return { name: str(o.name) || str(o.path), path: str(o.path), schedule: str(o.schedule), last_run: o.last_run ? str(o.last_run) : null, last_result: (['ok', 'failed', 'partial'].includes(lr) ? lr : 'unknown') as CronRow['last_result'], next_run: o.next_run ? str(o.next_run) : null, overdue: o.overdue === true, detail: str(o.detail), duration_ms: num(o.duration_ms) }
+  return { name: str(o.name) || str(o.path), path: str(o.path), schedule: str(o.schedule), schedule_label: [o.schedule_label, o.schedule_words, o.label].find((v) => typeof v === 'string' && v.trim()) as string | null ?? null, last_run: o.last_run ? str(o.last_run) : null, last_result: (['ok', 'failed', 'partial'].includes(lr) ? lr : 'unknown') as CronRow['last_result'], next_run: o.next_run ? str(o.next_run) : null, overdue: o.overdue === true, detail: str(o.detail), duration_ms: num(o.duration_ms) }
 }
 
 export type Tone = 'good' | 'caution' | 'bad' | 'info' | 'neutral'
@@ -81,7 +35,8 @@ export function cronLines(c: CronRow): string[] {
 
 /** The server's detail without what the lines already say ("Next: …", "Nothing records…"). */
 export function cronDetail(c: CronRow): string {
-  return c.detail.split(' · ').map((x) => x.trim()).filter((x) => x && !/^Next:/.test(x) && !/^Nothing records/.test(x)).join(' · ')
+  return c.detail.split(' · ').map((x) => x.trim())
+    .filter((x) => x && !/^next\b:?/i.test(x) && !/^Nothing records/.test(x) && !/^duration_ms\b/.test(x) && x !== c.schedule_label && x !== c.schedule).join(' · ')
 }
 
 export function durationWords(ms: number): string {
@@ -96,9 +51,9 @@ export function cronSummary(rows: CronRow[]): string {
   const unknown = rows.filter((c) => c.last_result === 'unknown' && !c.overdue)
   const known = rows.length - unknown.length
   if (!rows.length) return 'No scheduled jobs were listed.'
-  if (bad.length) return `${fmt(bad.length)} of ${fmt(rows.length)} scheduled jobs need a look: ${list(bad.slice(0, 3).map((c) => c.name))}${bad.length > 3 ? ' and more' : ''}.`
+  if (bad.length) return `${fmt(bad.length)} of ${fmt(rows.length)} scheduled ${rows.length === 1 ? 'job' : 'jobs'} ${bad.length === 1 ? 'needs' : 'need'} a look: ${list(bad.slice(0, 3).map((c) => c.name))}${bad.length > 3 ? ' and more' : ''}.`
   if (!known) return `None of the ${fmt(rows.length)} scheduled jobs records its runs yet, so none can be called on time.`
-  return `${fmt(known)} of ${fmt(rows.length)} scheduled jobs record their runs and none of those is late. ${fmt(unknown.length)} record nothing yet.`
+  return `${fmt(known)} of ${fmt(rows.length)} scheduled jobs ${known === 1 ? 'records its' : 'record their'} runs and none of those is late. ${fmt(unknown.length)} ${unknown.length === 1 ? 'records' : 'record'} nothing yet.`
 }
 
 // ── Flags ────────────────────────────────────────────────────────────────────────────────────────
@@ -210,3 +165,28 @@ export function dbSizeLine(d: DbSize): string {
   return `${head}${guard}.${jobs}`
 }
 export function dbSizeTone(d: DbSize): Tone { return d.usedPct === null ? 'neutral' : d.usedPct >= 90 ? 'bad' : d.usedPct >= 75 ? 'caution' : 'good' }
+
+/** The schedule as the server words it (never built here — the server knows Vercel's UTC clock and the PT day). */
+export function scheduleText(c: CronRow): string {
+  return c.schedule_label || `${c.schedule} (UTC)`
+}
+
+// ── Search demand (search_opportunities) ─────────────────────────────────────────────────────────
+export type SearchDemand = { ready: boolean; reason: string | null; totals: { clicks: number | null; impressions: number | null; queries: number | null } | null; stale: boolean; google: string | null; bing: string | null; rows: Array<{ query: string; source: string; impressions: number | null; clicks: number | null; position: number | null; company: string | null; advice: string }> }
+export function readSearchDemand(raw: unknown): SearchDemand | null {
+  const o0 = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  const o = (o0.report && typeof o0.report === 'object' ? o0.report : o0) as Record<string, unknown>
+  if (o.ok === false) return null
+  const f = (o.freshness && typeof o.freshness === 'object' ? o.freshness : {}) as Record<string, unknown>
+  if (o.ready === false) return { ready: false, reason: o.reason ? str(o.reason) : null, totals: null, stale: false, google: null, bing: null, rows: [] }
+  const t = (o.totals && typeof o.totals === 'object' ? o.totals : {}) as Record<string, unknown>
+  const rows = (Array.isArray(o.striking_distance) ? o.striking_distance : []).map((r: Record<string, unknown>) => ({ query: str(r.query), source: str(r.source), impressions: num(r.impressions), clicks: num(r.clicks), position: num(r.position), company: r.company ? str(r.company) : null, advice: str(r.advice) }))
+  return { ready: true, reason: null, totals: { clicks: num(t.clicks), impressions: num(t.impressions), queries: num(t.queries) }, stale: f.stale === true, google: f.google ? str(f.google) : null, bing: f.bing ? str(f.bing) : null, rows }
+}
+
+// ── Recent tracked applications (get_kpi_detail apps_total: the newest 100) ──────────────────────
+export type AppRow = { id: string; company: string; role: string; status: string; stage: string; created_at: string }
+export function readApps(raw: unknown): AppRow[] {
+  const o = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  return (Array.isArray(o.rows) ? o.rows : []).map((r: Record<string, unknown>) => ({ id: str(r.id), company: str(r.company_name), role: str(r.role), status: str(r.status), stage: str(r.stage), created_at: str(r.created_at) }))
+}

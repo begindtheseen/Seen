@@ -14,7 +14,7 @@ import { EmptyState } from '../../ui/states.tsx'
 import styles from '../listings/listings.module.css'
 import { displayName } from './adapter.ts'
 
-type ReportRow = { id: string; company_name?: string; outcome?: string; role?: string; platform?: string; created_at?: string; report_text?: string; state?: string; counted?: boolean }
+type ReportRow = { id: string; company_name?: string; outcome?: string; outcome_label?: string; source_label?: string; role?: string; platform?: string; created_at?: string; report_text?: string; state?: string; counted?: boolean }
 
 const STATES = [{ value: '', label: 'All' }, { value: 'live', label: 'Live' }, { value: 'held', label: 'Held' }, { value: 'rejected', label: 'Rejected' }, { value: 'duplicate', label: 'Duplicates' }]
 const TONE: Record<string, 'good' | 'caution' | 'bad' | 'neutral'> = { live: 'good', held: 'caution', rejected: 'bad', duplicate: 'neutral' }
@@ -46,11 +46,11 @@ export default function CompanyReports({ name, onOpenReport }: { name: string; o
           const busy = mod.busy(r.id)
           return (
             <Row testId={`co-report-${r.id}`}
-              title={`${r.outcome || 'Report'}${r.role ? ` · ${r.role}` : ''}`}
+              title={`${r.outcome_label || r.outcome || 'Report'}${r.role ? ` · ${r.role}` : ''}`}
               onOpen={() => onOpenReport(r.id)}
               sub={r.report_text ? (r.report_text.length > 180 ? `${r.report_text.slice(0, 180)}…` : r.report_text) : undefined}
               status={<StatusChip tone={TONE[st] || 'neutral'} label={`${WORD[st] || st || 'Unknown state'}${r.counted ? ' · counts in the grade' : ''}`} />}
-              meta={<span>{[r.company_name && r.company_name.toLowerCase() !== name.toLowerCase() ? displayName(r.company_name) : '', r.platform, r.created_at ? formatPacific(r.created_at, { dateStyle: 'medium' }) : ''].filter(Boolean).join(' · ')}</span>}
+              meta={<span>{[r.company_name && r.company_name.toLowerCase() !== name.toLowerCase() ? displayName(r.company_name) : '', r.source_label || r.platform, r.created_at ? formatPacific(r.created_at, { dateStyle: 'medium' }) : ''].filter(Boolean).join(' · ')}</span>}
               pending={busy}
               actions={(
                 <RowActions>

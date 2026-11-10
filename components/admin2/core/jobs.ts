@@ -16,6 +16,7 @@
 // Framework-free (React reads it through useAdminJob in ./hooks.tsx); unit-tested in core.test.mjs.
 import type { AdminJobState, AdminSkipped, AdminUndo } from '../contract.ts'
 import type { AdminApi, ApiResult } from './api.ts'
+import type { UndoBus } from './action.ts'
 
 export type JobSpec = {
   action: string
@@ -58,6 +59,10 @@ export type Job = AdminJobState & {
   request_id?: string | null
   /** The Undo was started (as its own job). */
   undone?: boolean
+  /** This job IS an Undo of that audit id (finishing it clears every line still offering that Undo). */
+  undo_of?: string
+  /** After a reload: the server is being asked what was really done before anything is said. */
+  checking?: boolean
   lost_rounds: number
   ended_at?: string
 }
@@ -98,10 +103,14 @@ export function jobSummary(j: Job, lastMessage = ''): string {
   const rounds = j.rounds === 1 ? '1 round' : `${j.rounds} rounds`
   switch (j.status) {
     case 'done':
-      return `${did} in ${rounds}.${tail ? ` ${tail}.` : ''}${j.reloaded ? ' A round that was running when the page reloaded may have done more than is counted here.' : ''}`
+      return `${did} in ${rounds}.${tail ? ` ${tail}.` : ''}`
     case 'cancelled':
       if (j.stopped === 'cap') return `Paused after ${rounds}: ${did.toLowerCase()}${left ? `, ${left}` : ''}. Resume to continue.`
-      if (j.stopped === 'reload') return `Stopped when the page reloaded: ${did.toLowerCase()}${left ? `, ${left}` : ''}.`
+      if (j.stopped === 'reload') {
+        if (j.checking) return 'Checking what was done…'
+        if (!j.changed && j.remaining == null) return 'Stopped when the page was closed or reopened. What its last round did is not known yet — Resume continues from where the server is.'
+        return `Stopped when the page was closed or reopened: ${did.toLowerCase()} so far${left ? `, ${left}` : ''}.`
+      }
       return `Cancelled: ${did.toLowerCase()}${left ? `, ${left}` : ''}.`
     case 'error':
       if (j.stopped === 'no_progress') return `Stopped: the last round changed nothing and did not move on, although the server reports ${left || 'more work'}. ${did} before that.`
@@ -121,6 +130,9 @@ export function createJobManager(deps: {
   /** An action's touched keys after each round (the cache re-reads them). */
   invalidate?: (touched: string[]) => void
   limits?: Partial<typeof JOB_LIMITS>
+  undoBus?: UndoBus
+  /** The server's truth for a job a reload interrupted: what is done and what is left (null = not known). */
+  statusRead?: (job: Job) => Promise<{ remaining: number | null; done: number | null; complete: boolean } | null>
 }) {
   const now = deps.now || Date.now
   const sleep = deps.sleep || ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)))
@@ -151,13 +163,44 @@ export function createJobManager(deps: {
       for (const j of Array.isArray(saved) ? saved : []) {
         if (!j || !j.id || !j.action) continue
         if (j.status === 'running' || j.status === 'cancelling') {
-          const fixed: Job = { ...j, status: 'cancelled', stopped: 'reload', resumable: true, reloaded: true }
+          // Say nothing about counts until the server has been asked (F5): the last round may have finished there.
+          const fixed: Job = { ...j, status: 'cancelled', stopped: 'reload', resumable: false, reloaded: true, checking: true }
           fixed.message = jobSummary(fixed)
           jobs.set(j.id, fixed)
+          void readTruth(j.id)
         } else jobs.set(j.id, j)
       }
     } catch { /* unreadable: start clean */ }
   }
+
+  async function readTruth(id: string) {
+    await Promise.resolve()
+    const j = jobs.get(id)
+    if (!j) return
+    let t: Awaited<ReturnType<NonNullable<typeof deps.statusRead>>> = null
+    try { t = deps.statusRead ? await deps.statusRead(j) : null } catch { t = null }
+    const cur = jobs.get(id)
+    if (!cur || !cur.checking) return
+    if (t && (t.complete || t.remaining === 0)) {
+      const done: Job = { ...cur, checking: false, status: 'done', resumable: false, remaining: 0, changed: t.done ?? cur.changed, ended_at: new Date(now()).toISOString() }
+      done.message = `Finished on the server while the page was closed. ${jobSummary(done)}`
+      jobs.set(id, done)
+    } else {
+      const stopped: Job = { ...cur, checking: false, resumable: true, ...(t ? { remaining: t.remaining, changed: t.done ?? cur.changed } : {}) }
+      stopped.message = jobSummary(stopped)
+      jobs.set(id, stopped)
+    }
+    persist(); emit()
+  }
+
+  // Undone somewhere else (the activity log): a finished job no longer offers that Undo (F8).
+  deps.undoBus?.subscribe((auditId) => {
+    for (const j of jobs.values()) {
+      const a = j.undo?.args?.audit_id
+      if (j.undo && a != null && String(a) === auditId) jobs.set(j.id, { ...j, undo: undefined, undone: true })
+    }
+    persist(); emit()
+  })
 
   async function loop(id: string) {
     const startedAt = now()
@@ -225,6 +268,7 @@ export function createJobManager(deps: {
         const done: Job = { ...next, status: 'done', resumable: false, ended_at: new Date(now()).toISOString() }
         done.message = jobSummary(done, lastMessage)
         jobs.set(id, done); persist(); emit()
+        if (done.undo_of) deps.undoBus?.emit(done.undo_of)
         return
       }
       // A round that moved its cursor forward is progress even with nothing changed (a scan that reads
@@ -294,7 +338,10 @@ export function createJobManager(deps: {
       if (!j || !j.undo || j.undone || j.status === 'running' || j.status === 'cancelling') return null
       const u = j.undo
       jobs.set(id, { ...j, undone: true, undo: undefined }); persist(); emit()
-      return mgr.start({ action: u.action, args: u.args, label: `Undoing: ${j.label.charAt(0).toLowerCase()}${j.label.slice(1)}`, past: 'Put back', noun: 'rows' })
+      const nid = mgr.start({ action: u.action, args: u.args, label: `Undoing — putting ${fmt(j.changed)} ${j.noun} back`, past: 'Put back', noun: j.noun, total: j.changed || undefined })
+      const a = u.args?.audit_id
+      if (a != null) { const nj = jobs.get(nid); if (nj) jobs.set(nid, { ...nj, undo_of: String(a) }) }
+      return nid
     },
     dismiss(id: string) {
       const j = jobs.get(id)

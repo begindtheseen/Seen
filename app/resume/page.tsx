@@ -26,7 +26,8 @@ import { LOCK_NOTE, PASS_AFTER_WIN } from '@/lib/pricing'
 import { signupHref } from '@/lib/signupIntent.js'
 import dynamic from 'next/dynamic'
 import { PaidPlanView, type Verdict, type ConstraintRow, type PaidPlan } from '@/components/optimizer/Verdict'
-import FitRead, { type FitData } from '@/components/optimizer/FitRead'
+import FitRead, { type FitData, type Answer, type Answers } from '@/components/optimizer/FitRead'
+import { useConfirmations, type Confirmed } from '@/components/optimizer/useConfirmations'
 import { PaidResult, BlockedResult, ResultTopLine, DownloadVersion, usePaidVersion, type Tailored, type Charge, type Blocked, type Question } from '@/components/optimizer/PaidResult'
 import rs from './resume.module.css'
 import CreditConfirmDialog from '@/components/CreditConfirmDialog'
@@ -191,7 +192,7 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
 }
 
 // ═══ FIT TAB — the diagnosis (scores, coverage, matches, company risk) ═══
-function FitView({ out, intel, jobCompany, insights }: { out: OptimizerOutput; intel: CompanyIntel | null; jobCompany: string; insights: Insights | null }) {
+function FitView({ out, intel, jobCompany, insights, answers, answerLines, onAnswer }: { out: OptimizerOutput; intel: CompanyIntel | null; jobCompany: string; insights: Insights | null; answers?: Answers; answerLines?: Record<string, string>; onAnswer?: (id: string, a: Answer | null, line?: string) => void }) {
   // Only the factors that were actually measured (an ungraded company or an unknown location is
   // not scored — lib/optimizer/explainScore.js), as plain bars.
   // ats_coverage is left out: it counts a different keyword set from the requirement list below, and printed
@@ -201,7 +202,7 @@ function FitView({ out, intel, jobCompany, insights }: { out: OptimizerOutput; i
   return (
     <div style={{ animation: 'fadeUp .3s ease both' }}>
       {/* THE fit read: band, sentence, graded gates, every requirement with its state and your line (free) */}
-      <Card><FitRead data={out as unknown as FitData} note={`${out.confidence_label} confidence · free`} /></Card>
+      <Card><FitRead data={out as unknown as FitData} note={`${out.confidence_label} confidence · free`} answers={answers} answerLines={answerLines} onAnswer={onAnswer} /></Card>
 
       {out.verdict.score != null && metrics.length > 0 && (
         <Card>
@@ -692,7 +693,9 @@ function ResumePageInner() {
     if (savedId) return savedId
     const slug = (s: string) => encodeURIComponent(String(s || '').toLowerCase().trim().replace(/\s+/g, '-')).slice(0, 60)
     return `manual-${slug(jobCompany)}-${slug(jobTitle)}` || 'manual'
-  }
+  }  // per user and job (swept on sign-out); keyed like the jobId every optimize call sends
+  const confirm = useConfirmations(user?.id, jobIdFor())
+
 
   async function uploadFile(file: File) {
     try {
@@ -745,8 +748,22 @@ function ResumePageInner() {
 
   // What every optimize call sends about the posting (the source lets the server tell an Adzuna
   // teaser from a posting; an edited description is the person's own pasted posting).
-  function postingBody() {
-    return jobSource ? { jobDescription: jobJD, jobSource, jobId: jobIdFor() } : { jobDescription: jobJD, postingPasted: !!jobJD.trim(), jobId: jobIdFor() }
+  function postingBody(conf: Confirmed[] = confirm.confirmed) {
+    // the person's Yes / No answers ride with every call, the way the Optimize sheet sends them (x-integration "Confirmations")
+    const c = conf.length ? { confirmed: conf } : {}
+    return jobSource ? { jobDescription: jobJD, jobSource, jobId: jobIdFor(), ...c } : { jobDescription: jobJD, postingPasted: !!jobJD.trim(), jobId: jobIdFor(), ...c }
+  }
+
+  // An answer is sent and the free check re-asked IN PLACE: no loading state, no scroll jump; the rows show what the
+  // server sends back (a changed statement comes back `by: 'you'` and reads "You said …").
+  async function answerAndReask(id: string, a: Answer | null, line?: string) {
+    const next = confirm.answer(id, a, line)
+    if (a === 'skip') return
+    try {
+      const res = await fetch('/api/optimizer', { method: 'POST', headers: await aiHeaders(), body: JSON.stringify({ action: 'optimize', resumeText, jobTitle, company: jobCompany, ...postingBody(next), remoteOk: /remote/i.test(jobJD) }) })
+      const data = await res.json().catch(() => null)
+      if (res.ok && data && !data.error) setFitOut(data as OptimizerOutput)
+    } catch { /* the rows keep the last answer the server gave */ }
   }
 
   // FREE: the diagnosis — the one verdict, matched/missing, the checklist.
@@ -1124,7 +1141,7 @@ function ResumePageInner() {
                   : fitState === 'disabled' ? <ResultEmpty icon="circle-slash" text={'SeenFit is temporarily unavailable.'} />
                   : fitState === 'error' ? <div><ResultEmpty icon="triangle-alert" text={'Could not score your fit. Try again.'} />{fitErrRef && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', color: 'var(--dim)', marginTop: '.25rem' }}>Error ref: {fitErrRef} — share this if it keeps happening.</div>}<button onClick={() => runFit()} style={{ ...btnPrimary, marginTop: '.5rem' }}>Retry</button></div>
                   : fitState === 'preview' ? <ResultEmpty icon="file-text" text={previewLink ? 'Seen could only read a summary of this listing, and its page would not open from here. Open the listing, copy the posting, and paste it into the job description box.' : 'This listing only has a summary. Paste the full posting into the job description box to optimize for it.'} link={previewLink ? { href: previewLink, label: 'Open the listing ↗' } : undefined} />
-                  : fitOut ? <FitView out={fitOut} intel={companyIntel} jobCompany={jobCompany} insights={insights} /> : null
+                  : fitOut ? <FitView out={fitOut} intel={companyIntel} jobCompany={jobCompany} insights={insights} answers={confirm.answers} answerLines={confirm.lines} onAnswer={(id, a, line) => { void answerAndReask(id, a, line) }} /> : null
                 )}
 
                 {/* REWRITE — the paid plan (a strict superset of the free Fit tab) */}

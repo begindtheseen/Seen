@@ -20,7 +20,9 @@ import { httpHref } from '@/lib/safeHref.js'
 import { ResumeDocStore } from '@/lib/stores/ResumeDocStore'
 import PostingInput from '@/components/jobs/PostingInput'
 import { needsSignIn, outOfCredits } from '@/lib/toolAuth.js'
-import FitRead, { type FitData } from '@/components/optimizer/FitRead'
+import FitRead, { type FitData, type Answer } from '@/components/optimizer/FitRead'
+import { useConfirmations, type Confirmed } from '@/components/optimizer/useConfirmations'
+import { serializeToText } from '@/lib/resume/engine-client'
 import { ChangeList, BlockedResult, ResultTopLine, usePaidVersion, type Tailored, type Charge, type Blocked } from '@/components/optimizer/PaidResult'
 import { creditCostLabel } from '@/lib/creditRules'
 
@@ -70,6 +72,8 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [showAll, setShowAll] = useState(false)
   const [extra, setExtra] = useState<TailorExtra>({})
+  // the person's Yes / No answers for THIS job (same store and contract as the Optimize sheet)
+  const confirm = useConfirmations(user?.id, job.jobId || (job.title || job.company ? `studio-${job.company}-${job.title}`.toLowerCase().replace(/\s+/g, '-').slice(0, 80) : ''))
   // read-only list of every change the server made (the overrides below are how a person overrules them here)
   const changeView = usePaidVersion(extra.tailored && extra.tailored.doc ? extra.tailored : null, '') // read-only list: nothing stored
 
@@ -114,7 +118,7 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
     try {
       const res = await fetch('/api/resume', {
         method: 'POST', headers: await aiHeaders(),
-        body: JSON.stringify({ action: 'tailor', doc, jobTitle: job.title, company: job.company, jobDescription: job.description, jobId: job.jobId || undefined }),
+        body: JSON.stringify({ action: 'tailor', doc, jobTitle: job.title, company: job.company, jobDescription: job.description, jobId: job.jobId || undefined, ...(confirm.confirmed.length ? { confirmed: confirm.confirmed } : {}) }),
       })
       const data = (await res.json().catch(() => ({}))) as TailorResponse & { message?: string }
       // an expired session is a sign-in, never "out of credits" (UX audit F2)
@@ -154,6 +158,18 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
       setState('done')
       markQuiet() // nothing optional pops over a result the person just paid for
     } catch { setError('Network error — try again.'); setState('error') }
+  }
+
+  // An answer re-asks the FREE check in place (no credit, no reload, no scroll jump) and the fit read shows the server's
+  // answer — a changed statement comes back `by: 'you'`. The next tailor run carries the answers too.
+  async function answerAndReask(id: string, a: Answer | null, line?: string) {
+    const next: Confirmed[] = confirm.answer(id, a, line)
+    if (a === 'skip') return
+    try {
+      const res = await fetch('/api/optimizer', { method: 'POST', headers: await aiHeaders(), body: JSON.stringify({ action: 'optimize', resumeText: serializeToText(baseDoc || doc), jobTitle: job.title, company: job.company, jobDescription: job.description, postingPasted: !!job.description.trim(), jobId: job.jobId || undefined, ...(next.length ? { confirmed: next } : {}) }) })
+      const d = await res.json().catch(() => null)
+      if (res.ok && d && d.statements) setExtra((x) => ({ ...x, fit: { verdict: d.verdict, statements: d.statements, matched_requirements: d.matched_requirements, unsupported_requirements: d.unsupported_requirements, constraints: d.constraints, field_match: d.field_match } }))
+    } catch { /* the rows keep the last answer the server gave */ }
   }
 
   // The variant the user will take: the plan re-applied with their overrides.
@@ -223,7 +239,7 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
       {state === 'done' && plan && finalVariant && !extra.blocked && (
         <>
           {extra.charge && <ResultTopLine charge={extra.charge} charged={!!extra.charged} pro={pro} balance={extra.balance ?? null} cost={creditCostLabel(RESUME_OPTIMIZE_COST)} vis={extra.tailored?.visibility || null} />}
-          {extra.fit && <div className={s.card}><FitRead data={extra.fit} compact /></div>}
+          {extra.fit && <div className={s.card}><FitRead data={extra.fit} compact answers={confirm.answers} answerLines={confirm.lines} onAnswer={(id, a, line) => { void answerAndReask(id, a, line) }} /></div>}
           <div className={s.card}>
             {noRequirements || plan.score.after == null || plan.score.before == null ? (
               <div className={s.dim} style={{ color: 'var(--amber)' }}>{plan.score.verdict?.withheld ? plan.score.verdict.sentence : 'The posting text gave us no requirements to match — this version is arranged from the job title and family only.'} Paste the full posting (requirements and responsibilities) for a real match score.</div>

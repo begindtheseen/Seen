@@ -121,7 +121,7 @@ replace: replace, swap, change?parts|filters|oil|tires|batteries|bulbs|component
 adjust: adjust, tune, calibrate, align, set?machines|equipment|controls|tools|levels|gauges|parameters, regulate?flow|temperature|pressure|speed|levels|equipment, fine-tune, reset?equipment|machines|systems|passwords
 feed_machines: feed?machines|lines|presses|materials|stock|conveyors, load?machines|presses|hoppers|conveyors|materials, tend?machines|lines|presses|ovens|furnaces, set up?machines|lines|presses|jobs|runs|equipment, change over?lines|machines|presses
 mix: mix, blend, combine?ingredients|chemicals|materials|solutions|compounds, compound, batch, stir, prepare?mixtures|solutions|batches|compounds|chemicals|ingredients
-store: store, warehouse, stow, put away, shelve, file?documents|records|papers|forms, archive, house?inventory|materials|records|equipment
+store: store, warehouse, stow, put away, putaway, stack?materials|inventory|products|pallets|boxes|stock|supplies, shelve, file?documents|records|papers|forms, archive, house?inventory|materials|records|equipment
 secure_loads: secure?loads|freight|cargo|pallets|materials|equipment, strap, tie down, brace?loads|freight|cargo, band?pallets|loads|bundles, shrink-wrap
 dispose: dispose, discard, dump, throw out, remove?waste|trash|debris|garbage|recycling|hazards, haul away, clear?debris|trash|waste|snow|brush|tables
 patrol: patrol, walk?beats|routes|perimeters|premises|floors, make rounds, do rounds, round?patients|units|floors|wards
@@ -232,7 +232,7 @@ equipment [work]: equipment, machinery, machine, apparatus, gear, tool?equipment
 machines [production]: machine, machinery, press, lathe, mill, cnc, line?production, equipment?production, robot, conveyor
 tools [work]: tool, instrument, implement, hand tool, power tool, utensil, device?tools
 vehicles [transport]: vehicle, truck, van, car, bus, fleet, rig, tractor, trailer, semi, forklift?transport, automobile, auto, lorry, box truck
-forklifts [logistics]: forklift, lift truck, pallet jack, reach truck, order picker?equipment, powered industrial truck, pit
+forklifts [logistics]: forklift, lift truck, pallet jack, reach truck, order picker?equipment, powered industrial truck, pit, industrial truck, industrial vehicle, material handling equipment, powered material handling equipment
 routes [transport]: route, run?transport, delivery route, territory?transport, loop, circuit, beat
 facilities [work]: facility, building, premises, plant, site, campus, property?facility, location, grounds, warehouse?facility, store?facility, office?facility, branch?facility
 property [real_estate]: property, unit, building, home, house, apartment, listing, real estate, community?real_estate, complex, portfolio?real_estate

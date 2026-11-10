@@ -61,6 +61,7 @@ export default function JobsPage() {
     recommended,
     recHasResume,
     recReason,
+    recNoDirection,
     recCity,
     recCitySource,
     recSkills,
@@ -109,7 +110,10 @@ export default function JobsPage() {
   // else the résumé's own), and never once a search has been typed — the search is the page's job.
   // (The old ≥3 bar hid the one Phoenix match the audit persona had: "Nothing near Phoenix matched".)
   const typed = query.trim().length > 0
-  const showRail = isLoggedIn && !typed && (recStatus === 'loading' || recommended.length >= 1)
+  // …or with no matches because the résumé's current title gives no direction: the rail then says so (never empty, never
+  // the upload card — the person HAS a résumé)
+  const noDirection = recStatus === 'done' && recommended.length === 0 ? recNoDirection : null
+  const showRail = isLoggedIn && !typed && (recStatus === 'loading' || recommended.length >= 1 || !!noDirection)
   const showCityLine = isLoggedIn && !typed && recStatus === 'done' && recReason === 'no_city'
   // Same employer + title at several addresses → one card with "+N more locations"
   // (lib/jobs/groupListings.js). Every row is still counted in the results line.
@@ -287,6 +291,7 @@ export default function JobsPage() {
             city={recCity}
             citySource={recCitySource}
             onOpen={j => setDetailJob(j)}
+            noDirection={noDirection}
           />
         )}
         {showCityLine && (
@@ -394,14 +399,14 @@ export default function JobsPage() {
               ))}
             </div>
             {/* Only when the ACCOUNT has no résumé on file (the rail says so) — never because the rail is empty. */}
-            {isLoggedIn && recStatus === 'done' && recommended.length === 0 && recHasResume === false && (
+            {isLoggedIn && recStatus === 'done' && recommended.length === 0 && recHasResume === false && !noDirection && (
               <div className={j.resumeAsk}>
                 <p className={j.resumeTitle}>Get matches from your résumé</p>
                 <p className={j.idleSub}>Upload it once and Seen surfaces jobs that match your skills and experience level.</p>
                 <Button size="sm" variant="secondary" href="/resume" iconRight="arrow-right">Upload résumé</Button>
               </div>
             )}
-            {isLoggedIn && recStatus === 'done' && recommended.length === 0 && recHasResume === true && recReason !== 'no_city' && (
+            {isLoggedIn && recStatus === 'done' && recommended.length === 0 && recHasResume === true && recReason !== 'no_city' && !noDirection && (
               <p className={j.idleSub}>Nothing near {recCity || 'you'} matched your résumé&apos;s roles yet — search by title above.</p>
             )}
           </div>

@@ -1,15 +1,15 @@
 'use client'
 
-// The seven smaller kinds (tickets, Reddit disputes, employer claims, employer replies, purchases, data
-// issues, account clusters) as DATA: how each is listed, what a row says, what the sheet shows, and the
+// The six smaller kinds (tickets, Reddit disputes, employer claims, employer replies, purchases, data
+// issues — account clusters are People's) as DATA: how each is listed, what a row says, what the sheet shows, and the
 // real actions SHAPES.md gives it. KindPanel (the list) and KindItem (the sheet) render any of them with
 // the same row → sheet → action → result-line pattern.
 import type { ReactNode } from 'react'
 import { httpHref } from '@/lib/safeHref'
 import type { AdminItemKind } from '../../contract.ts'
 import {
-  CLUSTER_STATUSES, day, hasOpenDispute, label, money, plural, signalText, snippet, ticketSummary, when,
-  type Claim, type Cluster, type Dispute, type Issue, type KindKey, type Purchase, type Reply, type Ticket, type Tone,
+  hasOpenDispute, label, money, outcomeWord, plural, snippet, ticketSummary, when,
+  type Claim, type Dispute, type Issue, type KindKey, type Purchase, type Reply, type Ticket, type Tone,
 } from './adapter.ts'
 import { Block, Facts } from './parts.tsx'
 import styles from './review.module.css'
@@ -213,7 +213,7 @@ const replies: KindConfig<Reply> = {
   body: (status) => (status === 'all' ? {} : { status }),
   idOf: (r) => String(r.id),
   search: (r) => [r.company_key, r.body, r.report?.company_name, r.report?.role],
-  title: (r) => `${r.report?.company_name || r.company_key || 'Unknown company'} replies to a ${label(r.report?.outcome).toLowerCase() || ''} report`.replace(/ a {2}/, ' a '),
+  title: (r) => `${r.report?.company_name || r.company_key || 'Unknown company'} replies to ${r.report?.outcome_phrase || (r.report ? `a ${outcomeWord(r.report)}` : 'a')} report`,
   sub: (r) => snippet(r.body) || 'No text.',
   chips: (r) => [statusChip(r.status, ['approved'], ['rejected'], ['pending'])],
   meta: (r) => [r.report?.role, when(r.created_at)],
@@ -222,7 +222,7 @@ const replies: KindConfig<Reply> = {
       <Block title="The reply"><p className={styles.fullText}>{r.body || '—'}</p></Block>
       <Block title="The report it answers">
         <Facts rows={[
-          ['Company', r.report?.company_name || r.company_key || '—'], ['Role', r.report?.role || '—'], ['Outcome', label(r.report?.outcome) || '—'],
+          ['Company', r.report?.company_name || r.company_key || '—'], ['Role', r.report?.role || '—'], ['Outcome', r.report ? outcomeWord(r.report) : '—'],
           ['Report', <span key="t" className={styles.fullText}>{r.report?.report_text || 'The report could not be read.'}</span>],
         ]} />
       </Block>
@@ -292,46 +292,8 @@ const issues: KindConfig<Issue> = {
   ],
 }
 
-// ── Account clusters ─────────────────────────────────────────────────────────────────────────────
-const clusters: KindConfig<Cluster> = {
-  kind: 'clusters', item: 'cluster', noun: 'account clusters', one: 'account cluster', prefix: 'clusters',
-  statuses: [...CLUSTER_STATUSES.map((s) => ({ value: s, label: label(s) })), { value: 'all', label: 'All' }],
-  waiting: 'suspected', listAction: 'clusters_list',
-  body: (status) => ({ status }),
-  idOf: (c) => String(c.id),
-  search: (c) => [...(c.users || []).map((u) => u.email), c.admin_note, signalText(c.signals)],
-  title: (c) => `${plural((c.users || c.user_ids || []).length, 'account')}${typeof c.risk_score === 'number' ? ` · risk ${c.risk_score}` : ''}`,
-  sub: (c) => (c.users || []).map((u) => u.email || `${u.id.slice(0, 8)}… (no email)`).join(', ') || 'No accounts listed.',
-  chips: (c) => [statusChip(c.status, ['safe'], ['frozen', 'suspended', 'limited'], ['suspected'])],
-  meta: (c) => [signalText(c.signals) || null, c.created_at ? `found ${day(c.created_at)}` : null, c.admin_note ? `note: ${c.admin_note}` : null],
-  detail: (c) => (
-    <>
-      <Block title="Accounts">
-        <ul className={styles.users}>{(c.users || []).map((u) => <li key={u.id}>{u.email || 'no email'} <span className={styles.note}>· {u.id}</span></li>)}</ul>
-      </Block>
-      <Facts rows={[
-        ['Signals', signalText(c.signals) || '—'], ['Risk score', typeof c.risk_score === 'number' ? String(c.risk_score) : '—'],
-        ['Status', label(c.status) || '—'], ['Found', when(c.created_at) || '—'], ['Note', c.admin_note || '—'],
-      ]} />
-    </>
-  ),
-  empty: (s) => (s === 'suspected' ? 'No suspected account clusters.' : 'No account clusters here.'),
-  noteLabel: 'Note (optional, kept on the cluster)',
-  actions: CLUSTER_STATUSES.map((s, i) => ({
-    key: s, label: s === 'safe' ? 'Mark safe' : s === 'watching' ? 'Watch' : label(s), action: 'update_cluster', running: 'Saving…',
-    variant: (i === 0 ? 'secondary' : 'ghost') as 'secondary' | 'ghost', note: true,
-    hotkey: s === 'safe' ? 'a' as const : undefined, decides: s !== 'suspected',
-    inRow: s === 'safe' || s === 'watching',
-    when: (c: Cluster) => c.status !== s,
-    args: (c: Cluster, note: string) => ({ cluster_id: c.id, status: s, ...(note ? { admin_note: note } : {}) }),
-    confirm: s === 'frozen' || s === 'suspended' || s === 'limited'
-      ? (c: Cluster) => ({ title: `Mark ${plural((c.users || c.user_ids || []).length, 'account')} ${s}?`, body: `The cluster is recorded as ${s}. Undo puts back its earlier status.`, confirmLabel: `Mark ${s}` })
-      : undefined,
-  })).filter((a) => a.key !== 'suspected'),
-}
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const KIND_CONFIGS: Partial<Record<KindKey, KindConfig<any>>> = { tickets, disputes, claims, replies, purchases, issues, clusters }
+export const KIND_CONFIGS: Partial<Record<KindKey, KindConfig<any>>> = { tickets, disputes, claims, replies, purchases, issues }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const CONFIG_BY_ITEM: Partial<Record<AdminItemKind, KindConfig<any>>> = Object.fromEntries(Object.values(KIND_CONFIGS).map((c) => [c!.item, c]))
 

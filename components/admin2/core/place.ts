@@ -35,15 +35,19 @@ export function useSection(allowed?: readonly string[]): [ShellSection, (s: Shel
   const go = useCallback((s: ShellSection, filter?: Record<string, string>) => {
     if (typeof window === 'undefined') return
     const qs = searchForSection(window.location.search, s, filter)
-    if (filter) {
-      // A queue row: the target section opens with exactly that filter (its old filters cleared).
-      const next = `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`
-      try { window.history.replaceState(ownState({}), '', next) } catch { /* ignore */ }
-      try { window.dispatchEvent(new Event('seen:urlchange')) } catch { /* ignore */ }
-      return
-    }
-    replaceParam('s', s === 'today' ? null : s)
-  }, [])
+    const next = `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`
+    const here = parseSection(readParam('s'), allowed)
+    // A section change PUSHES one entry, so the phone's Back walks back through the sections he visited and
+    // only leaves /admin from the first one (judge F1). The same section again (a queue row's filter) replaces:
+    // never two entries for one section in a row. Filters and kinds inside a section always replace.
+    const { [DEPTH]: _d, ...state } = ownState({})
+    try {
+      if (s !== here) window.history.pushState(state, '', next)
+      else window.history.replaceState(state, '', next)
+    } catch { /* ignore */ }
+    try { window.dispatchEvent(new Event('seen:urlchange')) } catch { /* ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [(allowed || []).join(',')])
   return [section, go]
 }
 
@@ -64,8 +68,11 @@ export function useItemPlace(): ItemPlace {
     pushParam('item', v)
     try { window.history.replaceState(ownState({ [DEPTH]: depth + 1 }), '') } catch { /* ignore */ }
   }, [])
-  const close = useCallback(() => {
+  const close = useCallback(function closeItem() {
     if (!readParam('item')) return
+    // A panel entry (an inline confirm, the sign-in step) sits above the item: take it back first, then close.
+    if (historyState()[PANEL]) { popPanelEntry(); afterPanelBack(closeItem); return }
+    if (pendingPanelBack) { afterPanelBack(closeItem); return }
     const depth = itemDepth()
     if (depth <= 0) { replaceParam('item', null); return } // opened straight from a link or a refresh
     // Walk back over every item this stack pushed; an item that was there before (a deep link) is
@@ -99,6 +106,16 @@ function flushPanel() {
 }
 if (typeof window !== 'undefined') window.addEventListener('popstate', flushPanel)
 
+/** Take the current panel entry back — at most one Back in flight, however many closers ask. */
+function popPanelEntry() {
+  if (pendingPanelBack) return
+  pendingPanelBack = true
+  if (panelTimer) clearTimeout(panelTimer)
+  panelTimer = setTimeout(flushPanel, 600) // a Back that never lands must not strand the queue
+  try { window.history.back() } catch { flushPanel() }
+}
+function afterPanelBack(fn: () => void) { if (pendingPanelBack) afterPanel.push(fn); else fn() }
+
 /** Run `fn` once the sheet that is closing now has taken its history entry back (or at once). */
 export function afterSheetClose(fn: () => void) {
   // One tick first: the panel's effect cleanup (which starts the Back) runs after this render.
@@ -121,12 +138,7 @@ export function usePanelEntry(open: boolean, onClose: () => void) {
     window.addEventListener('popstate', onPop)
     return () => {
       window.removeEventListener('popstate', onPop)
-      if (!popped && historyState()[PANEL] === id) {
-        pendingPanelBack = true
-        if (panelTimer) clearTimeout(panelTimer)
-        panelTimer = setTimeout(flushPanel, 600) // a Back that never lands must not strand the queue
-        try { window.history.back() } catch { flushPanel() }
-      }
+      if (!popped && historyState()[PANEL] === id) popPanelEntry()
     }
   }, [open])
 }

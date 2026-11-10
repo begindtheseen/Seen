@@ -69,7 +69,11 @@ test('approve: hiring rows keep their weight; employee reviews become never-scor
   }
   assert.deepEqual(patches.find((p) => p.u.includes(E)).body, { needs_review: false, trust_reason: 'external_employee_review' });
   assert.deepEqual(patches.find((p) => p.u.includes(A)).body, { needs_review: false });
-  const audit = calls.find((c) => c.u.includes('/admin_audit_log') && c.method === 'POST');
+  // The batch row is written first (admin remake round 7: audit before write, always); then one row per report.
+  const batchRow = calls.find((c) => c.u.includes('/admin_audit_log') && c.method === 'POST');
+  assert.equal(batchRow.body.action, 'review_held');
+  const audit = calls.find((c) => c.u.includes('/admin_audit_log') && c.method === 'POST' && Array.isArray(c.body));
+  assert.ok(calls.indexOf(batchRow) < calls.findIndex((c) => c.method === 'PATCH' && c.u.includes('/rest/v1/reports?')), 'audited before any write');
   assert.equal(audit.body.length, 2);
   assert.equal(audit.body[0].action, 'approve_held_report');
   assert.deepEqual(Object.keys(audit.body[0].metadata.prior).sort(), ['needs_review', 'outcome_weight', 'trust_reason']);

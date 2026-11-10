@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 import {
   KINDS, parseKind, kindCount, waitingLine, matchesHeldView, heldViewCounts, positiveIds, approvableIds, filterNote,
   pruneSelection, moderationFor, patchRows, sourceHref, when, newRequestId, ticketSummary, signalText, heldHasRules,
-  parseHeldView, label, snippet, outcomeTone, approvePlan, reviewQueues, nothingToPublishLine, tidyMessage, rulesReadings,
+  parseHeldView, label, snippet, outcomeTone, approvePlan, reviewQueues, nothingToPublishLine, tidyMessage, rulesReadings, outcomeWord, sourceWord,
 } from './adapter.ts'
 
 const row = (id, group, flags = [], extra = {}) => ({ id, company_name: 'Acme', outcome: group === 'positive' ? 'interview' : 'ghosted', review: { group, flags }, ...extra })
@@ -24,12 +24,13 @@ const ROWS = [
 ]
 
 test('kinds: every Today queue filter lands on its kind; unknown words fall back to held', () => {
-  for (const k of ['held', 'tickets', 'disputes', 'claims', 'replies', 'purchases', 'issues', 'clusters', 'recent', 'dupes']) assert.equal(parseKind(k), k)
+  for (const k of ['held', 'tickets', 'disputes', 'claims', 'replies', 'purchases', 'issues', 'recent', 'dupes']) assert.equal(parseKind(k), k)
   assert.equal(parseKind('listings'), 'tickets')
   assert.equal(parseKind('employers'), 'claims')
   assert.equal(parseKind(''), 'held')
   assert.equal(parseKind('nonsense'), 'held')
-  assert.equal(KINDS.length, 10)
+  assert.equal(KINDS.length, 9)
+  assert.equal(parseKind('clusters'), 'held', 'account clusters are People\'s, not a Review kind')
 })
 
 test('kind counts: a number, null when the server could not count it, undefined when not a queue', () => {
@@ -51,7 +52,7 @@ test('the header line adds up what is waiting and names the counts it could not 
 
 test('saved filters cover exactly the rows they name', () => {
   const c = heldViewCounts(ROWS)
-  assert.deepEqual([c.all, c.positive, c.needs_eyes, c.duplicates, c.anti_gaming, c.employee, c.no_source], [5, 2, 2, 1, 1, 1, 1])
+  assert.deepEqual([c.all, c.positive, c.needs_eyes, c.duplicates, c.anti_gaming, c.employee, c.no_source], [5, 1, 2, 1, 1, 1, 1], 'Clear positives counts what Approve all positive publishes')
   assert.ok(matchesHeldView(ROWS[1], 'duplicates'))
   assert.ok(!matchesHeldView(ROWS[0], 'duplicates'))
   assert.equal(parseHeldView('bogus'), 'all')
@@ -190,4 +191,19 @@ test('the rules check is told both ways', () => {
   assert.deepEqual(rulesReadings({ verdict: 'passes', comment: false, post: true }), { comment: 'Read as a comment: fails.', post: 'Read as the post itself (its first sentence as the title): passes.' })
   assert.equal(rulesReadings({ verdict: null, comment: null, post: null }), null)
   assert.equal(rulesReadings(undefined), null)
+})
+
+test('a row the server could not yet check for copies is never in a bulk approve', () => {
+  const rows = [row('p1', 'positive'), { ...row('p2', 'positive'), review: { group: 'positive', flags: [], duplicate_check: 'pending' } }]
+  const plan = approvePlan(rows, 'positive')
+  assert.deepEqual(plan.ids, ['p1'])
+  assert.equal(plan.sentence, '1 clear positive will be published · 1 not yet checked for copies stays for you to read.')
+})
+
+test('outcomes and sources print in the site\'s words, never the raw enum', () => {
+  assert.equal(outcomeWord({ outcome: 'human', outcome_label: 'Got a response' }), 'Got a response')
+  assert.equal(outcomeWord({ outcome: 'autoreject' }), 'Auto-rejected', 'a row without the server word still never shows the enum')
+  assert.equal(outcomeWord({}), 'No outcome')
+  assert.equal(sourceWord({ source_label: 'Imported · LinkedIn', platform: 'LinkedIn' }), 'Imported · LinkedIn')
+  assert.equal(sourceWord({ platform: 'Indeed' }), 'Indeed')
 })

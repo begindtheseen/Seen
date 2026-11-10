@@ -103,7 +103,7 @@ export default function LabSection(_props: SectionProps) {
         <List<LabRow>
           rows={list.rows} idOf={(r) => r.id} noun="held reports" loading={list.loading} error={list.error} onRetry={() => void list.refresh()}
           total={list.total} hasMore={list.hasMore} loadingMore={list.loadingMore} onLoadMore={() => void list.loadMore()}
-          newCount={list.newCount} onShowNew={list.showNew}
+          newCount={list.newCount} onShowNew={list.showNew} actions={[decide]}
           renderRow={(r) => (
             <Row
               testId={`lab-row-${r.id}`}

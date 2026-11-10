@@ -26,6 +26,23 @@ The UI codes to THIS file and to `components/admin2/contract.ts`. Everything her
 | 502 | `upstream` | true | the database refused or failed; `changed` says what was written first |
 | 504 | `timeout` | true | ran out of time; `changed`/`remaining` say where it stopped |
 | 501 | `not_available` | false | this action cannot run in this function; `run` says where it can (extra code) |
+| 409 | `in_progress` | true | the same `request_id` is still running from the first press — wait, then check (extra code) |
+
+## One press = one execution (`request_id`, every write)
+Every write action accepts `request_id` (8–64 of `A–Z a–z 0–9 _ -`; one per press, reused on Retry). The first call
+records its answer in `admin_audit_log` (action `request_result`, target `request:<action>:<id>:<round>`, metadata
+`{status, status_code, response}`); a replay answers that recorded answer with `replayed: true`, `changed: 0` and
+`recorded_changed`, and writes nothing. A replay while the first is still running → 409 `in_progress`. A first call
+that failed (not 2xx) is not replayed: Retry runs it. Job actions (`purge_stale_jobs`, `auto_merge`,
+`job_dupes_remove`, `dedupe_jobs`, `recompute_queue_drain`) repeat one id across rounds, so they are only made
+idempotent when the call names its round (`round: n`). `review_held` and `dedupe_reports` keep their own batch rule
+(a retry finishes the rest). These records never appear in `activity_log`.
+
+## Audit before write, always
+A destructive write writes its audit row first, time-boxed (8 s); if that row cannot be written or does not answer,
+nothing is written and the answer is a retryable AdminErr (502 `upstream` or 504 `timeout`) saying "nothing was
+changed". A bulk decision writes its batch row first (the activity line and the Undo), then each chunk's per-report
+rows before that chunk.
 
 Every `AdminOk.message` is one plain sentence that says what happened, with counts. `touched` names the
 cache keys to re-read (AdminCacheKey). `undo` is present only when the server can reverse it:
@@ -156,7 +173,9 @@ them comma-joined in the hour field when they differ only by hour, else `;`-join
 the schedule in UTC (Vercel's clock); `detail` says it in California time. Sources, in order: `cron_runs` (new),
 then what the cron already writes: `collector_runs` (cron-archive-reports), `outcome_email_log` (outcome-followups —
 only proves a send), `search_daily.fetched_at` (cron-search-data), `demand_refresh_log` (demand). Nothing →
-`"unknown"`, `last_run:null`, `overdue:false` (never guessed). `duration_ms` (optional) = the last recorded run's length: "duration_ms N" in `cron_runs.detail`
+`"unknown"`, `last_run:null`, `overdue:false` (never guessed). `schedule_label` = the schedule in words, in California time ("Every 15 minutes", "6 times a day (2:00 AM PT, …)",
+"Last day of each month at 8:00 PM PT" for `0 4 1 * *` UTC) — show this, never `schedule`.
+`duration_ms` (optional) = the last recorded run's length: "duration_ms N" in `cron_runs.detail`
 (lib/server/cronRecord.js), else finished − started; absent when nothing recorded it. `overdue` = a recorded last run older than the
 scheduled interval + 1 h grace.
 
@@ -334,7 +353,16 @@ conditional on `status=eq.paid` — a second press says "Already fulfilled"). To
 
 ### `listing_counts` `{}` → `AdminOk` + `counts`
 `counts: { total, active, added_today, stale_or_expired, stale_clearable, expired_kept, stale_overdue, source:"rpc"|"exact" }`
-— each `number|null`; `failed: string[]`.
+— each `number|null`; `failed: string[]`. `expired_kept` counts EVERY hidden expired row (kept or about to go) — the
+UI reads `clear_plan` for Clear stale:
+`clear_plan: { will_delete, stale_delete, expired_delete, aging_delete, kept_referenced, expired_kept_referenced, stale_total, expired_total, aging_total } | null`
+— what "Clear stale" (sweep mode 'all') deletes: stale + expired + active-unseen-7-days rows that no saved_jobs /
+applications row references; what it keeps: the referenced ones (`kept_referenced`; `expired_kept_referenced` = the
+"expired, stored because someone saved/tracked it" tile). Each count from its own exact read. Also on `overview.extra.clear_plan`.
+
+### `job_status` `{ kind: "clear_stale"|"auto_merge"|"recompute"|"report_dupes"|"job_dupes" }` → `AdminOk` `{ kind, remaining, complete, rows:[{kind, remaining}] }`
+What a resumable job still has to do, read from the database (after a reload, show "Nothing left" / "N left" from
+this, never the page's own counter). `job_dupes` answers `remaining: null` (known only after a scan).
 
 ### `listings_browse` `{ filters: { q?, company?, location?, source?, status?, visible?, employer?, since?, sort?, limit? }, after? }` → `AdminList<JobRow>`
 `next` is a string; pass it back as `after`. (`jobs_browse` is the Seen Command form: same filters, `filters.cursor` = the
@@ -385,11 +413,13 @@ CompanyRow: `{ id, name, overall_score, report_count, ghost_rate, response_rate 
 ### `find_duplicates` `{}` → `AdminList<{ key, auto, companies:[{id,name,report_count,overall_score}] }>` + `duplicates`, `total`
 ### `merge` `{ primary_id, secondary_id }` or `{ primary, secondary }` (exact names, case-insensitive, no wildcards)
 → `AdminOk` (`changed`=1, `moved_reports`, `merge_id`, undoable → reverses via `undo_merge`). Touched `companies, company_dupes, merges, company:<a>, company:<b>, activity`.
-### `auto_merge` `{}` → `AdminOk` job in ONE unit, groups: `changed` = groups merged this round, `remaining` = groups
+### `auto_merge` `{ request_id?, round? }` → `AdminOk` job, rounds of ~10 s (progress every round), ONE unit, groups: `changed` = groups merged this round, `remaining` = groups
 left, `groups_total`, `complete`; `merged` = companies absorbed (detail only), `groups: [{canonical, absorbed[]}]`.
+Sentence: "Merged 57 groups (60 companies) · 12 groups left." A summary over rounds sums `changed` (groups) and `merged`
+(companies) and says both the same way.
 ### `list_merges` `{}` → `AdminList<MergeRow>` + `merges`. MergeRow: `{ id, created_at, primary_name, secondary_name, moved_reports, undone_at }`.
 ### `undo_merge` `{ merge_id }` / `resplit_company` `{ name }` → `AdminOk` (`restored {…}`).
-### `export_company` `{ company }` → `AdminOk` + `bundle` (read; audited).
+### `export_company` `{ company }` → `AdminOk` + `bundle`, `display_name` (the company's own spelling; read; audited).
 **Legal audit exports (binary, separate endpoints, for a core download helper):**
 - `POST /api/admin-company-audit-pdf` and `POST /api/admin-company-audit-package`, header `X-Admin-Token`, JSON body
   `{ company: "<name>" }` (or `{ id: "<companies.id>" }`; GET `?company=` also works). Full admins only.
@@ -494,3 +524,14 @@ Every list action answers an error (502 `upstream`, retryable) when its main rea
 not be read is `null` (never `[]`): `user_detail.ledger`, `report_detail.rows[0].history`, `job_detail.history`,
 `company_detail.rows[0].merges` / `perks`, `list_employer_purchases.perks`. `list_merges` answers `ready:false` with no
 rows only when the table does not exist yet (404).
+
+
+## Words the server writes
+- Report rows carry `outcome_label` (the public site's words: Ghosted, Auto-rejected, Rejected, Got a response, Interview,
+  Interviewing, Offer, Hired, Waiting) and `source_label` ("Imported · LinkedIn", "Sent to Seen · Seen", "From Reddit
+  (passed the first-hand rules) · Reddit r/jobs", …). Employer replies' `report` carries `outcome_label` and
+  `outcome_phrase` ("an Auto-rejected"). Never print `outcome` / `trust_reason` raw.
+- Flag states read "Off", "On for admins only", "On for beta users", "On for N% of users", "On for everyone".
+- Dates in sentences: "Nov 30, 2026"; times: "… PT".
+- Account clusters are a People queue (`section: "people"` in `overview.queues`); Review's chips, sentence and badge
+  do not count them.

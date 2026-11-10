@@ -211,6 +211,7 @@ test('round 4: db size, source health, grant reason, sign-up source, one cluster
   // (8) the two runs: listings cannot run in this function (clear reason + where to run it); demand answers the contract.
   await run('refresh_jobs', { action: 'refresh_jobs' }, (r) => { const p = C.checkErr(r.jsonBody); if (r.jsonBody.code !== 'not_available' || r.jsonBody.run?.path !== '/api/refresh-jobs') p.push('not_available + run'); return p; }, 501);
   await run('refresh_demand', { action: 'refresh_demand' }, either, null);
+  await run('job_status', { action: 'job_status', kind: 'clear_stale' }, ok);
   const co = await run('correct_report_outcome', { action: 'correct_report_outcome', id: uid(3, '2'), outcome: 'ghosted' }, ok);
   assert.equal(co.changed, 1);
 });

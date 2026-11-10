@@ -19,6 +19,9 @@ for (const [src,n] of Object.entries(plan)) {
   }
   console.log(src, got.size); rows.push(...got.values());
 }
-const emp=await (await fetch(`${U}/rest/v1/jobs?is_employer_posted=eq.true&limit=30&select=id,title,company,location,source,description,apply_url,is_employer_posted`,{headers:h})).json();
-console.log('employer',emp.length); rows.push(...emp);
+// employer posts: a refused or failed read answers an error OBJECT, which is not a list to spread — say so and go on
+const er=await fetch(`${U}/rest/v1/jobs?is_employer_posted=eq.true&order=id.asc&limit=30&select=id,title,company,location,source,description,apply_url,is_employer_posted`,{headers:h});
+const emp=er.ok?await er.json():null;
+if (Array.isArray(emp)) { console.log('employer',emp.length); rows.push(...emp); }
+else console.log('employer read skipped: HTTP',er.status);
 fs.writeFileSync(out, JSON.stringify(rows));

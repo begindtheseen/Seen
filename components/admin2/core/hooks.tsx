@@ -149,10 +149,11 @@ export type ActionView = {
 
 /** Every button that changes something. See README "How to write an action". */
 export function useAdminAction(action: string, options: ActionOptions = {}): ActionView {
-  const { api, cache, jobs } = useRuntime()
+  const { api, cache, jobs, undoBus, dock } = useRuntime()
   const optsRef = useRef(options)
   optsRef.current = options
   const [, setTick] = useState(0)
+  const runnerRef = useRef<ActionRunner | null>(null)
   const runner = useMemo(() => createActionRunner({
     api, cache, action,
     options: {
@@ -162,9 +163,18 @@ export function useAdminAction(action: string, options: ActionOptions = {}): Act
       get partialTouched() { return optsRef.current.partialTouched },
       get timeoutMs() { return optsRef.current.timeoutMs },
     },
-    onChange: () => setTick((n) => n + 1),
+    onChange: (target, s) => {
+      setTick((n) => n + 1)
+      // Every result is also pinned to the result dock, where the owner is looking (judge F2).
+      if (!dock || optsRef.current.dock === false) return
+      const entry = { key: `${action}:${target}`, state: s, onUndo: () => { void runnerRef.current?.undo(target) }, onRetry: () => { void runnerRef.current?.retry(target) } }
+      if ((s.status === 'done' || s.status === 'error') && !s.undoing && !s.undone && !s.checking) dock.set(entry)
+      else if (s.status !== 'idle') dock.update(entry)
+    },
     jobs,
-  }), [api, cache, jobs, action])
+    undoBus,
+  }), [api, cache, jobs, undoBus, dock, action])
+  runnerRef.current = runner
   return useMemo(() => ({
     run: (args = {}, target = '*') => runner.run(args, target),
     state: (target = '*') => runner.state(target) || IDLE(target),

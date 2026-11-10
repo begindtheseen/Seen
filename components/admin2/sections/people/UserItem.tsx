@@ -12,6 +12,7 @@ import { StatTile, StatStrip, StatusChip } from '../../ui/bits.tsx'
 import ConfirmStep from '../../ui/ConfirmStep.tsx'
 import ResultLine from '../../ui/ResultLine.tsx'
 import { EmptyState, ErrorState, RefreshFailed, Skeleton } from '../../ui/states.tsx'
+import { isUnknownAnswer } from '../listings/unknown.ts'
 import styles from '../listings/listings.module.css'
 import { endOfPacificDay, fmt, ledgerWords, pacificPlusDays, proLine, readUserDetail, signupWords } from './adapter.ts'
 
@@ -22,9 +23,12 @@ export default function UserItem({ kind, id, setTitle, close }: ItemViewProps) {
   useEffect(() => { if (u) setTitle(u.email || `Account ${u.id}`, u.created_at ? `joined ${formatPacific(u.created_at, { dateStyle: 'medium' })}` : `account ${u.id}`) }, [u, setTitle])
 
   const pro = useAdminAction('set_pro_window')
-  const grant = useAdminAction('grant_credits')
-  const pw = useAdminAction('set_user_password', { onSettled: (res) => { if (res.ok) { setPassword(''); setReason(''); setConfirmPw(false) } else setConfirmPw(false) } })
-  const del = useAdminAction('delete_user', { onSettled: (res) => { if (!res.ok) setConfirmDel(false) } })
+  // An answer that never arrived: the write may have happened. Re-read the account (balance, ledger) before
+  // showing a number, and offer no Retry (a Retry granted twice — judge F3).
+  const reread = (res: { ok: boolean }) => { if (!res.ok && isUnknownAnswer(res as never)) void q.refresh() }
+  const grant = useAdminAction('grant_credits', { onSettled: reread })
+  const pw = useAdminAction('set_user_password', { onSettled: (res) => { if (res.ok) { setPassword(''); setReason(''); setConfirmPw(false) } else setConfirmPw(false); reread(res) } })
+  const del = useAdminAction('delete_user', { onSettled: (res) => { if (!res.ok) setConfirmDel(false); reread(res) } })
   const [until, setUntil] = useState(pacificPlusDays(30))
   const [amount, setAmount] = useState('5')
   const [grantWhy, setGrantWhy] = useState('')
@@ -87,9 +91,10 @@ export default function UserItem({ kind, id, setTitle, close }: ItemViewProps) {
             <input className="ui-input" type="number" inputMode="numeric" min={1} max={500} value={amount} onChange={(e) => setAmount(e.target.value)} aria-invalid={!amountOk} data-testid="user-credits-amount" /></label>
           <label className={styles.field}><span>Why (kept on the ledger line)</span>
             <input className="ui-input" value={grantWhy} maxLength={200} onChange={(e) => setGrantWhy(e.target.value)} autoComplete="off" data-testid="user-credits-why" /></label>
-          <Button type="submit" variant="secondary" icon="plus" disabled={!amountOk} loading={grant.busy()} data-testid="user-credits-add">Add {amountOk ? fmt(n) : ''} credits</Button>
+          <Button type="submit" variant="secondary" icon="plus" disabled={!amountOk} loading={grant.busy()} data-testid="user-credits-add">{amountOk ? `Add ${fmt(n)} ${n === 1 ? 'credit' : 'credits'}` : 'Add credits'}</Button>
         </form>
-        <ResultLine state={grant.state()} onUndo={() => grant.undo()} onRetry={() => grant.retry()} onDismiss={() => grant.dismiss()} runningText="Adding credits…" />
+        <ResultLine state={grant.state()} onUndo={() => grant.undo()} onRetry={isUnknownAnswer(grant.state().error) ? undefined : () => grant.retry()} onDismiss={() => grant.dismiss()} runningText="Adding credits…" />
+        {isUnknownAnswer(grant.state().error) ? <p className={styles.quiet} data-testid="user-credits-unknown">The answer didn’t arrive, so the credits may have been added. The balance and the history were read again{q.fetching ? ' (reading…)' : ''} — check them before adding more.</p> : null}
         {u.ledger.length ? (
           <ul className={styles.lines} aria-label="Credit history" data-testid="user-ledger">
             {u.ledger.map((l, i) => <li key={`${l.created_at}-${i}`} className={styles.lineItem}><span className={styles.lineMain}>{ledgerWords(l)}</span><span className={styles.lineSide}>{l.created_at ? formatPacific(l.created_at) : ''}</span></li>)}
@@ -120,7 +125,7 @@ export default function UserItem({ kind, id, setTitle, close }: ItemViewProps) {
             <div className={styles.actions}><Button type="submit" variant="secondary" icon="lock" disabled={!pwOk} data-testid="user-pw-set">Set new password…</Button></div>
           </form>
         )}
-        <ResultLine state={pw.state()} onRetry={() => pw.retry()} onDismiss={() => pw.dismiss()} runningText="Setting the password…" />
+        <ResultLine state={pw.state()} onRetry={isUnknownAnswer(pw.state().error) ? undefined : () => pw.retry()} onDismiss={() => pw.dismiss()} runningText="Setting the password…" />
       </div>
 
       <div className={styles.itemPart}>
@@ -133,7 +138,7 @@ export default function UserItem({ kind, id, setTitle, close }: ItemViewProps) {
         ) : (
           <div className={styles.actions}><Button variant="danger" icon="trash-2" onClick={() => setConfirmDel(true)} data-testid="user-delete">Delete the account…</Button></div>
         )}
-        <ResultLine state={del.state()} onRetry={() => del.retry()} onDismiss={() => del.dismiss()} runningText="Deleting…" />
+        <ResultLine state={del.state()} onRetry={isUnknownAnswer(del.state().error) ? undefined : () => del.retry()} onDismiss={() => del.dismiss()} runningText="Deleting…" />
       </div>
       {u.comped ? <p className={styles.quiet}><StatusChip tone="info" label="Comped" /> An old lifetime grant; ending Pro removes it.</p> : null}
     </div>
