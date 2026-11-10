@@ -7,6 +7,9 @@ import type { AdminItemKind, AdminOverview } from '../contract.ts'
 import AdminShell from '../ui/AdminShell.tsx'
 import { JobChip } from '../ui/Job.tsx'
 import ResultLine from '../ui/ResultLine.tsx'
+import type { ActionState } from './action.ts'
+import type { DockEntry } from './dock.ts'
+import { jobProgressText, type Job } from './jobs.ts'
 import { Loadable } from './Boundary.tsx'
 import { AdminRuntimeProvider, useAdminJobs, useAdminQuery, useRuntime } from './hooks.tsx'
 import LoginForm from './LoginForm.tsx'
@@ -225,9 +228,7 @@ function Shell({ username: initialUser, onSignedOut }: { username: string; onSig
         badges={badges}
         jobChip={jobList.length ? <JobChip jobs={jobList} onOpen={() => setPanel({ kind: 'jobs' })} /> : null}
         jobBar={jobList.length ? <JobChip bar jobs={jobList} onOpen={() => setPanel({ kind: 'jobs' })} /> : null}
-        dock={dockEntry && dockEntry.state.status !== 'idle'
-          ? <ResultLine state={dockEntry.state} onUndo={dockEntry.onUndo} onRetry={dockEntry.onRetry} onDismiss={() => dockStore?.dismiss()} />
-          : null}
+        dock={dockEntry && dockEntry.state.status !== 'idle' ? <DockLine entry={dockEntry} jobs={jobList} onDismiss={() => dockStore?.dismiss()} /> : null}
         onSearch={() => setPanel({ kind: 'search' })}
         onMore={() => setPanel({ kind: 'more' })}
         onSignOut={() => { void signOut() }}
@@ -242,6 +243,22 @@ function Shell({ username: initialUser, onSignedOut }: { username: string; onSig
       <SheetHost place={place} panel={panel} setPanel={setPanel} shell={shell} />
     </ShellContext.Provider>
   )
+}
+
+/** The dock's line. An Undo that became a job shows that job's live progress here ("Undoing… 420 of 1,040"), then its result. */
+function DockLine({ entry, jobs, onDismiss }: { entry: DockEntry; jobs: Job[]; onDismiss: () => void }) {
+  const job = entry.state.jobId ? jobs.find((j) => j.id === entry.state.jobId) : undefined
+  if (job && (job.status === 'running' || job.status === 'cancelling' || job.checking)) {
+    return <ResultLine state={{ ...entry.state, status: 'running', undoing: false, checking: false }} runningText={`Undoing… ${jobProgressText(job)}`} />
+  }
+  if (job) {
+    const ok = job.status === 'done'
+    const st: ActionState = ok
+      ? { ...entry.state, status: 'done', result: { ...entry.state.result!, message: job.message, undo: undefined } }
+      : { ...entry.state, status: 'done', error: { ok: false, code: job.resumable ? 'unknown_outcome' : 'upstream', retryable: !!job.resumable, error: job.message } }
+    return <ResultLine state={st} onDismiss={onDismiss} />
+  }
+  return <ResultLine state={entry.state} onUndo={entry.onUndo} onRetry={entry.onRetry} onDismiss={onDismiss} />
 }
 
 function SectionSlot({ active, children }: { active: boolean; children: ReactNode }) {

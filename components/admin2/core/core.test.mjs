@@ -209,7 +209,7 @@ test('action: a large Undo answers in rounds and is called until complete', asyn
   const r = createActionRunner({ api, cache: new QueryCache(), action: 'review_held' })
   await r.run({ ids: ['*'] }); await r.undo()
   assert.deepEqual(calls.slice(1).map((c) => c.body), [{ audit_id: '9' }, { audit_id: '9' }])
-  assert.equal(r.state().result.changed, 300); assert.match(r.state().result.message, /Undone: 300 rows put back\./); assert.equal(r.state().undone, true)
+  assert.equal(r.state().result.changed, 300); assert.match(r.state().result.message, /^300 rows put back\./); assert.equal(r.state().undone, true)
 })
 
 test('cache: keyset loadMore appends after the rows on screen, dedupes, and refresh keeps them', async () => {

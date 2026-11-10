@@ -218,7 +218,7 @@ export function AlreadyRightBlock({ a }: { a?: AlreadyRight | null }) {
   const items = (a.items || []).slice(0, 3)
   return (
     <section className={s.already} data-testid="already-right" aria-label="What is already right">
-      <p className={s.alreadyText}><Icon name="circle-check" size={16} label="Already right" />{a.sentence.replace(/^Already right:\s*/i, '')}</p>
+      <p className={s.alreadyText}><Icon name="circle-check" size={16} label="Already right" />{a.sentence}</p>
       {items.length > 0 && (
         <ul className={s.plain}>{items.map((x, i) => <li key={i}><b>{q(x.statement, 90)}</b> — your line “{q(x.line, 110)}”</li>)}</ul>
       )}

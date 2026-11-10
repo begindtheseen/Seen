@@ -218,7 +218,7 @@ export function createActionRunner(deps: {
       const r = res as AdminOk & { restored?: number; total?: number }
       const done = typeof r.restored === 'number' ? r.restored : total
       const jobId = deps.jobs.start({
-        action: u.action, args: u.args, label: 'Restoring rows', past: 'Restored', noun: 'rows',
+        action: u.action, args: u.args, label: 'Undoing', past: 'Put back', noun: 'rows',
         initial: { changed: done, remaining: typeof r.remaining === 'number' ? r.remaining : null, cursor: r.cursor },
       })
       const of = typeof r.total === 'number' ? ` of ${r.total.toLocaleString('en-US')}` : ''
@@ -229,12 +229,12 @@ export function createActionRunner(deps: {
     if (res!.ok && auditIdOf(u)) deps.undoBus?.emit(auditIdOf(u)!)
     if (res!.ok) {
       cache.invalidate([...touched])
-      const message = rounds > 1 ? `Undone: ${total.toLocaleString('en-US')} rows put back.${res.complete === false ? ` ${(res.remaining ?? 0).toLocaleString('en-US')} still to undo — press Undo again to continue.` : ''}` : (res.message || 'Undone.')
+      const message = rounds > 1 ? `${total.toLocaleString('en-US')} rows put back.${res.complete === false ? ` ${(res.remaining ?? 0).toLocaleString('en-US')} still to undo — press Undo again to continue.` : ''}` : (undoSentence(res.message) || 'Undone.')
       const unfinished = res.complete === false
       setState(target, { status: 'done', target, args: s.args, result: { ...res, changed: total, message, undo: unfinished ? u : undefined }, undone: !unfinished })
     } else {
       // The original result stays (its Undo button too); the line says why the Undo failed.
-      setState(target, { ...s, undoing: false, error: res })
+      setState(target, { ...s, undoing: false, checking: false, undoRid, error: res })
     }
     return res
   }

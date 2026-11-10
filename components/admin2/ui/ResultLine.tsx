@@ -59,7 +59,8 @@ export default function ResultLine({ state, onUndo, onRetry, onDismiss, skipLink
   const res = state.result
   const tone = running ? styles.lineRun : failed ? styles.lineBad : styles.lineGood
   const unknown = failed && err?.code === 'unknown_outcome'
-  const word = running ? (state.undoing ? 'Undoing' : state.checking ? 'Checking' : 'Working') : failed ? (state.status === 'done' ? 'Undo failed' : unknown ? 'Not known yet' : 'Not done') : state.undone ? 'Undone' : 'Done'
+  const undoUnknown = failed && state.status === 'done' && err?.code === 'unknown_outcome'
+  const word = running ? (state.undoing ? (state.checking ? 'Checking' : 'Undoing') : state.checking ? 'Checking' : 'Working') : failed ? (state.status === 'done' ? (undoUnknown ? 'Not known yet' : 'Undo failed') : unknown ? 'Not known yet' : 'Not done') : state.undone ? 'Undone' : 'Done'
   const skipped: AdminSkipped[] = !failed && res ? res.skipped.filter((s) => s.count > 0) : []
   return (
     <div className={`${styles.line} ${tone}`} role="status" aria-live="polite" data-testid="result-line" data-state={running ? 'running' : failed ? 'error' : 'done'}>
@@ -68,7 +69,7 @@ export default function ResultLine({ state, onUndo, onRetry, onDismiss, skipLink
         {word}
       </span>
       <span className={styles.lineText}>
-        {running ? (state.undoing ? undoingText(state) : state.checking ? 'No answer yet — asking the server whether it went through…' : (runningText || 'Working…')) : failed ? (
+        {running ? (state.undoing ? (state.checking ? 'No answer yet — asking the server whether the Undo went through…' : undoingText(state)) : state.checking ? 'No answer yet — asking the server whether it went through…' : (runningText || 'Working…')) : failed ? (
           <>
             {err?.error}
             {err && (err.changed || 0) > 0 ? ` ${fmt(err.changed!)} ${err.changed === 1 ? 'row was' : 'rows were'} changed before it stopped.` : ''}
@@ -90,6 +91,11 @@ export default function ResultLine({ state, onUndo, onRetry, onDismiss, skipLink
         {!running && !failed && res?.undo && onUndo ? (
           <button type="button" className={styles.lineBtn} onClick={onUndo} data-testid="result-undo">
             <Icon name="undo-2" size={16} />{res.undo.label || 'Undo'}
+          </button>
+        ) : null}
+        {undoUnknown && res?.undo && onUndo ? (
+          <button type="button" className={styles.lineBtn} onClick={onUndo} data-testid="result-undo-check">
+            <Icon name="refresh-cw" size={16} />Check again
           </button>
         ) : null}
         {!running && state.status === 'error' && err?.retryable && onRetry ? (

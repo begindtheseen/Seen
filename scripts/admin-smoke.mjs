@@ -391,7 +391,7 @@ async function run(vp) {
     const d2 = await dlP
     check(tag('a 401 during a download → sign in → the file still arrives'), d2.suggestedFilename() === 'acme-logistics-audit.pdf' && await sentinelAlive(page))
     await page.getByTestId('section-lab').locator('[data-testid=result-dismiss]').first().click().catch(() => {})
-    await page.getByTestId('result-dock').getByTestId('result-dismiss').click().catch(() => {})
+    await page.locator('[data-testid=result-dock]:visible').getByTestId('result-dismiss').click().catch(() => {})
   }
 
   // Scroll memory never fights the person: switch kind, scroll 400px at 100 ms, still there at 1.5 s
@@ -423,7 +423,7 @@ async function run(vp) {
   check(tag('Approve all: one request even on a double tap'), S.requests.filter((a) => a === 'lab_decide').length - before === 1)
   check(tag('Approve all: the result line says what changed with counts'), /Approved 258 of 300 held reports/.test(line), line.replace(/\s+/g, ' '))
   check(tag('Approve all: skipped duplicates are offered as a link'), await page.getByTestId('section-lab').getByRole('button', { name: 'Review them' }).count() === 1)
-  check(tag('the result is also pinned in the result dock'), /Approved 258 of 300/.test(await page.getByTestId('result-dock').innerText()))
+  check(tag('the result is also pinned in the result dock'), /Approved 258 of 300/.test(await page.locator('[data-testid=result-dock]:visible').innerText()))
   await page.getByTestId('section-lab').getByTestId('lab-row-r007').waitFor()
   check(tag('Approve all: approved rows left the list without a reload'), await page.getByTestId('lab-row-r001').count() === 0 && await sentinelAlive(page))
   await shot(page, `${vp.name}-07-approved`)
@@ -431,14 +431,14 @@ async function run(vp) {
   await page.waitForFunction(() => /Undo is running: 100 of 258 restored so far/.test(document.querySelector('[data-testid=section-lab] [data-testid=result-line]')?.textContent || ''))
   await page.locator('[data-testid=job-chip]:visible').waitFor()
   const chipU = await page.locator('[data-testid=job-chip]:visible').innerText()
-  check(tag('a big Undo runs as a visible job ("Restoring rows · N of 258")'), /Restoring rows/.test(chipU) && /of 258/.test(chipU), chipU.replace(/\s+/g, ' '))
+  check(tag('a big Undo runs as a visible job ("Undoing · N of 258")'), /Undoing/.test(chipU) && /of 258/.test(chipU), chipU.replace(/\s+/g, ' '))
   await shot(page, `${vp.name}-07b-undo-job`)
-  await page.waitForFunction(() => [...document.querySelectorAll('[data-testid=job-chip]')].some((c) => /Done: Restoring rows/.test(c.textContent || '')), null, { timeout: 15000 })
+  await page.waitForFunction(() => [...document.querySelectorAll('[data-testid=job-chip]')].some((c) => /Done: Undoing/.test(c.textContent || '')), null, { timeout: 15000 })
   await page.getByTestId('lab-row-r001').waitFor()
   check(tag('the Undo job puts every row back, in place, without a reload'), S.batches.size === 0 && await page.getByTestId('lab-row-r001').count() === 1 && await sentinelAlive(page))
   await page.locator('[data-testid=job-chip]:visible').click(); await page.getByTestId('sheet-panel').getByTestId('job-dismiss').click(); await page.getByTestId('sheet-close').click()
   await page.getByTestId('section-lab').getByTestId('result-dismiss').first().click()
-  await page.getByTestId('result-dock').getByTestId('result-dismiss').click().catch(() => {})
+  await page.locator('[data-testid=result-dock]:visible').getByTestId('result-dismiss').click().catch(() => {})
 
   // 5 · Row action deep in the list: the result appears in the row's place AND in the dock (judge F2)
   await page.getByTestId('lab-row-r020').scrollIntoViewIfNeeded()
@@ -450,12 +450,12 @@ async function run(vp) {
   const slotBox = await slot.boundingBox()
   check(tag('a row action\'s result shows in the row\'s place, on screen, with Undo'),
     !!slotBox && slotBox.y >= 0 && slotBox.y + slotBox.height <= vp.h && await slot.getByTestId('result-undo').count() === 1, JSON.stringify(slotBox))
-  check(tag('…and in the pinned result dock'), /Approved the/.test(await page.getByTestId('result-dock').innerText()))
+  check(tag('…and in the pinned result dock'), /Approved the/.test(await page.locator('[data-testid=result-dock]:visible').innerText()))
   await shot(page, `${vp.name}-07c-row-result`)
-  await page.getByTestId('result-dock').getByTestId('result-undo').click()
+  await page.locator('[data-testid=result-dock]:visible').getByTestId('result-undo').click()
   await page.getByTestId('lab-row-r020').waitFor()
   check(tag('Undo from the dock puts the row back'), true)
-  await page.getByTestId('result-dock').getByTestId('result-dismiss').click().catch(() => {})
+  await page.locator('[data-testid=result-dock]:visible').getByTestId('result-dismiss').click().catch(() => {})
   await page.evaluate(() => window.scrollTo(0, 0))
 
   // Forced failures. A definite failure (500) → "Not done" + Retry, row back. An UNKNOWN outcome (empty answer,
@@ -471,7 +471,7 @@ async function run(vp) {
     await errLine.getByTestId('result-retry').click()
     await page.waitForFunction(() => !document.querySelector('[data-testid=lab-row-r002]'))
     check(tag('forced 500: Retry then works'), true)
-    await page.getByTestId('result-dock').getByTestId('result-undo').click(); await page.getByTestId('lab-row-r002').waitFor()
+    await page.locator('[data-testid=result-dock]:visible').getByTestId('result-undo').click(); await page.getByTestId('lab-row-r002').waitFor()
   }
   const unknown = ['empty', 'html']
   if (!SKIP_TIMEOUT) unknown.push('timeout')
@@ -480,13 +480,13 @@ async function run(vp) {
     S.faults.push({ kind, action: 'lab_decide' })
     await page.getByTestId('lab-approve-r002').click()
     if (kind !== 'timeout') await page.waitForFunction(() => /Checking/.test(document.body.textContent || ''), null, { timeout: 10_000 })
-    await page.waitForFunction(() => /Approved the/.test(document.querySelector('[data-testid=result-dock]')?.textContent || ''), null, { timeout: 60_000 })
-    const dockTxt = await page.getByTestId('result-dock').innerText()
+    await page.waitForFunction(() => /Approved the/.test([...document.querySelectorAll('[data-testid=result-dock]')].find((e) => e.offsetParent)?.textContent || ''), null, { timeout: 60_000 })
+    const dockTxt = await page.locator('[data-testid=result-dock]:visible').innerText()
     check(tag(`unknown outcome (${kind}): checked with the same request_id, then "Done" — written once, never "Not done"`),
       S.decideWrites - writes === 1 && !/Not done|refresh|reload/i.test(dockTxt) && await page.getByTestId('lab-row-r002').count() === 0, `${S.decideWrites - writes} writes · ${dockTxt.replace(/\s+/g, ' ')}`)
-    await page.getByTestId('result-dock').getByTestId('result-undo').click(); await page.getByTestId('lab-row-r002').waitFor()
+    await page.locator('[data-testid=result-dock]:visible').getByTestId('result-undo').click(); await page.getByTestId('lab-row-r002').waitFor()
   }
-  await page.getByTestId('result-dock').getByTestId('result-dismiss').click().catch(() => {})
+  await page.locator('[data-testid=result-dock]:visible').getByTestId('result-dismiss').click().catch(() => {})
 
   // A declined sign-in puts an optimistically removed row back (judge F4)
   S.token = 'expired-by-test'
@@ -495,7 +495,7 @@ async function run(vp) {
   await page.getByTestId('session-cancel').click()
   await page.getByTestId('lab-row-r003').waitFor({ timeout: 5000 }).catch(() => {})
   check(tag('declining the sign-in brings the removed row back'), await page.getByTestId('lab-row-r003').count() === 1 && !S.gone.has('r003'))
-  await page.getByTestId('result-dock').getByTestId('result-dismiss').click().catch(() => {})
+  await page.locator('[data-testid=result-dock]:visible').getByTestId('result-dismiss').click().catch(() => {})
 
   // 401 mid-action: the sign-in step replays the action; the page stays
   // (the token is still the expired one from the declined sign-in: the next action meets the 401)
@@ -509,7 +509,7 @@ async function run(vp) {
   await page.getByTestId('sheet-session').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {})
   check(tag('401: sign in, and the pressed action finishes'), await sentinelAlive(page) && await page.getByTestId('sheet-session').count() === 0,
     `sentinel ${await sentinelAlive(page)}, session sheets ${await page.getByTestId('sheet-session').count()}, url ${page.url()}`)
-  await page.getByTestId('result-dock').getByTestId('result-dismiss').click().catch(() => {})
+  await page.locator('[data-testid=result-dock]:visible').getByTestId('result-dismiss').click().catch(() => {})
 
   // 6 · The item sheet: four ways out, focus back, refresh reopens, replace + Back
   const opener = page.getByTestId('lab-row-r004').locator('button').first()
