@@ -149,7 +149,8 @@ export async function confirmFullPostings(rows, keys, { db, deadline, fetchFull 
       dropped.push({ id, why: full?.reason === 'gone' ? 'gone' : 'unreadable' }); continue;
     }
     const row = { ...j, description: full.description };
-    const m = matchListing(row, keys, { now, mode: 'email' });
+    let m;
+    try { m = matchListing(row, keys, { now, mode: 'email' }); } catch { dropped.push({ id, why: 'skipped_error' }); continue; }
     if (!m.ok || m.summaryOnly || !m.reason) { dropped.push({ id, why: m.ok ? 'still_summary' : `full_posting:${m.why}` }); continue; }
     out.push({ ...row, _reason: m.reason, _basis: m.basis, _need: m.need, _have: m.have, _summaryOnly: false });
   }
@@ -271,6 +272,8 @@ async function run(req, res, { loadGeo, fetchFull = fetchFullPosting }) {
       } else {
         const m = await findResumeMatches({ supabaseUrl: SUPABASE_URL, serviceKey: SERVICE_KEY, userId: uid, persist: !dry, mode: 'email' });
         if (m.heal) await m.heal;
+        // listings that made a helper throw were skipped (never the whole person); counted here
+        if (m.skippedError) summary.skipped.skipped_error = (summary.skipped.skipped_error || 0) + m.skippedError;
         if (m.reason) {
           skip(m.reason);
           if (dry) summary.picked.push({ user: uid.slice(0, 8), reason: m.reason, matches: [] });
