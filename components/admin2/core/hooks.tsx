@@ -195,6 +195,8 @@ export type JobView = {
   cancel: () => void
   resume: () => void
   dismiss: () => void
+  /** Run the finished job's Undo (present when `job.undo` is). Additive, 2026-11-10. */
+  undo: () => void
 }
 
 /** An "until done" action. The job lives in the shell, so leaving the section does not stop or hide it. */
@@ -211,6 +213,7 @@ export function useAdminJob(spec: JobSpec): JobView {
     cancel: () => { if (job) jobs.cancel(job.id) },
     resume: () => { if (job) jobs.resume(job.id) },
     dismiss: () => { if (job) jobs.dismiss(job.id) },
+    undo: () => { if (job) jobs.undo(job.id) },
   }
 }
 

@@ -143,3 +143,32 @@ test('update_cluster and cluster_detail accept the rig\'s uuid ids', async () =>
   assert.equal(r.statusCode, 200, JSON.stringify(r.jsonBody));
   assert.equal(fake.tables.duplicate_clusters.find((c) => c.id === cid).status, 'safe');
 });
+
+test('round 6: the list does not wait on the duplicate-of-live check; the bulk guard skips what it could not verify', async () => {
+  const review = await import('../lib/server/admin/review.js');
+  const fake = createFakeRest({ tables: copiesWorld(), rpcs: RPCS });
+  const call = await caller(handler, fake);
+  await call({ action: 'review_held', decision: 'approve', scope: 'all', group: 'positive' }); // originals go live
+  // Published-report reads (the live check) become slow; every other read stays fast.
+  const real = fake.fetch;
+  fake.fetch = async (u, o) => { if (String(u).includes('/rest/v1/reports?') && String(u).includes('needs_review=is.false')) await new Promise((r) => setTimeout(r, 400)); return real(u, o); };
+  const slowCall = await caller(handler, fake);
+  const saved = { ...review.LIVE_CHECK };
+  Object.assign(review.LIVE_CHECK, { listBudgetMs: 100, guardBudgetMs: 100 });
+  try {
+    const t0 = Date.now();
+    const list = (await slowCall({ action: 'list_held_reports' })).jsonBody;
+    assert.ok(Date.now() - t0 < 350, `rows came back in ${Date.now() - t0} ms, not after the slow check`);
+    assert.equal(list.duplicate_check, 'pending');
+    assert.equal(list.duplicate_check_pending, 3);
+    assert.ok(list.rows.every((r) => r.review.duplicate_check === 'pending' && !r.review.flags.includes('possible_duplicate')), 'pending, never a false "clean"');
+    const bulk = (await slowCall({ action: 'review_held', decision: 'approve', scope: 'all' })).jsonBody;
+    assert.equal(bulk.changed, 0, 'nothing unverified is approved');
+    assert.deepEqual(bulk.skipped.map((s) => [s.reason, s.count]), [['not_checked_for_duplicates', 3]]);
+    assert.match(bulk.message, /3 not checked for duplicates — try again/);
+  } finally { Object.assign(review.LIVE_CHECK, saved); }
+  // With time, the same list and guard are exact again.
+  const list2 = (await slowCall({ action: 'list_held_reports' })).jsonBody;
+  assert.equal(list2.duplicate_check, 'done');
+  assert.ok(list2.rows.every((r) => r.review.flags.includes('possible_duplicate')));
+});

@@ -23,7 +23,7 @@ export function resumeLabel(j: Job): string {
   return typeof j.remaining === 'number' && j.remaining > 0 ? `Resume ${verb} — ${fmt(j.remaining)} left` : `Resume ${verb}`
 }
 
-export function JobProgress({ job, onCancel, onResume, onDismiss }: { job: Job; onCancel?: () => void; onResume?: () => void; onDismiss?: () => void }) {
+export function JobProgress({ job, onCancel, onResume, onDismiss, onUndo }: { job: Job; onCancel?: () => void; onResume?: () => void; onDismiss?: () => void; onUndo?: () => void }) {
   const live = job.status === 'running' || job.status === 'cancelling'
   const total = jobTotal(job)
   const pct = total ? Math.min(100, Math.round((job.changed / Math.max(1, total)) * 100)) : null
@@ -55,6 +55,7 @@ export function JobProgress({ job, onCancel, onResume, onDismiss }: { job: Job; 
       <div className={styles.jobMsg}>{live && job.last_message ? job.last_message : job.message}</div>
       <div className={styles.jobActions}>
         {live && onCancel ? <Button variant="ghost" onClick={onCancel} disabled={job.status === 'cancelling'} data-testid="job-cancel">{job.status === 'cancelling' ? 'Stopping after this round…' : 'Cancel'}</Button> : null}
+        {!live && job.undo && !job.undone && onUndo ? <Button variant="secondary" icon="undo-2" onClick={onUndo} data-testid="job-undo">{job.undo.label || 'Undo'}</Button> : null}
         {!live && job.resumable && onResume ? <Button variant="secondary" icon="refresh-cw" onClick={onResume} data-testid="job-resume">{resumeLabel(job)}</Button> : null}
         {!live && onDismiss ? <Button variant="ghost" onClick={onDismiss} data-testid="job-dismiss">Dismiss</Button> : null}
       </div>

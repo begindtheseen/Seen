@@ -14,7 +14,7 @@
 //   · the final summary stays until the owner dismisses it.
 //
 // Framework-free (React reads it through useAdminJob in ./hooks.tsx); unit-tested in core.test.mjs.
-import type { AdminJobState, AdminSkipped } from '../contract.ts'
+import type { AdminJobState, AdminSkipped, AdminUndo } from '../contract.ts'
 import type { AdminApi, ApiResult } from './api.ts'
 
 export type JobSpec = {
@@ -49,6 +49,15 @@ export type Job = AdminJobState & {
   last_message?: string
   /** The job's size: from JobSpec.total, then changed + the server's remaining. One number everywhere. */
   total?: number | null
+  /**
+   * The server's Undo for the whole job: the last round's `undo`, kept only while every round carried the
+   * same `request_id` (one press = one batch). A finished job offers it exactly like a single action.
+   */
+  undo?: AdminUndo
+  /** The request_id every round answered with (null once two rounds disagreed — then no Undo is offered). */
+  request_id?: string | null
+  /** The Undo was started (as its own job). */
+  undone?: boolean
   lost_rounds: number
   ended_at?: string
 }
@@ -210,6 +219,7 @@ export function createJobManager(deps: {
         cursor: res.cursor || undefined,
         skipped,
         last_message: res.message || cur.last_message,
+        ...undoAfter(cur, res),
       }
       if (res.complete !== false) {
         const done: Job = { ...next, status: 'done', resumable: false, ended_at: new Date(now()).toISOString() }
@@ -237,7 +247,7 @@ export function createJobManager(deps: {
     return [...jobs.values()].find((j) => j.key === key && (j.status === 'running' || j.status === 'cancelling'))
   }
 
-  return {
+  const mgr = {
     /** Start the job, or return the one already running for the same action+args (and focus it). */
     start(spec: JobSpec): string {
       const key = jobKey(spec.action, spec.args)
@@ -278,6 +288,14 @@ export function createJobManager(deps: {
       void loop(id)
       return id
     },
+    /** Run the finished job's Undo — itself a job (a big undo answers in rounds), shown like any other. */
+    undo(id: string): string | null {
+      const j = jobs.get(id)
+      if (!j || !j.undo || j.undone || j.status === 'running' || j.status === 'cancelling') return null
+      const u = j.undo
+      jobs.set(id, { ...j, undone: true, undo: undefined }); persist(); emit()
+      return mgr.start({ action: u.action, args: u.args, label: `Undoing: ${j.label.charAt(0).toLowerCase()}${j.label.slice(1)}`, past: 'Put back', noun: 'rows' })
+    },
     dismiss(id: string) {
       const j = jobs.get(id)
       if (!j || j.status === 'running' || j.status === 'cancelling') return
@@ -294,6 +312,17 @@ export function createJobManager(deps: {
     /** Test helper: drop listeners. */
     _reset() { subs.clear(); focusListeners = new Set() },
   }
+  return mgr
+}
+
+/** Carry the job's Undo: the newest round's `undo`, as long as every round answered with one request_id. */
+function undoAfter(cur: Job, res: ApiResult): Pick<Job, 'undo' | 'request_id'> {
+  if (!res.ok) return {}
+  const rid = typeof (res as { request_id?: unknown }).request_id === 'string' ? (res as unknown as { request_id: string }).request_id
+    : typeof cur.args.request_id === 'string' ? cur.args.request_id : undefined
+  if (cur.request_id === null) return { undo: undefined, request_id: null }
+  if (cur.request_id !== undefined && rid !== undefined && rid !== cur.request_id) return { undo: undefined, request_id: null }
+  return { request_id: rid ?? cur.request_id, undo: res.undo || cur.undo }
 }
 
 export function mergeSkipped(a: AdminSkipped[], b: AdminSkipped[] | undefined): AdminSkipped[] {

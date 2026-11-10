@@ -158,7 +158,13 @@ async function answer(req) {
       await sleep(S.staleDelayMs)
       const d = Math.min(S.stale, 1500)
       S.stale -= d
-      return json(200, { ok: true, changed: d, remaining: S.stale, complete: S.stale === 0, cursor: `c${S.stale}`, message: `Cleared ${d}.`, touched: ['overview'] })
+      S.cleared = (S.cleared || 0) + d
+      return json(200, { ok: true, changed: d, remaining: S.stale, complete: S.stale === 0, cursor: `c${S.stale}`, message: `Cleared ${d}.`, touched: ['overview'],
+        request_id: body.request_id, undo: { action: 'lab_unclear', args: { request_id: body.request_id }, label: 'Undo' } })
+    }
+    case 'lab_unclear': {
+      const n = S.cleared || 0; S.stale += n; S.cleared = 0
+      return json(200, { ok: true, changed: n, complete: true, message: `Put ${n} stale listings back.`, touched: ['overview'] })
     }
     default:
       return json(400, { ok: false, code: 'unknown_action', error: `Unknown action: ${action}`, retryable: false })
@@ -368,6 +374,19 @@ async function run(vp) {
     await page.locator('[data-testid=result-dismiss]').first().click().catch(() => {})
   }
 
+  // Scroll memory never fights the person: switch kind, scroll 400px at 100 ms, still there at 1.5 s
+  await page.evaluate(() => window.scrollTo(0, 0))
+  await page.getByRole('button', { name: 'Positive' }).click()
+  await page.waitForTimeout(100)
+  if (phone) await page.evaluate(() => { window.dispatchEvent(new Event('touchstart')); window.scrollBy(0, 400) })
+  else await page.mouse.wheel(0, 400)
+  await page.waitForTimeout(1400)
+  const yKind = await page.evaluate(() => window.scrollY)
+  check(tag('a scroll right after a kind switch is not pulled back'), yKind >= 300, `scrollY ${yKind} at 1.5 s`)
+  await page.getByRole('button', { name: 'All', exact: true }).click()
+  await page.getByTestId('lab-row-r001').waitFor()
+  await page.evaluate(() => window.scrollTo(0, 0))
+
   // 4 · Approve all → result line, rows leave in place, Undo restores, a second press cannot double-run
   await page.getByTestId('lab-approve-all').click()
   await page.getByTestId('confirm-step').waitFor()
@@ -565,7 +584,11 @@ async function run(vp) {
     await shot(page, `${vp.name}-15b-job-bar`)
   }
   await page.locator('[data-testid=job-chip]:visible').click()
-  await page.getByTestId('sheet-panel').getByTestId('job-dismiss').click()
+  // A finished multi-round job offers the server's Undo for the whole press (one request_id on every round)
+  await page.getByTestId('sheet-panel').getByTestId('job-undo').click()
+  await page.waitForFunction(() => [...document.querySelectorAll('[data-testid=sheet-panel] [data-testid=job-progress]')].some((e) => /Put back 20,982 rows/.test(e.textContent || '')), null, { timeout: 10000 })
+  check(tag('a finished job offers Undo, and the Undo runs (every listing back)'), S.stale === 20982 && await page.getByTestId('sheet-panel').getByTestId('job-undo').count() === 0)
+  for (let i = 0; i < 2; i++) await page.getByTestId('sheet-panel').getByTestId('job-dismiss').first().click()
   await page.getByTestId('sheet-close').click()
 
   // 9 · No document navigation happened except the reloads/gotos the test made itself

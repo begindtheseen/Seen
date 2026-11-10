@@ -131,6 +131,13 @@ sentence for the last round is kept on the job as `job.last_message` and shown b
 ("Scanned 61,000 listings so far — keep going."). The Listings workaround that restarted a job when the
 cursor moved (`ListingsSection.tsx`, "The job manager stops on 'no change'…") can go.
 
+A finished multi-round job keeps the server's Undo (`job.undo` = the last round's `undo`, kept only while
+every round answered with the same `request_id` — send one per press) and `JobProgress` shows it when you
+pass `onUndo={job.undo}` (from `useAdminJob`); the Undo runs as its own job. No more digging through the activity log.
+
+Scroll memory restores only on a SECTION change and gives way to any scroll intent; a filter or kind change
+never moves the page.
+
 A job's size is ONE number: `JobSpec.total` (when known up front) and then `changed + remaining` from the
 server. Show progress with `jobProgressText(job)` / `<JobProgress job={job} />` — never compute your own
 "N of M" in a section (the bar and the section said "0 so far" vs "0 of 58" before this).

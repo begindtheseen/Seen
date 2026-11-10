@@ -490,3 +490,27 @@ test('jobs: a known total shows the same "N of M" from the first moment, kept cu
   const id2 = m2.start({ ...SPEC, total: 58 }); await until(() => m2.get(id2).status !== 'running')
   assert.equal(jobProgressText(m2.get(id2)), '10 of 80')
 })
+
+test('jobs: a multi-round job keeps the server Undo when every round carried one request_id', async () => {
+  let n = 0
+  const sent = []
+  const api = async (action, body) => {
+    sent.push({ action, body })
+    if (action === 'undo') return toResult(200, JSON.stringify({ ok: true, changed: 30, complete: true, message: 'Put 30 back.', touched: ['report_dupes'] }))
+    n++
+    return toResult(200, JSON.stringify({ ok: true, changed: 10, remaining: 30 - n * 10, complete: n === 3, cursor: `c${n}`, request_id: 'rq1', undo: { action: 'undo', args: { audit_id: `a${n}` }, label: 'Undo' }, touched: ['report_dupes'] }))
+  }
+  const m = createJobManager({ api, sleep: async () => {} })
+  const id = m.start({ action: 'dedupe_reports', args: { request_id: 'rq1' }, label: 'Marking duplicate copies', past: 'Marked', noun: 'duplicate copies' })
+  await until(() => m.get(id).status === 'done')
+  assert.deepEqual(m.get(id).undo, { action: 'undo', args: { audit_id: 'a3' }, label: 'Undo' }, 'the last round\'s undo covers the press')
+  const uid = m.undo(id)
+  await until(() => m.get(uid).status === 'done')
+  assert.deepEqual(sent.at(-1), { action: 'undo', body: { audit_id: 'a3' } }); assert.equal(m.get(id).undone, true); assert.equal(m.undo(id), null, 'no second Undo')
+  // two request_ids → no Undo offered
+  let k = 0
+  const api2 = async () => { k++; return toResult(200, JSON.stringify({ ok: true, changed: 5, complete: k === 2, cursor: `d${k}`, request_id: `r${k}`, undo: { action: 'undo', args: { audit_id: 'x' }, label: 'Undo' } })) }
+  const m2 = createJobManager({ api: api2, sleep: async () => {} })
+  const id2 = m2.start({ ...SPEC, action: 'x' }); await until(() => m2.get(id2).status === 'done')
+  assert.equal(m2.get(id2).undo, undefined)
+})

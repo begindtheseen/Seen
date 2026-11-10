@@ -98,19 +98,46 @@ function Shell({ username: initialUser, onSignedOut }: { username: string; onSig
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => { window.removeEventListener('scroll', onScroll); if (t) clearTimeout(t) }
   }, [])
+  // The restore runs ONLY on a section change (a filter or kind change inside a section never restores),
+  // and it gives way to the person: any scroll intent after the switch (wheel, touch, a scroll key, a
+  // scrollbar drag) cancels it, and it never runs later than the frame in which the page first becomes
+  // tall enough (or 1.5 s, whichever is first). The page is never pulled back to where it was.
+  const lastSection = useRef<ShellSection | null>(null)
   useEffect(() => {
     if (!ready) return
     current.current = section
+    const sectionChanged = lastSection.current !== null && lastSection.current !== section
+    lastSection.current = section
     const y = scrolls.current[section] || 0
-    let tries = 0
+    if (y === 0 && !sectionChanged) return // a restore to the top only belongs to a real section change
+    let cancelled = false
+    const cancel = () => { cancelled = true }
+    const onKey = (e: KeyboardEvent) => { if (['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End', ' ', 'Spacebar'].includes(e.key)) cancelled = true }
+    const onPointer = (e: PointerEvent) => { if (e.clientX >= document.documentElement.clientWidth) cancelled = true } // the scrollbar
+    const opts: AddEventListenerOptions = { passive: true, once: true }
+    window.addEventListener('wheel', cancel, opts)
+    window.addEventListener('touchstart', cancel, opts)
+    window.addEventListener('touchmove', cancel, opts)
+    window.addEventListener('keydown', onKey, { passive: true })
+    window.addEventListener('pointerdown', onPointer, { passive: true })
+    const started = performance.now()
     let raf = 0
     const put = () => {
-      // A section that is still loading is too short to reach its old position: wait for it (≤1.5 s).
-      if (y > 0 && document.documentElement.scrollHeight < y + window.innerHeight && tries++ < 90) { raf = requestAnimationFrame(put); return }
+      if (cancelled) return
+      // Still loading and too short to reach the old position: wait for it, at most 1.5 s.
+      if (y > 0 && document.documentElement.scrollHeight < y + window.innerHeight && performance.now() - started < 1500) { raf = requestAnimationFrame(put); return }
       window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior })
+      cleanup()
+    }
+    const cleanup = () => {
+      window.removeEventListener('wheel', cancel)
+      window.removeEventListener('touchstart', cancel)
+      window.removeEventListener('touchmove', cancel)
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('pointerdown', onPointer)
     }
     raf = requestAnimationFrame(put)
-    return () => cancelAnimationFrame(raf)
+    return () => { cancelAnimationFrame(raf); cleanup() }
   }, [ready, section])
 
   const goSection = useCallback((s: ShellSection, filter?: Record<string, string>) => {

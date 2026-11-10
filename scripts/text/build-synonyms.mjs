@@ -18,7 +18,9 @@
 // WordNet licence (kept in the output header and on /methods): "WordNet 3.0 Copyright 2006 by Princeton
 // University. All rights reserved." — permission to use, copy, modify and distribute for any purpose,
 // with the notice and the disclaimer kept (THIS SOFTWARE AND DATABASE IS PROVIDED "AS IS" …).
-// Output is deterministic: the same inputs give the same bytes.
+// No network: every input is a local file (the installed wordnet-db package, the corpus JSON, the O*NET CSV
+// folder, lib/occupations/data/titles.json — build occupations first). The output is written only from
+// parsed, validated rows. Output is deterministic: the same inputs give the same bytes.
 
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';

@@ -51,7 +51,7 @@ export default function LabSection(_props: SectionProps) {
     },
   })
   const dl = useAdminDownload()
-  const job = useAdminJob({ action: 'lab_clear', label: 'Clearing stale listings', past: 'Cleared', noun: 'stale listings' })
+  const job = useAdminJob({ action: 'lab_clear', args: { request_id: 'lab-press' }, label: 'Clearing stale listings', past: 'Cleared', noun: 'stale listings' })
 
   const toggle = (id: string) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
   const bulk = (decision: 'approve' | 'reject', which: string[]) => { void decide.run({ ids: which, decision, kind }, 'bulk') }
@@ -97,7 +97,7 @@ export default function LabSection(_props: SectionProps) {
           <ResultLine state={decide.state(lastRow)} onUndo={() => decide.undo(lastRow)} onDismiss={() => { decide.dismiss(lastRow); setLastRow(null) }} />
         </div>
       ) : null}
-      {job.job ? <div className={styles.job}><JobProgress job={job.job} onCancel={job.cancel} onResume={job.resume} onDismiss={job.dismiss} /></div> : null}
+      {job.job ? <div className={styles.job}><JobProgress job={job.job} onCancel={job.cancel} onResume={job.resume} onDismiss={job.dismiss} onUndo={job.undo} /></div> : null}
 
       <div className={styles.list}>
         <List<LabRow>

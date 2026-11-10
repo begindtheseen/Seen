@@ -132,7 +132,7 @@ function JobsPanel({ focus }: { focus?: string }) {
     <div className={styles.jobsList}>
       {[...list].reverse().map((j) => (
         <div key={j.id} data-focused={j.id === focus || undefined}>
-          <JobProgress job={j} onCancel={() => jobs.cancel(j.id)} onResume={() => jobs.resume(j.id)} onDismiss={() => jobs.dismiss(j.id)} />
+          <JobProgress job={j} onCancel={() => jobs.cancel(j.id)} onResume={() => jobs.resume(j.id)} onDismiss={() => jobs.dismiss(j.id)} onUndo={() => jobs.undo(j.id)} />
         </div>
       ))}
     </div>

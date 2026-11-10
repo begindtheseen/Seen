@@ -2,9 +2,14 @@
 // Builds lib/occupations/data/{occupations,titles,military}.json from the O*NET 31.0 Database and the
 // O*NET Military Occupational Classification (MOC) crosswalk.
 //
-//   node scripts/occupations/build-occupations.mjs              download the sources to a temp dir, then build
+//   node scripts/occupations/build-occupations.mjs --work DIR   download the two fixed source zips into DIR
+//                                                                (a scratch folder OUTSIDE the repo), then build
 //   node scripts/occupations/build-occupations.mjs --from DIR   build from DIR/db_31_0_csv/*.csv + DIR/milx0724.csv
-//   node scripts/occupations/build-occupations.mjs --dir DIR    download into DIR (kept), then build
+//
+// Downloads are contained: only the two hard-coded onetcenter.org URLs below are fetched (nothing taken
+// from input), each response must be HTTP 200, a zip content type and under a size cap, raw bytes go only
+// into the --work folder (refused when it is inside the repo), and the repo's data files are written only
+// from parsed, validated rows — never from downloaded bytes.
 //
 // Sources (retrieved 2026-11-10):
 //   O*NET 31.0 Database, CSV (August 2026)  https://www.onetcenter.org/dl_files/database/db_31_0_csv.zip
@@ -18,20 +23,20 @@
 // Output is deterministic: the same source files give the same bytes. Raw sources are never committed.
 // `unzip` must be on PATH. The build fails loudly when a source file's shape changes.
 
-import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { tmpdir } from 'node:os';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve, relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { normTitle, stripNoise } from '../../lib/occupations/normalize.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = join(HERE, '..', '..', 'lib', 'occupations', 'data');
 const RETRIEVED = '2026-11-10';
-const SOURCES = [
-  { url: 'https://www.onetcenter.org/dl_files/database/db_31_0_csv.zip', check: 'db_31_0_csv/occupation_data.csv' },
-  { url: 'https://www.onetcenter.org/dl_files/2019/military_crosswalk.zip', check: 'military_crosswalk/milx0724.csv' },
-];
+const REPO = resolve(HERE, '..', '..');
+const SOURCES = Object.freeze([
+  { url: 'https://www.onetcenter.org/dl_files/database/db_31_0_csv.zip', file: 'db_31_0_csv.zip', check: 'db_31_0_csv/occupation_data.csv', maxBytes: 64 * 1024 * 1024 },
+  { url: 'https://www.onetcenter.org/dl_files/2019/military_crosswalk.zip', file: 'military_crosswalk.zip', check: 'military_crosswalk/milx0724.csv', maxBytes: 32 * 1024 * 1024 },
+]);
 const MAX_TASKS = 15;
 const MAX_TECH = 10;
 const BUDGET = 2.5 * 1024 * 1024;
@@ -72,14 +77,30 @@ function readTable(path, cols, minRows) {
   return rows;
 }
 
+/** @param {string} dir */
+function assertOutsideRepo(dir) {
+  const rel = relative(REPO, resolve(dir));
+  if (rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))) throw new Error(`--work ${dir} is inside the repo; raw sources must stay out of it`);
+}
+
+/** Fetch the fixed sources into the work folder (status, content type and size checked first). @param {string} dir */
 async function download(dir) {
-  for (const { url, check } of SOURCES) {
+  assertOutsideRepo(dir);
+  for (const { url, file, check, maxBytes } of SOURCES) {
     if (existsSync(join(dir, check))) { console.log(`have ${check}`); continue; }
-    const r = await fetch(url);
-    if (!r.ok) throw new Error(`${url} → HTTP ${r.status}`);
-    const zip = join(dir, url.split('/').pop() || 'src.zip');
-    writeFileSync(zip, Buffer.from(await r.arrayBuffer()));
+    const r = await fetch(url, { redirect: 'error' });
+    if (r.status !== 200) throw new Error(`${url} → HTTP ${r.status}`);
+    const type = r.headers.get('content-type') || '';
+    if (!/zip|octet-stream/i.test(type)) throw new Error(`${url} → unexpected content type "${type}"`);
+    const declared = Number(r.headers.get('content-length') || 0);
+    if (declared > maxBytes) throw new Error(`${url} → ${declared} bytes, over the ${maxBytes}-byte cap`);
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length > maxBytes) throw new Error(`${url} → ${buf.length} bytes, over the ${maxBytes}-byte cap`);
+    if (buf.readUInt32LE(0) !== 0x04034b50) throw new Error(`${url} → not a zip archive`);
+    const zip = join(dir, file);
+    writeFileSync(zip, buf);
     execFileSync('unzip', ['-o', '-q', zip, '-d', dir]);
+    if (!existsSync(join(dir, check))) throw new Error(`${file} did not contain ${check}`);
     console.log(`fetched ${url}`);
   }
 }
@@ -221,6 +242,9 @@ export function build(from) {
     const suffix = helper ? ' Helper' : '';
     const own = qual ? 1 : isList ? 2 : 3;   // strength: 3 the whole name, 2 one name of a list, 1 a qualified name bare
     for (const part of isList ? parts : [base]) if (part.split(' ').length <= 7) addTitle(singularTitle(part) + suffix, c, { own });
+    // "Architectural and Engineering Managers" → "Engineering Manager", "Architectural Manager"
+    const pair = !isList && base.match(/^(\w+) and (\w+) ((?:\w+ )?\w+s)$/);
+    if (pair && AGENT.test(pair[3])) for (const m of [pair[1], pair[2]]) addTitle(`${m} ${singularTitle(pair[3])}${suffix}`, c, { own: 2 });
     if (qual && !/^(Except|Including|All Other)\b/.test(qual) && qual.split(' ').length <= 3 && !isList) {
       addTitle(`${qual} ${singularTitle(base)}${suffix}`, c, { own: 3 });
     }
@@ -279,9 +303,12 @@ async function main() {
   const args = process.argv.slice(2);
   let from = args.includes('--from') ? args[args.indexOf('--from') + 1] : null;
   if (!from) {
-    from = args.includes('--dir') ? args[args.indexOf('--dir') + 1] : mkdtempSync(join(tmpdir(), 'onet-'));
-    mkdirSync(from, { recursive: true });
-    await download(from);
+    const work = args.includes('--work') ? args[args.indexOf('--work') + 1] : null;
+    if (!work) throw new Error('pass --work <scratch folder outside the repo> to download, or --from <folder> with the sources');
+    assertOutsideRepo(work);
+    mkdirSync(work, { recursive: true });
+    await download(work);
+    from = work;
   }
   const { files, stats } = build(from);
   mkdirSync(OUT_DIR, { recursive: true });

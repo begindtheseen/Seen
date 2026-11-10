@@ -171,6 +171,28 @@ export default function MethodsPage() {
           </p>
         </section>
 
+        <section className={styles.card} aria-labelledby="m-occupations">
+          <h2 id="m-occupations" className={styles.h2}>Occupation data</h2>
+          <p className={styles.p}>
+            To tell which line of work a job title belongs to, how two jobs relate and what a job usually involves, Seen&rsquo;s résumé and job
+            tools read public occupation data shipped with the site; nothing is sent anywhere to do it.
+          </p>
+          <p className={styles.p}>
+            This page includes information from the <a href="https://www.onetcenter.org/database.html">O*NET 31.0 Database</a> by the U.S.
+            Department of Labor, Employment and Training Administration (USDOL/ETA). Used under
+            the <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a> license. Seen has modified all or some of this
+            information. USDOL/ETA has not approved, endorsed, or tested these modifications. O*NET&reg; is a trademark of USDOL/ETA.
+            Seen keeps each occupation&rsquo;s title, job zone, related occupations, up to 15 task statements and 10 technology examples,
+            its alternate and reported job titles, and the military occupation crosswalk, and turns titles into lookup keys.
+          </p>
+          <p className={styles.p}>
+            Word families and synonyms come from <a href="https://wordnet.princeton.edu/">WordNet 3.1</a>, narrowed to the common senses of
+            work words. WordNet 3.0 Copyright 2006 by Princeton University. All rights reserved. THIS SOFTWARE AND DATABASE IS PROVIDED
+            &ldquo;AS IS&rdquo; AND PRINCETON UNIVERSITY MAKES NO REPRESENTATIONS OR WARRANTIES, EXPRESS OR IMPLIED.
+            See the <a href="https://wordnet.princeton.edu/license-and-commercial-use">WordNet license</a>.
+          </p>
+        </section>
+
         <p className={styles.foot}>
           Questions about a number on a company page? <Link href="/contact">Ask us</Link>, or <Link href="/report">report your own outcome</Link> so the next applicant knows more.
         </p>
