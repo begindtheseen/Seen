@@ -25,7 +25,12 @@ globalThis.fetch = async (url, opts = {}) => {
 const { default: handler } = await import('./resume.js');
 
 const FX = JSON.parse(readFileSync(new URL('../lib/optimizer/fixtures/expert-postings.json', import.meta.url), 'utf8'));
-const RESUME = FX.resume.replace(/Customer-focused retail[^\n]*(\n[^\n]+)?/, 'Hard working and dependable team player looking for a sales role.');
+// strict charge (director 2026-11-10): a credit only when more of the posting's displayed lines reach a recruiter's first
+// read — so the money fixture buries its cash-drawer proof under line 3 with no "Cash handling" skill, and the tailor's
+// summary brings it up front
+const RESUME = FX.resume.replace(/Customer-focused retail[^\n]*(\n[^\n]+)?/, 'Hard working and dependable team player looking for a sales role.')
+  .replace('Cash handling · ', '')
+  .replace(/(• Trained 4[^\n]*\n)/, '$1• Restocked the retail shelf and folded towels between classes\n• Balanced the cash drawer at close every shift with zero variances over 18 months\n');
 const A = FX.postings.A;
 const token = (sub) => {
   const b = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');

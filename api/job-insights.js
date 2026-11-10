@@ -128,7 +128,10 @@ export default async function handler(req, res) {
   if (probe) {
     // what a credit would buy, counted (never the items themselves): the screen can say so before the tap
     return res.status(200).json({ cached: false, price: JOB_INSIGHTS_COST, _src: 'uncached', cost: 0, charged: false,
-      requirements_read: parsed.requirements_read, item_count: parsed.items.length, condition_count: parsed.hidden_items.length, has_pay: !!parsed.pay });
+      requirements_read: parsed.requirements_read,
+      // ONE count: N things it asks for (= the fit check's requirement_count), K of them conditions; plus conditions read from
+      // its other text (visa, relocation…) that are not among the N
+      item_count: parsed.requirements_read, condition_count: parsed.condition_requirements || 0, other_condition_count: parsed.hidden_items.filter((c) => !c.statementId).length, has_pay: !!parsed.pay });
   }
 
   // Cache miss → costs JOB_INSIGHTS_COST (shared cache means most users never pay)

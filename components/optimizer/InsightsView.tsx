@@ -25,7 +25,7 @@ export interface InsightsData {
   shared?: boolean
 }
 /** The probe's counts before a credit (api/job-insights.js on a miss). */
-export interface InsightsProbe { requirements_read?: number; item_count?: number; condition_count?: number; has_pay?: boolean }
+export interface InsightsProbe { requirements_read?: number; item_count?: number; condition_count?: number; other_condition_count?: number; has_pay?: boolean }
 
 // Some stored postings carry raw entities; the quote is verbatim on purpose, so decode on screen only.
 const ENT: Record<string, string> = { amp: '&', mdash: '—', ndash: '–', nbsp: ' ', quot: '"', apos: "'", rsquo: '’', lsquo: '‘', ldquo: '“', rdquo: '”', hellip: '…', bull: '•', middot: '·' }
@@ -35,8 +35,10 @@ export const decode = (t?: string | null) => String(t || '').replace(/&(#\d+|#x[
 export function insightsOfferSentence(p: InsightsProbe | null | undefined): string | null {
   if (!p || typeof p.requirements_read !== 'number') return null
   const n = p.item_count ?? p.requirements_read
-  const parts = [`${n} thing${n === 1 ? '' : 's'} this posting asks for, dealbreakers first, each with the sentence it comes from`]
-  if (p.condition_count) parts.push(`${p.condition_count} condition${p.condition_count === 1 ? '' : 's'} it states about the job`)
+  // one count: N is the fit check's requirement count, and the conditions among them are part of N, never added to it
+  const k = p.condition_count || 0
+  const parts = [`${n} thing${n === 1 ? '' : 's'} this posting asks for${k ? `, ${k} of them conditions (hours, lifting, screening and the like)` : ''}, dealbreakers first, each with the sentence it comes from`]
+  if (p.other_condition_count) parts.push(`${p.other_condition_count} more condition${p.other_condition_count === 1 ? '' : 's'} from the rest of its text`)
   if (p.has_pay) parts.push('the pay it lists')
   return `${parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`}.`
 }

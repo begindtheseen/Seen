@@ -259,7 +259,7 @@ async function run(req, res, { loadGeo, fetchFull = fetchFullPosting }) {
         found = await findAlertMatches(prefs.alerts, geo, rows);
         if (!found) { skip('jobs_unreadable'); continue; }
         // Their own alert words choose the field; their résumé (when there is one) still decides whether
-        // they meet what the listing requires — years in that field, licences, level.
+        // they meet what the listing requires — years in that field, licenses, level.
         const km = await findResumeMatches({ supabaseUrl: SUPABASE_URL, serviceKey: SERVICE_KEY, userId: uid, persist: !dry, onlyKeys: true }).catch(() => null);
         if (km?.heal) await km.heal;
         if (km?.keys) found = found.filter((j) => matchListing(j, km.keys, { alert: true }).ok);

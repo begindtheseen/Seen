@@ -127,8 +127,21 @@
 }
 .row[data-selected='true'] { border-color: var(--accent-line); background: var(--accent-tint); }
 .rowPending { opacity: .55; }
+/* The whole leading cell is the tap target: the input itself is 44×44; the drawn box (20px) sits in its middle. */
 .rowCheck { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-left: calc(-1 * var(--sp-2)); cursor: pointer; }
-.rowCheck input { width: 20px; height: 20px; accent-color: var(--accent-strong); cursor: pointer; }
+.rowCheck input {
+  appearance: none; -webkit-appearance: none; display: grid; place-items: center; width: 44px; height: 44px; margin: 0;
+  border: 0; border-radius: var(--r-control); background: transparent; cursor: pointer;
+}
+.rowCheck input::before {
+  content: ''; grid-area: 1 / 1; width: 20px; height: 20px; box-sizing: border-box;
+  border: 2px solid var(--border-3); border-radius: var(--r-chip); background: var(--surface-1);
+}
+.rowCheck input:checked::before { background: var(--accent-strong); border-color: var(--accent-strong); }
+.rowCheck input:checked::after {
+  content: ''; grid-area: 1 / 1; width: 6px; height: 11px; margin-top: -2px; border: solid var(--text-1); border-width: 0 2px 2px 0; transform: rotate(45deg);
+}
+.rowCheck input:focus-visible { outline: none; box-shadow: var(--sh-focus); }
 .row:not(:has(.rowCheck)) { grid-template-columns: minmax(0, 1fr) auto; }
 .rowMain { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .rowTitle, .rowTitleBtn { font-size: var(--fs-body); font-weight: 600; color: var(--text-1); line-height: var(--lh-snug); overflow-wrap: anywhere; }
