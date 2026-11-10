@@ -172,7 +172,8 @@ export function build(from) {
 
   // ---- titles: key "rest of title" under its head word; value n = occupationIndex*8 + weight (0–7).
   // Evidence per (title, occupation) is ADDED: O*NET source count (≤3) + 2 when incumbents reported it +
-  // 1 when My Next Move shows it − 1 for an "All Other" catch-all; 7 = the occupation's own name.
+  // 1 when My Next Move shows it − 1 for an "All Other" catch-all; 7 = the occupation's own name, at least 5 for one
+  // name out of a listed name ("Director" out of "Producers and Directors").
   /** @type {Map<string, Map<number, { src: number, rep: number, mnm: number, own: number }>>} */
   const keyMap = new Map();
   const addTitle = (/** @type {string} */ raw, /** @type {string} */ code, /** @type {{ src?: number, rep?: number, mnm?: number, own?: number }} */ w) => {
@@ -204,11 +205,25 @@ export function build(from) {
   for (const c of codes) {
     if (allOther(c)) continue;
     const t = byCode.get(c).Title;
-    const base = t.replace(/^Helpers--/, 'Helper ');
-    // "Plumbers, Pipefitters, and Steamfitters" is a list of names; "Painters, Construction and Maintenance" is not.
+    const helper = /^Helpers--/.test(t);
+    const name = t.replace(/^Helpers--/, '');
+    // "Plumbers, Pipefitters, and Steamfitters" is a list of names (Oxford comma); in "Cooks, Restaurant",
+    // "Buyers and Purchasing Agents, Farm Products" or "Painters, Construction and Maintenance" the text after
+    // the last comma QUALIFIES the name: the bare name is then weak evidence ("buyer" is not mostly a farm buyer)
+    // and the qualified form ("Restaurant Cook") is the occupation's own name.
+    const oxford = /, and /.test(name);
+    const cut = oxford ? -1 : name.lastIndexOf(', ');
+    const base = cut > 0 ? name.slice(0, cut) : name;
+    const qual = cut > 0 ? name.slice(cut + 2) : '';
+    const AGENT = /(ers|ors|ists|ians|ants|ents|men|ees|eers|aides|clerks|cooks|chefs|guards|pilots|nurses|attendants|agents|assistants|technicians|teachers|mechanics|operators|workers|specialists|analysts|officers|managers|directors|scientists|engineers|counselors|therapists|physicians|surgeons|dentists|pharmacists|hosts|hostesses|waitresses|cashiers|tellers|maids|janitors|barbers|dancers|actors|models|judges|chiropractors|podiatrists|veterinarians|optometrists|audiologists|paralegals|carpenters|plumbers|roofers|glaziers|millwrights|machinists|welders|bakers|butchers|tailors|upholsterers|jewelers|embalmers|undertakers|morticians|ushers|porters|bellhops|concierges|nannies|sailors|captains|mates|conductors|yardmasters|dispatchers|inspectors|appraisers|assessors|adjusters|examiners|investigators|underwriters|actuaries|economists|historians|sociologists|geographers|archivists|curators|librarians|editors|writers|authors|reporters|photographers|designers|architects|surveyors|drafters)$/i;
     const parts = base.split(/,\s*(?:and\s+)?|\s+and\s+(?=[A-Z])/).map((p) => p.trim()).filter(Boolean);
-    const isList = parts.length > 1 && parts.every((p) => /s$/.test(p) && p.split(' ').length <= 3);
-    for (const part of isList ? parts : [base]) if (part.split(' ').length <= 7) addTitle(singularTitle(part), c, { own: 1 });
+    const isList = parts.length > 1 && parts.every((p) => AGENT.test(p) && p.split(' ').length <= 3);
+    const suffix = helper ? ' Helper' : '';
+    const own = qual ? 1 : isList ? 2 : 3;   // strength: 3 the whole name, 2 one name of a list, 1 a qualified name bare
+    for (const part of isList ? parts : [base]) if (part.split(' ').length <= 7) addTitle(singularTitle(part) + suffix, c, { own });
+    if (qual && !/^(Except|Including|All Other)\b/.test(qual) && qual.split(' ').length <= 3 && !isList) {
+      addTitle(`${qual} ${singularTitle(base)}${suffix}`, c, { own: 3 });
+    }
   }
   /** @type {Record<string, any[]>} */
   const t = Object.create(null);
@@ -217,7 +232,7 @@ export function build(from) {
     const head = toks[toks.length - 1];
     const rest = toks.slice(0, -1).join(' ');
     const vals = [...keyMap.get(k).entries()]
-      .map(([i, e]) => [i, e.own ? 7 : Math.max(0, Math.min(6, e.src + e.rep + e.mnm - (allOther(codes[i]) ? 1 : 0)))])
+      .map(([i, e]) => { const w = Math.max(0, Math.min(6, e.src + e.rep + e.mnm - (allOther(codes[i]) ? 1 : 0))); return [i, e.own === 3 ? 7 : e.own === 2 ? Math.max(5, w) : e.own === 1 ? Math.max(3, w) : w]; })
       .sort((a, b) => b[1] - a[1] || a[0] - b[0]).map(([i, w]) => i * 8 + w);
     (t[head] ||= []).push([rest, ...vals]);
   }
