@@ -7,6 +7,7 @@ import { toResult, createAdminApi, createReauthGate } from './api.ts'
 import { QueryCache, keyMatches, mergeListRefresh } from './cache.ts'
 import { createActionRunner } from './action.ts'
 import { createJobManager, jobKey, jobProgressText, jobSummary } from './jobs.ts'
+const untilJ = async (fn, ms = 2000) => { const t = Date.now(); while (!fn()) { if (Date.now() - t > ms) throw new Error('timeout'); await new Promise((r) => setTimeout(r, 0)) } }
 import { readLogin } from './login.ts'
 
 const tick = () => new Promise((r) => setTimeout(r, 0))
@@ -399,4 +400,28 @@ test('jobs: the round cap pauses (resumable), never silently stops', async () =>
   const j = m.get(id)
   assert.equal(j.status, 'cancelled'); assert.equal(j.stopped, 'cap'); assert.equal(j.resumable, true); assert.equal(j.changed, 30)
   assert.match(jobSummary(j), /Resume to continue/)
+})
+
+test('action: an Undo that answers in rounds continues as a visible, resumable job (Restoring 400 of 1,200)', async () => {
+  const sent = []
+  let restored = 0
+  const api = async (action, body) => {
+    sent.push({ action, body })
+    if (action === 'review_held') return toResult(200, JSON.stringify({ ok: true, changed: 1200, message: 'Approved 1,200.', touched: ['held'], undo: { action: 'undo', args: { audit_id: '7' }, label: 'Undo' } }))
+    restored += 400
+    const done = restored >= 1200
+    return toResult(200, JSON.stringify({ ok: true, changed: 400, restored, total: 1200, remaining: 1200 - restored, complete: done, cursor: done ? undefined : `c${restored}`, message: `Restoring ${restored} of 1,200.`, touched: ['held', 'overview'] }))
+  }
+  const store = memStorage()
+  const jobs = createJobManager({ api, storage: store, sleep: async () => {} })
+  const r = createActionRunner({ api, cache: new QueryCache(), action: 'review_held', jobs })
+  await r.run({ ids: ['*'] }); await r.undo()
+  const st = r.state()
+  assert.ok(st.jobId, 'the undo was handed to the job manager'); assert.equal(st.undone, true)
+  assert.match(st.result.message, /400 of 1,200 restored so far/)
+  await untilJ(() => jobs.get(st.jobId).status === 'done')
+  const j = jobs.get(st.jobId)
+  assert.equal(j.changed, 1200); assert.equal(j.remaining, 0)
+  assert.deepEqual(sent.slice(2).map((c) => c.body), [{ audit_id: '7', cursor: 'c400' }, { audit_id: '7', cursor: 'c800' }], 'same audit_id, cursor passed back')
+  assert.match(j.message, /^Restored 1,200 rows in 3 rounds\./)
 })

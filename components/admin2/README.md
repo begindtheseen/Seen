@@ -95,6 +95,12 @@ const decide = useAdminAction('review_held', {
 - The api turns every failure into an `AdminErr` with a sentence (network, timeout, empty body, HTML
   error page, 5xx). A 401 opens the "Session ended" step in the sheet and **replays the same call** after
   sign-in — you do nothing.
+- **A big Undo becomes a job (added 2026-11-10, additive).** When the server's `undo` answers
+  `complete:false` (it restores in rounds), `decide.undo(target)` hands it to the job manager: the result
+  line says "Undo is running: 400 of 1,200 restored so far…", the shell chip shows "Restoring rows ·
+  400 of 1,200", the owner can leave the section, Cancel, and resume after a reload. `state(target).jobId`
+  names the job. Nothing to do in your section. (`JobSpec.initial` lets a job start from a round the
+  caller already ran; a running total the server reports as `restored` wins over the summed `changed`.)
 - Keep a `ConfirmStep` mounted with `busy` until the action settles (close it in `onSettled`): if it
   collapsed on the tap, a double tap would land on whatever moved up under the finger (found by the
   smoke test: a double tap on "Approve all" opened the first row's sheet).

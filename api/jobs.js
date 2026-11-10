@@ -1091,8 +1091,18 @@ async function handleRecommended(req, res, _body) {
     }
     const { ranked, city, citySource } = m;
 
+    // A summary row is shown only for the person's own job, labelled — and never when its source has closed:
+    // up to 4 of them get the drawer's liveness check (lib/server/listingLiveness.js: answered from the row when
+    // it was checked in the last 24 h, else one paced request, 3 s cap, cached; a closed one is marked expired).
+    const pool = ranked.slice(0, 12);
+    const liveDb = (path, opts = {}) => fetch(`${SUPABASE_URL}/rest/v1/${path}`, { ...opts, headers: { ...dbHeaders, ...(opts.headers || {}) } });
+    let checks = 0;
+    const live = await Promise.all(pool.map((j) => (j._summaryOnly && checkableId(j.id) && checks++ < 4
+      ? checkLiveness({ jobId: j.id, db: liveDb, timeoutMs: 3000 }).catch(() => null)
+      : null)));
+    const shown = pool.filter((j, i) => live[i]?.state !== 'gone');
     const names = await loadTenantNames(SUPABASE_URL, dbHeaders);
-    const jobs = ranked.slice(0, 8).map(j => withTenantName({
+    const jobs = shown.slice(0, 8).map(j => withTenantName({
       id: j.id,
       title: j.title,
       company: j.company,
@@ -1143,7 +1153,7 @@ async function handleAreaSearch(req, res, body) {
   // their town's middle. Only US-mainland/AK/HI/PR coordinates are taken.
   const glat = Number(body.lat), glng = Number(body.lng);
   if (Number.isFinite(glat) && Number.isFinite(glng) && glat > 17 && glat < 72 && glng > -180 && glng < -64 && (place.kind === 'point' || place.reason === 'needs_position')) {
-    place = { ...place, kind: 'point', lat: glat, lng: glng, label: place.kind === 'point' ? place.label : 'your location', reason: null, suggestions: [], device: true };
+    place = { ...place, kind: 'point', lat: glat, lng: glng, label: place.kind === 'point' ? `your location (near ${place.label})` : 'your location', reason: null, suggestions: [], device: true };
   }
   const base = { ok: true, mode: 'area', query: '', location: loc, jobs: [], total: 0, remote_total: 0, in_radius: 0, has_more: false, next_cursor: null };
   if (place.kind === 'remote' || String(body.radius) === '0' || String(body.radius).toLowerCase() === 'remote') {

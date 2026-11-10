@@ -39,7 +39,6 @@ export type TodayView = {
   system: { ok: boolean | null; line: string; failing: NonNullable<AdminOverview['system']['failing']> }
 }
 
-const UNKNOWN_LINE = /no cron reports|nothing records|not recorded|no run recorded|unknown/i
 const isCount = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0
 const numOrNull = (v: unknown) => (isCount(v) ? v : null)
 
@@ -73,13 +72,35 @@ export function readToday(raw: unknown): TodayView {
     stats,
     waiting: queues.filter((q) => q.count === null || q.count > 0),
     empty: queues.filter((q) => q.count === 0),
-    system: {
-      // "ok" with nothing recorded is not "on time": until a cron records its runs the honest word is unknown.
-      ok: typeof sys.ok === 'boolean' ? (sys.ok && UNKNOWN_LINE.test(String(sys.line || '')) ? null : sys.ok) : null,
-      line: typeof sys.line === 'string' && sys.line.trim() ? sys.line.trim() : 'The scheduled jobs could not be read.',
-      failing: Array.isArray(sys.failing) ? sys.failing.filter((f) => f && typeof f.name === 'string') : [],
-    },
+    system: readSystem(sys),
   }
+}
+
+type SystemIn = Partial<AdminOverview['system']> & { state?: unknown; recorded?: unknown; unknown?: unknown }
+
+/**
+ * The scheduled-jobs line. `state` decides the word (ok → On time, failing → Failing, unknown → Unknown);
+ * an older server without `state` falls back to `ok`. With counts, the line says both halves:
+ * "12 on time · 5 have no run recorded yet".
+ */
+export function readSystem(raw: unknown): TodayView['system'] {
+  const sys = (raw && typeof raw === 'object' ? raw : {}) as SystemIn
+  const failing = Array.isArray(sys.failing) ? sys.failing.filter((f) => f && typeof f.name === 'string') : []
+  const ok = sys.state === 'ok' ? true : sys.state === 'failing' ? false : sys.state === 'unknown' ? null
+    : typeof sys.ok === 'boolean' ? sys.ok : null
+  const recorded = isCount(sys.recorded) ? sys.recorded : null
+  const unknown = isCount(sys.unknown) ? sys.unknown : null
+  const serverLine = typeof sys.line === 'string' && sys.line.trim() ? sys.line.trim() : ''
+  let line = serverLine || 'The scheduled jobs could not be read.'
+  if (recorded !== null && unknown !== null && recorded > 0) {
+    const onTime = Math.max(0, recorded - failing.length)
+    const parts = []
+    if (failing.length) parts.push(`${failing.length} failing`)
+    parts.push(onTime === recorded && !unknown ? `All ${onTime} on time` : `${onTime} on time`)
+    if (unknown) parts.push(`${unknown} ${unknown === 1 ? 'has' : 'have'} no run recorded yet`)
+    line = parts.join(' · ')
+  }
+  return { ok, line, failing }
 }
 
 export function money(cents: number): string {

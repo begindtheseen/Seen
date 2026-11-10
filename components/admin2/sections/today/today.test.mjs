@@ -47,10 +47,16 @@ test('a malformed answer reads as unknown, never throws', () => {
   assert.equal(readToday({ stats: { listings_live: -5, reports_24h: Number.NaN } }).stats.listings_live, null)
 })
 
-test('"ok" with no runs recorded reads as unknown, never "on time"', () => {
-  const v = readToday({ ...OK, system: { ok: true, line: 'No cron reports its runs yet (17 scheduled).' } })
-  assert.equal(v.system.ok, null)
-  assert.equal(readToday(OK).system.ok, true)
+test('scheduled jobs render from `state`, say both halves, and fall back to `ok`', () => {
+  const none = readToday({ ...OK, system: { ok: false, state: 'unknown', recorded: 0, unknown: 17, line: 'No cron has recorded a run yet (17 scheduled) — health unknown.' } })
+  assert.equal(none.system.ok, null); assert.match(none.system.line, /health unknown/)
+  const mixed = readToday({ ...OK, system: { ok: true, state: 'ok', recorded: 12, unknown: 5, line: 'x' } })
+  assert.equal(mixed.system.ok, true); assert.equal(mixed.system.line, '12 on time · 5 have no run recorded yet')
+  const bad = readToday({ ...OK, system: { ok: false, state: 'failing', recorded: 9, unknown: 8, line: 'x', failing: [{ name: 'refresh-jobs', last_run: null, detail: 'overdue' }] } })
+  assert.equal(bad.system.ok, false); assert.equal(bad.system.line, '1 failing · 8 on time · 8 have no run recorded yet')
+  assert.equal(readToday({ ...OK, system: { ok: true, state: 'ok', recorded: 17, unknown: 0, line: 'x' } }).system.line, 'All 17 on time')
+  assert.equal(readToday({ ...OK, system: { ok: true, state: 'unknown', recorded: null, unknown: null, line: 'Cron health could not be read.' } }).system.ok, null)
+  assert.equal(readToday(OK).system.ok, true, 'an older server without `state` falls back to ok')
 })
 
 test('money and the fold line read as a person would say them', () => {

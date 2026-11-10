@@ -548,8 +548,9 @@ export function useJobSearch() {
     if (jobs.some(j => (j.level || '').toLowerCase().includes(want))) setLevel(want as LevelFilter)
   }, [profile?.experience, jobs]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function requestGpsLocation() {
-    if (!navigator.geolocation || location.trim()) return
+  // `force`: the person asked for it ("Use my location" after "near me") — run even with text in the box, and search.
+  async function requestGpsLocation(force = false) {
+    if (!navigator.geolocation || (!force && location.trim())) return
     setGpsLoading(true)
     try {
       const pos = await new Promise<GeolocationPosition>((res, rej) =>
@@ -571,7 +572,7 @@ export function useJobSearch() {
         // survives reloads and GPS won't re-fire over it next visit.
         gpsRef.current = { label: loc, lat, lng: lon }
         setLocation(loc)
-        if (!autoSearchedRef.current) { autoSearchedRef.current = true; searchJobs(undefined, loc) }
+        if (force || !autoSearchedRef.current) { autoSearchedRef.current = true; searchJobs(undefined, loc) }
       }
     } catch {
       // GPS failed — fall back to profile HOME (not persisted; home stays dynamic).

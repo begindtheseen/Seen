@@ -140,10 +140,18 @@ async function answer(req) {
         undo: body.decision === 'delete' ? undefined : { action: 'lab_undo', args: { batch }, label: 'Undo' } })
     }
     case 'lab_undo': {
-      const ids = S.batches.get(body.batch) || []
-      for (const id of ids) S.gone.delete(id)
-      S.batches.delete(body.batch)
-      return json(200, { ok: true, changed: ids.length, message: `Put ${ids.length} ${ids.length === 1 ? 'report' : 'reports'} back in the queue.`, touched: ['lab_held', 'overview'] })
+      // Like the real server: a big undo answers in rounds (≤100 per round, running totals, cursor).
+      const all = S.batches.get(body.batch) || []
+      const total = all.length
+      const left = all.filter((id) => S.gone.has(id))
+      const now = left.slice(0, 100)
+      for (const id of now) S.gone.delete(id)
+      const restored = total - left.length + now.length
+      const complete = restored >= total
+      if (complete) S.batches.delete(body.batch)
+      if (total > 100) await sleep(500)
+      return json(200, { ok: true, changed: now.length, restored, total, remaining: total - restored, complete, cursor: complete ? undefined : `u${restored}`,
+        message: complete && total <= 100 ? `Put ${total} ${total === 1 ? 'report' : 'reports'} back in the queue.` : `Restoring ${restored} of ${total}.`, touched: ['lab_held', 'overview'] })
     }
     case 'lab_clear': {
       await sleep(S.staleDelayMs)
@@ -331,8 +339,15 @@ async function run(vp) {
   check(tag('Approve all: approved rows left the list without a reload'), await page.getByTestId('lab-row-r001').count() === 0 && await sentinelAlive(page))
   await shot(page, `${vp.name}-07-approved`)
   await page.getByTestId('result-undo').click()
+  await page.waitForFunction(() => /Undo is running: 100 of 258 restored so far/.test(document.querySelector('[data-testid=result-line]')?.textContent || ''))
+  await page.locator('[data-testid=job-chip]:visible').waitFor()
+  const chipU = await page.locator('[data-testid=job-chip]:visible').innerText()
+  check(tag('a big Undo runs as a visible job ("Restoring rows · N of 258")'), /Restoring rows/.test(chipU) && /of 258/.test(chipU), chipU.replace(/\s+/g, ' '))
+  await shot(page, `${vp.name}-07b-undo-job`)
+  await page.waitForFunction(() => [...document.querySelectorAll('[data-testid=job-chip]')].some((c) => /Done: Restoring rows/.test(c.textContent || '')), null, { timeout: 15000 })
   await page.getByTestId('lab-row-r001').waitFor()
-  check(tag('Undo restores the rows in place'), /Put 258 reports back/.test(await page.getByTestId('result-line').first().innerText()) && await sentinelAlive(page))
+  check(tag('the Undo job puts every row back, in place, without a reload'), S.batches.size === 0 && await page.getByTestId('lab-row-r001').count() === 1 && await sentinelAlive(page))
+  await page.locator('[data-testid=job-chip]:visible').click(); await page.getByTestId('sheet-panel').getByTestId('job-dismiss').click(); await page.getByTestId('sheet-close').click()
   await page.getByTestId('result-dismiss').first().click()
 
   // 5 · Row action: optimistic removal, then forced failures

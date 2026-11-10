@@ -25,6 +25,18 @@ export const ITEM_LABEL: Record<AdminItemKind, string> = {
 /** kind → its view module (default export). Loaded when first opened; a failed load can be retried. */
 export const ITEM_VIEWS: Partial<Record<AdminItemKind, () => Promise<{ default: ComponentType<ItemViewProps> }>>> = {}
 
+// Listings, Companies, People (A4). People owns `cluster` (the Today queue for clusters opens People), so it
+// registers first; Review's ??= below then leaves it.
+ITEM_VIEWS.job = () => import('../sections/listings/JobItem.tsx')
+ITEM_VIEWS.company = () => import('../sections/companies/CompanyItem.tsx')
+ITEM_VIEWS.user = () => import('../sections/people/UserItem.tsx')
+ITEM_VIEWS.cluster = () => import('../sections/people/ClusterItem.tsx')
+
+// Review (sections/review): reports and the seven decision kinds. `cluster` also belongs to People —
+// whichever line registers it first wins (??=).
+ITEM_VIEWS.report = () => import('../sections/review/ReportItem.tsx')
+for (const k of ['ticket', 'dispute', 'claim', 'reply', 'purchase', 'issue', 'cluster'] as const) ITEM_VIEWS[k] ??= () => import('../sections/review/KindItem.tsx')
+
 if (process.env.NEXT_PUBLIC_ADMIN_LAB === '1') {
   ITEM_VIEWS.report ??= () => import('./devlab/LabItem.tsx')
 }

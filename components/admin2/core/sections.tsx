@@ -34,11 +34,11 @@ const placeholder = (name: string) => async () => {
 
 export const SECTIONS: SectionDef[] = [
   { key: 'today', label: 'Today', icon: 'layout-dashboard', hotkey: '1', phone: 'bar', load: () => import('../sections/today/TodaySection.tsx') },
-  { key: 'review', label: 'Review', icon: 'inbox', hotkey: '2', phone: 'bar', load: placeholder('Review') },
-  { key: 'listings', label: 'Listings', icon: 'briefcase', hotkey: '3', phone: 'bar', load: placeholder('Listings') },
-  { key: 'companies', label: 'Companies', icon: 'building-2', hotkey: '4', phone: 'more', load: placeholder('Companies') },
-  { key: 'people', label: 'People', icon: 'users', hotkey: '5', phone: 'bar', load: placeholder('People') },
-  { key: 'system', label: 'System', icon: 'gauge', hotkey: '6', phone: 'more', load: placeholder('System') },
+  { key: 'review', label: 'Review', icon: 'inbox', hotkey: '2', phone: 'bar', load: () => import('../sections/review/ReviewSection.tsx') },
+  { key: 'listings', label: 'Listings', icon: 'briefcase', hotkey: '3', phone: 'bar', load: () => import('../sections/listings/ListingsSection.tsx') },
+  { key: 'companies', label: 'Companies', icon: 'building-2', hotkey: '4', phone: 'more', load: () => import('../sections/companies/CompaniesSection.tsx') },
+  { key: 'people', label: 'People', icon: 'users', hotkey: '5', phone: 'bar', load: () => import('../sections/people/PeopleSection.tsx') },
+  { key: 'system', label: 'System', icon: 'gauge', hotkey: '6', phone: 'more', load: () => import('../sections/system/SystemSection.tsx') },
 ]
 
 // The core's lab: a section that exercises every primitive and the whole action/job pipeline against a

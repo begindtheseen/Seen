@@ -41,6 +41,12 @@ export default forwardRef(function Link({ href, prefetch, ...p }, ref) { return 
     src = src.replace(/(from\s+|import\s*\(\s*)(['"])([^'"]+)\2/g, (m, pre, q, spec) => {
       if (BARE[spec]) return `${pre}${q}${BARE[spec]}${q}`
       if (spec === 'next/link') return `${pre}${q}${pathToFileURL(stub).href}${q}`
+      // a CSS module renders its class names as written (server markup only needs a string per class)
+      if (/\.module\.css$/.test(spec)) {
+        const cssStub = join(out, '__css_module.mjs')
+        if (!existsSync(cssStub)) writeFileSync(cssStub, 'export default new Proxy({}, { get: (_, k) => (typeof k === "string" ? k : undefined) })\n')
+        return `${pre}${q}${pathToFileURL(cssStub).href}${q}`
+      }
       if (spec.startsWith('.') || spec.startsWith('@/')) {
         const hit = resolveRepo(spec, file)
         if (!hit) throw new Error(`tsxForTest: cannot resolve ${spec} from ${file}`)

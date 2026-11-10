@@ -11,6 +11,7 @@
 import type { AdminErr, AdminOk } from '../contract.ts'
 import type { AdminApi, ApiResult } from './api.ts'
 import type { CacheTx, QueryCache } from './cache.ts'
+import type { JobManager } from './jobs.ts'
 
 export type ActionStatus = 'idle' | 'running' | 'done' | 'error'
 
@@ -24,6 +25,8 @@ export type ActionState = {
   undoing?: boolean
   /** The Undo already ran (its own result replaces `result`). */
   undone?: boolean
+  /** The Undo continues as a job in the job manager (shell chip + Jobs sheet; resumable after a reload). */
+  jobId?: string
 }
 
 export type ActionOptions = {
@@ -52,6 +55,8 @@ export function createActionRunner(deps: {
   options?: ActionOptions
   /** Called whenever any target's state changes. */
   onChange?: (target: string, state: ActionState) => void
+  /** When given, an Undo that answers `complete:false` continues as a visible, resumable job. */
+  jobs?: JobManager
 }) {
   const { api, cache, action } = deps
   const opts = deps.options || {}
@@ -116,10 +121,26 @@ export function createActionRunner(deps: {
         total += res.changed || 0
         res.touched.forEach((t) => touched.add(t))
         if (res.complete !== false || !res.changed || rounds >= UNDO_MAX_ROUNDS) break
+        if (deps.jobs) break // the job manager takes it from here (below)
       }
     }
     catch (e) { res = { ok: false, code: 'client', error: `Something on this screen failed: ${(e as Error).message || 'unknown error'}.`, retryable: true } }
     finally { inflight.delete(target) }
+    if (res!.ok && res.complete === false && res.changed && deps.jobs) {
+      // A big Undo: continue as a job — "Restoring 400 of 1,200" in the shell, leave the section freely,
+      // resume after a reload. The server resumes from any later call with the same args (+ cursor).
+      cache.invalidate([...touched])
+      const r = res as AdminOk & { restored?: number; total?: number }
+      const done = typeof r.restored === 'number' ? r.restored : total
+      const jobId = deps.jobs.start({
+        action: u.action, args: u.args, label: 'Restoring rows', past: 'Restored', noun: 'rows',
+        initial: { changed: done, remaining: typeof r.remaining === 'number' ? r.remaining : null, cursor: r.cursor },
+      })
+      const of = typeof r.total === 'number' ? ` of ${r.total.toLocaleString('en-US')}` : ''
+      setState(target, { status: 'done', target, args: s.args, undone: true, jobId,
+        result: { ...res, changed: done, undo: undefined, message: `Undo is running: ${done.toLocaleString('en-US')}${of} restored so far. It keeps going if you leave this screen — follow it in Jobs.` } })
+      return res
+    }
     if (res!.ok) {
       cache.invalidate([...touched])
       const message = rounds > 1 ? `Undone: ${total.toLocaleString('en-US')} rows put back.${res.complete === false ? ` ${(res.remaining ?? 0).toLocaleString('en-US')} still to undo — press Undo again to continue.` : ''}` : (res.message || 'Undone.')

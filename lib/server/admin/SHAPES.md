@@ -68,7 +68,8 @@ One session per submit. 5 attempts / 15 min / IP (429 `rate_limited`), 5 wrong p
     { "key": "data_issues", "label": "Data issues", "count": 3, "section": "review", "filter": { "kind": "issues" } },
     { "key": "account_clusters", "label": "Account clusters", "count": 2, "section": "people", "filter": { "view": "clusters" } }
   ],
-  "system": { "ok": false, "line": "1 cron needs a look: refresh-jobs last ran 9 h ago.",
+  "system": { "ok": false, "state": "failing", "recorded": 9, "unknown": 8,
+    "line": "1 cron needs a look: refresh-jobs missed its last run (last ran Nov 10, 2026, 1:00 AM PT).",
     "failing": [ { "name": "refresh-jobs", "last_run": "2026-11-10T09:00:03.000Z", "detail": "overdue — next run was 2026-11-10T14:00:00.000Z" } ] },
   "extra": { "reports_7d": 122, "signups_7d": 9, "signups_today": 1, "errors_24h": 6, "recompute_waiting": 0,
              "listings_total": 158082, "listings_added_today": 951, "listings_counts_source": "rpc",
@@ -79,7 +80,13 @@ One session per submit. 5 attempts / 15 min / IP (429 `rate_limited`), 5 wrong p
 - `revenue_7d_cents` = one-time purchases only: consumer `credit_transactions.reason = purchase_<sku>` × the SKU
   price in `lib/server/creditRules.js ONE_TIME_SKUS`, plus `employer_purchases.amount_cents` (status paid/fulfilled)
   in the last 7 days. Seen sells no subscriptions: no MRR / trial / past-due field exists anywhere.
-- `listings_stale` = clearable stale (what "Clear stale" removes, `staleSweep.STALE_CLEARABLE_FILTER`).
+- `listings_stale` = stale rows (`staleSweep.STALE_CLEARABLE_FILTER`), an exact count. "Clear stale" also deletes
+  expired rows nobody saved, so its result can be larger than this number (its message says so).
+- `system`: `ok` (true only when every cron that records its runs is on time), plus optional
+  `state: 'ok' | 'failing' | 'unknown'`, `recorded` (crons with a recorded run) and `unknown` (crons with none;
+  `recorded + unknown` = all crons). No recorded run anywhere → `ok:false, state:'unknown'` — never "all on time".
+  When cron health itself cannot be read: `state:'unknown', recorded:null, unknown:null` and `cron_health` in `failed`.
+- Every count here and in every list is an exact count (Content-Range) or `null` — never the length of a page.
 - The 30-day chart / top companies / outcome mix are `reports_stats` (kept off Today so it stays fast).
 - Touched: none (read). Cache key: `overview`.
 
@@ -119,7 +126,14 @@ shows as its one batch row (`review_held`, whose Undo covers every report); the 
   "message": "Undid it: 288 reports are back in the review queue.", "touched": ["held","reports","overview","activity"],
   "remaining": 0, "complete": true }
 ```
-Large bulk undos run as a job: `complete:false` + `remaining` → call again with the same `audit_id`.
+A bulk undo (`review_held`) runs as a job, ~40 s per round:
+```json
+{ "ok": true, "changed": 400, "skipped": [], "message": "Restoring 400 of 1,200 — keep going.", "touched": ["held","reports","overview","activity"],
+  "remaining": 800, "complete": false, "cursor": "eyJhdWRpdF9pZCI6…", "restored": 400, "total": 1200 }
+```
+`changed` = rows restored by THIS round; `restored` / `total` = running totals across rounds. Call again with the same
+`audit_id` (pass `cursor` back; the server re-reads the batch, so an interrupted or cancelled undo resumes from any
+later press). The audit row records `undo_progress` and is marked undone only by the round that completes.
 An already-undone row: 409 `conflict` "That was already undone." A row that cannot be undone: 400 `bad_request`.
 
 ### `cron_health` `{}` → `AdminList<AdminCron>`

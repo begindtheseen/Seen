@@ -1,0 +1,23 @@
+Marcus Bell
+Austin, TX | marcus.bell@example.com | github.com/marcusbell
+
+SUMMARY
+Web developer, one year in, after a full-stack bootcamp. Building React and TypeScript features for a small agency.
+
+EXPERIENCE
+Web Developer — Brightline Digital, Austin, TX                         Oct 2025 – Present
+• Build React and TypeScript pages for client marketing sites and a booking app
+• Connect forms to REST APIs and fix layout bugs reported by clients
+• Write CSS and HTML for landing pages from Figma designs
+
+Barista — Cuppa Coffee, Austin, TX                                      2021 – 2025
+• Made drinks and ran the register during morning rush
+
+EDUCATION
+Full-Stack Web Development Certificate — Austin Coding Bootcamp, 2025
+
+PROJECTS
+Chat demo — React, Node.js and Socket.io (a personal project)
+
+SKILLS
+JavaScript, TypeScript, React, Node.js, HTML, CSS, Git, REST APIs

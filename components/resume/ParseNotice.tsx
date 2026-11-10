@@ -44,7 +44,7 @@ export default function ParseNotice({ doc, onPaste, onRefile, studioHref }: { do
               {asks.slice(0, 4).map(({ u, q }, i) => (
                 <li key={i} className={s.q}>
                   <p className={s.qText}>{q.question}</p>
-                  {q.why && q.kind !== 'note' && <p className={s.fine}>Seen {q.why.replace(/^read /, 'read it ')}.</p>}
+                  {q.why && q.kind !== 'note' && <p className={s.fine}>{/^read /.test(q.why) ? `Seen ${q.why.replace(/^read /, 'read it ')}` : /^(?:listed|filed|placed|kept)\b/.test(q.why) ? `It was ${q.why}` : q.why.charAt(0).toUpperCase() + q.why.slice(1)}{/[.!?]$/.test(q.why) ? '' : '.'}</p>}
                   {q.kind === 'note'
                     ? (studioHref ? <a className={s.link} href={studioHref}>Add the employer in Résumé Studio</a> : <p className={s.fine}>Add the employer in the editor.</p>)
                     : onRefile

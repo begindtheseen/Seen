@@ -222,7 +222,7 @@ export default function JobsPage() {
                 />
                 <button
                   type="button"
-                  onClick={requestGpsLocation}
+                  onClick={() => { void requestGpsLocation() }}
                   title="Use my location"
                   aria-label="Use my location"
                   disabled={gpsLoading || hasCity}
@@ -428,7 +428,7 @@ export default function JobsPage() {
               </>
             )}
             {areaProblem.reason === 'needs_position' && (
-              <Button size="sm" variant="secondary" icon="map-pin" onClick={() => { setLocation(''); setTimeout(requestGpsLocation, 0) }}>Use my location</Button>
+              <Button size="sm" variant="secondary" icon="map-pin" onClick={() => { void requestGpsLocation(true) }}>Use my location</Button>
             )}
           </div>
         ) : view === 'empty' && area ? (

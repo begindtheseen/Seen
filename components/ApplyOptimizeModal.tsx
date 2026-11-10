@@ -213,10 +213,13 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
       : { ...who, jobDescription: job.description || '', jobSource: job.source || null, jobId: job.id }
   }
 
-  function readFrom(c: PostingCtx, d: { matched_requirements?: RequirementRow[]; unsupported_requirements?: RequirementRow[]; posting?: PostingEcho; requirements_listed?: number } | null): PostingRead | null {
+  function readFrom(c: PostingCtx, d: { matched_requirements?: RequirementRow[]; unsupported_requirements?: RequirementRow[]; posting?: PostingEcho; requirements_listed?: number; statements?: Statement[] } | null): PostingRead | null {
     if (!c.pasted) return null
     // the server's ONE count when it sends it (requirements_listed); else the rows it listed
-    const n = d ? (typeof d.requirements_listed === 'number' ? d.requirements_listed : requirementCounts({ matched: d.matched_requirements || [], missing: d.unsupported_requirements || [] }).total) : null
+    // the same count the fit read and the build steps use: the reader's statements when sent (not promises), else
+    // the server's one listed count — never two different numbers on one screen
+    const sts = d && Array.isArray((d as { statements?: Statement[] }).statements) ? ((d as { statements?: Statement[] }).statements || []).filter((x) => x.kind !== 'promise') : null
+    const n = d ? (sts && sts.length ? sts.length : typeof d.requirements_listed === 'number' ? d.requirements_listed : requirementCounts({ matched: d.matched_requirements || [], missing: d.unsupported_requirements || [] }).total) : null
     const echo = d?.posting || null
     return readFacts({ pasted: c.pasted, server: echo ? { title: echo.title, company: echo.company } : (c.other ? { title: c.title, company: c.company } : null), job: { title: c.title, company: c.company }, requirements: n })
   }
@@ -405,7 +408,8 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
     const asks = st.filter((x) => x.status === 'cannot_tell').length
     if (st.length) {
       out.push(`Read ${st.length} thing${st.length === 1 ? '' : 's'} the posting asks for`)
-      if (proved) out.push(`Matched ${proved} to lines on your résumé${asks ? ` (${asks} only you can answer)` : ''}`)
+      if (proved) out.push(`Matched ${proved} of them to lines on your résumé`)
+      if (asks) out.push(`Left ${asks} for you to answer — hours, lifting and the like`)
     } else if (typeof result.requirements_listed === 'number') out.push(`Read ${result.requirements_listed} requirement${result.requirements_listed === 1 ? '' : 's'} in the posting`)
     const built = (tailored.changes || []).filter((c) => c.type !== 'format' && c.type !== 'heading').length
     out.push(built ? `Built ${built} change${built === 1 ? '' : 's'} to your résumé` : 'Found nothing worth changing in your lines')

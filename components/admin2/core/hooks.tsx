@@ -149,7 +149,7 @@ export type ActionView = {
 
 /** Every button that changes something. See README "How to write an action". */
 export function useAdminAction(action: string, options: ActionOptions = {}): ActionView {
-  const { api, cache } = useRuntime()
+  const { api, cache, jobs } = useRuntime()
   const optsRef = useRef(options)
   optsRef.current = options
   const [, setTick] = useState(0)
@@ -163,7 +163,8 @@ export function useAdminAction(action: string, options: ActionOptions = {}): Act
       get timeoutMs() { return optsRef.current.timeoutMs },
     },
     onChange: () => setTick((n) => n + 1),
-  }), [api, cache, action])
+    jobs,
+  }), [api, cache, jobs, action])
   return useMemo(() => ({
     run: (args = {}, target = '*') => runner.run(args, target),
     state: (target = '*') => runner.state(target) || IDLE(target),

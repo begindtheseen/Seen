@@ -26,6 +26,8 @@ export type JobSpec = {
   past: string
   /** What is counted: "stale listings". */
   noun: string
+  /** A round the caller already ran (e.g. the first round of an Undo): its totals and where to go on. */
+  initial?: { changed: number; remaining: number | null; cursor?: string }
 }
 
 /** The contract's job state plus what the core needs to resume and to summarise. Extra fields are optional. */
@@ -191,7 +193,8 @@ export function createJobManager(deps: {
       const next: Job = {
         ...cur,
         rounds: cur.rounds + 1,
-        changed: cur.changed + (res.changed || 0),
+        // A running total the server reports (undo's `restored`) wins over our sum: it survives a lost round.
+        changed: typeof (res as { restored?: unknown }).restored === 'number' ? (res as unknown as { restored: number }).restored : cur.changed + (res.changed || 0),
         remaining: typeof res.remaining === 'number' ? res.remaining : (res.complete === false ? cur.remaining : 0),
         cursor: res.cursor || undefined,
         skipped,
@@ -230,9 +233,11 @@ export function createJobManager(deps: {
       const id = `job_${now().toString(36)}_${(seq++).toString(36)}`
       const job: Job = {
         id, key, action: spec.action, args: spec.args || {}, label: spec.label, past: spec.past, noun: spec.noun,
-        status: 'running', changed: 0, remaining: null, rounds: 0, message: `${spec.label}…`, skipped: [],
+        status: 'running', changed: spec.initial?.changed || 0, remaining: spec.initial ? spec.initial.remaining : null,
+        rounds: spec.initial ? 1 : 0, cursor: spec.initial?.cursor, message: `${spec.label}…`, skipped: [],
         lost_rounds: 0, started_at: new Date(now()).toISOString(),
       }
+      job.message = spec.initial ? jobSummary(job) : job.message
       jobs.set(id, job); persist(); emit()
       void loop(id)
       return id

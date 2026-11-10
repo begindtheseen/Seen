@@ -35,7 +35,8 @@ function installFetch(role) {
     }
     // The ephemeral-delete path reads the report's client snapshot to recover the apply_url it
     // suppresses. Return a snapshot row for that specific GET.
-    if (u.includes('/job_availability_reports?job_id=eq') && method === 'GET') {
+    // Reports are read by keyset pages now (select first, then the job_id filter).
+    if (u.includes('/job_availability_reports?') && u.includes('job_id=eq') && method === 'GET') {
       return mockResponse([{ id: 'r1', job_id: 'x', apply_url: 'https://example.com/job/123', title: 'Warehouse Associate', company: 'Aerotek' }]);
     }
     // Writes are counted from the rows they return (admin remake, 2026-11-10), so the fake answers like
