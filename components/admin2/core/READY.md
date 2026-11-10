@@ -14,7 +14,7 @@ useAdminAction(action, { optimistic?(tx, args), onRows?(rows, cache, args), onSe
   → { run(args, target?), state(target?), busy(target?), undo(target?), retry(target?), dismiss(target?) }
   tx: { patch(keyPrefix | (key)=>bool, fn), removeRows(keyPrefix, ids), rollback() }
 // long jobs
-useAdminJob({ action, args?, label, past, noun }) → { job, running, start, cancel, resume, dismiss }
+useAdminJob({ action, args?, label, past, noun, total?, initial? }) → { job, running, start, cancel, resume, dismiss }
 useAdminJobs() → Job[]            // Job.last_message = the server's sentence for the last round
 // files
 useAdminDownload() → { run(endpoint, body?, { fallbackName?, timeoutMs? }), state, busy, retry, dismiss }

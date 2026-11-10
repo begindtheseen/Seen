@@ -475,3 +475,18 @@ test('a 503 session check (upstream, retryable) is an error to retry — never t
   const r = await api('overview')
   assert.equal(r.code, 'upstream'); assert.equal(r.retryable, true); assert.equal(asked, 0)
 })
+
+test('jobs: a known total shows the same "N of M" from the first moment, kept current by the server', async () => {
+  let done = 0; const seen = []
+  const api = async () => { done += 20; const c = Math.min(done, 58); return toResult(200, JSON.stringify({ ok: true, changed: 20, complete: c >= 58, cursor: `c${c}`, touched: [] })) }
+  const m = createJobManager({ api, sleep: async () => {} })
+  const id = m.start({ ...SPEC, action: 'company_recompute_all', label: 'Updating company scores', past: 'Updated', noun: 'company scores', total: 58 })
+  assert.equal(jobProgressText(m.get(id)), '0 of 58', 'never "0 so far" when the size is known')
+  m.subscribe(() => { const j = m.get(id); if (j.status === 'running') seen.push(jobProgressText(j)) })
+  await until(() => m.get(id).status === 'done')
+  assert.deepEqual(seen, ['20 of 58', '40 of 58'])
+  // the server's remaining wins when it says one
+  const m2 = createJobManager({ api: async () => toResult(200, JSON.stringify({ ok: true, changed: 10, remaining: 70, complete: false, cursor: 'x1' })), sleep: async () => {}, limits: { maxRounds: 1 } })
+  const id2 = m2.start({ ...SPEC, total: 58 }); await until(() => m2.get(id2).status !== 'running')
+  assert.equal(jobProgressText(m2.get(id2)), '10 of 80')
+})

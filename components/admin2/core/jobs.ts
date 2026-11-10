@@ -28,6 +28,8 @@ export type JobSpec = {
   noun: string
   /** A round the caller already ran (e.g. the first round of an Undo): its totals and where to go on. */
   initial?: { changed: number; remaining: number | null; cursor?: string }
+  /** The whole job's size when known up front ("58 company scores"). Later rounds' `remaining` keep it current. */
+  total?: number
 }
 
 /** The contract's job state plus what the core needs to resume and to summarise. Extra fields are optional. */
@@ -45,6 +47,8 @@ export type Job = AdminJobState & {
   reloaded?: boolean
   /** The server's own sentence from the last round ("Scanned 61,000 listings so far — keep going."). */
   last_message?: string
+  /** The job's size: from JobSpec.total, then changed + the server's remaining. One number everywhere. */
+  total?: number | null
   lost_rounds: number
   ended_at?: string
 }
@@ -192,12 +196,17 @@ export function createJobManager(deps: {
       lastMessage = res.message
       if (res.touched?.length) deps.invalidate?.(res.touched)
       const skipped = mergeSkipped(cur.skipped, res.skipped)
+      // A running total the server reports (undo's `restored`) wins over our sum: it survives a lost round.
+      const changedNow = typeof (res as { restored?: unknown }).restored === 'number' ? (res as unknown as { restored: number }).restored : cur.changed + (res.changed || 0)
+      // One size for the job: the server's remaining when it says it, else what the known total leaves.
+      const remainingNow = typeof res.remaining === 'number' ? res.remaining
+        : res.complete === false ? (typeof cur.total === 'number' ? Math.max(0, cur.total - changedNow) : cur.remaining) : 0
       const next: Job = {
         ...cur,
         rounds: cur.rounds + 1,
-        // A running total the server reports (undo's `restored`) wins over our sum: it survives a lost round.
-        changed: typeof (res as { restored?: unknown }).restored === 'number' ? (res as unknown as { restored: number }).restored : cur.changed + (res.changed || 0),
-        remaining: typeof res.remaining === 'number' ? res.remaining : (res.complete === false ? cur.remaining : 0),
+        changed: changedNow,
+        remaining: remainingNow,
+        total: typeof remainingNow === 'number' ? changedNow + remainingNow : cur.total,
         cursor: res.cursor || undefined,
         skipped,
         last_message: res.message || cur.last_message,
@@ -239,7 +248,9 @@ export function createJobManager(deps: {
       const id = `job_${now().toString(36)}_${(seq++).toString(36)}`
       const job: Job = {
         id, key, action: spec.action, args: spec.args || {}, label: spec.label, past: spec.past, noun: spec.noun,
-        status: 'running', changed: spec.initial?.changed || 0, remaining: spec.initial ? spec.initial.remaining : null,
+        status: 'running', changed: spec.initial?.changed || 0,
+        remaining: spec.initial ? spec.initial.remaining : (typeof spec.total === 'number' ? spec.total : null),
+        total: typeof spec.total === 'number' ? spec.total : spec.initial && typeof spec.initial.remaining === 'number' ? spec.initial.changed + spec.initial.remaining : null,
         rounds: spec.initial ? 1 : 0, cursor: spec.initial?.cursor, message: `${spec.label}…`, skipped: [],
         lost_rounds: 0, started_at: new Date(now()).toISOString(),
       }

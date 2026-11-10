@@ -23,7 +23,7 @@ sections/<name>/       one folder per section
 ## Adding a section
 
 1. Create `sections/<name>/<Name>Section.tsx` with a default export `(props: SectionProps) => JSX`.
-2. In `core/sections.tsx` replace the section's `load: placeholder('…')` with
+2. In `core/sections.tsx` point the section's `load` at your module:
    `load: () => import('../sections/<name>/<Name>Section.tsx')`. That is the only shared line you edit.
 3. Your section is mounted on first visit and then **kept mounted** (hidden) when the owner leaves —
    your `useState` (selection, half-typed fields, open confirm steps) survives a round trip. Do not
@@ -113,6 +113,7 @@ const decide = useAdminAction('review_held', {
 
 ```tsx
 const job = useAdminJob({ action: 'purge_stale_jobs', label: 'Clearing stale listings', past: 'Cleared', noun: 'stale listings' })
+// size known up front? pass it: useAdminJob({ …, total: 58 }) — the shell bar and JobProgress then both say "0 of 58"
 <Button onClick={job.start}>Clear stale</Button>
 {job.job ? <JobProgress job={job.job} onCancel={job.cancel} onResume={job.resume} onDismiss={job.dismiss} /> : null}
 ```
@@ -129,6 +130,15 @@ so only a round that neither changes rows nor moves the cursor stops as "no prog
 sentence for the last round is kept on the job as `job.last_message` and shown by `JobProgress` while it runs
 ("Scanned 61,000 listings so far — keep going."). The Listings workaround that restarted a job when the
 cursor moved (`ListingsSection.tsx`, "The job manager stops on 'no change'…") can go.
+
+A job's size is ONE number: `JobSpec.total` (when known up front) and then `changed + remaining` from the
+server. Show progress with `jobProgressText(job)` / `<JobProgress job={job} />` — never compute your own
+"N of M" in a section (the bar and the section said "0 so far" vs "0 of 58" before this).
+
+The List primitive's row checkbox is itself a 44×44 target (the drawn box stays 20px) — a section override
+for it (review.module.css `.rowWrap input[type=checkbox]`) is no longer needed.
+
+The lab (lab builds only) opens its own item kind `labitem`; `report` sheets belong to Review.
 
 On a phone the shell shows the job as a one-line bar directly above the bottom bar (never in the header);
 on desktop it stays in the rail.

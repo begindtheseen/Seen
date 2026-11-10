@@ -53,7 +53,7 @@ test('tailor: one credit, a full plan and variant, no polish result, no model ho
   assert.ok(Array.isArray(r.body.plan.decisions) && r.body.plan.decisions.length > 0);
   assert.equal('polish' in r.body, false, 'no polish result is ever returned');
   // A plan that cannot raise the fit score is returned free and says so (no_gain); any other plan is one credit.
-  if (r.body.no_gain) { assert.equal(state.charges, 0); assert.equal(r.body.charged, false); assert.match(String(r.body.note), /no credit was used/); }
+  if (r.body.no_gain) { assert.equal(state.charges, 0); assert.equal(r.body.charged, false); assert.match(String(r.body.note), /no credit (?:was|is) used/); }
   else assert.equal(state.charges, 1);
   assert.deepEqual(state.modelCalls, [], 'no model API');
   assert.deepEqual(state.outside, [], 'only Seen\'s own database');

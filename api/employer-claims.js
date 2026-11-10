@@ -232,7 +232,10 @@ async function adminRoute(req, res, { db, body, adminToken }) {
       `employer_company_claims?select=id,user_id,company_name,company_display_name,status,created_at,reviewed_at,reviewed_by,note` +
       `${filter}&order=created_at.desc&limit=500`,
     );
-    const claims = r.ok ? await r.json() : [];
+    // A failed read is an error answer, never "no claims".
+    if (!r.ok) return res.status(502).json({ ok: false, error: `Could not read the claims (HTTP ${r.status}).`, code: 'upstream', retryable: true });
+    const claims = await r.json().catch(() => null);
+    if (!Array.isArray(claims)) return res.status(502).json({ ok: false, error: 'Could not read the claims.', code: 'upstream', retryable: true });
     // Enrich with the employer's email (best-effort; service-key read of profiles).
     const enriched = await attachEmployerEmails(db, claims);
     const rank = { pending: 0, approved: 1, rejected: 2 };

@@ -143,7 +143,7 @@ An already-undone row: 409 `conflict` "That was already undone." A row that cann
 { "ok": true, "as_of": "…", "rows": [
   { "name": "refresh-jobs", "path": "/api/refresh-jobs", "schedule": "0 2,6,10,14,18,22 * * *",
     "last_run": "2026-11-10T14:00:04.000Z", "last_result": "ok", "next_run": "2026-11-10T18:00:00.000Z",
-    "overdue": false, "detail": "Next: Nov 10, 10:00 AM (California) · from cron_runs" },
+    "overdue": false, "duration_ms": 29876, "detail": "Next: Nov 10, 10:00 AM (California) · from cron_runs" },
   { "name": "outcome-followups", "path": "/api/outcome-followups", "schedule": "0 15 * * *",
     "last_run": "2026-11-10T15:00:41.000Z", "last_result": "ok", "next_run": "2026-11-11T15:00:00.000Z",
     "overdue": false, "detail": "Last email sent Nov 10, 7:00 AM · from outcome_email_log" },
@@ -156,7 +156,8 @@ them comma-joined in the hour field when they differ only by hour, else `;`-join
 the schedule in UTC (Vercel's clock); `detail` says it in California time. Sources, in order: `cron_runs` (new),
 then what the cron already writes: `collector_runs` (cron-archive-reports), `outcome_email_log` (outcome-followups —
 only proves a send), `search_daily.fetched_at` (cron-search-data), `demand_refresh_log` (demand). Nothing →
-`"unknown"`, `last_run:null`, `overdue:false` (never guessed). `overdue` = a recorded last run older than the
+`"unknown"`, `last_run:null`, `overdue:false` (never guessed). `duration_ms` (optional) = the last recorded run's length: "duration_ms N" in `cron_runs.detail`
+(lib/server/cronRecord.js), else finished − started; absent when nothing recorded it. `overdue` = a recorded last run older than the
 scheduled interval + 1 h grace.
 
 ---
@@ -178,6 +179,12 @@ scheduled interval + 1 h grace.
 ```
 Every pending row is read (keyset pages internally, no 1,000 cap; `truncated` true only past 20,000).
 `flags` may include `possible_duplicate`, `anti_gaming_hold`, `not_a_hiring_outcome`, `no_source_link`.
+- `possible_duplicate` covers a copy of another HELD row AND a copy of a published report (same company + outcome +
+  text); then `review.duplicate_of` = the original's id and `review.duplicate_of_live: true`. The flag survives the
+  original's approval, so a fresh tab never offers the copy for bulk approval.
+- Every row carries `rules: "passes"|"fails"|null` and `rules_detail: { verdict, comment: boolean|null, post: boolean|null }`
+  — Seen's strict first-hand rules read as a comment and as the post itself (null = the rules do not apply: not an
+  imported public account, or too short). `reports_recent` rows carry the same two fields.
 
 ### `review_held` `{ decision: "approve"|"reject", ids?: string[], scope?: "all", group?: "needs_eyes"|"positive"|"employee_review", include_ids?: string[], request_id?: uuid }` → `AdminOk`  (THE bulk fix)
 - `ids` (1–5,000) OR `scope: "all"` ("all matching": the server takes every pending report, narrowed by `group`).
@@ -202,7 +209,8 @@ bulk approve unless `include_duplicates: true`.
   "recompute": { "queued": 41, "done": 41, "remaining": 0, "mode": "table" },
   "remaining": 0, "complete": true }
 ```
-- `skipped` reasons: `anti_gaming_hold` and `possible_duplicate` (bulk approve only — see the guard above), `already_decided` (held but already rejected/duplicate,
+- `skipped` reasons: `anti_gaming_hold` (message: "left for one-by-one review (approve them by ticking each)") and
+  `possible_duplicate` (bulk approve only — see the guard above), `already_decided` (held but already rejected/duplicate,
   or decided by someone else — **never** a row this same admin decided in the last 10 minutes: a retry after a
   timeout counts those as `changed` again via the audit trail, `message` says "already done by your last try"),
   `not_held` (live rows), `not_found` (no such id), `invalid_id`.
@@ -237,6 +245,11 @@ Newest first, keyset. `q` = company name contains.
 ### `reports_stats` `{}` → `AdminOk` `rows:[{ total, by_day:[{date,count}]×30 (California days), top_companies:[{company,count}], outcome_mix:{ghosted,rejected,interview,offer,waiting}, source }]`
 Every report of the last 30 California days (keyset read) — the old chart read the oldest 1,000.
 
+### `correct_report_outcome` `{ id, outcome, reason? }` → `AdminOk` (full admins)
+`outcome` ∈ ghosted, rejected, autoreject, hired, offer, interview, interviewing, human, waiting (the database's own
+check). Conditional on the outcome read; audited with prior and next (`reason` in the audit row); the company's score
+is recomputed (`recompute {queued, done, remaining, cursor?}`); undoable. Same outcome → `changed:0` "Already “x”.".
+
 ### `report_detail` `{ id }` → `AdminOk` with `rows:[ReportRow & { history: AdminActivityRow[] }]`
 
 ### `moderate_report` `{ id, decision: "approve"|"reject"|"hold"|"restore" }` → `AdminOk`
@@ -251,7 +264,9 @@ Nothing to do → `changed:0` and the reason as `message` (e.g. "Already live �
 Aliases: `approve_report`→approve, `investigate_report`→hold, `deny_hiring_report`→reject.
 
 ### `scan_report_dupes` `{}` → `AdminList<{company, count}>` + `{ suspected, groups, total, by_company }`
-### `dedupe_reports` `{}` → `AdminOk` job: `changed` = copies marked, `remaining`, `complete`. Touched `report_dupes, reports, overview`.
+### `dedupe_reports` `{ request_id? }` → `AdminOk` job: `changed` = copies marked, `remaining`, `complete`, `undo`, `request_id`.
+One Undo covers the whole press: send one `request_id` for every round of the job, and the last round's `undo`
+reverts every copy marked under it (a resumable job like the review Undo). Touched `report_dupes, reports, held, overview, activity`.
 
 ### `list_listing_tickets` `{ status?: "open"|"resolved"|"all" }` → `AdminList<Ticket>` + `counts {open, resolved}`
 ```json
@@ -290,7 +305,8 @@ Row: `{ id, type, target_type, target_name, notes, status, created_at, resolved_
 ### `resolve_issue` / `dismiss_issue` `{ id }` → `AdminOk` (checked; 404 when no open issue has that id; undoable). Touched `issues, overview, activity`.
 
 ### Employer claims — `POST /api/employer-claims` (same `X-Admin-Token`)
-- `{ action:"list", status? }` → `{ ok:true, rows: Claim[], claims: Claim[], counts:{pending,approved,rejected} }`
+- `{ action:"list", status? }` → `{ ok:true, rows: Claim[], claims: Claim[], counts:{pending,approved,rejected} }`;
+  a failed read is 502 `{ ok:false, code:"upstream", retryable:true }`, never an empty list.
   Claim: `{ id, user_id, company_name, company_display_name, status, created_at, reviewed_at, reviewed_by, note, email, email_verified, employer_name }`
 - `{ action:"approve"|"reject", id, note? }` → `{ ok:true, changed:1, skipped:[], message:"Claim approved.", touched:["claims","overview"], rows:[Claim], claim }`; 409 `conflict` when another approved claim exists.
 
@@ -462,3 +478,10 @@ it answers its own JSON: `{ ok, found, upserted, inserted, updated, failed_batch
 | `approve_report`, `investigate_report`, `deny_hiring_report` | `moderate_report` |
 | `jobs_browse`, `job_detail`, `job_restore` (Seen Command) | unchanged + contract fields |
 | `seed_flags`, `get_recent_jobs`, `list_listing_disputes`, `remove_listing`, `deny_report`, `emergency_job_refresh`, `list_subscriptions`, `list_growth_rewards` | kept working for the legacy page; checked writes; not used by the new UI |
+
+
+## Failed reads are never empty
+Every list action answers an error (502 `upstream`, retryable) when its main read fails; a secondary field that could
+not be read is `null` (never `[]`): `user_detail.ledger`, `report_detail.rows[0].history`, `job_detail.history`,
+`company_detail.rows[0].merges` / `perks`, `list_employer_purchases.perks`. `list_merges` answers `ready:false` with no
+rows only when the table does not exist yet (404).

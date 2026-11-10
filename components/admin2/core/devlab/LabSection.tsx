@@ -9,7 +9,7 @@
 // Its `lab_*` actions exist only in the fixture server; real sections call real actions.
 import { useState } from 'react'
 import Button from '@/components/ui/Button'
-import type { AdminList } from '../../contract.ts'
+import type { AdminItemKind, AdminList } from '../../contract.ts'
 import { useAdminAction, useAdminDownload, useAdminJob, useAdminList, useApi } from '../hooks.tsx'
 import { useUrlFilter } from '../place.ts'
 import type { SectionProps } from '../sections.tsx'
@@ -20,6 +20,9 @@ import { JobProgress } from '../../ui/Job.tsx'
 import { BulkBar, List, Row, RowActions } from '../../ui/List.tsx'
 import ResultLine from '../../ui/ResultLine.tsx'
 import styles from './lab.module.css'
+
+/** The lab's own item kind (core/items.tsx registers it in lab builds only). */
+const LAB_KIND = 'labitem' as AdminItemKind
 
 type LabRow = { id: string; company: string; outcome: string; text: string; dupe?: boolean }
 
@@ -105,7 +108,7 @@ export default function LabSection(_props: SectionProps) {
             <Row
               testId={`lab-row-${r.id}`}
               title={`${r.company} — ${r.outcome}`}
-              onOpen={() => shell.openItem('report', r.id)}
+              onOpen={() => shell.openItem(LAB_KIND, r.id)}
               sub={r.text}
               status={r.dupe ? <StatusChip tone="caution" label="Possible duplicate" /> : undefined}
               selected={selected.has(r.id)} onToggle={() => toggle(r.id)} selectLabel={`Select the ${r.company} report`}

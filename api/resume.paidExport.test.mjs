@@ -26,11 +26,11 @@ const { default: handler } = await import('./resume.js');
 
 const FX = JSON.parse(readFileSync(new URL('../lib/optimizer/fixtures/expert-postings.json', import.meta.url), 'utf8'));
 // strict charge (director 2026-11-10): a credit only when more of the posting's displayed lines reach a recruiter's first
-// read — so the money fixture buries its cash-drawer proof under line 3 with no "Cash handling" skill, and the tailor's
-// summary brings it up front
-const RESUME = FX.resume.replace(/Customer-focused retail[^\n]*(\n[^\n]+)?/, 'Hard working and dependable team player looking for a sales role.')
-  .replace('Cash handling · ', '')
-  .replace(/(• Trained 4[^\n]*\n)/, '$1• Restocked the retail shelf and folded towels between classes\n• Balanced the cash drawer at close every shift with zero variances over 18 months\n');
+// read. The money fixture has no summary and no skills section, and its latest role opens on three lines that prove
+// nothing, so the summary the tailor adds brings proof (the cash drawer) up front
+const RESUME = FX.resume.replace(/\nSUMMARY\n[\s\S]*?\n\nEXPERIENCE/, '\n\nEXPERIENCE').replace(/\nSKILLS[\s\S]*$/, '\n')
+  .replace(/(Membership Specialist — UFC Gym[^\n]*\n)/, '$1• Opened the gym at 5 a.m. on weekdays\n• Folded towels and restocked the retail shelf between classes\n• Kept the lobby and front desk tidy\n')
+  .replace(/(• Trained 4[^\n]*\n)/, '$1• Balanced the cash drawer at close every shift with zero variances over 18 months\n');
 const A = FX.postings.A;
 const token = (sub) => {
   const b = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');

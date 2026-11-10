@@ -9,6 +9,8 @@ import { ADMIN_SECTIONS, type AdminItemKind, type AdminSection } from '../contra
 
 export const ITEM_KINDS: readonly AdminItemKind[] = [
   'report', 'job', 'company', 'user', 'ticket', 'dispute', 'claim', 'reply', 'purchase', 'issue', 'cluster',
+  // The core's lab has its own item kind, accepted ONLY in a build with NEXT_PUBLIC_ADMIN_LAB=1 (never production).
+  ...(process.env.NEXT_PUBLIC_ADMIN_LAB === '1' ? ['labitem' as AdminItemKind] : []),
 ]
 
 /** Extra sections that exist only in a private build (the core's lab). Never in production. */

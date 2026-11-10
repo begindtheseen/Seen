@@ -20,11 +20,11 @@ const FX = JSON.parse(readFileSync(new URL('../lib/optimizer/fixtures/expert-pos
 // The money tests need a résumé the tailor really changes (a thin, job-hunting summary it rewrites from the verdict):
 // since v6 a package that changes nothing of substance is FREE (no_gain) — pinned separately below.
 // strict charge (director 2026-11-10): a credit only when more of the posting's displayed lines reach a recruiter's first
-// read — so the money fixture buries its cash-drawer proof under line 3 with no "Cash handling" skill, and the tailor's
-// summary brings it up front
-const RESUME = FX.resume.replace(/Customer-focused retail[^\n]*(\n[^\n]+)?/, 'Hard working and dependable team player looking for a sales role.')
-  .replace('Cash handling · ', '')
-  .replace(/(• Trained 4[^\n]*\n)/, '$1• Restocked the retail shelf and folded towels between classes\n• Balanced the cash drawer at close every shift with zero variances over 18 months\n');
+// read. The money fixture has no summary and no skills section, and its latest role opens on three lines that prove
+// nothing, so the summary the tailor adds brings proof (the cash drawer) up front
+const RESUME = FX.resume.replace(/\nSUMMARY\n[\s\S]*?\n\nEXPERIENCE/, '\n\nEXPERIENCE').replace(/\nSKILLS[\s\S]*$/, '\n')
+  .replace(/(Membership Specialist — UFC Gym[^\n]*\n)/, '$1• Opened the gym at 5 a.m. on weekdays\n• Folded towels and restocked the retail shelf between classes\n• Kept the lobby and front desk tidy\n')
+  .replace(/(• Trained 4[^\n]*\n)/, '$1• Balanced the cash drawer at close every shift with zero variances over 18 months\n');
 const RESUME_STRONG = FX.resume;
 const A = FX.postings.A;
 const WALMART = FX.postings.walmart;
@@ -115,7 +115,7 @@ test('E6: a probe never charges; C2: the first run charges once and every reopen
   assert.equal(probeAfter.body.cached, true);
 
   // a changed résumé is a new input — it costs a credit
-  const changed = await optimize({ resume: RESUME + '\n• Balanced a cash drawer every shift for 20 months' }, uid);
+  const changed = await optimize({ resume: RESUME.replace('(602) 555-0148', '(602) 555-0199') }, uid);
   assert.equal(changed.body.charged, true);
   assert.equal(state.charges, before + 2);
   // another user never sees this user's cached result
@@ -145,7 +145,10 @@ test('v6 (director G3): a package that changes nothing of substance is free — 
   assert.equal(t.score_before, paid.body.fit_score, 'one score in one package');
   assert.ok(t.changes.some((c) => c.default === 'applied' && c.substantive));
   for (const c of t.changes) { assert.ok(['reorder', 'summary', 'skills', 'rewrite', 'cut', 'move', 'format'].includes(c.type)); assert.ok(['applied', 'needs_ok'].includes(c.default)); assert.ok(c.why && c.why.length > 20, c.why); }
-  assert.equal(t.doc.basics.summary, t.changes.find((c) => c.type === 'summary').after, 'the doc carries the applied summary');
+  // (this fixture's credit is bought by the reorder; when a summary change is applied, the doc carries it)
+  const sc = t.changes.find((c) => c.type === 'summary' && c.default === 'applied');
+  if (sc) assert.equal(t.doc.basics.summary, sc.after, 'the doc carries the applied summary');
+  assert.ok(t.visibility.after > t.visibility.before, 'charged only for more of the posting up front');
 });
 
 test('v6 (director G2): a signed-out caller gets signin_required, never credits_required', async () => {

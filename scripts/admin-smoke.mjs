@@ -104,7 +104,7 @@ async function answer(req) {
     case 'search': {
       const q = String(body.q || '').toLowerCase()
       const hits = S.held.filter((r) => !S.gone.has(r.id) && (r.company.toLowerCase().includes(q) || r.id === q)).slice(0, 5)
-        .map((r) => ({ kind: 'report', id: r.id, title: `${r.company} — ${r.outcome}`, sub: `Report ${r.id}` }))
+        .map((r) => ({ kind: 'labitem', id: r.id, title: `${r.company} — ${r.outcome}`, sub: `Report ${r.id}` }))
       if ('owner@seenjobs.io'.includes(q)) hits.push({ kind: 'user', id: 'u1', title: 'owner@seenjobs.io', sub: 'Account' })
       return json(200, { ok: true, q: body.q, results: hits })
     }
@@ -196,8 +196,9 @@ async function measure(page) {
     const overflow = all.filter((el) => { const r = el.getBoundingClientRect(); return (r.right > vw + 1 || r.left < -1) && !clipped(el) && getComputedStyle(el).position !== 'fixed' })
       .map((el) => `${el.tagName.toLowerCase()}.${(el.className && el.className.baseVal === undefined ? el.className : '').toString().slice(0, 40)}`)
     const dlg = document.querySelector('[role=dialog][aria-modal=true]')
-    const targets = [...(dlg || document).querySelectorAll('button, a[href], input:not([type=checkbox]):not([type=radio]), select, textarea, [role=button], label:has(input[type=checkbox])')]
-      .filter(visible).filter((el) => !el.closest('label:has(input[type=checkbox])') || el.tagName === 'LABEL')
+    // Every control itself, checkboxes included (a 20px box is not a 44px target unless the input is).
+    const targets = [...(dlg || document).querySelectorAll('button, a[href], input:not([type=hidden]), select, textarea, [role=button]')]
+      .filter(visible)
       .filter((el) => { const r = el.getBoundingClientRect(); return r.bottom > 0 && r.top < vh && r.right > 0 && r.left < vw })
     const small = targets.filter((el) => { const r = el.getBoundingClientRect(); return r.height < 43.5 || r.width < 43.5 })
       .map((el) => `${el.tagName.toLowerCase()}[${(el.textContent || el.getAttribute('aria-label') || '').trim().slice(0, 24)}] ${Math.round(el.getBoundingClientRect().width)}×${Math.round(el.getBoundingClientRect().height)}`)
@@ -309,18 +310,20 @@ async function run(vp) {
   check(tag('Retry after the 503 reads again and clears the line'), true)
   await page.getByTestId('queue-held_reports').click()
   check(tag('a queue row opens its section with its filter in the URL'), url(page).searchParams.get('s') === 'review' && url(page).searchParams.get('review.kind') === 'held', page.url())
-  await page.getByText('Review is still on the legacy admin.').waitFor()
+  await page.waitForFunction(() => document.querySelector('[data-section-active] h1')?.textContent?.trim() === 'Review')
+  check(tag('the queue row lands on the Review section'), true)
 
   // 3 · A section whose code cannot be downloaded shows ErrorState + Retry inside it; the shell stays
   let blockChunks = true
   await page.route('**/_next/static/chunks/**', (route) => (blockChunks ? route.abort('internetdisconnected') : route.continue()))
   await go('lab')
-  await page.getByTestId('error-state').waitFor()
+  const activeErr = page.locator('[data-section-active] [data-testid=error-state]')
+  await activeErr.waitFor()
   check(tag('a section that fails to load shows Retry inside the section; the shell stays'),
-    /could not be downloaded/.test(await page.getByTestId('error-state').innerText()) && await page.getByTestId('admin-shell').isVisible() && await sentinelAlive(page))
+    /could not be downloaded/.test(await activeErr.innerText()) && await page.getByTestId('admin-shell').isVisible() && await sentinelAlive(page))
   await shot(page, `${vp.name}-05a-section-load-failed`)
   blockChunks = false
-  await page.getByTestId('error-retry').click()
+  await page.locator('[data-section-active] [data-testid=error-retry]').click()
 
   // 4 · Lab: section state survives leaving and returning
   await page.getByTestId('section-lab').waitFor()
@@ -376,7 +379,7 @@ async function run(vp) {
   check(tag('Approve all: one request even on a double tap'), S.requests.filter((a) => a === 'lab_decide').length - before === 1)
   check(tag('Approve all: the result line says what changed with counts'), /Approved 258 of 300 held reports/.test(line), line.replace(/\s+/g, ' '))
   check(tag('Approve all: skipped duplicates are offered as a link'), await page.getByRole('button', { name: 'Review them' }).count() === 1)
-  await page.getByTestId('empty-state').or(page.getByTestId('lab-row-r007')).first().waitFor()
+  await page.getByTestId('section-lab').getByTestId('lab-row-r007').waitFor()
   check(tag('Approve all: approved rows left the list without a reload'), await page.getByTestId('lab-row-r001').count() === 0 && await sentinelAlive(page))
   await shot(page, `${vp.name}-07-approved`)
   await page.getByTestId('result-undo').click()
@@ -431,7 +434,7 @@ async function run(vp) {
   const opener = page.getByTestId('lab-row-r004').locator('button').first()
   const openIt = async () => { await opener.click(); await page.getByTestId('lab-item').waitFor() }
   await openIt()
-  check(tag('an item opens in the URL'), url(page).searchParams.get('item') === 'report:r004')
+  check(tag('an item opens in the URL'), url(page).searchParams.get('item') === 'labitem:r004')
   await screenCheck(page, tag('item sheet'), { sheet: true })
   await shot(page, `${vp.name}-10-item`)
   await page.getByTestId('sheet-close').click()
@@ -446,15 +449,15 @@ async function run(vp) {
   check(tag('Back closes the sheet and stays in the admin'), !url(page).searchParams.get('item') && url(page).pathname === '/admin' && url(page).searchParams.get('s') === 'lab')
   await openIt()
   await page.reload(); await page.getByTestId('lab-item').waitFor()
-  check(tag('a refresh reopens the open item'), url(page).searchParams.get('item') === 'report:r004')
+  check(tag('a refresh reopens the open item'), url(page).searchParams.get('item') === 'labitem:r004')
   await page.evaluate(() => { window.__seenSentinel = 'alive' })
   const navsAfterReload2 = docNavs.length
   await page.getByTestId('lab-item-related').click()
-  await page.waitForFunction(() => new URLSearchParams(location.search).get('item') === 'report:r005')
+  await page.waitForFunction(() => new URLSearchParams(location.search).get('item') === 'labitem:r005')
   check(tag('opening a related item replaces the sheet (still one sheet)'), await page.locator('[role=dialog]').count() === 1)
-  await page.goBack(); await page.waitForFunction(() => new URLSearchParams(location.search).get('item') === 'report:r004')
+  await page.goBack(); await page.waitForFunction(() => new URLSearchParams(location.search).get('item') === 'labitem:r004')
   check(tag('Back from the related item returns to the previous one'), true)
-  await page.getByTestId('lab-item-related').click(); await page.waitForFunction(() => new URLSearchParams(location.search).get('item') === 'report:r005')
+  await page.getByTestId('lab-item-related').click(); await page.waitForFunction(() => new URLSearchParams(location.search).get('item') === 'labitem:r005')
   await page.getByTestId('sheet-close').click(); await page.getByTestId('sheet-item').waitFor({ state: 'detached' })
   check(tag('✕ closes the whole stack, including an item opened from a link'), !url(page).searchParams.get('item'))
   // destructive step inside the sheet, type-to-confirm
@@ -466,11 +469,11 @@ async function run(vp) {
   check(tag('Esc inside a confirm step cancels the step, not the sheet'), await page.getByTestId('lab-item').count() === 1 && await page.getByTestId('confirm-step').count() === 0)
   await page.getByTestId('sheet-close').click()
   // unknown kinds and kinds with no view
-  await page.goto(`${BASE}/admin?s=lab&item=wizard:1`); await page.getByTestId('empty-state').waitFor()
+  await page.goto(`${BASE}/admin?s=lab&item=wizard:1`); await page.getByTestId('sheet-item').getByTestId('empty-state').waitFor()
   check(tag('an unknown item kind shows a plain "not found" in the sheet'), /Nothing to open at this link/.test(await page.getByTestId('sheet-item').innerText()))
   await page.getByTestId('sheet-close').click()
-  await page.goto(`${BASE}/admin?s=lab&item=report:nope`); await page.getByTestId('empty-state').waitFor()
-  check(tag('an id the server does not know shows "not found"'), /Report not found/.test(await page.getByTestId('sheet-item').innerText()))
+  await page.goto(`${BASE}/admin?s=lab&item=labitem:nope`); await page.getByTestId('sheet-item').getByTestId('empty-state').waitFor()
+  check(tag('an id the server does not know shows "not found"'), /Lab report not found/.test(await page.getByTestId('sheet-item').innerText()))
   await page.getByTestId('sheet-close').click()
   await page.evaluate(() => { window.__seenSentinel = 'alive' })
   const navsAfterGoto = docNavs.length
@@ -492,7 +495,7 @@ async function run(vp) {
   await shot(page, `${vp.name}-12-search`)
   await page.getByTestId('search-input').press('Enter')
   await page.getByTestId('lab-item').waitFor()
-  check(tag('a search result opens its item'), /^report:/.test(url(page).searchParams.get('item') || ''))
+  check(tag('a search result opens its item'), /^labitem:/.test(url(page).searchParams.get('item') || ''))
   await page.goBack(); await page.getByTestId('sheet-item').waitFor({ state: 'detached' })
   check(tag('Back from a searched item closes it (no stale search entry)'), !url(page).searchParams.get('item') && url(page).pathname === '/admin')
   if (phone) {

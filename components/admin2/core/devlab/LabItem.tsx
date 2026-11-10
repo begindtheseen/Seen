@@ -33,7 +33,7 @@ export default function LabItem({ kind, id, open, setTitle, close }: ItemViewPro
         <span className="ui-field__label">Note (kept while the sign-in step covers this sheet)</span>
         <input className="ui-input" data-testid="lab-item-note" />
       </label>
-      {r.related ? <Button variant="ghost" iconRight="arrow-right" onClick={() => open('report', r.related!)} data-testid="lab-item-related">Open the related report</Button> : null}
+      {r.related ? <Button variant="ghost" iconRight="arrow-right" onClick={() => open('labitem' as typeof kind, r.related!)} data-testid="lab-item-related">Open the related report</Button> : null}
       <ResultLine state={del.state()} onRetry={() => del.retry()} onDismiss={() => del.dismiss()} />
       {confirming ? (
         <ConfirmStep

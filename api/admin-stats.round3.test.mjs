@@ -80,12 +80,13 @@ test('bulk approve never publishes anti-gaming holds or possible duplicates unle
   const r = (await call({ action: 'review_held', decision: 'approve', ids: pendingIds(fake) })).jsonBody;
   assert.equal(r.changed, 10);
   assert.deepEqual(r.skipped.map((s) => [s.reason, s.count, [...s.ids].sort()]), [['anti_gaming_hold', 2, [uid(901, '1'), uid(902, '1')]], ['possible_duplicate', 1, [uid(903, '1')]]]);
-  assert.match(r.message, /2 anti-gaming holds left for one-by-one review · 1 skipped as possible duplicates/);
+  assert.match(r.message, /2 anti-gaming holds left for one-by-one review \(approve them by ticking each\) · 1 skipped as possible duplicates/);
   // Named on purpose → approved.
   const named = (await call({ action: 'review_held', decision: 'approve', ids: pendingIds(fake), include_ids: [uid(901, '1')] })).jsonBody;
-  // 901 was named; the copy 903 is no longer a duplicate once its original left the queue, so it goes too.
-  assert.equal(named.changed, 2);
-  assert.deepEqual(named.skipped.map((s) => [s.reason, s.ids]), [['anti_gaming_hold', [uid(902, '1')]]]);
+  // 901 was named. The copy 903 stays a possible duplicate: its original is now LIVE (round 5 compares held copies
+  // with published reports too), so it is still skipped.
+  assert.equal(named.changed, 1);
+  assert.deepEqual(named.skipped.map((s) => [s.reason, s.ids]), [['anti_gaming_hold', [uid(902, '1')]], ['possible_duplicate', [uid(903, '1')]]]);
   // One report approved on its own names itself.
   const one = (await call({ action: 'review_held', decision: 'approve', ids: [uid(902, '1')] })).jsonBody;
   assert.equal(one.changed, 1);

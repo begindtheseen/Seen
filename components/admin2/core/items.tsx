@@ -37,5 +37,7 @@ ITEM_VIEWS.report = () => import('../sections/review/ReportItem.tsx')
 for (const k of ['ticket', 'dispute', 'claim', 'reply', 'purchase', 'issue'] as const) ITEM_VIEWS[k] ??= () => import('../sections/review/KindItem.tsx')
 
 if (process.env.NEXT_PUBLIC_ADMIN_LAB === '1') {
-  ITEM_VIEWS.report ??= () => import('./devlab/LabItem.tsx')
+  // The lab's own kind (report sheets belong to Review). Not a contract kind: lab builds only.
+  ;(ITEM_LABEL as Record<string, string>).labitem = 'Lab report'
+  ;(ITEM_VIEWS as Record<string, () => Promise<{ default: ComponentType<ItemViewProps> }>>).labitem = () => import('./devlab/LabItem.tsx')
 }
