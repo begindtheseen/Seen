@@ -1117,6 +1117,8 @@ async function handleRecommended(req, res, _body) {
       level: inferLevel(j.title || ''),
       source: j.source || 'Seen',
       match_reason: j._reason,
+      // the checks behind the sentence (field, licences, years, limits, level) — each one passed
+      match_checks: Array.isArray(j._checks) ? j._checks : undefined,
       match_basis: j._basis,
       summary_only: !!j._summaryOnly,
       miles: Number.isFinite(j._miles) ? j._miles : null,
