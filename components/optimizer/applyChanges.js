@@ -143,9 +143,12 @@ export function promptFor(q) {
 /**
  * What kind of field a question gets. A number question shows a numeric field and the exact line it will
  * complete; a tool / duty / credential question shows a text field worded for what it is.
- * @returns {'number'|'credential'|'tool'|'duty'}
+  * @returns {'detail'|'number'|'credential'|'tool'|'duty'}
  */
 export function questionKind(q) {
+  // a detail question (paid.js detailQuestions: open as well as close, ticket times, how often you count) asks for the
+  // person's own words under their current role
+  if (q.kind === 'detail' || q.facet) return 'detail';
   if (q.kind === 'metric' || q.unit === 'line' || /\[(?:number|the number)[^\]]*\]/i.test(String(q.template || ''))) return 'number';
   const k = q.answerKind || q.answer_kind;
   if (k === 'credential') return 'credential';

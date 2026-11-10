@@ -29,8 +29,10 @@ const looksLikeHeader = (t) => /\|/.test(t) && /\b(?:19|20)\d{2}\b/.test(t) && t
 
 /** The line to quote for a statement: its first evidence line, preferring a bullet over a role header. */
 export function proofOf(st) {
-  // the reader sends evidence as [{ line, why }]; the Studio's tailor answer (paid.js screenStatements) sends one line as a string
-  const raw = st && Array.isArray(st.evidence) ? st.evidence : st && typeof st.evidence === 'string' ? [{ line: st.evidence }] : [];
+  // ONE statement shape everywhere (free, paid and Studio): evidence is the verdict's [{ line, why }]; a row the person
+  // answered (`by: 'you'`) is never proved by a résumé line here — the row prints their answer
+  if (st && st.by === 'you') return '';
+  const raw = st && Array.isArray(st.evidence) ? st.evidence : [];
   const ev = raw.map((e) => proofText(e && e.line)).filter(Boolean);
   if (!ev.length) return '';
   return ev.find((l) => !looksLikeHeader(l)) || ev[0];
