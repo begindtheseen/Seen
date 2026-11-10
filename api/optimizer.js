@@ -553,7 +553,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ...free,
       // ONE requirement count and a coverage figure over the SAME rows the list shows (lib/server/optimizePackage.js)
-      requirements_listed: listedRequirements(output).length,
+      requirements_listed: typeof output.requirement_count === 'number' ? output.requirement_count : listedRequirements(output).length,
       ats_coverage: listedCoverage(output),
       posting: postingInfo(posting, { job: jobTitle, company: employerDisplayName({ company: company || '', postingText: jobDescription || '' }) || company }),
       legacy_seenfit_compatible: true,

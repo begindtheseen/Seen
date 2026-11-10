@@ -14,11 +14,10 @@ import { useShell } from '../../core/shellContext.ts'
 import { SearchField } from '../../ui/bits.tsx'
 import ConfirmStep from '../../ui/ConfirmStep.tsx'
 import { List, Row, RowActions } from '../../ui/List.tsx'
-import ResultLine from '../../ui/ResultLine.tsx'
 import { EmptyState } from '../../ui/states.tsx'
 import { matchesQuery } from './adapter.ts'
 import { listKey, type KAction, type KindConfig } from './kinds.tsx'
-import { Chips, Choice, CursorRow, KeysHint, Meta } from './parts.tsx'
+import { Chips, Choice, CursorRow, KeysHint, Meta, Line } from './parts.tsx'
 import { useClaimsApi, useEndpointAction, useListKeys } from './reviewHooks.tsx'
 import styles from './review.module.css'
 
@@ -120,7 +119,7 @@ export default function KindPanel({ cfg, on, visible }: { cfg: KindConfig<AnyRow
         </p>
       ) : null}
       {last && lastState && lastState.status === 'done' ? (
-        <ResultLine state={lastState} onUndo={() => acts.all[last.name].undo(last.id)} onDismiss={() => { acts.all[last.name].dismiss(last.id); setLast(null) }} />
+        <Line state={lastState} onUndo={() => acts.all[last.name].undo(last.id)} onDismiss={() => { acts.all[last.name].dismiss(last.id); setLast(null) }} />
       ) : null}
       <List<AnyRow>
         rows={rows}
@@ -164,7 +163,7 @@ export default function KindPanel({ cfg, on, visible }: { cfg: KindConfig<AnyRow
                 below={conf && conf.confirm ? (
                   <ConfirmStep inline {...conf.confirm(r)} busy={busy} onCancel={() => setConfirming(null)} onConfirm={() => { setLast({ id, name: `${conf.claims ? 'claims:' : ''}${conf.action}` }); void acts.run(conf, r) }} />
                 ) : errored ? (
-                  <ResultLine state={errored[1].state(id)} onRetry={() => errored[1].retry(id)} onDismiss={() => errored[1].dismiss(id)} />
+                  <Line state={errored[1].state(id)} onRetry={() => errored[1].retry(id)} onDismiss={() => errored[1].dismiss(id)} />
                 ) : undefined}
               />
             </CursorRow>
@@ -186,7 +185,7 @@ function ClusterScan() {
           Scan sign-in signals for new clusters
         </Button>
       </div>
-      <ResultLine state={scan.state('scan')} onRetry={() => scan.retry('scan')} onDismiss={() => scan.dismiss('scan')} runningText="Reading the last month of sign-ins…" />
+      <Line state={scan.state('scan')} onRetry={() => scan.retry('scan')} onDismiss={() => scan.dismiss('scan')} runningText="Reading the last month of sign-ins…" />
     </div>
   )
 }

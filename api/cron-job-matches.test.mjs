@@ -340,7 +340,7 @@ test('teaser hole: a closed or unreadable source → not emailed; a full posting
   const full = `${'Grow and renew small-business accounts for an office-supply distributor. '.repeat(12)}\nRequirements\n• 1+ year of account management experience.`;
   res = await run({ h: makeHandler({ fetchFull: async () => ({ ok: true, description: full, fetched: true }) }) });
   assert.equal(res.body.sent, 1, JSON.stringify(res.body));
-  assert.match(st.sends[0].text, /You're an Account Manager at Skymark Solutions \(since 2024\)\. They ask for 1\+ year; you have about 3 years as an Account Manager\./);
+  assert.match(st.sends[0].text, /You're an Account Manager at Skymark Solutions \(since 2024\)\. They ask for 1\+ year; you have about 2\.5 years as an Account Manager\./);
 });
 
 test('teaser hole: a dry run reads the posting but writes nothing back', async () => {

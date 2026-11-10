@@ -27,6 +27,7 @@ import { detectAts } from '../lib/jobs/atsDetect.js';
 import { mapLimit } from '../lib/server/jobSources.js';
 import { logError } from '../lib/server/errlog.js';
 import { isVercelCron } from '../lib/server/cronAuth.js';
+import { withCronRecord } from '../lib/server/cronRecord.js';
 
 // Must stay under the maxDuration declared for this function in vercel.json (300s), with room to
 // serialize the response. Discovery gets the WHOLE budget here — that is the entire point.
@@ -336,7 +337,7 @@ async function probeAdzunaApi() {
 
 // Vercel crons fire as GET, so GET must reach the work — a POST-only handler would make the schedule
 // a silent no-op (the mistake api/demand.js and api/reports.js already had to correct).
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -422,3 +423,6 @@ export default async function handler(req, res) {
     return res.status(500).json({ ok: false, error: e.message, ms: Date.now() - startedAt });
   }
 }
+
+// every Vercel cron run is recorded for Admin → System (ok / partial / failed, a short count, duration_ms)
+export default withCronRecord('discover-sources', handler);

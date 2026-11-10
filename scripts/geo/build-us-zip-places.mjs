@@ -25,6 +25,7 @@ const FIPS = { '01': 'AL', '02': 'AK', '04': 'AZ', '05': 'AR', '06': 'CA', '08':
   17: 'IL', 18: 'IN', 19: 'IA', 20: 'KS', 21: 'KY', 22: 'LA', 23: 'ME', 24: 'MD', 25: 'MA', 26: 'MI', 27: 'MN', 28: 'MS', 29: 'MO', 30: 'MT', 31: 'NE',
   32: 'NV', 33: 'NH', 34: 'NJ', 35: 'NM', 36: 'NY', 37: 'NC', 38: 'ND', 39: 'OH', 40: 'OK', 41: 'OR', 42: 'PA', 44: 'RI', 45: 'SC', 46: 'SD', 47: 'TN',
   48: 'TX', 49: 'UT', 50: 'VT', 51: 'VA', 53: 'WA', 54: 'WV', 55: 'WI', 56: 'WY', 72: 'PR' };
+const BOROUGH = { 36005: 'Bronx', 36047: 'Brooklyn', 36081: 'Queens', 36085: 'Staten Island', 36061: 'New York' };
 const arg = (n) => { const i = process.argv.indexOf(n); return i > 0 ? process.argv[i + 1] : null; };
 const fail = (m) => { throw new Error(`${m} — refusing to write`); };
 const HEAD_RE = /^﻿?OID_ZCTA5_20\|GEOID_ZCTA5_20\|NAMELSAD_ZCTA5_20\|AREALAND_ZCTA5_20\|AREAWATER_ZCTA5_20\|MTFCC_ZCTA5_20\|CLASSFP_ZCTA5_20\|FUNCSTAT_ZCTA5_20\|OID_(?:COUNTY|PLACE)_20\|GEOID_(?:COUNTY|PLACE)_20\|NAMELSAD_(?:COUNTY|PLACE)_20\|/;
@@ -60,8 +61,7 @@ expectCount('ZCTAs with a county', counties.size, 32000, 35000);
 const statesOf = new Map();
 for (const r of countyRows) { const st = FIPS[r.geoid.slice(0, 2)]; if (!st) continue; if (!statesOf.has(r.zip)) statesOf.set(r.zip, new Set()); statesOf.get(r.zip).add(st); }
 const stateFor = (zip, c) => { const ps = prefixState(zip); return ps && statesOf.get(zip)?.has(ps) ? ps : FIPS[c.geoid.slice(0, 2)]; };
-// The city: among the places holding land of the ZIP area inside that state, the most populous of those with at
-// least a third of the largest share ("62201" is East St. Louis, not the village holding a little more of its land).
+// The city: the place holding the LARGEST share of the ZIP area's land inside that state (90210 is Beverly Hills).
 const POP = new Map();
 for (const [st, list] of Object.entries(JSON.parse(readFileSync(join(HERE, '..', '..', 'lib', 'geo', 'data', 'us-places.json'), 'utf8')).states)) {
   for (const [name, , , pop] of list) POP.set(`${st}|${String(name).toLowerCase()}`, pop || 0);
@@ -74,7 +74,8 @@ for (const [k, list] of partsIn) {
   const st = k.split('|')[1];
   const max = Math.max(...list.map((r) => r.part));
   const pop = (r) => POP.get(`${st}|${bare(r.name).toLowerCase()}`) ?? POP.get(`${st}|${r.name.toLowerCase()}`) ?? 0;
-  placeIn.set(k, list.filter((r) => r.part * 3 >= max).sort((a, b) => (pop(b) - pop(a)) || (b.part - a.part))[0]);
+  void max; void pop;
+  placeIn.set(k, list.slice().sort((a, b) => b.part - a.part)[0]);
 }
 
 const zips = {};
@@ -92,6 +93,8 @@ for (const [zip, c] of [...counties].sort()) {
   name = name.replace(/\s+(?:city and borough|metropolitan government|consolidated government|unified government|urban county|charter township|township|city|town|village|borough|municipality|CDP|comunidad|zona urbana)$/i, '').trim();
     named++;
   }
+  // New York City ZIPs carry their borough, by county (Manhattan stays "New York").
+  if (st === 'NY' && name === 'New York') name = BOROUGH[c.geoid] || name;
   zips[zip] = name ? [st, name] : [st];
 }
 expectCount('ZIPs written', Object.keys(zips).length, 32000, 35000);

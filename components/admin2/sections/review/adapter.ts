@@ -99,7 +99,7 @@ export function day(iso: unknown): string {
   return formatPacific(iso, { dateStyle: 'medium' })
 }
 
-export function snippet(text: unknown, max = 160): string {
+export function snippet(text: unknown, max = 120): string {
   const s = String(text || '').replace(/\s*\[Source:[^\]]*\]\s*$/, '').replace(/\s+/g, ' ').trim()
   return s.length > max ? `${s.slice(0, max - 1).trimEnd()}…` : s
 }
@@ -431,4 +431,51 @@ export function newRequestId(): string {
   b[6] = (b[6] & 15) | 64; b[8] = (b[8] & 63) | 128
   const h = [...b].map((x) => x.toString(16).padStart(2, '0')).join('')
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`
+}
+
+// ── Copies the server stops flagging ─────────────────────────────────────────────────────────────
+// The server flags a held row as a possible duplicate only against OTHER HELD rows: once the original is
+// published, its copies read as clean "clear positives" (rig: after Approve all positive, the 24 copies
+// came back as "Approve all positive (24)"). Until the server compares against live reports too, Review
+// remembers every id it has seen flagged in this tab and keeps treating it as a possible duplicate.
+
+/** Rows with the remembered duplicate flag put back. Returns the same array when nothing changes. */
+export function withKnownDuplicates(rows: HeldRow[], known: Set<string>): HeldRow[] {
+  if (!known.size) return rows
+  let changed = false
+  const out = rows.map((r) => {
+    if (!known.has(r.id) || isDuplicate(r)) return r
+    changed = true
+    return { ...r, review: { ...(r.review || {}), flags: [...flagsOf(r), 'possible_duplicate'] } }
+  })
+  return changed ? out : rows
+}
+
+/** Add every currently flagged id to the remembered set; true when it grew. */
+export function rememberDuplicates(rows: HeldRow[], known: Set<string>): boolean {
+  let grew = false
+  for (const r of rows) if (isDuplicate(r) && !known.has(r.id)) { known.add(r.id); grew = true }
+  return grew
+}
+
+/** "No clear positives left · 24 possible duplicates" — what the filled button's place says when it has nothing to publish. */
+export function nothingToPublishLine(plan: ApprovePlan): string {
+  const left = [
+    plan.heldBack.duplicates ? plural(plan.heldBack.duplicates, 'possible duplicate') : '',
+    plan.heldBack.antiGaming ? plural(plan.heldBack.antiGaming, 'anti-gaming hold') : '',
+    plan.heldBack.needsEyes ? `${fmt(plan.heldBack.needsEyes)} that ${plan.heldBack.needsEyes === 1 ? 'needs' : 'need'} your eyes` : '',
+    plan.heldBack.employee ? plural(plan.heldBack.employee, 'employee review') : '',
+  ].filter(Boolean)
+  return `No clear positives left${left.length ? ` · ${left.join(' · ')}` : ''}`
+}
+
+/**
+ * The status word beside a result line already says Done / Undone / Not done; a server sentence that
+ * starts by saying it again ("Undid it: 140 reports…", "Done: …") loses that lead so it reads once:
+ * "Undone — 140 reports are back in the review queue."
+ */
+export function tidyMessage(message: string): string {
+  const m = String(message || '').replace(/^\s*(?:undid it|undone|done|success|ok|not done|failed)\s*[:—–-]\s*/i, '')
+  if (m === message) return message
+  return m ? m.charAt(0).toUpperCase() + m.slice(1) : message
 }

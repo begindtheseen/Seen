@@ -62,7 +62,7 @@ export default function ReviewSection({ active }: SectionProps) {
         title="Review"
         sub={sub}
         fetching={fetching}
-        actions={<Button variant="ghost" icon="refresh-cw" onClick={refreshAll} disabled={overview.fetching} data-testid="review-refresh">Refresh counts</Button>}
+        actions={<Button variant="ghost" icon="refresh-cw" className={styles.hidePhone} onClick={refreshAll} disabled={overview.fetching} data-testid="review-refresh">Refresh counts</Button>}
       />
       <RefreshFailed error={overview.data ? overview.error : undefined} onRetry={() => void overview.refresh()} />
       <KindChips chips={chips} value={kind} onChange={setKind} />

@@ -196,16 +196,17 @@ test('a whole state lists every row placed in that state, state-only rows includ
 
 test('a place Seen cannot place: a plain message and suggestions, never a list', async () => {
   const typo = await call({ query: '', location: 'Pheonix', radius: '25' });
-  assert.equal(typo.body.jobs.length, 0);
-  assert.equal(typo.body.total, 0);
-  assert.deepEqual(typo.body.unplaced.suggestions.slice(0, 1), ['Phoenix, AZ']);
-  assert.match(typo.body.message, /couldn’t find a US place called “Pheonix”/);
+  // Round 7: a clear near-miss now resolves (the label says what was understood); a nonsense word does not.
+  assert.equal(typo.body.area.label, 'Phoenix, AZ');
+  const junk = await call({ query: '', location: 'Qxzvbn', radius: '25' });
+  assert.equal(junk.body.jobs.length, 0);
+  assert.match(junk.body.message, /couldn’t find a US place called “Qxzvbn”/);
   const abroad = await call({ query: '', location: 'Toronto, ON', radius: '25' });
   assert.equal(abroad.body.jobs.length, 0);
   assert.equal(abroad.body.unplaced.reason, 'non_us');
+  // Round 7: Remote with no title is every remote job in the US (not "add a title").
   const remote = await call({ query: '', location: 'Phoenix, AZ', radius: '0' });
-  assert.equal(remote.body.need_title, true);
-  assert.equal(remote.body.jobs.length, 0);
+  assert.equal(remote.body.mode, 'remote');
   const empty = await call({ query: '', location: '', radius: '25' });
   assert.equal(empty.code, 400);
 });
@@ -262,3 +263,17 @@ test('load: at most 4 reads in flight, a capped number of reads, and a partial a
   assert.equal(again.rows.length, full.rows.length);
 });
 
+
+test('round 7: "Remote US" typed as the place lists the remote-only US jobs, labelled', async () => {
+  _clearAreaCache();
+  const { rows, total, pages } = await all({ query: '', location: 'Remote US', radius: '25' });
+  assert.equal(pages[0].mode, 'remote');
+  assert.equal(pages[0].area.label, 'Remote jobs in the US');
+  assert.equal(rows.length, total);
+  assert.ok(total > 0);
+  assert.ok(rows.every((j) => /remote/i.test(j.location)), rows.map((j) => j.location).slice(0, 5).join(' | '));
+  assert.ok(!rows.some((j) => /toronto|hybrid/i.test(j.location)));
+  const typo = await call({ query: '', location: 'Pheonix AZ', radius: '25' });
+  assert.equal(typo.body.area.label, 'Phoenix, AZ');
+  assert.equal(typo.body.understood, 'Pheonix AZ');
+});

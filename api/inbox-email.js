@@ -11,6 +11,7 @@
 import { dbClient, resendClient, tablesReady, processEmail, catchUp, isProviderId } from '../lib/server/inbox/store.js';
 import { rateLimit as defaultRateLimit } from '../lib/server/ratelimit.js';
 import { isVercelCron } from '../lib/server/cronAuth.js';
+import { withCronRecord } from '../lib/server/cronRecord.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
@@ -19,7 +20,7 @@ const CRON_SECRET = process.env.CRON_SECRET;
 const CHECK_TTL_MS = 5 * 60 * 1000;
 let lastCheck = null; // { at, body } — the public check answers from cache so it can't be used to hammer Resend
 
-export default async function handler(req, res, deps = {}) {
+async function handler(req, res, deps = {}) {
   const fetchImpl = deps.fetch || fetch;
   const rateLimit = deps.rateLimit || defaultRateLimit;
   if (!SUPABASE_URL || !SERVICE_KEY) return res.status(500).json({ ok: false, error: 'db_not_configured' });
@@ -69,3 +70,6 @@ function safeJson(s) { try { return JSON.parse(s); } catch { return {}; } }
 
 // Text from Resend or the DB in a log line: one line, printable, short (CodeQL log-injection form).
 function logSafe(v) { return String(v == null ? '' : v).replace(/\n|\r/g, ' ').replace(/[^\x20-\x7e]/g, '').slice(0, 160); }
+
+// every Vercel cron run is recorded for Admin → System (ok / partial / failed, a short count, duration_ms)
+export default withCronRecord('inbox-email', handler);

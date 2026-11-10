@@ -34,6 +34,7 @@ import { runCollection } from '../lib/reports/collectorRun.js';
 import { redditArchiveSource } from '../lib/reports/archiveSource.js';
 import { searchableName } from '../lib/reports/targetNames.js';
 import { isVercelCron } from '../lib/server/cronAuth.js';
+import { withCronRecord } from '../lib/server/cronRecord.js';
 
 export const PIPELINE = 'applicant_reports_cloud';
 const RUN_MS = 230_000;          // the function may run 300 s; leave room to write the log
@@ -158,7 +159,7 @@ export async function runCloudCollection({ now = Date.now, sources, targetsCall 
   return { ok: status !== 'failed', status, id: logId, error, summary: compact };
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   const q = req.query || {};
   if (req.method === 'GET' && String(q.runs) === '1') {
     const secret = process.env.LOCAL_COMPANY_INTEL_INGEST_SECRET;
@@ -176,3 +177,6 @@ export default async function handler(req, res) {
   const out = await runCloudCollection();
   return res.status(out.ok ? 200 : 500).json(out);
 }
+
+// every Vercel cron run is recorded for Admin → System (ok / partial / failed, a short count, duration_ms)
+export default withCronRecord('cron-archive-reports', handler);

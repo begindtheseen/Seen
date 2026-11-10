@@ -25,13 +25,6 @@ export type SectionDef = {
   load: () => Promise<{ default: ComponentType<SectionProps> }>
 }
 
-const placeholder = (name: string) => async () => {
-  const m = await import('./Placeholder.tsx')
-  const P = m.default
-  const C = (p: SectionProps) => <P {...p} name={name} />
-  return { default: C }
-}
-
 export const SECTIONS: SectionDef[] = [
   { key: 'today', label: 'Today', icon: 'layout-dashboard', hotkey: '1', phone: 'bar', load: () => import('../sections/today/TodaySection.tsx') },
   { key: 'review', label: 'Review', icon: 'inbox', hotkey: '2', phone: 'bar', load: () => import('../sections/review/ReviewSection.tsx') },

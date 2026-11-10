@@ -12,11 +12,10 @@ import { useAdminList, useApi, useRuntime } from '../../core/hooks.tsx'
 import type { ItemViewProps } from '../../core/items.tsx'
 import { ItemNotFound } from '../../core/SheetHost.tsx'
 import ConfirmStep from '../../ui/ConfirmStep.tsx'
-import ResultLine from '../../ui/ResultLine.tsx'
 import { ErrorState, RefreshFailed, Skeleton } from '../../ui/states.tsx'
 import { CONFIG_BY_ITEM, listKey, type KAction, type KindConfig } from './kinds.tsx'
 import { useKindActions } from './KindPanel.tsx'
-import { Chips } from './parts.tsx'
+import { Chips, Line } from './parts.tsx'
 import { useClaimsApi } from './reviewHooks.tsx'
 import styles from './review.module.css'
 
@@ -94,7 +93,7 @@ function KindItemBody({ kind, id, setTitle, open, cfg }: ItemViewProps & { cfg: 
           <textarea className="ui-input" value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} data-testid={`${cfg.kind}-note`} />
         </label>
       ) : null}
-      {last ? <ResultLine state={last.state(id)} onUndo={() => last.undo(id)} onRetry={() => last.retry(id)} onDismiss={() => { last.dismiss(id); setLastName(null) }} /> : null}
+      {last ? <Line state={last.state(id)} onUndo={() => last.undo(id)} onRetry={() => last.retry(id)} onDismiss={() => { last.dismiss(id); setLastName(null) }} /> : null}
       {conf && conf.confirm ? (
         <ConfirmStep {...conf.confirm(row)} busy={busy} onCancel={() => setConfirming(null)} onConfirm={() => press(conf)} />
       ) : available.length ? (

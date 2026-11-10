@@ -137,8 +137,8 @@ export default function JobsPage() {
   }
   // A state typed alone is the whole state: the radius means nothing there (the select says "Whole state").
   // A state or a county typed alone is that whole area: the radius means nothing there (the select says so).
-  const wholeState = (area?.kind === 'state' || area?.kind === 'county') && location.trim() === area.typed
-  const radiusLabel = wholeState ? (area?.kind === 'county' ? 'whole county' : 'whole state') : radius === '0' ? 'Remote' : hasCity ? `${radius} mi` : 'Anywhere'
+  const wholeState = (area?.kind === 'state' || area?.kind === 'county' || area?.kind === 'remote') && location.trim() === area.typed
+  const radiusLabel = wholeState ? (area?.kind === 'county' ? 'whole county' : area?.kind === 'remote' ? 'anywhere in the US' : 'whole state') : radius === '0' ? 'Remote' : hasCity ? `${radius} mi` : 'Anywhere'
   // Follow the URL: Back/Forward open or close the listing; a page loaded on ?job= (Back from another
   // page) reopens it once its row is known — from the results, the rail, or this tab's listing cache.
   useEffect(() => {
@@ -243,7 +243,7 @@ export default function JobsPage() {
                 onChange={e => setRadius(e.target.value === 'any' ? '25' : e.target.value)}
               >
                 {wholeState ? (
-                  <option value="state">{area?.kind === 'county' ? 'Whole county' : 'Whole state'}</option>
+                  <option value="state">{area?.kind === 'county' ? 'Whole county' : area?.kind === 'remote' ? 'Anywhere in the US' : 'Whole state'}</option>
                 ) : hasCity ? (
                   <>
                     <option value="10">10 mi</option>

@@ -14,6 +14,7 @@ import { EMPLOYER_SKUS } from '../lib/server/employerSkus.js';
 import { fulfillEmployerCheckout, isEmployerSession } from '../lib/server/employerFulfillment.js';
 import { pacificDate } from '../lib/time/pacific.js';
 import { isVercelCron } from '../lib/server/cronAuth.js';
+import { withCronRecord } from '../lib/server/cronRecord.js';
 
 const CORS = (req, res) => {
   const o = req.headers.origin || '';
@@ -142,7 +143,7 @@ async function readRawBody(req) {
   return Buffer.concat(chunks).toString('utf8');
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (CORS(req, res)) return;
 
   const STRIPE_KEY   = process.env.STRIPE_SECRET_KEY;
@@ -675,3 +676,6 @@ export default async function handler(req, res) {
 
   return res.status(400).json({ error: 'Unknown action' });
 }
+
+// every Vercel cron run is recorded for Admin → System (ok / partial / failed, a short count, duration_ms)
+export default withCronRecord((req) => ((req.query && req.query.action) === 'reconcile_all' ? 'stripe:reconcile_all' : null), handler);

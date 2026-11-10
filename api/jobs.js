@@ -1156,8 +1156,9 @@ async function handleAreaSearch(req, res, body) {
     place = { ...place, kind: 'point', lat: glat, lng: glng, label: place.kind === 'point' ? `your location (near ${place.label})` : 'your location', reason: null, suggestions: [], device: true };
   }
   const base = { ok: true, mode: 'area', query: '', location: loc, jobs: [], total: 0, remote_total: 0, in_radius: 0, has_more: false, next_cursor: null };
-  if (place.kind === 'remote' || String(body.radius) === '0' || String(body.radius).toLowerCase() === 'remote') {
-    return res.status(200).json({ ...base, need_title: true, message: 'Remote is not a place — add a job title to search remote jobs.' });
+  // "remote" / "Remote US" typed as the place, or the Remote option with no title: every remote job in the US.
+  if (place.kind !== 'remote' && (String(body.radius) === '0' || String(body.radius).toLowerCase() === 'remote')) {
+    place = { kind: 'remote', lat: null, lng: null, state: null, name: null, label: 'Remote jobs in the US', zip: null, reason: null, suggestions: [] };
   }
   if (place.kind === 'none') {
     const message = place.reason === 'non_us' ? `Seen lists jobs in the United States — “${loc}” is outside it.`
@@ -1169,7 +1170,7 @@ async function handleAreaSearch(req, res, body) {
   }
   if (!U || !K) return res.status(503).json({ error: 'DB unavailable', jobs: [] });
   const r = parseInt(body.radius, 10);
-  const miles = place.kind === 'state' || place.kind === 'county' ? null : (Number.isFinite(r) && r >= 5 && r <= 500 ? r : 25);
+  const miles = place.kind === 'state' || place.kind === 'county' || place.kind === 'remote' ? null : (Number.isFinite(r) && r >= 5 && r <= 500 ? r : 25);
   const sort = AREA_SORTS.has(body.sort) ? body.sort : 'nearest';
   const includeRemote = body.include_remote === true;
   const filters = {
@@ -1229,7 +1230,8 @@ async function handleAreaSearch(req, res, body) {
     else res.setHeader('Cache-Control', 'no-store');
     return res.status(200).json({
       ...base,
-      mode: place.kind === 'state' || place.kind === 'county' ? place.kind : 'area',
+      mode: place.kind === 'state' || place.kind === 'county' || place.kind === 'remote' ? place.kind : 'area',
+      ...(place.understood ? { understood: place.understood } : {}),
       pending: pending === true,
       jobs, in_radius: jobs.length,
       // The page shows one card per employer + job title (lib/jobs/groupListings.js — "+N more locations"), so the

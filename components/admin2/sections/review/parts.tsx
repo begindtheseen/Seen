@@ -5,8 +5,11 @@
 // row wrapper that carries the keyboard cursor.
 import { useEffect, useRef, type ReactNode } from 'react'
 import Icon from '@/components/ui/Icon'
+import Button from '@/components/ui/Button'
+import type { Job } from '../../core/jobs.ts'
 import { KeyHint, StatusChip } from '../../ui/bits.tsx'
-import { fmt, type KindKey, type Tone } from './adapter.ts'
+import ResultLine, { type ResultLineProps } from '../../ui/ResultLine.tsx'
+import { fmt, tidyMessage, type KindKey, type Tone } from './adapter.ts'
 import styles from './review.module.css'
 
 /** Keep the chosen chip in view inside a sideways-scrolling row — horizontally only, never the page. */
@@ -124,5 +127,34 @@ export function Facts({ rows }: { rows: Array<[string, ReactNode] | null | false
         </div>
       ))}
     </dl>
+  )
+}
+
+/** ResultLine, with the server's sentence tidied so it never repeats the status word beside it. */
+export function Line(props: ResultLineProps) {
+  const st = props.state
+  const msg = st.result?.message
+  const state = msg && tidyMessage(msg) !== msg ? { ...st, result: { ...st.result!, message: tidyMessage(msg) } } : st
+  return <ResultLine {...props} state={state} />
+}
+
+/**
+ * The company-score update after a decision, said ONCE, with the real denominator from the start
+ * ("0 of 71 company scores updated"): the server gives the count in the decision's answer, before the
+ * job's first round has reported anything.
+ */
+export function RecomputeLine({ job, queued, onCancel, onResume, onDismiss }: { job: Job; queued: number | null; onCancel: () => void; onResume: () => void; onDismiss: () => void }) {
+  const live = job.status === 'running' || job.status === 'cancelling'
+  const total = typeof job.remaining === 'number' ? job.changed + job.remaining : queued
+  const count = total != null ? `${fmt(job.changed)} of ${fmt(Math.max(total, job.changed))} company scores updated` : `${fmt(job.changed)} company scores updated so far`
+  const text = live ? count : job.message
+  return (
+    <div className={styles.recompute} role="status" aria-live="polite" data-testid="recompute-line" data-status={job.status}>
+      {live ? <span className="ui-btn__spin" aria-hidden="true" /> : <Icon name={job.status === 'done' ? 'circle-check' : 'circle-slash'} size={16} />}
+      <span className={styles.recomputeText}>{text}</span>
+      {live ? <Button variant="ghost" onClick={onCancel} disabled={job.status === 'cancelling'}>{job.status === 'cancelling' ? 'Stopping…' : 'Stop'}</Button>
+        : job.resumable ? <Button variant="ghost" onClick={onResume}>Continue</Button> : null}
+      {!live ? <button type="button" className={styles.x} onClick={onDismiss} aria-label="Dismiss this message"><Icon name="x" size={16} /></button> : null}
+    </div>
   )
 }

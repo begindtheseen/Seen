@@ -12,13 +12,12 @@ import { useUrlFilter } from '../../core/place.ts'
 import { useShell } from '../../core/shellContext.ts'
 import { SearchField } from '../../ui/bits.tsx'
 import { List, Row, RowActions } from '../../ui/List.tsx'
-import ResultLine from '../../ui/ResultLine.tsx'
 import { EmptyState } from '../../ui/states.tsx'
 import {
   DECISION_TEXT, RECENT_STATES, STATE_TEXT, label, moderationFor, outcomeTone, patchRows, snippet, when,
   type ModDecision, type ReportRow,
 } from './adapter.ts'
-import { Chips, Choice, CursorRow, KeysHint, Meta } from './parts.tsx'
+import { Chips, Choice, CursorRow, KeysHint, Meta, Line } from './parts.tsx'
 import { useListKeys } from './reviewHooks.tsx'
 import styles from './review.module.css'
 
@@ -72,7 +71,7 @@ export default function RecentPanel({ on, visible }: { on: boolean; visible: boo
       </div>
       <p className={styles.note}>Newest first, every report Seen holds{query ? `, company contains “${query}”` : ''}. Hold sends a live report back to the queue; Restore brings back a rejected one as it was.</p>
       {lastRow && lastState && lastState.status === 'done' ? (
-        <ResultLine state={lastState} onUndo={() => mod.undo(lastRow)} onDismiss={() => { mod.dismiss(lastRow); setLastRow(null) }} />
+        <Line state={lastState} onUndo={() => mod.undo(lastRow)} onDismiss={() => { mod.dismiss(lastRow); setLastRow(null) }} />
       ) : null}
       <List<ReportRow>
         rows={list.rows}
@@ -116,7 +115,7 @@ export default function RecentPanel({ on, visible }: { on: boolean; visible: boo
                     ))}
                   </RowActions>
                 ) : undefined}
-                below={mod.state(r.id).status === 'error' ? <ResultLine state={mod.state(r.id)} onRetry={() => mod.retry(r.id)} onDismiss={() => mod.dismiss(r.id)} /> : undefined}
+                below={mod.state(r.id).status === 'error' ? <Line state={mod.state(r.id)} onRetry={() => mod.retry(r.id)} onDismiss={() => mod.dismiss(r.id)} /> : undefined}
               />
             </CursorRow>
           )

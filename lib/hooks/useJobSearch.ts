@@ -28,13 +28,15 @@ export interface AreaInfo {
   jobsTotal: number
   remoteTotal: number
   label: string
-  kind: 'point' | 'state' | 'county'
+  kind: 'point' | 'state' | 'county' | 'remote'
   radius: number | null
   includeRemote: boolean
   wider: { radius: number; total: number } | null
   complete: boolean
   /** What was typed in the place box for this search. */
   typed: string
+  /** Set when the server read a misspelling as a place ("Tuscon AZ" → Tucson, AZ): what the person typed. */
+  understood?: string | null
   sort: 'nearest' | 'recent'
 }
 // An area search the server could not run as asked: an unknown / foreign / ambiguous place, "near me" with no
@@ -48,6 +50,7 @@ export function areaStatus(a: AreaInfo): string {
   const fmt = (x: number) => x.toLocaleString('en-US')
   // One number per thing: cards are jobs; a job open in several places counts each place as a location.
   const jobs = j < n ? `${fmt(j)} job${j === 1 ? '' : 's'} (${fmt(n)} locations)` : `${fmt(n)} job${n === 1 ? '' : 's'}`
+  if (a.kind === 'remote') return `${fmt(n)} remote job${n === 1 ? '' : 's'} in the US · newest first`
   const where = a.kind !== 'point' ? `in ${a.label}` : `within ${a.radius} mile${a.radius === 1 ? '' : 's'} of ${a.label}`
   if (!n) return `No jobs ${where}`
   const remote = a.includeRemote && a.remoteTotal ? ` · including ${fmt(a.remoteTotal)} remote listing${a.remoteTotal === 1 ? '' : 's'}` : ''
@@ -799,7 +802,7 @@ export function useJobSearch() {
   }
   type AreaResponse = {
     jobs?: unknown[]; total?: number; jobs_total?: number; remote_total?: number; include_remote?: boolean; has_more?: boolean; next_cursor?: string | null
-    area?: { kind: 'point' | 'state' | 'county'; label: string; radius: number | null } | null; wider?: { radius: number; total: number } | null
+    area?: { kind: 'point' | 'state' | 'county' | 'remote'; label: string; radius: number | null } | null; understood?: string; wider?: { radius: number; total: number } | null
     complete?: boolean; pending?: boolean; unplaced?: { reason: string | null; suggestions: string[] }; message?: string; need_title?: boolean
   }
   function showArea(c: CachedSearch) {
@@ -811,7 +814,8 @@ export function useJobSearch() {
     setAreaProblem(c.problem ?? null)
     JobCache.setMany(c.jobs)
     setJobs(c.jobs)
-    setNotice(null)
+    // A misspelling read as a place says so, every time the list is shown.
+    setNotice(c.area?.understood ? `Showing jobs near ${c.area.label} — you typed “${c.area.understood}”.` : null)
     if (c.area) updateDisplayRef.current(c.jobs, sortRef.current)
     else { setFiltered([]); setStatusMsg(c.problem?.message || '') }
     setStatus('done')
@@ -858,7 +862,7 @@ export function useJobSearch() {
         const entry: CachedSearch = d.area
           ? {
               jobs: rows, ts: Date.now(), hasMore: d.has_more === true, pages: 1, notice: null, label: null, cursor: d.next_cursor ?? null, problem: null,
-              area: { total: d.total ?? rows.length, jobsTotal: d.jobs_total ?? d.total ?? rows.length, remoteTotal: d.remote_total ?? 0, label: d.area.label, kind: d.area.kind, radius: d.area.radius, includeRemote: d.include_remote === true, wider: d.wider ?? null, complete: d.complete !== false, typed: loc, sort: sortRef.current === 'recent' ? 'recent' : 'nearest' },
+              area: { total: d.total ?? rows.length, jobsTotal: d.jobs_total ?? d.total ?? rows.length, remoteTotal: d.remote_total ?? 0, label: d.area.label, kind: d.area.kind, radius: d.area.radius, includeRemote: d.include_remote === true, wider: d.wider ?? null, complete: d.complete !== false, typed: loc, understood: d.understood || null, sort: sortRef.current === 'recent' ? 'recent' : 'nearest' },
             }
           : { jobs: [], ts: Date.now(), hasMore: false, pages: 1, notice: null, label: null, cursor: null, area: null,
               problem: { message: d.message || 'That place could not be searched.', suggestions: d.unplaced?.suggestions || [], reason: d.unplaced?.reason ?? null, needTitle: d.need_title === true } }

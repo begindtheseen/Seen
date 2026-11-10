@@ -10,13 +10,12 @@ import type { AdminActivityRow } from '../../contract.ts'
 import { useAdminQuery, useApi } from '../../core/hooks.tsx'
 import type { ItemViewProps } from '../../core/items.tsx'
 import { ItemNotFound } from '../../core/SheetHost.tsx'
-import ResultLine from '../../ui/ResultLine.tsx'
 import { ErrorState, RefreshFailed, Skeleton } from '../../ui/states.tsx'
 import {
   DECISION_TEXT, FLAG_TEXT, GROUP_TEXT, STATE_TEXT, heldWhy, historyText, label, moderationFor, outcomeTone, sourceHref, when,
   type ModDecision, type ReportRow,
 } from './adapter.ts'
-import { Block, Chips, Facts } from './parts.tsx'
+import { Block, Chips, Facts, Line } from './parts.tsx'
 import { useModerate } from './RecentPanel.tsx'
 import styles from './review.module.css'
 
@@ -85,7 +84,7 @@ export default function ReportItem({ kind, id, setTitle, open }: ItemViewProps) 
         ) : <p className={styles.note}>No admin has decided anything about this report yet.</p>}
       </Block>
       {lastDecision ? (
-        <ResultLine state={mod.state(id)} onUndo={() => mod.undo(id)} onRetry={() => mod.retry(id)} onDismiss={() => { mod.dismiss(id); setLastDecision(null) }}
+        <Line state={mod.state(id)} onUndo={() => mod.undo(id)} onRetry={() => mod.retry(id)} onDismiss={() => { mod.dismiss(id); setLastDecision(null) }}
           runningText={DECISION_TEXT[lastDecision].running} />
       ) : null}
       {options.length ? (

@@ -88,3 +88,18 @@
   content: ''; grid-area: 1 / 1; width: 6px; height: 11px; margin-top: -2px; border: solid var(--text-1); border-width: 0 2px 2px 0; transform: rotate(45deg);
 }
 .rowWrap :global(input[type='checkbox']:focus-visible) { outline: none; box-shadow: var(--sh-focus); }
+@media (max-width: 767px) {
+  .hidePhone { display: none !important; }
+  .grow { flex-basis: 160px; }
+  .select { max-width: 152px; }
+}
+
+.recompute { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); min-height: 44px; padding: 0 var(--sp-2) 0 var(--sp-3); border-radius: var(--r-control); border: 1px solid var(--border-1); background: var(--surface-1); font-size: var(--fs-sm); color: var(--text-2); }
+.recompute > svg { color: var(--text-3); }
+.recompute[data-status='done'] > svg { color: var(--good-text); }
+.recomputeText { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
+.recompute :global(.ui-btn) { min-height: 44px; }
+.x { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border: 0; border-radius: var(--r-control); background: transparent; color: var(--text-3); cursor: pointer; }
+.x:hover { color: var(--text-1); background: var(--surface-2); }
+.leftLine { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-2); font-size: var(--fs-sm); color: var(--text-2); }
+.inlineLink { min-height: 44px; padding: 0 var(--sp-1); border: 0; background: transparent; color: var(--accent); font: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }

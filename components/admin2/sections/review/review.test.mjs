@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 import {
   KINDS, parseKind, kindCount, waitingLine, matchesHeldView, heldViewCounts, positiveIds, approvableIds, filterNote,
   pruneSelection, moderationFor, patchRows, sourceHref, when, newRequestId, ticketSummary, signalText, heldHasRules,
-  parseHeldView, label, snippet, outcomeTone, approvePlan, reviewQueues,
+  parseHeldView, label, snippet, outcomeTone, approvePlan, reviewQueues, withKnownDuplicates, rememberDuplicates, nothingToPublishLine, tidyMessage,
 } from './adapter.ts'
 
 const row = (id, group, flags = [], extra = {}) => ({ id, company_name: 'Acme', outcome: group === 'positive' ? 'interview' : 'ghosted', review: { group, flags }, ...extra })
@@ -168,4 +168,22 @@ test('the header sentence adds up exactly what the shell badge adds up (queues w
   ] }
   assert.equal(waitingLine(reviewQueues(ov)), '389 decisions are waiting.')
   assert.deepEqual(reviewQueues(undefined), [])
+})
+
+test('copies stay possible duplicates after their original is published (the server stops flagging them)', () => {
+  const known = new Set()
+  const before = [row('o', 'positive'), row('c', 'positive', ['possible_duplicate'])]
+  assert.equal(rememberDuplicates(before, known), true)
+  // the original is approved; the server now reads the copy as a clean positive
+  const after = [row('c', 'positive')]
+  const seen = withKnownDuplicates(after, known)
+  assert.deepEqual(approvePlan(seen, 'positive').ids, [], 'the bulk button counts only what it will publish')
+  assert.equal(nothingToPublishLine(approvePlan(seen, 'positive')), 'No clear positives left · 1 possible duplicate')
+  assert.equal(withKnownDuplicates(after, new Set()), after)
+})
+
+test('a result sentence never repeats the status word beside it', () => {
+  assert.equal(tidyMessage('Undid it: 140 reports are back in the review queue.'), '140 reports are back in the review queue.')
+  assert.equal(tidyMessage('Approved 140 of 140.'), 'Approved 140 of 140.')
+  assert.equal(tidyMessage('Done: cleared 3.'), 'Cleared 3.')
 })

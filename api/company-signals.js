@@ -17,6 +17,7 @@ import { SEC_PHRASES, fetchEdgarGroup } from '../lib/server/secEdgar.js';
 import { pacificDate } from '../lib/time/pacific.js';
 import { isVercelCron } from '../lib/server/cronAuth.js';
 import { likeLiteral } from '../lib/server/pgrest.js';
+import { withCronRecord } from '../lib/server/cronRecord.js';
 
 const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
 
@@ -29,7 +30,7 @@ function cors(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Admin-Token');
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   cors(req, res);
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -183,3 +184,6 @@ async function ingestSec(req, res, { db, body }) {
     note: 'Only high-confidence company matches inserted; unmatched filings dropped (never mis-attributed).',
   });
 }
+
+// every Vercel cron run is recorded for Admin → System (ok / partial / failed, a short count, duration_ms)
+export default withCronRecord('company-signals', handler);

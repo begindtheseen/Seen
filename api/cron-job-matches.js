@@ -27,7 +27,7 @@
 // résumé. Before migration 20261101120000 the columns do not exist: everyone stays on résumé matches.
 
 import { isVercelCron, hasCronSecret, hasAdminSession } from '../lib/server/cronAuth.js';
-import { findResumeMatches } from '../lib/server/resumeMatches.js';
+import { findResumeMatches, finalizeMatches } from '../lib/server/resumeMatches.js';
 import {
   pickBestMatch, canSendNow, buildJobMatchEmail, jobKey, companyScoreKey, companyVerdict,
 } from '../lib/server/jobMatchEmails.js';
@@ -40,6 +40,7 @@ import { scoreRow } from '../lib/server/jobScore.js';
 import { prefsFromRow, matchAlerts, alertDbTerm, ALERT_NEW_DAYS } from '../lib/server/jobAlerts.js';
 import { matchListing } from '../lib/server/jobKeys.js';
 import { fetchFullPosting } from '../lib/server/fullPosting.js';
+import { withCronRecord } from '../lib/server/cronRecord.js';
 
 const SITE = 'https://seenjobs.io';
 const BUDGET_MS = 240_000;
@@ -150,7 +151,7 @@ export async function confirmFullPostings(rows, keys, { db, deadline, fetchFull 
   return { rows: out, fetched, dropped };
 }
 
-export default function handler(req, res) { return run(req, res, { loadGeo: loadUsPlaces }); }
+function handler(req, res) { return run(req, res, { loadGeo: loadUsPlaces }); }
 
 /** The handler with its geocoder / full-posting reader swapped (tests). */
 export function makeHandler({ loadGeo = loadUsPlaces, fetchFull = fetchFullPosting } = {}) { return (req, res) => run(req, res, { loadGeo, fetchFull }); }
@@ -251,6 +252,7 @@ async function run(req, res, { loadGeo, fetchFull = fetchFullPosting }) {
       let found;
       let city = null;
       let keys = null;
+      let residentText = '';
       if (prefs) {
         if (!prefs.alerts.length) { skip('no_alerts'); continue; }
         if (!geo) { skip('geo_unavailable'); continue; }
@@ -272,6 +274,7 @@ async function run(req, res, { loadGeo, fetchFull = fetchFullPosting }) {
         found = m.ranked;
         city = m.city;
         keys = m.keys;
+        residentText = m.resumeText || '';
       }
       const ranked = found.map((j) => withTenantName(j, tenantNames));
       const dryMatches = dry && !prefs ? ranked.slice(0, 15).map((j) => ({ job_id: j.id, title: j.title, company: j.company, location: j.location, miles: j._miles ?? null, remote: !!j._remote, reason: j._reason, basis: j._basis, summary_only: !!j._summaryOnly })) : null;
@@ -298,10 +301,14 @@ async function run(req, res, { loadGeo, fetchFull = fetchFullPosting }) {
         const open = ranked.filter((j) => j.id && !emailedKeys.has(jobKey(j)) && !emailedIds.has(String(j.id)) && !appliedIds.has(String(j.id)) && !savedIds.has(String(j.id)));
         // A dry run never writes: the reader's store / gone-marking calls answer as if done.
         const readDb = dry ? (path, opts = {}) => ((opts.method || 'GET').toUpperCase() === 'GET' ? q(path, opts) : Promise.resolve(new Response(null, { status: 204 }))) : q;
-        const c = await confirmFullPostings(open, keys, { db: readDb, deadline, fetchFull, want: 6 });
-        confirmed = c.rows;
+        const c = await confirmFullPostings(open, keys, { db: readDb, deadline, fetchFull, want: 8 });
+        // The final yes is the fit check's: its gates on the full posting, and a reason naming what in each
+        // listing the résumé shows (no two the same). Nothing it marks "gate not met" is ever emailed.
+        const f = finalizeMatches(c.rows, residentText, { limit: 6, keys });
+        confirmed = f.rows;
+        for (const d of f.dropped) { c.dropped.push(d); }
         summary.full_posting_reads = (summary.full_posting_reads || 0) + c.fetched;
-        for (const d of c.dropped) summary.skipped[`teaser_${d.why.split(':')[0]}`] = (summary.skipped[`teaser_${d.why.split(':')[0]}`] || 0) + 1;
+        for (const d of c.dropped) { const k = d.why.startsWith('gate:') ? d.why.replace(':', '_') : `teaser_${d.why.split(':')[0]}`; summary.skipped[k] = (summary.skipped[k] || 0) + 1; }
         if (dry && dryMatches) for (const dm of dryMatches) { const d = c.dropped.find((x) => x.id === String(dm.job_id)); if (d) dm.dropped = d.why; }
         if (!confirmed.length) {
           const why = open.length ? 'no_readable_match' : 'no_good_match'; // nothing new vs. nothing readable
@@ -414,3 +421,5 @@ async function run(req, res, { loadGeo, fetchFull = fetchFullPosting }) {
   }
 }
 
+// every Vercel cron run is recorded for Admin → System (ok / partial / failed, a short count, duration_ms)
+export default withCronRecord('cron-job-matches', handler);

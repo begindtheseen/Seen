@@ -26,6 +26,7 @@ import { dueSources, recordSourceSync, seedSources } from '../lib/jobs/sourceReg
 import { SEED_SOURCES } from '../lib/jobs/seedSources.js';
 import { upsertJobs, mapLimit, normalizeCompany } from '../lib/server/jobSources.js';
 import { inUsMarket } from '../lib/jobs/usLocation.js';
+import { withCronRecord } from '../lib/server/cronRecord.js';
 
 // 4,100 active boards / 24 hourly runs ≈ 170; 200 leaves room for the registry to grow.
 export const BOARDS_PER_RUN = Number(process.env.EMPLOYER_BOARDS_PER_RUN || 200);
@@ -121,7 +122,7 @@ function parseBody(req) {
   return b && typeof b === 'object' ? b : {};
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') return send(res, 405, { error: 'Method not allowed' });
   const caller = authorize(req);
   if (!caller) return send(res, 401, { error: 'Unauthorized' });
@@ -153,3 +154,6 @@ export default async function handler(req, res) {
     return send(res, 502, { ok: false, error: String(e.message || e).slice(0, 200) });
   }
 }
+
+// every Vercel cron run is recorded for Admin → System (ok / partial / failed, a short count, duration_ms)
+export default withCronRecord('refresh-employer-boards', handler);

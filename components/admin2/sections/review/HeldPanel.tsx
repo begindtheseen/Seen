@@ -13,24 +13,27 @@ import { useUrlFilter } from '../../core/place.ts'
 import { useShell } from '../../core/shellContext.ts'
 import { SearchField } from '../../ui/bits.tsx'
 import ConfirmStep from '../../ui/ConfirmStep.tsx'
-import { JobProgress } from '../../ui/Job.tsx'
 import { BulkBar, List, Row, RowActions } from '../../ui/List.tsx'
-import ResultLine from '../../ui/ResultLine.tsx'
 import { EmptyState } from '../../ui/states.tsx'
 import {
   FLAG_TEXT, GROUP_TEXT, HELD_VIEWS, MAX_BULK, approvableIds, filterNote, fmt, groupOf, heldHasRules, heldSearchFields,
   heldViewCounts, heldWhy, isDuplicate, label, matchesHeldView, matchesQuery, newRequestId, outcomeTone, parseHeldView,
-  plural, approvePlan, pruneSelection, snippet, when, type HeldRow, type HeldView,
+  plural, approvePlan, pruneSelection, rememberDuplicates, withKnownDuplicates, nothingToPublishLine, snippet, when, type HeldRow, type HeldView,
 } from './adapter.ts'
-import { Chips, Choice, CursorRow, KeysHint, Meta } from './parts.tsx'
+import { Chips, Choice, CursorRow, KeysHint, Line, Meta, RecomputeLine } from './parts.tsx'
 import { useListKeys } from './reviewHooks.tsx'
 import styles from './review.module.css'
 
 const PAGE = 200
+const KNOWN_KEY = 'seen_admin_review_known_dupes_v1'
+const KNOWN_DUPES: Set<string> = (() => {
+  try { return new Set(JSON.parse((typeof window !== 'undefined' && window.sessionStorage.getItem(KNOWN_KEY)) || '[]') as string[]) } catch { return new Set<string>() }
+})()
+function saveKnown() { try { window.sessionStorage.setItem(KNOWN_KEY, JSON.stringify([...KNOWN_DUPES].slice(-20000))) } catch { /* private window: kept for this page only */ } }
 const SORTS = [
-  { value: 'needs_eyes', label: 'Needs your eyes first' },
-  { value: 'newest', label: 'Newest first' },
-  { value: 'oldest', label: 'Oldest first' },
+  { value: 'needs_eyes', label: 'Needs eyes first' },
+  { value: 'newest', label: 'Newest' },
+  { value: 'oldest', label: 'Oldest' },
   { value: 'company', label: 'Company A–Z' },
   { value: 'outcome', label: 'Outcome' },
 ]
@@ -58,8 +61,13 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
   const [lastTarget, setLastTarget] = useState<string | null>(null)
   const [limit, setLimit] = useState(PAGE)
   const pendingCursors = useRef<string[]>([])
+  // The score count the decision's answer gave, so progress reads "0 of 71" before the job's first round.
+  const [recomputeQueued, setRecomputeQueued] = useState<number | null>(null)
 
-  const rows = list.rows
+  // Copies the server stopped flagging once their original went live stay possible duplicates (adapter.ts).
+  const [knownVer, setKnownVer] = useState(0)
+  useEffect(() => { if (rememberDuplicates(list.rows, KNOWN_DUPES)) { saveKnown(); setKnownVer((v) => v + 1) } }, [list.rows])
+  const rows = useMemo(() => withKnownDuplicates(list.rows, KNOWN_DUPES), [list.rows, knownVer]) // eslint-disable-line react-hooks/exhaustive-deps
   const rowsRef = useRef(rows)
   rowsRef.current = rows
   const truncated = !!(list.data as { truncated?: boolean } | undefined)?.truncated
@@ -76,6 +84,9 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
   // must stay put until the answer lands — a second tap then lands on a disabled button, not the list.
   const bulkBusyRef = useRef(false)
   const bulkArgsRef = useRef<Record<string, unknown> | null>(null)
+  // The selection a bulk-bar press acted on: once it lands, every row of it leaves the selection (the ones the
+  // server changed AND the ones held back), while rows ticked meanwhile stay ticked.
+  const snapRef = useRef<Set<string> | null>(null)
   useEffect(() => { if (!bulkBusyRef.current) { setSelected((s) => pruneSelection(s, rows)); setPicked((s) => pruneSelection(s, rows)) } }, [rows])
 
   const recomputeJob = [...allJobs].reverse().find((j) => j.action === 'recompute_queue_drain')
@@ -102,14 +113,18 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
     },
     onSettled: (res, args) => {
       const ids = args.ids as string[]
-      if (args === bulkArgsRef.current) { bulkBusyRef.current = false; bulkArgsRef.current = null }
-      // Only the ids this press sent leave the selection — never a newer selection made meanwhile.
+      const isBulk = args === bulkArgsRef.current
+      if (isBulk) { bulkBusyRef.current = false; bulkArgsRef.current = null }
+      // Only what this press acted on leaves the selection — never a newer selection made meanwhile.
       const sent = new Set(ids)
+      if (isBulk && snapRef.current && res.ok) for (const id of snapRef.current) sent.add(id)
+      if (isBulk) snapRef.current = null
       const drop = (cur: Set<string>) => { if (![...cur].some((id) => sent.has(id))) return cur; const n = new Set(cur); for (const id of sent) n.delete(id); return n }
       if (res.ok) {
         setSelected(drop); setPicked(drop)
         const rc = (res as AdminOk & { recompute?: Recompute }).recompute
         if (rc && (rc.remaining || 0) > 0) {
+          setRecomputeQueued((q) => (recomputeRunning && q ? q + (rc.remaining || 0) : rc.remaining || 0))
           if (recomputeRunning) { if (rc.cursor) pendingCursors.current.push(rc.cursor) } else startRecompute(rc.cursor)
         }
       }
@@ -118,12 +133,12 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
     },
   })
 
-  const run = (decision: 'approve' | 'reject', ids: string[], target: string, extra: Record<string, unknown> = {}) => {
+  const run = (decision: 'approve' | 'reject', ids: string[], target: string, extra: Record<string, unknown> = {}, fromSelection = false) => {
     if (!ids.length) return
     setLastTarget(target)
     if (target !== 'bulk') setLastRow(target)
     const args = { decision, request_id: newRequestId(), ...extra, ids: ids.slice(0, MAX_BULK) }
-    if (target === 'bulk' && !decide.busy('bulk')) { bulkBusyRef.current = true; bulkArgsRef.current = args }
+    if (target === 'bulk' && !decide.busy('bulk')) { bulkBusyRef.current = true; bulkArgsRef.current = args; snapRef.current = fromSelection ? new Set(selected) : null }
     void decide.run(args, target)
   }
   const one = (decision: 'approve' | 'reject', r: HeldRow) => run(decision, [r.id], r.id, decision === 'approve' && isDuplicate(r) ? { include_duplicates: true } : {})
@@ -167,8 +182,8 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
             <SearchField ref={searchRef} value={q} onChange={(v) => { setQ(v); setLimit(PAGE) }} label="Search held reports" placeholder="Search company, role, text" testId="held-search" />
           </div>
           <label className={styles.selectLabel}>
-            Sort
-            <select className={`ui-input ${styles.select}`} value={sort} onChange={(e) => setSort(e.target.value)} data-testid="held-sort">
+            <span className={styles.hidePhone}>Sort</span>
+            <select className={`ui-input ${styles.select}`} aria-label="Sort held reports" value={sort} onChange={(e) => setSort(e.target.value)} data-testid="held-sort">
               {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
           </label>
@@ -182,6 +197,12 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
             <Button variant="primary" icon="check" onClick={() => setConfirmApprove('positive')} disabled={decide.busy('bulk')} data-testid="held-approve-positive">
               Approve all positive ({fmt(positivePlan.ids.length)})
             </Button>
+          ) : null}
+          {!positivePlan.ids.length ? (
+            <p className={styles.leftLine} data-testid="held-nothing-positive">
+              {nothingToPublishLine(positivePlan)}
+              {positivePlan.heldBack.duplicates ? <button type="button" className={styles.inlineLink} onClick={() => setView('duplicates')}>Review the duplicates</button> : null}
+            </p>
           ) : null}
           {confirmApprove === 'positive' ? (
             <ConfirmStep
@@ -203,15 +224,15 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
       ) : null}
 
       <div className={styles.lines}>
-        <ResultLine state={bulkState} onUndo={() => decide.undo('bulk')} onRetry={() => decide.retry('bulk')} onDismiss={() => decide.dismiss('bulk')}
+        <Line state={bulkState} onUndo={() => decide.undo('bulk')} onRetry={() => decide.retry('bulk')} onDismiss={() => decide.dismiss('bulk')}
           runningText={`${bulkState.args?.decision === 'reject' ? 'Rejecting' : 'Approving'} ${plural((bulkState.args?.ids as string[] | undefined)?.length || 0, 'report')}…`} skipLinks={skipLinks} />
         {lastRow && lastRowState && lastRowState.status === 'done' ? (
-          <ResultLine state={lastRowState} onUndo={() => decide.undo(lastRow)} onDismiss={() => { decide.dismiss(lastRow); setLastRow(null) }} skipLinks={skipLinks} />
+          <Line state={lastRowState} onUndo={() => decide.undo(lastRow)} onDismiss={() => { decide.dismiss(lastRow); setLastRow(null) }} skipLinks={skipLinks} />
         ) : null}
-        {recomputeJob ? <JobProgress job={recomputeJob} onCancel={() => jobs.cancel(recomputeJob.id)} onResume={() => jobs.resume(recomputeJob.id)} onDismiss={() => jobs.dismiss(recomputeJob.id)} /> : null}
+        {recomputeJob ? <RecomputeLine job={recomputeJob} queued={recomputeQueued} onCancel={() => jobs.cancel(recomputeJob.id)} onResume={() => jobs.resume(recomputeJob.id)} onDismiss={() => jobs.dismiss(recomputeJob.id)} /> : null}
       </div>
 
-      {rows.length ? (
+      {rows.length && (isFiltered || truncated) ? (
         <p className={styles.note} data-testid="held-note">
           {filterNote(filtered.length, rows.length, { total: list.total, truncated, filtered: isFiltered, noun: 'held reports' })}
         </p>
@@ -261,7 +282,7 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
                   </RowActions>
                 )}
                 below={decide.state(r.id).status === 'error' ? (
-                  <ResultLine state={decide.state(r.id)} onRetry={() => decide.retry(r.id)} onDismiss={() => decide.dismiss(r.id)} />
+                  <Line state={decide.state(r.id)} onRetry={() => decide.retry(r.id)} onDismiss={() => decide.dismiss(r.id)} />
                 ) : undefined}
               />
             </CursorRow>
@@ -285,7 +306,7 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
             confirmLabel={`Publish ${fmt(Math.min(selectionPlan.ids.length, MAX_BULK))}`}
             busy={decide.busy('bulk')}
             onCancel={() => setConfirmApprove(null)}
-            onConfirm={() => { if (selectionPlan.ids.length) run('approve', selectionPlan.ids, 'bulk', selectionPlan.includeDuplicates ? { include_duplicates: true } : {}) }}
+            onConfirm={() => { if (selectionPlan.ids.length) run('approve', selectionPlan.ids, 'bulk', selectionPlan.includeDuplicates ? { include_duplicates: true } : {}, true) }}
           />
         ) : confirmReject ? (
           <ConfirmStep
@@ -295,7 +316,7 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
             confirmLabel={`Reject ${fmt(Math.min(selectedIds.length, MAX_BULK))}`}
             busy={decide.busy('bulk')}
             onCancel={() => setConfirmReject(false)}
-            onConfirm={() => run('reject', selectedIds, 'bulk')}
+            onConfirm={() => run('reject', selectedIds, 'bulk', {}, true)}
           />
         ) : (
           <>
