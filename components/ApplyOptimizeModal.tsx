@@ -33,7 +33,7 @@ import { markQuiet } from '@/lib/quietWindow'
 import { markOptimized } from '@/lib/optimizedJobs'
 import { RequirementsView, Checklist, PlanChanges, CopyBtn, planChangeCount, type Verdict, type RequirementRow, type ConstraintRow, type PaidPlan } from './optimizer/Verdict'
 import FitRead, { type Statement, type FieldMatch, type Answer, type Answers } from './optimizer/FitRead'
-import { PaidResult, BlockedResult, ResultTopLine, PaidOffer, BuildSteps, usePaidVersion, paidExportFields, type Tailored, type Charge, type Blocked, type ChangeCounts, type Question } from './optimizer/PaidResult'
+import { PaidResult, BlockedResult, ResultTopLine, PaidOffer, BuildSteps, usePaidVersion, type AlreadyRight, paidExportFields, type Tailored, type Charge, type Blocked, type ChangeCounts, type Question } from './optimizer/PaidResult'
 import { renderText } from '@/lib/resume/engine-client'
 import PostingInput, { PostingReadRow, type PostingRead } from './jobs/PostingInput'
 import ResumePicker from './resume/ResumePicker'
@@ -662,7 +662,7 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
               {readRow}
               <ResultTopLine charge={result.charge || tailored.charge} charged={!!result.charged} cached={!!result.cached} pro={pro} balance={balance} cost={cost} vis={tailored.visibility || null} />
               <BuildSteps steps={steps} />
-              <PaidResult t={tailored} questions={result.questions || []} v={version} />
+              <PaidResult t={tailored} questions={result.questions || []} v={version} alreadyRight={(result as { already_right?: AlreadyRight | null }).already_right || null} />
               {result.availability && (
                 <section className={s.section} aria-label="Availability line">
                   <h3 className={s.h3}>A line about when you can work</h3>

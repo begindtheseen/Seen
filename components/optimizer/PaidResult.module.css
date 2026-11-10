@@ -74,3 +74,8 @@
 .figure { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--sp-2); margin: 0; }
 .figNum { font-size: var(--fs-xl); font-weight: 600; color: var(--text-1); font-variant-numeric: tabular-nums; line-height: var(--lh-snug); }
 .figCap { font-size: var(--fs-sm); color: var(--text-2); }
+
+/* what is already right — the reassurance block above the changes (good colour with the word and an icon) */
+.already { display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-4); background: var(--surface-1); border: 1px solid var(--good-line); border-radius: var(--r-card); min-width: 0; }
+.alreadyText { display: flex; gap: var(--sp-2); align-items: flex-start; margin: 0; font-size: var(--fs-body); color: var(--text-1); line-height: var(--lh-body); overflow-wrap: anywhere; }
+.alreadyText svg { flex-shrink: 0; margin-top: 4px; color: var(--good-text); }

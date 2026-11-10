@@ -29,6 +29,16 @@ export type ActionState = {
   jobId?: string
   /** No answer yet (timeout / empty / unreadable): the pipeline is asking again with the same request_id. */
   checking?: boolean
+  /** The request_id of this line's Undo press, reused when the Undo is asked again ("Check again"). */
+  undoRid?: string
+}
+
+/** The longest an action or an Undo waits for one answer: a bulk Undo can take ~25–40 s on the server. */
+export const LONG_TIMEOUT_MS = 75_000
+
+/** The server's undo sentence without its own prefix: the line's word already says "Undone". Pure. */
+export function undoSentence(message: string): string {
+  return message.replace(/^\s*(?:undid it|undone)\s*[:—-]\s*/i, '').replace(/^./, (c) => c.toUpperCase())
 }
 
 export type ActionOptions = {
@@ -166,7 +176,11 @@ export function createActionRunner(deps: {
     if (!s || !u || s.undoing) return null
     if (inflight.has(target)) return { ok: false, code: 'busy', error: 'Already working on this — wait for it to finish.', retryable: false }
     inflight.add(target)
-    setState(target, { ...s, undoing: true })
+    // One request_id per Undo press, reused when the same Undo is asked again; the long timeout (a bulk Undo takes
+    // ~25 s on the server), and an unknown answer is CHECKED — never "Undo failed" because the client gave up.
+    const undoRid = s.undoRid || newRequestId()
+    const undoArgs = { ...u.args, request_id: undoRid, round: 1 }
+    setState(target, { ...s, undoing: true, undoRid, error: undefined })
     let res: ApiResult
     let total = 0
     let rounds = 0
@@ -174,7 +188,19 @@ export function createActionRunner(deps: {
     try {
       // A large undo runs in rounds (`complete:false` + `remaining`): call again with the same args until done.
       for (;;) {
-        res = await api(u.action, u.args)
+        res = await api(u.action, { ...undoArgs, round: rounds + 1 }, { timeoutMs: opts.timeoutMs ?? LONG_TIMEOUT_MS })
+        if (!res.ok && isUnknownOutcome(res)) {
+          const roundArgs = { ...undoArgs, round: rounds + 1 }
+          let probe: ApiResult = res
+          for (const ms of delays) {
+            if (probe.ok || !isUnknownOutcome(probe as AdminErr)) break
+            setState(target, { ...s, undoing: true, undoRid, checking: true })
+            await sleep(ms)
+            try { probe = await api(u.action, roundArgs, { timeoutMs: opts.timeoutMs ?? LONG_TIMEOUT_MS }) } catch { /* keep unknown */ }
+          }
+          res = probe.ok || !isUnknownOutcome(probe as AdminErr) ? probe
+            : { ok: false, code: 'unknown_outcome', retryable: true, error: 'Still no answer, so it is not known whether the Undo went through. "Check again" asks once more — it will never undo twice.' }
+        }
         rounds += 1
         if (!res.ok) break
         total += res.changed || 0
@@ -196,7 +222,7 @@ export function createActionRunner(deps: {
         initial: { changed: done, remaining: typeof r.remaining === 'number' ? r.remaining : null, cursor: r.cursor },
       })
       const of = typeof r.total === 'number' ? ` of ${r.total.toLocaleString('en-US')}` : ''
-      setState(target, { status: 'done', target, args: s.args, undone: true, jobId,
+      setState(target, { status: 'done', target, args: s.args, undone: true, jobId, undoRid,
         result: { ...res, changed: done, undo: undefined, message: `Undo is running: ${done.toLocaleString('en-US')}${of} restored so far. It keeps going if you leave this screen — follow it in Jobs.` } })
       return res
     }

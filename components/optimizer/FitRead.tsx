@@ -64,7 +64,7 @@ function StatementRow({ r, answer, answerLine, onAnswer, quoted, dense = false }
       <p className={s.text}>{dense && <><StateMark state={r.state} />{' '}</>}{r.state === 'ask' ? r.question : r.text}{r.preferred && r.state !== 'ask' ? <span className={s.tag}> · preferred</span> : null}</p>
       {r.byYou && (
         <p className={s.said} data-testid="fit-said">
-          <span>{r.state === 'not_shown' ? `You said no to: “${r.text}”` : (r.candidate?.line || r.line) ? `You said this line shows it: “${clip(r.candidate?.line || r.line, 160)}”` : `You said yes to: “${r.text}”`}</span>
+          <span>{r.state === 'not_shown' ? `You said no to: “${r.text}”` : (answerLine || r.candidate?.line) ? `You said “${clip(answerLine || r.candidate?.line || '', 160)}” shows it.` : `You said yes to: “${r.text}”`}</span>
           {onAnswer && <button type="button" className={s.change} onClick={() => onAnswer(r.id, null)}>Change</button>}
         </p>
       )}

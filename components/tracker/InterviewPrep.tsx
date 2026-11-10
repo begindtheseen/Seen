@@ -28,6 +28,8 @@ import { localDay, localTime, isoFrom } from '@/lib/interviewTime'
 // ONE posting text: the cap the server and the fit check use (20,000 characters, lines kept)
 import { PREP_POSTING_MAX } from '@/lib/server/prepPosting.js'
 import s from './InterviewPrep.module.css'
+import { useAuth } from '@/lib/auth'
+import { useConfirmations, type Confirmed } from '@/components/optimizer/useConfirmations'
 
 const SKU = PREP
 const PRICE = PREP_PRICE
@@ -56,7 +58,7 @@ type Pack = {
   answers: Answer[]
   intro: string | null
   resume_check?: { line: string; note: string }[]
-  job_match?: { label: string; status: 'shown' | 'stated' | 'related' | 'gap' | 'expired' | 'in progress'; proof?: string; say: string; duty?: boolean; cert?: boolean; source?: string; basis?: string; story?: string; candidate?: { line: string; why?: string } | null }[]
+  job_match?: { label: string; status: 'shown' | 'stated' | 'related' | 'gap' | 'expired' | 'in progress'; proof?: string; say: string; duty?: boolean; cert?: boolean; source?: string; basis?: string; story?: string; candidate?: { line: string; why?: string } | null; statementId?: string; by?: string }[]
   ask_them?: { q: string; company?: boolean }[]
   format?: string
   guide?: { company: string; confidence: string; framework: { name: string; note: string } | null; tips: string[]; watch: string } | null
@@ -158,6 +160,10 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
   /** Saves the interview date on the application (an interview_scheduled event). */
   onSchedule: (iso: string) => void
 }) {
+  const { user } = useAuth()
+  // the person's Yes / No on a requirement ("Closest line we found") for THIS application: sent with the prep build as
+  // `confirmed` (x-integration contract), stored per user like the fit check's (swept on sign-out)
+  const confirm = useConfirmations(guest ? null : user?.id, `prep-${appId}`)
   const [data, setData] = useState<RecordData | null>(null)
   // Closed until the person opens it; remembered per application for this tab. `lead` (just reached an
   // interview) brings the one-line row into view but never opens it by itself.
@@ -250,12 +256,12 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
   const nextPath = !guest && UUID_RE.test(appId) ? `/tracker?app=${encodeURIComponent(appId)}` : '/tracker'
   const checkout = useCheckout('tracker_prep', { isLoggedIn: !guest, guestHref: () => signupHref({ intent: 'prep', company, next: nextPath }) })
 
-  const build = useCallback(async (opts: { refresh?: boolean; jobText?: string } = {}) => {
+  const build = useCallback(async (opts: { refresh?: boolean; jobText?: string; confirmed?: Confirmed[] } = {}) => {
     setState('building'); setErr('')
     try {
       const h = await aiHeaders()
       const jobText = (opts.jobText ?? postingRef.current).trim().slice(0, PREP_POSTING_MAX)
-      const r = await fetch('/api/interview-prep', { method: 'POST', headers: h, body: JSON.stringify({ action: 'build', company, role, application_id: appId, interview_at: interviewAt, job_id: jobId || '', job_text: jobText, stage, ...(opts.refresh ? { refresh: true } : {}) }) })
+      const r = await fetch('/api/interview-prep', { method: 'POST', headers: h, body: JSON.stringify({ action: 'build', company, role, application_id: appId, interview_at: interviewAt, job_id: jobId || '', job_text: jobText, stage, ...(opts.refresh ? { refresh: true } : {}), ...((opts.confirmed ?? confirm.confirmed).length ? { confirmed: opts.confirmed ?? confirm.confirmed } : {}) }) })
       const d = await r.json().catch(() => ({}))
       if (r.status === 409 && d.need_resume) { setState('need_resume'); return }
       if (r.status === 402) { setState('idle'); setErr('This needs Interview Prep or Pro.'); return }
@@ -269,7 +275,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
     } catch {
       setState('error'); setErr('Network error — check your connection and try again.')
     }
-  }, [appId, company, role, interviewAt, jobId, stage])
+  }, [appId, company, role, interviewAt, jobId, stage, confirm.confirmed])
 
   // Back from Stripe (or Pro already on with a stashed posting): the prep builds with the posting pasted before
   // paying — from the server stash, or this device's copy (round 3: it was lost at checkout).
@@ -410,7 +416,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
 
           {/* PAID — the prep pack */}
           {pack ? (
-            <PackView pack={pack} company={company} fu={fu} onFill={saveFill} onRebuild={(text) => { setPostingBoth(text); void build({ refresh: true, jobText: text }) }} building={state === 'building'} />
+            <PackView pack={pack} company={company} fu={fu} onFill={saveFill} onRebuild={(text) => { setPostingBoth(text); void build({ refresh: true, jobText: text }) }} building={state === 'building'} onConfirm={guest ? undefined : (id, a, line) => { const next = confirm.answer(id, a, line); void build({ refresh: true, confirmed: next }) }} answers={confirm.answers} />
           ) : (
             <div className={s.offer}>
               <div className={s.offerTitle}>Walk in ready for {company}</div>
@@ -577,19 +583,23 @@ function AnswerEditor({ a, company, values, notes, onSave, defaultOpen, title, t
 // "Closest line we found" on a job-match row (shown only when the prep server sends `candidate`): the same Yes / No question
 // as the fit read. The prep API takes no answers yet, so the answer is shown as the person's own words ("You said …") and
 // never as "your résumé shows"; it is not sent anywhere.
-function PrepCandidate({ line, why }: { line: string; why?: string }) {
+function PrepCandidate({ line, why, answer, onAnswer }: { line: string; why?: string; answer?: string; onAnswer?: (a: 'yes' | 'no' | null) => void }) {
+  // with an answer path (`statementId` on the row) the answer is sent to the prep build as `confirmed` and the row shows what
+  // the server returns (`by: 'you'`); a Yes it did not accept leaves the question standing. Without one, the person's
+  // answer is shown as their own words only and sent nowhere.
   const [said, setSaid] = useState<'yes' | 'no' | null>(null)
-  if (said) return <span className={s.why}>{said === 'yes' ? `You said “${line}” shows this.` : `You said “${line}” does not show this.`} <button type="button" className={s.linkBtn} onClick={() => setSaid(null)}>Change</button></span>
+  if (onAnswer && answer === 'no') return <span className={s.why}>Not on your résumé — you said “{line}” does not show this. <button type="button" className={s.linkBtn} onClick={() => onAnswer(null)}>Change</button></span>
+  if (!onAnswer && said) return <span className={s.why}>{said === 'yes' ? `You said “${line}” shows this.` : `You said “${line}” does not show this.`} <button type="button" className={s.linkBtn} onClick={() => setSaid(null)}>Change</button></span>
   return (
     <span className={s.why}>
       Closest line we found: “{line}”. Does this show it?{why ? ` (${why})` : ''}{' '}
-      <button type="button" className={s.linkBtn} onClick={() => setSaid('yes')}>Yes</button>{' '}
-      <button type="button" className={s.linkBtn} onClick={() => setSaid('no')}>No</button>
+      <button type="button" className={s.linkBtn} onClick={() => (onAnswer ? onAnswer('yes') : setSaid('yes'))}>Yes</button>{' '}
+      <button type="button" className={s.linkBtn} onClick={() => (onAnswer ? onAnswer('no') : setSaid('no'))}>No</button>
     </span>
   )
 }
 
-function PackView({ pack, company, fu, onFill, onRebuild, building }: { pack: Pack; company: string; fu: FollowUp | null | undefined; onFill: (q: string, values: string[], urgent?: boolean) => void; onRebuild: (posting: string) => void; building: boolean }) {
+function PackView({ pack, company, fu, onFill, onRebuild, building, onConfirm, answers }: { pack: Pack; company: string; fu: FollowUp | null | undefined; onFill: (q: string, values: string[], urgent?: boolean) => void; onRebuild: (posting: string) => void; building: boolean; onConfirm?: (statementId: string, a: 'yes' | 'no' | null, line?: string) => void; answers?: Record<string, string> }) {
   const intro = pack.intro
   const fills = pack.fills || {}
   const notes = pack.notes || {}
@@ -666,7 +676,8 @@ function PackView({ pack, company, fu, onFill, onRebuild, building }: { pack: Pa
               <li key={i}>
                 <b>{m.label}</b> <span className={s.dim}>· {MATCH_WORD[m.status] || m.status}</span>
                 {m.proof && <span className={s.why}>Your line: “{m.proof}”</span>}
-                {!m.proof && m.candidate?.line && <PrepCandidate line={m.candidate.line} why={m.candidate.why} />}
+                {m.by === 'you' && <span className={s.why}>{m.candidate?.line || m.proof ? `You said this line shows it: “${m.candidate?.line || m.proof}”` : 'You said yes.'}{onConfirm && m.statementId ? <> <button type="button" className={s.linkBtn} onClick={() => onConfirm(m.statementId as string, null)}>Change</button></> : null}</span>}
+                {m.by !== 'you' && !m.proof && m.candidate?.line && <PrepCandidate line={m.candidate.line} why={m.candidate.why} answer={m.statementId ? answers?.[m.statementId] : undefined} onAnswer={onConfirm && m.statementId ? (a) => onConfirm(m.statementId as string, a, m.candidate!.line) : undefined} />}
                 {m.say && <span className={s.why}>{m.say}</span>}
               </li>
             ))}

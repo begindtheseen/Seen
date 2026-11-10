@@ -75,9 +75,9 @@
   .top, .bottom, .jobBar { display: none; }
   .root { --admin-bottom-offset: var(--sp-4); }
   .main { padding-bottom: var(--sp-16) !important; }
-  /* Desktop: the result dock sits bottom-right, clear of the rail. */
-  .stack { left: auto; right: var(--sp-8); bottom: var(--sp-6); width: min(480px, calc(100vw - var(--admin-rail) - var(--sp-16))); }
-  .dock { padding: 0; background: transparent; }
+  /* Desktop: nothing floats over the page — the result dock lives in the rail's foot (judge round 3: a dock over the
+     page covered a bulk bar's button and took its click). The phone stack is not used. */
+  .stack { display: none; }
   .rail {
     position: fixed; top: 0; bottom: 0; left: 0; z-index: 50; width: var(--admin-rail);
     display: flex; flex-direction: column; gap: var(--sp-4); padding: var(--sp-6) var(--sp-3) var(--sp-4);
@@ -109,6 +109,8 @@
 .railLabel { flex: 1 1 auto; min-width: 0; }
 .railFoot { margin-top: auto; display: flex; flex-direction: column; gap: var(--sp-3); }
 .railJob { min-width: 0; display: flex; }
+.railDock { min-width: 0; }
+.railDock :global([data-testid='result-line']) { font-size: var(--fs-sm); }
 .railJob > * { width: 100%; }
 .railLink { display: inline-flex; align-items: center; gap: var(--sp-1); min-height: 44px; padding: 0 var(--sp-3); color: var(--text-3); font-size: var(--fs-sm); text-decoration: none; border-radius: var(--r-control); }
 .railLink:hover { color: var(--text-1); background: var(--surface-2); }

@@ -28,7 +28,7 @@ import dynamic from 'next/dynamic'
 import { PaidPlanView, type Verdict, type ConstraintRow, type PaidPlan } from '@/components/optimizer/Verdict'
 import FitRead, { type FitData, type Answer, type Answers } from '@/components/optimizer/FitRead'
 import { useConfirmations, type Confirmed } from '@/components/optimizer/useConfirmations'
-import { PaidResult, BlockedResult, ResultTopLine, DownloadVersion, usePaidVersion, type Tailored, type Charge, type Blocked, type Question } from '@/components/optimizer/PaidResult'
+import { PaidResult, BlockedResult, ResultTopLine, DownloadVersion, usePaidVersion, type AlreadyRight, type Tailored, type Charge, type Blocked, type Question } from '@/components/optimizer/PaidResult'
 import rs from './resume.module.css'
 import CreditConfirmDialog from '@/components/CreditConfirmDialog'
 import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
@@ -283,7 +283,7 @@ function RewriteView({ out, copy, copied, onRerun, pro }: { out: PaidOptimize; c
   if (tailored) return (
     <div className="ai-stack" data-testid="resume-version">
       <ResultTopLine charge={x.charge || tailored.charge} charged={!!x.charged} cached={!!out.cached} pro={pro} balance={x.balance ?? null} cost={OPTIMIZE_PRICE} vis={tailored.visibility || null} />
-      <PaidResult t={tailored} questions={(x.questions || []) as Question[]} v={version} />
+      <PaidResult t={tailored} questions={(x.questions || []) as Question[]} v={version} alreadyRight={(x as { already_right?: AlreadyRight | null }).already_right || null} />
       <DownloadVersion doc={version.doc} paid={tailored} />
       {out.application_message && (
         <details>

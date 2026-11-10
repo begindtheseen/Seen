@@ -16,7 +16,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Icon from '@/components/ui/Icon'
 import Button from '@/components/ui/Button'
 import DocPage from '@/components/resume/DocPage'
-import { bulletFromAnswer } from '@/lib/resume/engine-client'
+import { composeAnswer } from '@/lib/resume/engine-client'
 import type { ResumeDoc } from '@/lib/resume/types'
 import { applyToggles, isToggleable, defaultOn, promptFor, questionKind, blankLine } from './applyChanges.js'
 import s from './PaidResult.module.css'
@@ -32,7 +32,7 @@ export interface Change {
 }
 export interface Charge { charge: boolean; reason: string; sentence: string | null; headline?: string | null; detail?: string | null }
 export interface Blocked { reason: string; sentence: string; what_would_change_it?: string[]; carries_over?: { requirement: string; line: string }[] }
-export interface Question { id: string; kind: string; question: string; unit?: string; requirement?: string | null; statement?: string | null; answer_kind?: string | null; term?: string; itemId?: string; role?: string; company?: string; template?: string; why?: string; bulletId?: string; line?: string; slot?: string }
+export interface Question { id: string; kind: string; facet?: string; question: string; unit?: string; requirement?: string | null; statement?: string | null; answer_kind?: string | null; term?: string; itemId?: string; role?: string; company?: string; template?: string; why?: string; bulletId?: string; line?: string; slot?: string }
 export interface Tailored { doc: ResumeDoc; text?: string; changes: Change[]; kept_as_is?: string | null; visibility?: { of: number; before: number; after: number }; charge?: Charge; score_before?: number | null; score_after?: number | null; export_token?: string | null; export_key?: string | null }
 export interface ChangeCounts { reorder?: number; summary?: number; skills?: number; rewrites?: number; proposals?: number; questions?: number; availability?: number; formatting?: number }
 
@@ -46,23 +46,27 @@ export function usePaidVersion(t: Tailored | null | undefined, key: string) {
   const store = key ? `seen_paid_v1:${key}` : ''
   const [on, setOn] = useState<Record<string, boolean>>({})
   const [answered, setAnswered] = useState<Answered[]>([])
+  // what the person typed but has not confirmed (kept so a reload or a tab switch loses nothing; never a résumé line
+  // until they confirm the composed line) and the questions they skipped
+  const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const [skipped, setSkipped] = useState<string[]>([])
   const loaded = useRef('')
   useEffect(() => {
     if (!t || loaded.current === store) return
     loaded.current = store
     if (!store) return
-    try { const v = JSON.parse(sessionStorage.getItem(store) || 'null'); if (v) { setOn(v.on || {}); setAnswered(v.answered || []) } else { setOn({}); setAnswered([]) } } catch { /* storage unavailable */ }
+    try { const v = JSON.parse(sessionStorage.getItem(store) || 'null'); if (v) { setOn(v.on || {}); setAnswered(v.answered || []); setDrafts(v.drafts || {}); setSkipped(v.skipped || []) } else { setOn({}); setAnswered([]); setDrafts({}); setSkipped([]) } } catch { /* storage unavailable */ }
   }, [t, store])
   useEffect(() => {
     if (!t || !store || loaded.current !== store) return
-    try { sessionStorage.setItem(store, JSON.stringify({ on, answered })) } catch { /* storage unavailable */ }
-  }, [t, store, on, answered])
+    try { sessionStorage.setItem(store, JSON.stringify({ on, answered, drafts, skipped })) } catch { /* storage unavailable */ }
+  }, [t, store, on, answered, drafts, skipped])
   const applied = useMemo(() => (t && t.doc ? applyToggles(t.doc, t.changes || [], on, answered) : null), [t, on, answered])
   return {
     doc: (applied?.doc || null) as ResumeDoc | null,
     marks: applied?.marks || { summary: null, bullets: {}, skills: {}, certs: {} },
     stuck: applied?.stuck || [],
-    on, setOn, answered, setAnswered,
+    on, setOn, answered, setAnswered, drafts, setDrafts, skipped, setSkipped,
     isOn: (c: Change) => on[c.id] ?? defaultOn(c),
   }
 }
@@ -92,6 +96,8 @@ export function formatLines(items: FormatItem[]): { text: string; warn?: boolean
   const restyled = of('line_restyled').filter((x) => arr(x.before)[0]).length
   if (restyled) out.push({ text: `${restyled === 1 ? 'One line keeps' : `${restyled} lines keep`} the same words with the separators applicant systems read (“|” between title, employer and dates).` })
   for (const x of of('line_restyled').filter((y) => !arr(y.before)[0])) out.push({ text: `“${bare(arr(x.after)[0])}” now sits on a line of its own.` })
+  const recased = of('line_recased')
+  if (recased.length) out.push({ text: `${recased.length === 1 ? 'One line now starts' : `${recased.length} lines now start`} with a capital letter: “${bare(arr(recased[0].after)[0])}”${recased.length > 1 ? ' and others like it' : ''}.` })
   for (const x of of('unplaced')) out.push({ text: `“${bare(x.line)}” could not be placed — check where it sits before you send.`, warn: true })
   return out
 }
@@ -145,20 +151,28 @@ function ChangeCard({ c, v, stuck, readOnly = false }: { c: Change; v: PaidVersi
   )
 }
 
-const KIND_OF_Q: Record<string, string> = { number: 'A number for one of your lines', tool: 'A tool they name', credential: 'A credential they ask for', duty: 'Work they ask for' }
+const KIND_OF_Q: Record<string, string> = { detail: 'A detail only you know', number: 'A number for one of your lines', tool: 'A tool they name', credential: 'A credential they ask for', duty: 'Work they ask for' }
+// The person's words are kept as they type (on every change — a pause, a tab switch or a reload loses nothing) but they
+// become a résumé line ONLY when the person confirms the composed line ("Add this line"). Skip puts the question away.
 function QuestionCard({ qn, v }: { qn: Question; v: PaidVersion }) {
   const kind = questionKind(qn)
   const prompt = promptFor(qn)
   const existing = v.answered.find((a) => a.id === qn.id)
-  const [answer, setAnswer] = useState('')
-  // a number added to the END of a line needs what it counts too ("…WMS (Manhattan), 25." says nothing)
+  const answer = v.drafts[qn.id] || ''
+  const setAnswer = (t: string) => v.setDrafts((d) => ({ ...d, [qn.id]: t }))
   // a line with two blanks ("Do [number] cycle counts [a shift / a week]") needs the number AND how often
   const slots = (String(qn.template || '').match(/\[[^\]]+\]/g) || []).length
-  const bare = kind === 'number' && (qn.slot !== 'insert' || slots > 1) && answer.trim().split(/\s+/).length < 2
-  const line = answer.trim() && !bare ? bulletFromAnswer(prompt as Parameters<typeof bulletFromAnswer>[0], answer) : ''
-  const add = () => { if (!line) return; v.setAnswered((xs) => [...xs.filter((x) => x.id !== qn.id), { id: qn.id, itemId: qn.itemId, bulletId: qn.bulletId, kind: qn.kind, answerKind: prompt.answerKind, line }]) }
+  const composed = answer.trim() ? composeAnswer(prompt as Record<string, unknown>, answer) : { line: '', problem: null as string | null }
+  const line = composed.line
+  const add = () => { if (!line) return; v.setAnswered((xs) => [...xs.filter((x) => x.id !== qn.id), { id: qn.id, itemId: qn.itemId, bulletId: qn.bulletId, kind: qn.kind === 'detail' ? 'gap' : qn.kind, answerKind: prompt.answerKind, line }]) }
   const remove = () => v.setAnswered((xs) => xs.filter((x) => x.id !== qn.id))
   const where = qn.role ? `${qn.role}${qn.company ? ` · ${qn.company}` : ''}` : ''
+  if (v.skipped.includes(qn.id)) return (
+    <li id={`chg-q:${qn.id}`} className={s.card} data-testid="question-card" data-kind={kind} data-skipped="1">
+      <p className={s.why}>Skipped: {qn.question}</p>
+      <div><button type="button" className={s.toggle} onClick={() => v.setSkipped((xs) => xs.filter((x) => x !== qn.id))}>Answer it after all</button></div>
+    </li>
+  )
   return (
     <li id={`chg-q:${qn.id}`} className={s.card} data-testid="question-card" data-kind={kind} data-slot={qn.slot || undefined}>
       <p className={s.kind}>{KIND_OF_Q[kind]}</p>
@@ -175,26 +189,40 @@ function QuestionCard({ qn, v }: { qn: Question; v: PaidVersion }) {
             {qn.question}
             {kind === 'credential' ? null : (
               <input autoComplete="off" className={s.input} value={answer} maxLength={kind === 'number' ? 60 : 160}
-                // a number slot inside the line ("Do ___ cycle counts") takes digits; a number added to the end of a line
-                // takes the number AND what it counts ("about 150 orders a shift")
                 inputMode={kind === 'number' && qn.slot === 'insert' && slots < 2 ? 'decimal' : 'text'}
-                placeholder={kind === 'number' ? (qn.slot === 'insert' ? (slots > 1 ? 'The number, and how often' : 'The number') : 'The number and what it counts') : kind === 'tool' ? 'Where you used it, and for what' : 'What you did, in your words'}
+                placeholder={kind === 'number' ? (qn.slot === 'insert' ? (slots > 1 ? 'The number, and how often' : 'The number') : 'The number and what it counts') : kind === 'tool' ? 'Where you used it, and for what' : 'In your own words'}
                 onChange={(e) => setAnswer(e.target.value)} data-testid="question-input" />
             )}
           </label>
+          {qn.statement && kind === 'detail' && <p className={s.why}>From the posting: “{q(qn.statement, 200)}”</p>}
           {kind === 'number' && qn.template && <p className={s.why}>Your line becomes: “{line || blankLine(qn.template)}”</p>}
-          {kind !== 'number' && kind !== 'credential' && line && <p className={s.after}>“{line}”</p>}
-          {kind !== 'number' && kind !== 'credential' && answer.trim() && !line && <p className={s.why}>Start with what you did (“Ran…”, “Used…”), in a few words.</p>}
-          {kind === 'number' && answer.trim() && !line && <p className={s.why}>{slots > 1 ? 'Give the number and how often — both blanks in the line.' : qn.slot === 'insert' ? 'Type the number itself (digits).' : bare ? 'Add what the number counts, so the line still reads as a sentence.' : 'Include the number itself, in digits.'}</p>}
-          {qn.why && <p className={s.why}>{qn.why}</p>}
+          {kind !== 'number' && kind !== 'credential' && line && <p className={s.after} data-testid="question-line">Your line would read: “{line}”</p>}
+          {answer.trim() && !line && <p className={s.why}>{composed.problem || (kind === 'number' ? 'Include the number itself, in digits.' : 'Start with what you did, in a few words.')}</p>}
+          {qn.why && kind !== 'detail' && <p className={s.why}>{qn.why}</p>}
           <div className={s.qActions}>
             {kind === 'credential'
-              ? <button type="button" className={s.toggle} onClick={() => { const l = bulletFromAnswer(prompt as Parameters<typeof bulletFromAnswer>[0], 'yes'); if (l) v.setAnswered((xs) => [...xs, { id: qn.id, kind: qn.kind, answerKind: 'credential', line: l }]) }} data-testid="question-yes">Yes, I hold it — add it</button>
+              ? <button type="button" className={s.toggle} onClick={() => { const l = composeAnswer(prompt as Record<string, unknown>, 'yes').line; if (l) v.setAnswered((xs) => [...xs, { id: qn.id, kind: qn.kind, answerKind: 'credential', line: l }]) }} data-testid="question-yes">Yes, I hold it — add it</button>
               : <button type="button" className={s.toggle} disabled={!line} onClick={add} data-testid="question-add">Add this line</button>}
+            <button type="button" className={s.toggle} onClick={() => v.setSkipped((xs) => [...xs.filter((x) => x !== qn.id), qn.id])} data-testid="question-skip">Skip</button>
           </div>
         </>
       )}
     </li>
+  )
+}
+
+/** What the first lines already show — the reassurance a strong fit paid for (paid.js `already_right`). */
+export interface AlreadyRight { count?: number; of?: number; sentence?: string; items?: { statementId?: string; statement: string; line: string }[] }
+export function AlreadyRightBlock({ a }: { a?: AlreadyRight | null }) {
+  if (!a || !a.sentence) return null
+  const items = (a.items || []).slice(0, 3)
+  return (
+    <section className={s.already} data-testid="already-right" aria-label="What is already right">
+      <p className={s.alreadyText}><Icon name="circle-check" size={16} label="Already right" />{a.sentence.replace(/^Already right:\s*/i, '')}</p>
+      {items.length > 0 && (
+        <ul className={s.plain}>{items.map((x, i) => <li key={i}><b>{q(x.statement, 90)}</b> — your line “{q(x.line, 110)}”</li>)}</ul>
+      )}
+    </section>
   )
 }
 
@@ -233,12 +261,13 @@ export function ResultTopLine({ charge, charged, cached, pro, balance, cost, vis
         : charge?.headline
         ? <><p className={`${s.bought} ${s.headline}`} data-testid="result-headline">{charge.headline}</p>{charge.detail && <p className={s.why}>{charge.detail}</p>}</>
         : charge?.sentence && <p className={s.bought}>{charge.sentence}</p>}
-      <p className={s.truth}><Icon name={charged && !cached ? 'circle-dollar-sign' : 'circle-check'} size={16} />{truth}</p>
+      {/* the server's free headline already says "No credit used — …": the truth line is not printed twice */}
+      {!(truth === 'No credit used' && /\bno credit (?:is |was )?used\b/i.test(String(charge?.headline || ''))) && <p className={s.truth}><Icon name={charged && !cached ? 'circle-dollar-sign' : 'circle-check'} size={16} />{truth}</p>}
     </div>
   )
 }
 
-export function PaidResult({ t, questions, v, defaultView }: { t: Tailored; questions: Question[]; v: PaidVersion; defaultView?: 'changes' | 'document' }) {
+export function PaidResult({ t, questions, v, defaultView, alreadyRight }: { t: Tailored; questions: Question[]; v: PaidVersion; defaultView?: 'changes' | 'document'; alreadyRight?: AlreadyRight | null }) {
   const [view, setView] = useState<'changes' | 'document'>(defaultView || 'changes')
   useEffect(() => { if (!defaultView && typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches) setView('document') }, [defaultView])
   const openChange = (id: string) => {
@@ -248,6 +277,7 @@ export function PaidResult({ t, questions, v, defaultView }: { t: Tailored; ques
   const n = (t.changes || []).filter((c) => c.type !== 'format' && c.type !== 'heading').length
   return (
     <div className={s.result}>
+      <AlreadyRightBlock a={alreadyRight} />
       <div className={s.switch} role="group" aria-label="View">
         <button type="button" className={s.seg} aria-pressed={view === 'changes'} onClick={() => setView('changes')} data-testid="view-changes">Changes{n ? ` (${n})` : ''}</button>
         <button type="button" className={s.seg} aria-pressed={view === 'document'} onClick={() => setView('document')} data-testid="view-document">Your résumé</button>

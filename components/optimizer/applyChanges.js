@@ -143,7 +143,7 @@ export function promptFor(q) {
 /**
  * What kind of field a question gets. A number question shows a numeric field and the exact line it will
  * complete; a tool / duty / credential question shows a text field worded for what it is.
-  * @returns {'detail'|'number'|'credential'|'tool'|'duty'}
+ * @returns {'detail'|'number'|'credential'|'tool'|'duty'}
  */
 export function questionKind(q) {
   // a detail question (paid.js detailQuestions: open as well as close, ticket times, how often you count) asks for the

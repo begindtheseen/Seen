@@ -22,7 +22,7 @@ export type AdminShellProps = {
   jobChip?: ReactNode
   /** Phone: the same job, as a one-line bar above the bottom bar. */
   jobBar?: ReactNode
-  /** The last action's result (the result dock): above the job bar on a phone, bottom-right on a desktop. */
+  /** The last action's result (the result dock): above the job bar on a phone; in the rail on a desktop, where it can never cover a control. */
   dock?: ReactNode
   onSearch: () => void
   onMore: () => void
@@ -88,6 +88,7 @@ export default function AdminShell({ sections, active, onSelect, badges, jobChip
           ))}
         </div>
         <div className={styles.railFoot}>
+          {dock ? <div className={styles.railDock} data-testid="result-dock"><div className={styles.dockCard}>{dock}</div></div> : null}
           {jobChip ? <div className={styles.railJob}>{jobChip}</div> : null}
           <a href="/admin/legacy" className={styles.railLink}>Legacy admin<Icon name="arrow-up-right" size={14} /></a>
           <div className={styles.who}>

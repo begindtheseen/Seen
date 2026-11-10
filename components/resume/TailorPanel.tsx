@@ -378,7 +378,7 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
               <span className={s.secTitle}>Summary · for this posting</span>
               <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text)', lineHeight: 1.6, margin: '.5rem 0' }}>{finalVariant.basics.summary || plan.summary.text}</p>
               {plan.summary.replaced && <div className={s.diff} style={{ marginBottom: '.5rem' }}><span className={s.muted}>Replaces: </span><span className={s.del}>{plan.summary.replaced}</span></div>}
-              <label className={s.dim} style={{ display: 'flex', gap: '.5rem', alignItems: 'center', cursor: 'pointer' }}><input type="checkbox" checked={summaryOn} onChange={(e) => setOverrides((o) => ({ ...o, summary: e.target.checked }))} />Use this summary</label>
+              <label className={s.dim} style={{ display: 'flex', gap: 'var(--sp-1)', alignItems: 'center', cursor: 'pointer', minHeight: 44 }}><span className={s.check44}><input type="checkbox" checked={summaryOn} onChange={(e) => setOverrides((o) => ({ ...o, summary: e.target.checked }))} /><span className={s.checkBox} aria-hidden="true" /></span>Use this summary</label>
             </div>
           )}
 
@@ -391,7 +391,7 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
                 </div>
               )}
               <p className={s.dim} style={{ margin: '.25rem 0 .5rem' }}>{plan.skills.added.length ? 'Each term is already written in your résumé — listing it under Skills makes keyword scans find it.' : ''}{plan.skills.reordered ? ' The skills this posting asks for lead each list.' : ''}</p>
-              <label className={s.dim} style={{ display: 'flex', gap: '.5rem', alignItems: 'center', cursor: 'pointer' }}><input type="checkbox" checked={overrides.skills !== false} onChange={(e) => setOverrides((o) => ({ ...o, skills: e.target.checked }))} />Apply these skills edits</label>
+              <label className={s.dim} style={{ display: 'flex', gap: 'var(--sp-1)', alignItems: 'center', cursor: 'pointer', minHeight: 44 }}><span className={s.check44}><input type="checkbox" checked={overrides.skills !== false} onChange={(e) => setOverrides((o) => ({ ...o, skills: e.target.checked }))} /><span className={s.checkBox} aria-hidden="true" /></span>Apply these skills edits</label>
             </div>
           )}
 
