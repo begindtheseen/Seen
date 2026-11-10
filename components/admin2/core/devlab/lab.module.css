@@ -1,0 +1,10 @@
+.toolbar { display: flex; flex-direction: column; gap: var(--sp-3); margin-bottom: var(--sp-4); }
+.actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-bottom: var(--sp-4); }
+.actions :global(.ui-btn) { min-height: 44px; }
+.actions > [data-testid='confirm-step'] { flex: 1 1 100%; }
+.job { margin: var(--sp-3) 0; }
+.list { margin-top: var(--sp-4); }
+.item { display: flex; flex-direction: column; gap: var(--sp-4); }
+.itemText { font-size: var(--fs-body); color: var(--text-1); line-height: var(--lh-body); }
+.itemActions { display: flex; gap: var(--sp-2); }
+.itemActions :global(.ui-btn), .item :global(.ui-btn) { min-height: 44px; }

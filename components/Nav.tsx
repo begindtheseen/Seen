@@ -231,7 +231,7 @@ export default function Nav() {
   }
 
   // The employer portal has its own employer-first chrome — never show the job-seeker nav there.
-  if (pathname?.startsWith('/employers')) return null
+  if (pathname?.startsWith('/employers') || pathname?.startsWith('/admin')) return null
 
   // ── Nav information architecture (9→5 primary; every destination still reachable) ──
   // Primary desktop links change with auth state; secondary destinations relocate to the

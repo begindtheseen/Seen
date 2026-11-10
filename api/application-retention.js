@@ -7,6 +7,7 @@
 import { purgeDecidedApplications } from '../lib/server/applicationRetention.js';
 import { lifecycleAvailable, deleteResumeObjects } from '../lib/server/seenApplyStore.js';
 import { isVercelCron, hasCronSecret, hasAdminSession } from '../lib/server/cronAuth.js';
+import { recordCronRun } from '../lib/server/cronRun.js';
 
 export default async function handler(req, res) {
   // Vercel's cron (GET + its CRON_SECRET bearer), a manual run with the secret, or an admin POST.
@@ -31,5 +32,6 @@ export default async function handler(req, res) {
     if (r.scanned < 200 || !r.cleared) break;
   }
   if (total.fileErrors) console.warn('[application-retention] résumé file deletes failed:', total.fileErrors);
+  if (isVercelCron(req)) await recordCronRun('application-retention', 'ok', total);
   return res.status(200).json({ ok: true, ...total });
 }

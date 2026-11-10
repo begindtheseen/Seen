@@ -18,6 +18,7 @@
 
 import { dueMilestone, buildEmail, unsubToken, trackerAppUrl } from '../lib/server/outcomeEmails.js';
 import { isVercelCron } from '../lib/server/cronAuth.js';
+import { recordCronRun } from '../lib/server/cronRun.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
@@ -43,7 +44,10 @@ export default async function handler(req, res) {
   // Oldest first so Day-30 applications win the per-run send budget over fresher Day-7 ones.
   // The column is company_name (api/user-sync.js writes it); selecting `company` 400'd every run.
   const r = await q(`applications?select=id,user_id,company_name,role,status,applied_at,created_at&created_at=lt.${encodeURIComponent(cutoff)}&order=created_at.asc&limit=1000`);
-  if (!r.ok) return res.status(200).json({ ok: false, reason: 'query_failed', sent: 0 });
+  if (!r.ok) {
+    if (isCron) await recordCronRun('outcome-followups', 'failed', `query failed (HTTP ${r.status})`);
+    return res.status(200).json({ ok: false, reason: 'query_failed', sent: 0 });
+  }
   const apps = (await r.json()).map((a) => ({ ...a, company: a.company_name }));
 
   const optRes = await q('email_prefs?select=user_id&outcome_opt_out=eq.true&limit=10000');
@@ -108,5 +112,6 @@ export default async function handler(req, res) {
     }
   }
 
+  if (isCron) await recordCronRun('outcome-followups', 'ok', `sent ${sent} of ${(apps || []).length} candidates`);
   return res.status(200).json({ ok: true, sent, skipped, candidates: (apps || []).length, byMilestone });
 }

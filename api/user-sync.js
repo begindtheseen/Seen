@@ -16,6 +16,7 @@ import { cancelLiveSubscriptions } from '../lib/server/stripeCancel.js';
 import { normalizeClaimCompany } from '../lib/server/employerClaims.js';
 import { buildNotificationRow } from '../lib/server/employerNotificationsStore.js';
 import { isReadableResume } from '../lib/server/resumeReadability.js';
+import { rebuildJobKeys } from '../lib/server/jobKeys.js';
 import { RESUME_ACTIONS, RESUME_WRITE_ACTIONS, handleResumeAction, saveDefaultResume, clearDefaultResume } from '../lib/server/resumes.js';
 import { deleteApplicantResumes } from '../lib/server/seenApplyStore.js';
 import { decodeThread } from '../lib/server/applicationThread.js';
@@ -347,6 +348,7 @@ export default async function handler(req, res) {
       const rr = await rewardReferralOnApplication(db, uid).catch(() => null);
       if (rr && rr.rewarded) reward = { kind: 'referral', days: rr.days, pro_until: rr.pro_until };
     }
+    if (data?.[0]?.id) await rebuildJobKeys(db, uid); // recent applications feed the matched-jobs keys
     return res.status(200).json({ id: data?.[0]?.id || null, updated_at: data?.[0]?.updated_at || null, ...(reward ? { reward } : {}) });
   }
 
@@ -366,6 +368,7 @@ export default async function handler(req, res) {
     }
     const gone = await r.json().catch(() => []);
     if (!Array.isArray(gone) || gone.length === 0) return res.status(404).json({ ok: false, reason: 'not_found' });
+    await rebuildJobKeys(db, uid); // recent applications feed the matched-jobs keys
     return res.status(200).json({ ok: true });
   }
 
@@ -549,6 +552,7 @@ export default async function handler(req, res) {
       const errText = await r.text().catch(() => '');
       console.error('save_resume failed:', r.status, errText);
     }
+    if (r.ok) await rebuildJobKeys(db, uid); // matched-jobs keys follow the résumé (lib/server/jobKeys.js)
     return res.status(r.ok ? 200 : 400).json({ ok: r.ok });
   }
 
@@ -562,6 +566,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({ resume_text: null, resume_file_name: null, resume_word_count: null }),
       headers: { Prefer: 'return=minimal' },
     });
+    await rebuildJobKeys(db, uid); // no résumé → keys cleared
     return res.status(200).json({ ok: true });
   }
 

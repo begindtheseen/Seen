@@ -35,9 +35,14 @@ function installFetch(role) {
     }
     // The ephemeral-delete path reads the report's client snapshot to recover the apply_url it
     // suppresses. Return a snapshot row for that specific GET.
-    if (u.includes('/job_availability_reports?job_id=eq') && u.includes('select=apply_url') && method === 'GET') {
-      return mockResponse([{ apply_url: 'https://example.com/job/123', title: 'Warehouse Associate', company: 'Aerotek' }]);
+    if (u.includes('/job_availability_reports?job_id=eq') && method === 'GET') {
+      return mockResponse([{ id: 'r1', job_id: 'x', apply_url: 'https://example.com/job/123', title: 'Warehouse Associate', company: 'Aerotek' }]);
     }
+    // Writes are counted from the rows they return (admin remake, 2026-11-10), so the fake answers like
+    // PostgREST does with return=representation: the job row it read, and the rows each write changed.
+    if (u.includes('/jobs?id=eq') && method === 'GET') return mockResponse([{ apply_url: 'https://example.com/job/9', title: 'Picker', company: 'Acme', availability_status: 'active', expires_at: '2099-01-01T00:00:00Z' }]);
+    if (u.includes('/jobs?id=eq') && method === 'PATCH') return mockResponse([{ id: UUID }]);
+    if (u.includes('/job_availability_reports?job_id=eq') && method === 'DELETE') return mockResponse([{ id: 'r1' }]);
     return mockResponse(null, { ok: true, status: 204 });
   };
   return calls;

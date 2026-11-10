@@ -80,8 +80,9 @@ export default async function handler(req, res) {
   const parsed = readable
     ? buildJobInsights({ title: job, company, description: jobDescription, needsSummary: true, taxonomy: await loadSkillTaxonomy().catch(() => null) })
     : null;
+  // the message names what THIS posting does and does not state (lib/server/jobInsights.js postingNote)
   const unreadBody = (p) => ({ ...p, what_they_want: [], _src: 'unread', cost: 0, charged: false,
-    message: "This listing doesn't state what it requires, so there is nothing to analyze — no credit used. If the employer's site has the full posting, paste it to analyze that." });
+    message: `${p.posting_note || "This listing doesn't state what it requires."} No credit used — if the employer's site has the full posting, paste it to analyze that.` });
 
   if (cacheKey && SUPABASE_URL && SUPABASE_SERVICE_KEY) {
     try {

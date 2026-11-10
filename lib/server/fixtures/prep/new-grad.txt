@@ -1,0 +1,19 @@
+Priya Raman
+Austin, TX | priya.raman@example.com
+
+EDUCATION
+The University of Texas at Austin — B.S. Statistics and Data Science, May 2026
+Relevant coursework: Regression Analysis, Machine Learning, Database Systems
+
+EXPERIENCE
+Data Analyst Intern — Lone Star Credit Union, Austin, TX    Jun 2025 – Aug 2025
+• Built a Tableau dashboard tracking loan delinquency for 14 branches, used in the weekly risk meeting
+• Wrote SQL queries to clean 2.3M member transaction records for a churn analysis
+• Presented churn findings to the VP of Member Experience
+
+Research Assistant — UT Department of Statistics, Austin, TX    Sep 2024 – May 2026
+• Cleaned and analyzed survey data from 3,000 respondents in R
+• Co-wrote a methods section for a paper on survey nonresponse
+
+SKILLS
+SQL, Python (pandas), R, Tableau, Excel

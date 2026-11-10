@@ -1,0 +1,28 @@
+/* Today — calm and exact: four numbers, the queues, one line about the scheduled jobs. */
+.today { display: flex; flex-direction: column; min-width: 0; }
+.h2 { margin: var(--sp-8) 0 var(--sp-3); font-size: var(--fs-meta); font-weight: 600; letter-spacing: var(--ls-meta); text-transform: uppercase; color: var(--text-3); }
+.queues { display: flex; flex-direction: column; gap: var(--sp-2); }
+.calm { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-body); color: var(--text-2); }
+.calm > svg { color: var(--good-text); }
+.quiet { margin-top: var(--sp-3); font-size: var(--fs-sm); color: var(--text-3); line-height: var(--lh-body); }
+
+.degraded { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-4); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-control); background: var(--caution-tint); border: 1px solid var(--caution-line); font-size: var(--fs-sm); color: var(--text-2); line-height: var(--lh-ui); }
+.degraded > svg { flex: none; color: var(--caution-text); }
+.degraded > span { flex: 1 1 220px; min-width: 0; }
+.inlineLink { min-height: 44px; padding: 0 var(--sp-2); border: 0; background: transparent; color: var(--accent); font: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+
+.system {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); width: 100%; min-height: 56px; padding: var(--sp-2) var(--sp-3) var(--sp-2) var(--sp-4);
+  border-radius: var(--r-control); border: 1px solid var(--border-1); background: var(--surface-1); color: var(--text-1);
+  font: inherit; font-size: var(--fs-sm); text-align: left; cursor: pointer;
+}
+.system:hover { border-color: var(--border-2); background: var(--surface-2); }
+.system:focus-visible { outline: none; box-shadow: var(--sh-focus); }
+.sysWord { flex: none; display: inline-flex; align-items: center; gap: var(--sp-1); font-weight: 600; }
+.sysGood .sysWord { color: var(--good-text); }
+.sysBad { border-color: var(--bad-line); background: var(--bad-tint); }
+.sysBad .sysWord { color: var(--bad-text); }
+.sysUnknown .sysWord { color: var(--text-3); }
+.sysLine { flex: 1 1 220px; min-width: 0; display: flex; flex-direction: column; gap: 2px; color: var(--text-2); overflow-wrap: anywhere; }
+.sysDetail { color: var(--text-3); }
+.sysChevron { flex: none; color: var(--text-4); }

@@ -24,7 +24,8 @@ ${title} — Ralphs | 2020 – 2022
 EDUCATION
 High School Diploma — Norwalk High School`;
 const FUTURE = new Date(Date.now() + 86_400_000).toISOString();
-const listing = (id, title, company, extra = {}) => ({ id, title, company, location: 'Norwalk, CA', salary: '$18/hr', apply_url: `https://apply.example/${id}`, description: 'register, customer service', type: 'Full-time', level: 'Entry level', source: 'Seen', score: 60, waste_score: 20, expires_at: FUTURE, lat: null, lng: null, ats_tenant: null, created_at: '2026-10-23T00:00:00Z', ...extra });
+const FULL_TEXT = `${'Run the register, greet guests, keep the front end moving and the store clean. '.repeat(10)}\nRequirements\n• No experience required — we train.`;
+const listing = (id, title, company, extra = {}) => ({ id, title, company, location: 'Norwalk, CA', salary: '$18/hr', apply_url: `https://apply.example/${id}`, description: FULL_TEXT, type: 'Full-time', level: 'Entry level', source: 'Seen', score: 60, waste_score: 20, expires_at: FUTURE, lat: null, lng: null, ats_tenant: null, created_at: '2026-10-23T00:00:00Z', ...extra });
 
 let st;
 beforeEach(() => {
@@ -60,6 +61,8 @@ globalThis.fetch = async (url, opts = {}) => {
     return json([...st.log].sort((a, b) => (a.sent_at < b.sent_at ? 1 : -1)));
   }
   if (table === 'profiles') {
+    if (method === 'PATCH') { st.keyWrites = (st.keyWrites || 0) + 1; return new Response('', { status: 204 }); }
+    if (path.includes('select=job_keys&limit=1')) return json([{ job_keys: null }]);
     if (path.includes('resume_text=not.is.null')) return json(st.resume ? [{ id: UID }] : []);
     return json([{ resume_text: st.resume, resume_updated_at: st.resumeUpdatedAt, city: st.city }]);
   }
@@ -67,7 +70,7 @@ globalThis.fetch = async (url, opts = {}) => {
     if (path.includes('job_match_mode=eq.alerts')) return st.alertColumns ? json(st.alertPrefs) : json({ code: '42703', message: 'column email_prefs.job_match_mode does not exist' }, 400);
     return json(st.prefs);
   }
-  if (table === 'applications') return json(st.apps);
+  if (table === 'applications' || table === 'seen_applications') return json(table === 'applications' ? st.apps : []);
   if (table === 'saved_jobs') return json(st.saved);
   if (table === 'company_scores') return json(st.scores);
   if (table === 'resume_skills') return method === 'POST' ? new Response('', { status: 201 }) : json([]);
@@ -103,7 +106,7 @@ test('only Vercel\'s bearer (or the secret / an admin) runs it; the spoofable he
   assert.equal(st.sends.length, 0);
 });
 
-test('sends ONE email for the best match, with the Seen link, and claims it first', async () => {
+test('sends ONE email for the best match (plus another employer\'s match under it), with reasons from the résumé, and claims both first', async () => {
   const res = await run();
   assert.equal(res.code, 200, JSON.stringify(res.body));
   assert.equal(res.body.sent, 1, JSON.stringify(res.body));
@@ -111,11 +114,14 @@ test('sends ONE email for the best match, with the Seen link, and claims it firs
   const mail = st.sends[0];
   assert.deepEqual(mail.to, ['jordan@example.com']);
   assert.match(mail.html, /https:\/\/seenjobs\.io\/jobs\/j1\?utm_source=email/);
-  assert.match(mail.subject, /^Cashier at Walmart matches your résumé$/);
+  assert.equal(mail.subject, 'Cashier at Walmart, Norwalk', 'role, employer, city — nothing promised');
+  assert.match(mail.text, /You're a Cashier at Target \(since 2022\)\./, 'the reason names her own job');
+  assert.match(mail.text, /Also a fit:\n- Cashier - Part Time · Target/);
+  assert.match(mail.html, /\/jobs\/j2\?utm_source=email/);
+  assert.ok(!/great fit|perfect|matches your résumé/i.test(mail.subject));
   assert.match(mail.headers['List-Unsubscribe'], /list=job_matches/);
   assert.equal(mail.headers['List-Unsubscribe-Post'], 'List-Unsubscribe=One-Click');
-  assert.equal(st.claims.length, 1);
-  assert.equal(st.claims[0].job_id, 'j1');
+  assert.deepEqual(st.claims.map((c) => c.job_id), ['j1', 'j2'], 'the extra item is claimed too: never sent twice');
   assert.ok(!/warehouse/i.test(JSON.stringify(st.sends)), 'a role the résumé does not name is never sent');
 });
 
@@ -124,11 +130,16 @@ test('the next run the same day respects the 4-hour gap; never the same job twic
   const second = await run();
   assert.equal(second.body.sent, 0);
   assert.equal(second.body.skipped.user_limit, 1);
-  // Five hours later the second email goes out — a different listing.
-  st.log[0].sent_at = new Date(Date.now() - 5 * 3600e3).toISOString();
+  // Five hours later: both cashier jobs were already sent and the warehouse job is not her field → nothing.
+  for (const r of st.log) r.sent_at = new Date(Date.now() - 5 * 3600e3).toISOString();
   const third = await run();
-  assert.equal(third.body.sent, 1, JSON.stringify(third.body));
-  assert.match(st.sends[1].html, /\/jobs\/j2\?/);
+  assert.equal(third.body.sent, 0, JSON.stringify(third.body));
+  assert.equal(third.body.skipped.no_good_match, 1);
+  // A new cashier listing then goes out on its own.
+  st.jobs.push(listing('j4', 'Cashier', 'ralphs grocery'));
+  const fourth = await run();
+  assert.equal(fourth.body.sent, 1, JSON.stringify(fourth.body));
+  assert.match(st.sends[1].html, /\/jobs\/j4\?/);
 });
 
 test('a changed résumé brings new matches', async () => {
@@ -160,7 +171,7 @@ test('a failed send releases the claim so a later run retries', async () => {
   const res = await run();
   assert.equal(res.body.sent, 0);
   assert.equal(res.body.skipped.send_500, 1);
-  assert.equal(st.deletes, 1);
+  assert.equal(st.deletes, 2, 'the main claim and the extra item\'s claim');
   assert.equal(st.log.length, 0);
 });
 
@@ -168,8 +179,14 @@ test('?dry=1 picks without claiming or sending; it is refused to an unauthentica
   const res = await run({ query: { dry: '1', secret: 'cron-secret' }, auth: null });
   assert.equal(res.body.dry, true);
   assert.equal(res.body.picked[0].job_id, 'j1');
+  assert.match(res.body.picked[0].reason, /Cashier at Target/);
+  assert.ok(res.body.picked[0].matches.every((m) => m.reason), 'every match it would send carries its reason');
+  assert.ok(!res.body.picked[0].matches.some((m) => /warehouse/i.test(m.title)));
+  assert.match(res.body.picked[0].text, /View and apply on Seen/);
+  assert.ok(res.body.picked[0].keys.occupations.some((o) => /cashier/i.test(o)));
   assert.equal(st.sends.length, 0);
   assert.equal(st.claims.length, 0);
+  assert.ok(!st.keyWrites, 'a dry run writes no keys');
 });
 
 test('before the migration (no log table) nothing is sent', async () => {
@@ -241,5 +258,99 @@ test('before the alerts migration (no columns) everyone stays on résumé matche
   assert.equal(res.body.ok, true);
   assert.equal(res.body.alerts_ready, false);
   assert.equal(res.body.sent, 1);
-  assert.match(st.sends[0].subject, /matches your résumé$/);
+  assert.equal(st.sends[0].subject, 'Cashier at Walmart, Norwalk');
+});
+
+test('the owner\'s case: a security company\'s "Account Manager" teaser is never emailed to a résumé with no security work', async () => {
+  st.resume = `Jamie Rivera
+Norwalk, CA 90650 | jamie@example.com
+
+EXPERIENCE
+Account Manager — Skymark Solutions | Jan 2025 – Jul 2025
+• Managed 40 small-business accounts and renewals.
+
+Operations Manager — Practical Magicka | Apr 2018 – Dec 2023
+• Led a team of 6; ran scheduling, purchasing and vendor management.`;
+  st.jobs = [listing('gsg', 'Account Manager (LA Metro)', 'GSG Protective Services', { location: 'Culver City, Los Angeles County', lat: 33.995, lng: -118.4,
+    description: 'Overview About Us – GSG Protective Services GSG Protective Services is a trusted security provider with a strong presence across the Southwest and Northeast United States. We offer high-quality, full-service security solutions with a commitment to safety, professionalism, and reliability. Our services include physical security, protective services, consulting, technology integration, and specialized training. Led by a seasoned leadership team with decades of experience, we stand by our core val…' })];
+  const res = await run();
+  assert.equal(res.body.sent, 0, JSON.stringify(res.body));
+  assert.equal(res.body.skipped.no_matches, 1);
+  assert.equal(st.sends.length, 0);
+  assert.equal(st.claims.length, 0);
+});
+
+test('?dry=1&user=<id>&all=1 checks one account even after today\'s emails, and never sends', async () => {
+  await run();
+  assert.equal(st.sends.length, 1);
+  const other = await run({ query: { dry: '1', secret: 'cron-secret', user: '00000000-0000-0000-0000-0000000000bb' }, auth: null });
+  assert.equal(other.body.users, 0, 'another id: nobody is checked');
+  const res = await run({ query: { dry: '1', secret: 'cron-secret', user: UID, all: '1' }, auth: null });
+  assert.equal(res.body.users, 1);
+  assert.ok(!res.body.skipped.user_limit, JSON.stringify(res.body));
+  assert.equal(st.sends.length, 1, 'the dry run sent nothing');
+  assert.ok(res.body.picked[0].keys, JSON.stringify(res.body.picked));
+});
+
+test('?dry=1 with the cron bearer is still a dry run (a check never sends)', async () => {
+  const res = await run({ query: { dry: '1' } });
+  assert.equal(res.body.dry, true);
+  assert.equal(st.sends.length, 0);
+  assert.equal(st.claims.length, 0);
+});
+
+// ── Round 2: a listing is emailed only when its requirements were read from the full posting ────────
+const AM_RESUME = `Jamie Rivera
+Norwalk, CA 90650 | jamie@example.com
+
+EXPERIENCE
+Account Manager — Skymark Solutions | Jan 2024 – Present
+• Manage 40 small-business accounts and renewals.
+
+Operations Manager — Practical Magicka | Apr 2018 – Dec 2023
+• Led a team of 6; ran scheduling, purchasing and vendor management.`;
+// GSG-shaped, with an employer name that says nothing about security.
+const NEUTRAL_TEASER = 'Summit Services Group is hiring an Account Manager for the Los Angeles metro. Join a growing team that values professionalism, reliability and great client relationships. Apply today to learn more about this exciting…';
+const NEUTRAL_FULL = `${'Summit Services Group supports client sites across Los Angeles. You will manage client relationships and site operations. '.repeat(5)}
+Minimum Qualifications
+• Minimum three (3) years of related security or operations experience.
+• Minimum two (2) years of supervisory experience within the security industry.
+• Maintain valid registration as a security guard throughout employment.`;
+const neutralRow = () => listing('sum1', 'Account Manager (LA Metro)', 'Summit Services Group', { source: 'Adzuna', description: NEUTRAL_TEASER, location: 'Downey, CA' });
+
+test('teaser hole: a neutral-name teaser passes on its summary, fails on the full posting → not emailed', async () => {
+  st.resume = AM_RESUME;
+  st.jobs = [neutralRow()];
+  const reads = [];
+  const h = makeHandler({ fetchFull: async ({ jobId }) => { reads.push(jobId); return { ok: true, description: NEUTRAL_FULL, fetched: true }; } });
+  const res = await run({ h });
+  assert.deepEqual(reads, ['sum1'], 'the full posting was read');
+  assert.equal(res.body.sent, 0, JSON.stringify(res.body));
+  assert.equal(res.body.skipped.teaser_full_posting, 1);
+  assert.equal(st.sends.length, 0);
+});
+
+test('teaser hole: a closed or unreadable source → not emailed; a full posting that still matches → emailed with its reason', async () => {
+  st.resume = AM_RESUME;
+  st.jobs = [neutralRow()];
+  let res = await run({ h: makeHandler({ fetchFull: async () => ({ ok: false, reason: 'gone' }) }) });
+  assert.equal(res.body.sent, 0);
+  assert.equal(res.body.skipped.teaser_gone, 1);
+  st.jobs = [listing('sum2', 'Account Manager', 'Northwind Supply', { source: 'Adzuna', description: 'Northwind Supply is hiring an Account Manager to grow small-business accounts…', location: 'Downey, CA' })];
+  const full = `${'Grow and renew small-business accounts for an office-supply distributor. '.repeat(12)}\nRequirements\n• 1+ year of account management experience.`;
+  res = await run({ h: makeHandler({ fetchFull: async () => ({ ok: true, description: full, fetched: true }) }) });
+  assert.equal(res.body.sent, 1, JSON.stringify(res.body));
+  assert.match(st.sends[0].text, /You're an Account Manager at Skymark Solutions \(since 2024\)\. They ask for 1\+ year; you have about 3 years as an Account Manager\./);
+});
+
+test('teaser hole: a dry run reads the posting but writes nothing back', async () => {
+  st.resume = AM_RESUME;
+  st.jobs = [{ ...neutralRow(), id: 'sum3' }];
+  let wrote = 0;
+  const h = makeHandler({ fetchFull: async ({ db }) => { const r = await db('jobs?id=eq.sum3', { method: 'PATCH', body: '{}' }); if (r.status === 204) wrote++; return { ok: true, description: NEUTRAL_FULL }; } });
+  const res = await run({ h, query: { dry: '1', secret: 'cron-secret' }, auth: null });
+  assert.equal(res.body.dry, true);
+  assert.equal(wrote, 1, 'the reader was answered');
+  assert.ok(!st.jobs[0].description.includes('security industry'), 'nothing reached the database');
+  assert.equal(res.body.picked[0].reason, 'no_readable_match');
 });

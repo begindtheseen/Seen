@@ -73,6 +73,11 @@ export async function healStoredPack(pack, { company, role, resumeText, save = a
   if (!pack || pack.pending || !needsHeal(pack) || !readableResume(resumeText)) return pack;
   const rebuilt = localPack({ company, role, resumeText, jobText: cleanPostingText(pack.job_text), pay: pack.pay || null, stage: pack.stage || '', taxonomy });
   const full = { ...pack, ...rebuilt, built_at: new Date().toISOString(), posting_pay: rebuilt.posting_pay || null, fills: {}, notes: {} };
+  // the emails name the posting's work the rebuilt pack chose; the sign-off name is the one the old emails carried
+  if (pack.emails && pack.emails.thankYou) {
+    const name = (String(pack.emails.thankYou.body || '').trim().split(/\n/).pop() || '').trim();
+    full.emails = prepEmails({ company, role: rebuilt.role_said || role, name: name && !/^\[/.test(name) ? name : '', detail: rebuilt.email_detail || '', detail2: rebuilt.email_detail2 || '', focus: rebuilt.email_focus || '', focus2: rebuilt.email_focus2 || '' });
+  }
   const carried = carryFills(pack, full);
   full.fills = carried.fills; full.notes = carried.notes; full.noteKeys = carried.noteKeys;
   try { await save(full); } catch { /* the healed pack is still served; the next read heals again */ }
@@ -337,7 +342,7 @@ export default async function handler(req, res) {
       company, role,
       built_at: new Date().toISOString(),
       ...pack,
-      emails: prepEmails({ company, role, name }),
+      emails: prepEmails({ company, role: pack.role_said || role, name, detail: pack.email_detail || '', detail2: pack.email_detail2 || '', focus: pack.email_focus || '', focus2: pack.email_focus2 || '' }),
       record: recOut?.record || null,
       pay: recOut?.pay || null,
       follow_up: followUpPlan(clean(body.interview_at, 40)),

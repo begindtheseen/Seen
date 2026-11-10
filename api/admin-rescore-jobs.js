@@ -18,6 +18,7 @@
 // JSON body { dry_run?: boolean }. Admin-only — moderators are refused (destructive/bulk op;
 // requires admin or super_admin). Returns { ok, dry_run, scanned, changed, unchanged, sample }.
 
+import { requireAdmin } from '../lib/server/admin/auth.js';
 import { scoreJob, wasteScore } from '../lib/server/jobScore.js';
 
 const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
@@ -65,11 +66,9 @@ export default async function handler(req, res) {
 
   try {
     // ── Admin session auth (mirrors admin-stats / admin-company-audit-pdf) ──
-    const adminToken = (req.headers['x-admin-token'] || '').trim();
-    if (!adminToken) return res.status(401).json({ error: 'unauthorized' });
-    const sessRes = await db(`admin_sessions?token=eq.${encodeURIComponent(adminToken)}&limit=1`);
-    const sess = sessRes.ok ? (await sessRes.json())[0] : null;
-    if (!sess || new Date(sess.expires_at) < new Date()) return res.status(401).json({ error: 'Session expired — log in again' });
+    // THE admin-session check (lib/server/admin/auth.js), shared by every admin endpoint.
+    const sess = await requireAdmin(req, { url: SB, key: SK });
+    if (!sess) return res.status(401).json({ ok: false, error: 'Session expired — log in again', code: 'unauthorized', retryable: false });
     // Destructive bulk op — require admin or super_admin; moderators are refused.
     if (sess.role !== 'admin' && sess.role !== 'super_admin') return res.status(403).json({ error: 'Insufficient role' });
 

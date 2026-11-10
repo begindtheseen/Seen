@@ -20,7 +20,9 @@ function installFetch(sku, role = 'super_admin') {
     const u = String(url); const method = opts.method || 'GET';
     calls.push({ url: u, method, body: opts.body });
     if (u.includes('/admin_sessions?token=eq')) return mockResponse([{ expires_at: new Date(Date.now() + 3600e3).toISOString(), role, admin_id: 'a1' }]);
-    if (u.includes('/employer_purchases?id=eq') && method === 'GET') return mockResponse([{ id: 7, company: 'Acme Corp', employer_sku: sku }]);
+    if (u.includes('/employer_purchases?id=eq') && method === 'GET') return mockResponse([{ id: 7, company: 'Acme Corp', employer_sku: sku, status: 'paid' }]);
+    // The purchase is marked fulfilled first, conditionally, and the write is counted from the returned row.
+    if (u.includes('/employer_purchases?id=eq') && method === 'PATCH') return mockResponse([{ id: 7 }]);
     return mockResponse(null, { ok: true, status: 204 });
   };
   return calls;

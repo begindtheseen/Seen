@@ -48,8 +48,12 @@ export default function JobsPage() {
     level, setLevel,
     jobType, setJobType,
     posted, setPosted,
+    pay, setPay,
     sort, setSort,
     hasFilters,
+    area,
+    areaProblem,
+    includeRemote, setIncludeRemote,
     filtered,
     status,
     statusMsg,
@@ -169,8 +173,8 @@ export default function JobsPage() {
             <input
               type="text"
               className={bar.input}
-              placeholder="Job title, role or company..."
-              aria-label="Job title, role or company"
+              placeholder="Job title or company — optional"
+              aria-label="Job title or company (optional — leave it empty to see every job in the place)"
               value={query}
               name="seen-job-query"
               autoComplete="off"
@@ -196,12 +200,14 @@ export default function JobsPage() {
             </button>
             <div className={bar.row} onPointerDownCapture={() => { if (searched) setWhereOpen(true) }}>
               <div className={bar.loc}>
+                <label htmlFor="jobs-location" className="sr-only">Where — city, state or ZIP code</label>
                 <input
                   type="text"
+                  id="jobs-location"
                   ref={locRef}
                   className={`${bar.input} ${bar.locInput}`}
-                  placeholder="City or state..."
-                  aria-label="City or state"
+                  placeholder="City, state or ZIP"
+                  inputMode="text"
                   value={location}
                   name="seen-job-location"
                   autoComplete="off"
@@ -260,6 +266,7 @@ export default function JobsPage() {
             level={level} setLevel={setLevel}
             jobType={jobType} setJobType={setJobType}
             posted={posted} setPosted={setPosted}
+            pay={pay} setPay={setPay}
             hasFilters={hasFilters} clearFilters={clearFilters}
           />
         </div>
@@ -288,7 +295,7 @@ export default function JobsPage() {
           <div className={j.toolbar}>
             <p className={j.count} aria-live="polite">{statusMsg}</p>
             <div className={j.tools}>
-              {status === 'done' && typed && (
+              {status === 'done' && (typed || !!area) && (
                 <Button size="sm" variant="ghost" onClick={copySearchLink} data-testid="copy-search-link" title="Copy a link to this search" icon={copied ? 'check' : 'link'}>
                   <span className={j.hideSm}>{copied ? 'Copied' : 'Copy link'}</span>
                 </Button>
@@ -298,16 +305,31 @@ export default function JobsPage() {
                 <Chip selected={swipeMode} onClick={() => setSwipeMode(true)} icon="layers" title="Swipe mode — drag right to save, left to pass">Swipe</Chip>
               </div>
               <label htmlFor="jobs-sort" className="sr-only">Sort results</label>
-              <select id="jobs-sort" className={`ui-input ${j.sort}`} value={sort} onChange={e => setSort(e.target.value as SortMode)}>
-                <option value="best">Best match</option>
-                <option value="transparency">Best posting score</option>
-                <option value="waste">Lowest wasted-effort risk</option>
-                <option value="recent">Most recent</option>
-              </select>
+              {area ? (
+                <select id="jobs-sort" className={`ui-input ${j.sort}`} value={sort === 'recent' ? 'recent' : 'nearest'} onChange={e => setSort(e.target.value as SortMode)}>
+                  {area.kind === 'point' && <option value="nearest">Nearest first</option>}
+                  <option value="recent">Newest first</option>
+                </select>
+              ) : (
+                <select id="jobs-sort" className={`ui-input ${j.sort}`} value={sort} onChange={e => setSort(e.target.value as SortMode)}>
+                  <option value="best">Best match</option>
+                  <option value="transparency">Best posting score</option>
+                  <option value="waste">Lowest wasted-effort risk</option>
+                  <option value="recent">Most recent</option>
+                </select>
+              )}
             </div>
           </div>
         )}
         {notice && filtered.length > 0 && <div className={bar.notice} role="status">{notice}</div>}
+        {/* Area search: remote listings based here are counted apart and shown only on request. */}
+        {area && status === 'done' && area.remoteTotal > 0 && (
+          <div className={bar.areaRemote}>
+            <Chip selected={includeRemote} onClick={() => setIncludeRemote(!includeRemote)} icon="globe" data-testid="area-remote">
+              {includeRemote ? `Including ${area.remoteTotal.toLocaleString('en-US')} remote` : `Also show ${area.remoteTotal.toLocaleString('en-US')} remote job${area.remoteTotal === 1 ? '' : 's'} based here`}
+            </Chip>
+          </div>
+        )}
 
         {/* Results — swipe deck or list */}
         {filtered.length > 0 && swipeMode ? (
@@ -336,8 +358,13 @@ export default function JobsPage() {
           </div>
           {hasMore && (
             <Button variant="secondary" full onClick={() => loadMore()} loading={loadingMore} data-testid="show-more" className={j.more}>
-              {loadingMore ? 'Loading…' : 'Show 60 more'}
+              {loadingMore ? 'Loading…' : area
+                ? `Show ${Math.min(60, area.total - filtered.length)} more · ${(area.total - filtered.length).toLocaleString('en-US')} left`
+                : 'Show 60 more'}
             </Button>
+          )}
+          {area && !hasMore && filtered.length >= 60 && (
+            <p className={bar.areaEnd}>That’s all {area.total.toLocaleString('en-US')}.</p>
           )}
           </>
         ) : view === 'error' ? (
@@ -349,7 +376,7 @@ export default function JobsPage() {
           <div className={j.idle}>
             <p className="ui-eyebrow">Start a search</p>
             <h2 className={j.idleTitle}>What role are you looking for?</h2>
-            <p className={j.idleSub}>Every result shows how complete its posting is and how the employer treats applicants.</p>
+            <p className={j.idleSub}>Or leave the title empty and search a city, state or ZIP to see every job Seen holds there.</p>
             <div className={j.suggest}>
               {SUGGESTED_ROLES.map(role => (
                 <Chip key={role} onClick={() => { setQuery(role); searchJobs(role) }}>{role}</Chip>
@@ -379,6 +406,36 @@ export default function JobsPage() {
                 </div>
               </div>
             ))}
+          </div>
+        ) : view === 'empty' && areaProblem ? (
+          /* A place Seen could not search: say why, offer the places it could mean — never an unrelated list. */
+          <div className={j.idle} data-testid="area-problem">
+            <Icon name="map-pin" size={28} className={j.emptyIcon} />
+            <h2 className={j.idleTitle}>{areaProblem.message}</h2>
+            {areaProblem.suggestions.length > 0 && (
+              <>
+                <p className={j.idleSub}>{areaProblem.reason === 'ambiguous' ? 'Which one?' : 'Did you mean'}</p>
+                <div className={j.suggest}>
+                  {areaProblem.suggestions.map(s => (
+                    <Chip key={s} onClick={() => { setLocation(s); searchJobs(undefined, s) }}>{s}</Chip>
+                  ))}
+                </div>
+              </>
+            )}
+            {areaProblem.reason === 'needs_position' && (
+              <Button size="sm" variant="secondary" icon="map-pin" onClick={() => { setLocation(''); setTimeout(requestGpsLocation, 0) }}>Use my location</Button>
+            )}
+          </div>
+        ) : view === 'empty' && area ? (
+          <div className={j.idle} data-testid="area-empty">
+            <Icon name="map-pin" size={28} className={j.emptyIcon} />
+            <h2 className={j.idleTitle}>{hasFilters ? `No jobs match these filters ${area.kind === 'state' ? `in ${area.label}` : `within ${area.radius} miles of ${area.label}`}` : `No jobs on Seen ${area.kind === 'state' ? `in ${area.label}` : `within ${area.radius} miles of ${area.label}`} yet`}</h2>
+            {area.wider && area.wider.total > 0 && (
+              <Button size="sm" variant="secondary" onClick={() => setRadius(String(area.wider!.radius))} iconRight="arrow-right">
+                {`${area.wider.total.toLocaleString('en-US')} within ${area.wider.radius} miles`}
+              </Button>
+            )}
+            {hasFilters && <Button size="sm" variant="ghost" onClick={clearFilters}>Clear filters</Button>}
           </div>
         ) : view === 'empty' ? (
           <div className={j.idle}>

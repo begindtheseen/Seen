@@ -18,8 +18,10 @@ import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { gateAI } from '../lib/server/credits.js';
 import { runOptimizer, ENGINE_VERSION } from '../lib/optimizer/index.js';
-import { previewOnlyOrFetch } from '../lib/server/postingGate.js';
-import { freeDiagnostic } from '../lib/server/optimizePackage.js';
+import { freeDiagnostic, listedRequirements, listedCoverage, postingInfo } from '../lib/server/optimizePackage.js';
+import { postingTextForReader } from '../lib/server/jobInsights.js';
+import { employerDisplayName } from '../lib/text/employerName.js';
+import { readPosting } from '../lib/server/postingRead.js';
 import { extractJobFacts, postingTermKey } from '../lib/optimizer/extractJobFacts.js';
 import { termFromLabel, POSTING_TERMS_VERSION } from '../lib/optimizer/postingTerms.js';
 import { runHumanProof, HUMANPROOF_ENGINE_VERSION } from '../lib/humanizer/index.js';
@@ -467,11 +469,17 @@ export default async function handler(req, res) {
     }
     // A preview-only listing (≤520-char teaser) has nothing to measure — Seen first follows the saved job's own
     // link for the posting (lib/server/fullPosting.js); only then the same paste box as the paid path.
-    if (String(body.jobDescription || '').trim()) {
-      const preview = await previewOnlyOrFetch(body);
-      if (preview) return res.status(preview.status).json({ ...preview.body, charged: false });
+    let posting = null;
+    // the SAME rule as the paid path (api/resume.js tool:optimize): the posting is always read through readPosting —
+    // a saved job with no text sent is fetched in full, a teaser is refused, a pasted link is read — so the free check
+    // and the paid package score one posting text
+    if (String(body.jobDescription || '').trim() || jobId) {
+      const read = await readPosting(body);
+      if (read.preview) return res.status(read.preview.status).json({ ...read.preview.body, charged: false });
+      posting = read.posting;
     }
-    const jobDescription = body.jobDescription;
+    // the SAME posting text Job Insights reads (markup turned into lines), so an HTML posting reads the same in both tools
+    const jobDescription = postingTextForReader(body.jobDescription);
     // a pasted link may have named the job (lib/server/postingGate.js)
     const jobTitle = body.jobTitle || body.job || reqTitle;
     const company = body.company || reqCompany;
@@ -492,10 +500,8 @@ export default async function handler(req, res) {
     // posting text was sent at all.
     let jobFacts = null;
     let factsSource = 'extracted';
-    if (haveDb && jobId && !String(jobDescription || '').trim()) {
-      jobFacts = await getCachedJobFacts(db, jobId);
-      if (jobFacts) factsSource = 'cache';
-    }
+    // (no read of the flat job_facts cache: it carries no gates and no statements, so a cached reading scored a
+    // different verdict than the paid path for the same pair — free 35 vs paid 52. The posting is read in full above.)
     if (!jobFacts) {
       jobFacts = extractJobFacts(jobDescription || '', { jobTitle, company, taxonomy: taxonomy || undefined });
       if (haveDb && jobId && jobFacts.length) cacheJobFacts(db, jobId, jobFacts).catch(() => {});
@@ -543,8 +549,13 @@ export default async function handler(req, res) {
     // paid package (api/resume.js tool:optimize) — the credit buys a strict superset of this.
     // The V2 and Resume-Intelligence engines no longer ride here: their second and third scores
     // contradicted the one verdict on the same screen (2026-10-24 audits, D4).
+    const free = freeDiagnostic(output);
     return res.status(200).json({
-      ...freeDiagnostic(output),
+      ...free,
+      // ONE requirement count and a coverage figure over the SAME rows the list shows (lib/server/optimizePackage.js)
+      requirements_listed: listedRequirements(output).length,
+      ats_coverage: listedCoverage(output),
+      posting: postingInfo(posting, { job: jobTitle, company: employerDisplayName({ company: company || '', postingText: jobDescription || '' }) || company }),
       legacy_seenfit_compatible: true,
       run_id: runId, _facts_source: factsSource, _engine_version: ENGINE_VERSION,
     });

@@ -26,6 +26,8 @@ function install(w, { failRefs = false } = {}) {
   global.fetch = async (url, opts = {}) => {
     const u = decodeURIComponent(String(url)); const method = opts.method || 'GET';
     calls.push({ u, method, body: opts.body ? JSON.parse(opts.body) : null });
+    // PostgREST answers 404 for a function that is not deployed; the server falls back to the REST scan.
+    if (u.includes('/rest/v1/rpc/')) return { ok: false, status: 404, async json() { return { code: 'PGRST202' }; }, async text() { return '{"code":"PGRST202"}'; }, headers: { get() { return null; } } };
     if (u.includes('/admin_sessions?token=eq')) return res200([{ expires_at: new Date(Date.now() + 3600e3).toISOString(), role: 'super_admin', admin_id: 'admin-1' }]);
     const q = new URL(String(url)).searchParams;
     const page = (rows) => { const off = Number(q.get('offset') || 0); return rows.slice(off, off + Math.min(1000, Number(q.get('limit') || 1000))); };
@@ -92,9 +94,13 @@ test('one press removes every duplicate, never a protected row, audits what it r
   assert.equal([...towns.values()].filter((c) => c > 1).length, 1);
   assert.equal(before.size - left.size, 1199);
   for (const d of calls.filter((c) => c.method === 'DELETE')) assert.match(d.u, /is_employer_posted=eq\.false/);
+  // The audit row is written BEFORE the delete (with the rows planned), then annotated with what was
+  // really deleted — a delete that cannot be audited does not happen (admin remake, 2026-11-10).
   const audit = calls.find((c) => c.u.includes('/admin_audit_log') && c.method === 'POST');
   assert.equal(audit.body.action, 'dedupe_jobs');
-  assert.equal(audit.body.metadata.deleted, 1199);
+  assert.equal(audit.body.metadata.planned, 1199);
+  const auditIdx = calls.indexOf(audit);
+  assert.ok(calls.findIndex((c) => c.method === 'DELETE') > auditIdx, 'audited before anything is deleted');
   // A second press finds nothing.
   const again = await call({ action: 'scan_job_dupes' }, w);
   assert.equal(again.res.jsonBody.suspected, 0);

@@ -46,7 +46,7 @@ export function updateCurrent(url: string) {
   const t = readTrail()
   const last = t[t.length - 1]
   if (last && pathOf(last.url) === pathOf(url)) { last.url = url; writeTrail(t) }
-  if (pathOf(url) === '/jobs' && /[?&]q=/.test(url)) {
+  if (pathOf(url) === '/jobs' && /[?&](?:q|loc)=/.test(url)) { // a titled search, or every job in a place
     try { sessionStorage.setItem(LAST_JOBS_KEY, url.replace(/([?&])job=[^&#]*&?/, '$1').replace(/[?&]$/, '')) } catch { /* ignore */ }
   }
 }
@@ -68,7 +68,7 @@ export function previousPage(): string | null {
 /** A short name for a Seen page, for "Back to …". */
 export function pageLabel(url: string): string {
   const p = pathOf(url)
-  if (p === '/jobs') return /[?&]q=/.test(url) ? 'results' : 'jobs'
+  if (p === '/jobs') return /[?&](?:q|loc)=/.test(url) ? 'results' : 'jobs'
   if (p.startsWith('/jobs/')) return 'the listing'
   if (p === '/saved') return 'Saved'
   if (p === '/tracker') return 'your tracker'

@@ -15,6 +15,7 @@
 import { logError } from '../lib/server/errlog.js';
 import { refreshStaleJobs } from '../lib/server/staleRefresh.js';
 import { isVercelCron } from '../lib/server/cronAuth.js';
+import { recordCronRun } from '../lib/server/cronRun.js';
 
 export default async function handler(req, res) {
   const cronSecret = process.env.CRON_SECRET;
@@ -56,10 +57,12 @@ export default async function handler(req, res) {
       concurrency: Number.isFinite(concurrency) ? concurrency : 20,
       timeoutMs: Number.isFinite(timeoutMs) ? timeoutMs : 8000,
     });
+    if (isCron) await recordCronRun('refresh-stale-jobs', 'ok', { dry_run: !apply, ...summary });
     return res.status(200).json({ ok: true, date: new Date().toISOString(), dry_run: !apply, ...summary });
   } catch (err) {
     console.error('refresh-stale-jobs error:', err.message);
     logError('refresh-stale-jobs', err.message, { isCron });
+    if (isCron) await recordCronRun('refresh-stale-jobs', 'failed', err.message);
     return res.status(500).json({ error: err.message });
   }
 }

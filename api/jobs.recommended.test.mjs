@@ -1,11 +1,12 @@
-// The /jobs "Matched to your résumé" rail reads the CANONICAL résumé (profiles.resume_text) and
-// self-heals the derived resume_skills cache. Contract: a signed-in user with a résumé on file is
-// never told to upload one (has_resume says which case it is), and the rail still serves when the
-// cache row is missing, stale, or the résumé has no dictionary skills.
-// Match bar (live audit 2026-10-23): a listing must share a title FAMILY with a résumé role AND
-// be near the profile city (or remote); without a city the rail says so (reason 'no_city').
+// The /jobs "Matched to your résumé" rail (api/jobs.js handleRecommended → lib/server/resumeMatches.js on the
+// person's job keys, lib/server/jobKeys.js). Contract:
+//   · a signed-in user with a résumé on file is never told to upload one (has_resume says which case it is);
+//   · every job carries match_reason, a sentence built from their résumé or applications;
+//   · the keys are rebuilt (and written to profiles.job_keys when the column exists) whenever they are missing,
+//     old, or built from a different résumé; before the migration the same matches are served from memory;
+//   · nothing is padded: zero matches is reason 'no_matches'; a far-away or different-field listing never shows.
 // Run: node --test api/jobs.recommended.test.mjs
-import { test } from 'node:test';
+import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
 process.env.SUPABASE_URL = 'https://db.example';
@@ -28,10 +29,14 @@ Membership Specialist — UFC Gym | 2021 – 2022
 
 EDUCATION
 High School Diploma — Great Oak High School`;
-const NOW = new Date(Date.now() + 86_400_000).toISOString();
-const jobRow = (i) => ({ id: `00000000-0000-0000-0000-00000000000${i}`, title: `Valet Attendant ${i}`, company: `Hotel ${i}`, location: 'Temecula, CA', salary: null, apply_url: `https://example.com/${i}`, description: 'valet parking, customer service', type: 'Full-time', level: 'Entry level', source: 'Seen', score: 60, waste_score: 20, expires_at: NOW, lat: null, lng: null });
+const FUTURE = new Date(Date.now() + 86_400_000).toISOString();
+const FULL = `${'Park and retrieve guest vehicles at a busy hotel entrance and keep the line moving. '.repeat(10)}\nRequirements\n• Valid driver license. Store and retail guests welcome.`;
+const jobRow = (i, extra = {}) => ({ id: `00000000-0000-0000-0000-00000000000${i}`, title: `Valet Attendant ${i}`, company: `Hotel ${i}`, location: 'Temecula, CA', salary: null, apply_url: `https://example.com/${i}`, description: FULL, type: 'Full-time', level: 'Entry level', source: 'Seen', score: 60, waste_score: 20, expires_at: FUTURE, lat: null, lng: null, created_at: new Date().toISOString(), availability_status: 'active', ...extra });
 
-const state = { resumeText: RESUME, resumeUpdatedAt: '2026-10-19T00:00:00Z', city: 'Temecula, CA', skillsRow: null, profileOk: true, jobsRows: [jobRow(1), jobRow(2), jobRow(3)] };
+let state;
+const fresh = () => ({ resumeText: RESUME, city: 'Temecula, CA', profileOk: true, column: true, storedKeys: null, apps: [], jobsRows: [jobRow(1), jobRow(2), jobRow(3)] });
+beforeEach(async () => { state = fresh(); (await import('../lib/server/jobKeys.js'))._resetJobKeysProbe(); });
+
 let calls = [];
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'Content-Type': 'application/json' } });
 globalThis.fetch = async (url, opts = {}) => {
@@ -40,17 +45,18 @@ globalThis.fetch = async (url, opts = {}) => {
   calls.push({ u, method, body: opts.body ? JSON.parse(opts.body) : null });
   if (u.includes('/auth/v1/user')) return json({ id: UID });
   if (/adzuna|greenhouse|lever|ashby/i.test(u)) return json({ results: [] });
-  if (u.includes('/rest/v1/resume_skills')) {
-    if (method === 'POST') return new Response('', { status: 201 });
-    return json(state.skillsRow ? [state.skillsRow] : []);
-  }
   if (u.includes('/rest/v1/profiles')) {
+    if (method === 'PATCH') { state.storedKeys = JSON.parse(opts.body).job_keys; return new Response('', { status: 204 }); }
+    if (u.includes('select=job_keys&limit=1')) return state.column ? json([{ job_keys: null }]) : json({ code: '42703', message: 'column profiles.job_keys does not exist' }, 400);
     if (!state.profileOk) return json({ message: 'boom' }, 500);
-    return json([{ resume_text: state.resumeText, resume_updated_at: state.resumeUpdatedAt, city: state.city }]);
+    return json([{ resume_text: state.resumeText, resume_updated_at: '2026-10-19T00:00:00Z', city: state.city, ...(state.column ? { job_keys: state.storedKeys } : {}) }]);
   }
-  if (u.includes('/rest/v1/jobs')) return json(state.jobsRows);
-  // geocode_cache: Phoenix only (Temecula stays un-geocoded → the rail falls back to city text)
-  if (u.includes('geocode_cache')) return json(/phoenix/i.test(decodeURIComponent(u)) ? [{ lat: 33.4484, lng: -112.074 }] : []);
+  if (u.includes('/rest/v1/applications') || u.includes('/rest/v1/seen_applications')) return json(u.includes('seen_applications') ? [] : state.apps);
+  if (u.includes('/rest/v1/jobs')) {
+    const t = decodeURIComponent((u.match(/title=ilike\.\*([^&*]+)\*/) || [])[1] || '').toLowerCase();
+    return json(state.jobsRows.filter((j) => j.title.toLowerCase().includes(t)));
+  }
+  if (u.includes('geocode_cache')) return json([]);
   return json([]);
 };
 const { default: handler } = await import('./jobs.js');
@@ -60,81 +66,90 @@ function call() {
   const res = { code: 200, body: null, setHeader() {}, status(c) { this.code = c; return this; }, json(o) { this.body = o; return this; }, end() { return this; } };
   return handler({ method: 'POST', body: { action: 'recommended' }, headers: { authorization: 'Bearer token-1', 'x-forwarded-for': `10.9.${Math.floor(Math.random() * 200)}.1` }, query: {}, socket: { remoteAddress: '10.0.0.1' } }, res).then(() => res);
 }
-const healPosts = () => calls.filter((c) => c.method === 'POST' && c.u.includes('/rest/v1/resume_skills'));
+const keyWrites = () => calls.filter((c) => c.method === 'PATCH' && c.u.includes('/rest/v1/profiles'));
 const jobReads = () => calls.filter((c) => c.u.includes('/rest/v1/jobs'));
 
-test('résumé on file but no resume_skills row → derives the signal now, serves the rail, heals the cache', async () => {
+test('résumé on file, no keys yet → builds them, writes profiles.job_keys, serves the rail with a reason per job', async () => {
   const res = await call();
   assert.equal(res.code, 200);
   assert.equal(res.body.has_resume, true);
-  assert.equal(res.body.reason, null);
+  assert.equal(res.body.reason, null, JSON.stringify(res.body));
   assert.equal(res.body.city, 'Temecula, CA');
   assert.equal(res.body.jobs.length, 3);
-  const heal = healPosts();
-  assert.equal(heal.length, 1, 'one upsert of the derived row');
-  assert.equal(heal[0].body.user_id, UID);
-  assert.ok(heal[0].body.top_titles.some((t) => /valet attendant/i.test(t)), JSON.stringify(heal[0].body));
-  assert.ok(Array.isArray(heal[0].body.skills));
-  assert.ok(jobReads().some((c) => /title=ilike\.\*valet/i.test(c.u)), 'queried listings by the résumé\'s real role');
-  assert.ok(jobReads().some((c) => /location=ilike\.\*temecula\*/i.test(c.u)), 'the local reads are scoped to the profile city');
+  for (const j of res.body.jobs) assert.equal(j.match_reason, 'You were a Valet Attendant at Towne Park (2022–2025).');
+  const w = keyWrites();
+  assert.equal(w.length, 1, 'one write of the rebuilt keys');
+  assert.ok(w[0].body.job_keys.occupations.some((o) => o.occupation === 'valet'));
+  assert.ok(w[0].body.job_keys_updated_at);
+  assert.ok(jobReads().some((c) => /title=ilike\.\*valet/i.test(c.u)), 'listings read by the résumé\'s real field');
+  assert.ok(jobReads().some((c) => /temecula/i.test(decodeURIComponent(c.u))), 'the local reads are scoped to the profile city');
+  assert.ok(!calls.some((c) => c.u.includes('resume_skills')), 'the old cache (missing in prod) is never read');
 });
 
-test('no résumé on the account → has_resume:false, no_resume, and no listing queries at all', async () => {
+test('fresh stored keys are used as they are; keys built from a different résumé are rebuilt', async () => {
+  await call();
+  assert.equal(keyWrites().length, 1);
+  let res = await call();
+  assert.equal(res.body.jobs.length, 3);
+  assert.equal(keyWrites().length, 0, 'same résumé, same applications: no rewrite');
+  state.resumeText = RESUME.replace('Valet Attendant — Towne Park', 'Parking Attendant — Towne Park');
+  res = await call();
+  assert.equal(keyWrites().length, 1, 'a changed résumé rewrites the keys');
+});
+
+test('before the migration (no job_keys column) → the same matches from memory, nothing written', async () => {
+  state.column = false;
+  const res = await call();
+  assert.equal(res.body.jobs.length, 3);
+  assert.equal(keyWrites().length, 0);
+});
+
+test('no résumé on the account → has_resume:false, no_resume, no listing reads, stored keys cleared', async () => {
   state.resumeText = '';
-  try {
-    const res = await call();
-    assert.equal(res.code, 200);
-    assert.equal(res.body.has_resume, false);
-    assert.equal(res.body.reason, 'no_resume');
-    assert.deepEqual(res.body.jobs, []);
-    assert.equal(jobReads().length, 0);
-    assert.equal(healPosts().length, 0);
-  } finally { state.resumeText = RESUME; }
+  state.storedKeys = { v: 1 };
+  const res = await call();
+  assert.equal(res.body.has_resume, false);
+  assert.equal(res.body.reason, 'no_resume');
+  assert.deepEqual(res.body.jobs, []);
+  assert.equal(jobReads().length, 0);
+  assert.equal(keyWrites().length, 1);
+  assert.equal(keyWrites()[0].body.job_keys, null);
 });
 
-test('résumé on file but nothing matches → has_resume:true with reason no_matches (never "upload")', async () => {
+test('résumé on file but nothing matches → no_matches (never "upload", never padded)', async () => {
   state.jobsRows = [];
-  try {
-    const res = await call();
-    assert.equal(res.body.has_resume, true);
-    assert.equal(res.body.reason, 'no_matches');
-    assert.deepEqual(res.body.jobs, []);
-  } finally { state.jobsRows = [jobRow(1), jobRow(2), jobRow(3)]; }
+  const res = await call();
+  assert.equal(res.body.has_resume, true);
+  assert.equal(res.body.reason, 'no_matches');
+  assert.deepEqual(res.body.jobs, []);
 });
 
-test('a fresh cache row is used as is; a row older than the résumé is re-derived', async () => {
-  state.skillsRow = { skills: ['customer service'], seniority: 'junior', function: 'ops', years_exp: 2, top_titles: ['Valet Attendant'], updated_at: '2026-10-20T00:00:00Z' };
-  try {
-    let res = await call();
-    assert.equal(res.body.has_resume, true);
-    assert.equal(res.body.jobs.length, 3);
-    assert.equal(healPosts().length, 0, 'fresh row: no re-derive');
-    state.skillsRow = { ...state.skillsRow, updated_at: '2026-01-01T00:00:00Z' };
-    res = await call();
-    assert.equal(res.body.jobs.length, 3);
-    assert.equal(healPosts().length, 1, 'stale row: re-derived and healed');
-  } finally { state.skillsRow = null; }
-});
-
-test('profile read fails → never claims "no résumé": has_resume:null; with no known city the rail asks for one', async () => {
+test('profile read fails → never claims "no résumé": has_resume:null, reason unavailable, no listing reads', async () => {
   state.profileOk = false;
-  try {
-    let res = await call();
-    assert.equal(res.body.has_resume, null);
-    assert.equal(res.body.reason, 'unavailable');
-    assert.deepEqual(res.body.jobs, []);
-    state.skillsRow = { skills: ['customer service'], top_titles: ['Valet Attendant'], updated_at: '2026-10-20T00:00:00Z' };
-    res = await call();
-    assert.equal(res.body.has_resume, null);
-    // The city lives on the profile; without it we never show far-away jobs as "matches".
-    assert.equal(res.body.reason, 'no_city');
-    assert.deepEqual(res.body.jobs, []);
-    assert.equal(jobReads().length, 0);
-    assert.equal(healPosts().length, 0);
-  } finally { state.profileOk = true; state.skillsRow = null; }
+  const res = await call();
+  assert.equal(res.body.has_resume, null);
+  assert.equal(res.body.reason, 'unavailable');
+  assert.equal(jobReads().length, 0);
 });
 
-// ── The audit case: a Phoenix sales-associate résumé must NOT get a Dallas hotel AE ─────────────
+test('the owner\'s case: an "Account Manager" at a security company never reaches a résumé with no security work', async () => {
+  state.city = 'Norwalk, CA';
+  state.resumeText = `Jamie Rivera
+Norwalk, CA | jamie@example.com
+
+EXPERIENCE
+Account Manager — Skymark Solutions | Jan 2025 – Jul 2025
+• Managed 40 small-business accounts and renewals.
+
+Operations Manager — Practical Magicka | Apr 2018 – Dec 2023
+• Led a team of 6; ran scheduling, purchasing and vendor management.`;
+  state.jobsRows = [jobRow(4, { title: 'Account Manager (LA Metro)', company: 'GSG Protective Services', location: 'Culver City, Los Angeles County', lat: 33.995, lng: -118.4,
+    description: 'Overview About Us – GSG Protective Services GSG Protective Services is a trusted security provider with a strong presence across the Southwest and Northeast United States. We offer high-quality, full-service security solutions with a commitment to safety, professionalism, and reliability. Our services include physical security, protective services, consulting, technology integration, and specialized training. Led by a seasoned leadership team with decades of experience, we stand by our core val…' })];
+  const res = await call();
+  assert.deepEqual(res.body.jobs, [], JSON.stringify(res.body.jobs));
+  assert.equal(res.body.reason, 'no_matches');
+});
+
 const GNC_RESUME = `Jordan Avery
 jordan.avery@example.com | 602-555-0100 | Phoenix, AZ
 
@@ -147,24 +162,20 @@ Membership Specialist — UFC Gym | 2022 – 2024
 
 Valet Attendant — Towne Park | 2021 – 2022
 • Parked and retrieved guest vehicles.`;
-const WRONG_SALES = [
-  { id: '20000000-0000-0000-0000-000000000001', title: 'Account Executive (Independent Hotel Sales)', company: 'lighthouse', location: 'Dallas-Fort Worth Metroplex', apply_url: 'https://example.com/ae', description: 'sell to independent hotels', type: 'Full-time', source: 'Greenhouse', score: 94, waste_score: 10, expires_at: NOW, lat: 32.78, lng: -96.8 },
-  { id: '20000000-0000-0000-0000-000000000002', title: 'Commercial Sales Manager', company: 'SpaceX', location: 'Hawthorne, CA', apply_url: 'https://example.com/spacex', description: 'commercial sales of launch services', type: 'Full-time', source: 'Greenhouse', score: 90, waste_score: 12, expires_at: NOW, lat: 33.92, lng: -118.33 },
-];
 
-test('sales-associate résumé in Phoenix vs a hotel AE in Dallas + a SpaceX sales manager → empty rail (no_matches)', async () => {
-  state.resumeText = GNC_RESUME; state.city = 'Phoenix, AZ'; state.jobsRows = WRONG_SALES;
-  try {
-    const res = await call();
-    assert.equal(res.code, 200);
-    assert.equal(res.body.has_resume, true);
-    assert.deepEqual(res.body.jobs, [], JSON.stringify(res.body.jobs.map((j) => j.title)));
-    assert.equal(res.body.reason, 'no_matches');
-    assert.ok(!jobReads().some((c) => /title=ilike\.\*sales\*/i.test(c.u)), 'the bare skill word "sales" is never a title query');
-  } finally { state.resumeText = RESUME; state.city = 'Temecula, CA'; state.jobsRows = [jobRow(1), jobRow(2), jobRow(3)]; }
+test('sales-associate résumé in Phoenix vs a hotel AE in Dallas + a SpaceX sales manager → empty rail', async () => {
+  state.resumeText = GNC_RESUME; state.city = 'Phoenix, AZ';
+  state.jobsRows = [
+    jobRow(5, { title: 'Account Executive (Independent Hotel Sales)', company: 'lighthouse', location: 'Dallas-Fort Worth Metroplex', lat: 32.78, lng: -96.8 }),
+    jobRow(6, { title: 'Commercial Sales Manager', company: 'SpaceX', location: 'Hawthorne, CA', lat: 33.92, lng: -118.33 }),
+  ];
+  const res = await call();
+  assert.deepEqual(res.body.jobs, [], JSON.stringify(res.body.jobs.map((j) => j.title)));
+  assert.equal(res.body.reason, 'no_matches');
 });
 
-const CASHIER_RESUME = `Sam Rivera
+test('cashier résumé in Phoenix → Phoenix/Glendale cashier rows with reasons, never Austin, never a director', async () => {
+  state.resumeText = `Sam Rivera
 sam@example.com | 602-555-0101
 
 EXPERIENCE
@@ -173,79 +184,56 @@ Cashier — Target | Jun 2023 – Present
 
 Crew Member — Chipotle | 2022 – 2023
 • Prepared orders and ran the register.`;
-const CASHIER_ROWS = [
-  { id: '30000000-0000-0000-0000-000000000001', title: 'Cosmetics Cashier', company: 'Walmart', location: 'Phoenix, Maricopa County', apply_url: 'https://example.com/w1', description: 'cashier', type: 'Part-time', source: 'Adzuna', score: 55, waste_score: 30, expires_at: NOW, lat: 33.45, lng: -112.07 },
-  { id: '30000000-0000-0000-0000-000000000002', title: 'Cosmetics Cashier', company: 'Walmart', location: 'Glendale, Maricopa County', apply_url: 'https://example.com/w2', description: 'cashier', type: 'Part-time', source: 'Adzuna', score: 55, waste_score: 30, expires_at: NOW, lat: 33.54, lng: -112.19 },
-  { id: '30000000-0000-0000-0000-000000000003', title: 'Cashier', company: 'Fry\'s', location: 'Phoenix, AZ', apply_url: 'https://example.com/f1', description: 'cashier', type: 'Part-time', source: 'Greenhouse', score: 50, waste_score: 35, expires_at: NOW, lat: null, lng: null },
-  { id: '30000000-0000-0000-0000-000000000004', title: 'Cashier', company: 'HEB', location: 'Austin, TX', apply_url: 'https://example.com/heb', description: 'cashier', type: 'Part-time', source: 'Adzuna', score: 80, waste_score: 10, expires_at: NOW, lat: 30.27, lng: -97.74 },
-  { id: '30000000-0000-0000-0000-000000000005', title: 'Director of Retail Operations', company: 'BigBox', location: 'Phoenix, AZ', apply_url: 'https://example.com/dir', description: 'lead stores', type: 'Full-time', source: 'Adzuna', score: 85, waste_score: 10, expires_at: NOW, lat: 33.45, lng: -112.07 },
-];
-
-test('cashier résumé in Phoenix vs Walmart cashier rows in Phoenix/Glendale → those rows, never the Austin one', async () => {
-  state.resumeText = CASHIER_RESUME; state.city = 'Phoenix, AZ'; state.jobsRows = CASHIER_ROWS;
-  try {
-    const res = await call();
-    assert.equal(res.code, 200);
-    assert.equal(res.body.reason, null);
-    assert.equal(res.body.city, 'Phoenix, AZ');
-    const got = res.body.jobs.map((j) => `${j.title} @ ${j.location}`);
-    assert.ok(got.includes('Cosmetics Cashier @ Phoenix, Maricopa County'), got.join(' | '));
-    assert.ok(got.includes('Cosmetics Cashier @ Glendale, Maricopa County'), 'Glendale is within the rail radius of Phoenix');
-    assert.ok(got.includes('Cashier @ Phoenix, AZ'), 'a coordinate-less row whose text says Phoenix counts');
-    assert.ok(!got.some((g) => /Austin/.test(g)), 'the Austin cashier is far away');
-    assert.ok(res.body.jobs.length >= 3, 'enough for the page to show the rail');
-    assert.ok(res.body.jobs.every((j) => j.level !== 'Mid level'));
-  } finally { state.resumeText = RESUME; state.city = 'Temecula, CA'; state.jobsRows = [jobRow(1), jobRow(2), jobRow(3)]; }
+  state.city = 'Phoenix, AZ';
+  state.jobsRows = [
+    jobRow(1, { title: 'Cosmetics Cashier', company: 'Walmart', location: 'Phoenix, Maricopa County', lat: 33.45, lng: -112.07 }),
+    jobRow(2, { title: 'Cosmetics Cashier', company: 'Walmart', location: 'Glendale, Maricopa County', lat: 33.54, lng: -112.19 }),
+    jobRow(3, { title: 'Cashier', company: "Fry's", location: 'Phoenix, AZ' }),
+    jobRow(7, { title: 'Cashier', company: 'HEB', location: 'Austin, TX', lat: 30.27, lng: -97.74 }),
+    jobRow(8, { title: 'Director of Retail Operations', company: 'BigBox', location: 'Phoenix, AZ', lat: 33.45, lng: -112.07 }),
+  ];
+  const res = await call();
+  assert.equal(res.body.reason, null);
+  const got = res.body.jobs.map((j) => `${j.title} @ ${j.company}`);
+  assert.ok(got.includes("Cashier @ Fry's"), got.join(' | '));
+  assert.ok(got.some((g) => /Cosmetics Cashier @ Walmart/.test(g)), 'one Walmart cashier (the same job in two towns is one match)');
+  assert.ok(!got.some((g) => /HEB|Director/.test(g)), got.join(' | '));
+  assert.ok(res.body.jobs.every((j) => /You're a Cashier at Target \(since 2023\)\./.test(j.match_reason)), JSON.stringify(res.body.jobs.map((j) => j.match_reason)));
 });
 
-test('no city on the profile → reason no_city, no listing reads, nothing far away offered', async () => {
+test('no city on the profile and none on the résumé → no_city, no listing reads', async () => {
   state.city = '';
-  try {
-    const res = await call();
-    assert.equal(res.code, 200);
-    assert.equal(res.body.has_resume, true);
-    assert.equal(res.body.reason, 'no_city');
-    assert.deepEqual(res.body.jobs, []);
-    assert.equal(jobReads().length, 0);
-  } finally { state.city = 'Temecula, CA'; }
+  const res = await call();
+  assert.equal(res.body.has_resume, true);
+  assert.equal(res.body.reason, 'no_city');
+  assert.equal(jobReads().length, 0);
 });
 
-
-test('no profile city but the résumé states one → the rail uses the résumé\'s city (city_source: resume)', async () => {
-  const saved = { ...state };
+test('no profile city but the résumé states one → the rail uses it (city_source: resume)', async () => {
   state.city = '';
-  state.skillsRow = null;
-  state.resumeText = `Jordan Avery
-Phoenix, AZ 85004 · (602) 555-0148 · jordan.avery.jobs@gmail.com · linkedin.com/in/jordanavery
-
-SUMMARY
-Customer-focused retail and front-desk professional with 5+ years of experience.
-
-EXPERIENCE
-Sales Associate — GNC | 2021 – Present
-• Sold supplements and built repeat business with regulars.
-
-Valet Attendant — Towne Park | Oct 2019 – Jan 2021
-• Parked and retrieved vehicles for hotel guests.`;
-  state.jobsRows = [{ ...jobRow(7), title: 'Seasonal Sales Associate (Part-Time) - Biltmore Fashion Park', company: 'aloyoga', location: 'Phoenix, Arizona, United States', lat: 33.51, lng: -112.03 }];
-  try {
-    const res = await call();
-    assert.equal(res.code, 200);
-    assert.notEqual(res.body.reason, 'no_city', JSON.stringify(res.body));
-    assert.equal(res.body.city, 'Phoenix, AZ');
-    assert.equal(res.body.city_source, 'resume');
-    assert.equal(res.body.jobs.length, 1, 'one Phoenix sales associate match is a match');
-    assert.ok(jobReads().some((c) => /phoenix/i.test(decodeURIComponent(c.u))), 'the local reads are scoped to the résumé city');
-  } finally { Object.assign(state, saved); }
+  state.resumeText = GNC_RESUME.replace('jordan.avery@example.com | 602-555-0100 | Phoenix, AZ', 'Phoenix, AZ 85004 · (602) 555-0148 · jordan.avery.jobs@gmail.com');
+  state.jobsRows = [jobRow(7, { title: 'Seasonal Sales Associate (Part-Time) - Biltmore Fashion Park', company: 'aloyoga', location: 'Phoenix, Arizona, United States', lat: 33.51, lng: -112.03 })];
+  const res = await call();
+  assert.equal(res.body.city, 'Phoenix, AZ', JSON.stringify(res.body));
+  assert.equal(res.body.city_source, 'resume');
+  assert.equal(res.body.jobs.length, 1);
+  assert.match(res.body.jobs[0].match_reason, /Sales Associate at GNC/);
 });
 
-test('no city anywhere → still an honest no_city', async () => {
-  const saved = { ...state };
-  state.city = '';
-  state.skillsRow = null;
-  try {
-    const res = await call();
-    assert.equal(res.body.reason, 'no_city');
-    assert.equal(res.body.has_resume, true);
-  } finally { Object.assign(state, saved); }
+test('a job the person already applied to is not offered again; an application adds its field', async () => {
+  state.apps = [{ job_id: jobRow(1).id, company_name: 'Hotel 1', role: 'Valet Attendant 1', created_at: new Date().toISOString() }];
+  const res = await call();
+  assert.ok(!res.body.jobs.some((j) => j.id === jobRow(1).id));
+  assert.equal(res.body.jobs.length, 2);
+});
+
+test('summaries: the rail shows a teaser only for the person\'s own current title, marked summary_only', async () => {
+  state.jobsRows = [jobRow(1, { source: 'Adzuna', description: 'Hotel 1 is hiring a valet attendant to park guest cars at our downtown hotel…' })];
+  let res = await call();
+  assert.deepEqual(res.body.jobs, [], 'her valet job ended in 2025: a summary is not enough');
+  state.resumeText = RESUME.replace('Oct 2022 – Jan 2025', 'Oct 2022 – Present');
+  res = await call();
+  assert.equal(res.body.jobs.length, 1);
+  assert.equal(res.body.jobs[0].summary_only, true);
+  assert.match(res.body.jobs[0].match_reason, /You're a Valet Attendant at Towne Park/);
 });

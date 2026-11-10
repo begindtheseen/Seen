@@ -82,6 +82,10 @@ function installFetch({ session = true, listRows = [], countRows = [] } = {}) {
         ? mockResponse([{ expires_at: new Date(Date.now() + 3600e3).toISOString(), role: 'super_admin', admin_id: 'a1' }])
         : mockResponse([]);
     }
+    // The update reads the row's current status (it is audited as the prior value) and its PATCH is
+    // counted from the returned rows (admin remake, 2026-11-10: a write is never assumed to have landed).
+    if (u.includes('company_reddit_disputes?id=eq.') && (opts.method || 'GET') === 'GET') return mockResponse([{ status: 'open' }]);
+    if (u.includes('company_reddit_disputes?id=eq.') && opts.method === 'PATCH') return mockResponse([{ id: 5 }]);
     if (u.includes('company_reddit_disputes') && u.includes('select=id,')) return mockResponse(listRows);
     if (u.includes('company_reddit_disputes') && u.includes('select=status')) return mockResponse(countRows);
     return mockResponse([]); // PATCH / audit-log writes

@@ -1,0 +1,422 @@
+[
+ {
+  "resume": "dev",
+  "posting": 98,
+  "label": "good",
+  "why": "backend Python engineer, 8 yrs vs 4+; aerospace/telemetry missing"
+ },
+ {
+  "resume": "dev",
+  "posting": 375,
+  "label": "good",
+  "why": "Go, distributed systems, Postgres; 8 yrs vs 'typically 10+'"
+ },
+ {
+  "resume": "dev",
+  "posting": 371,
+  "label": "strong",
+  "why": "6+ yrs backend Go/SQL; he has 8 and the stack"
+ },
+ {
+  "resume": "dev",
+  "posting": 62,
+  "label": "strong",
+  "why": "8+ yrs production systems, Go/Python/TypeScript; he has 8"
+ },
+ {
+  "resume": "dev",
+  "posting": 140,
+  "label": "strong",
+  "why": "3+ yrs backend, AWS, Terraform, Kubernetes, Docker \u2014 all shown"
+ },
+ {
+  "resume": "dev",
+  "posting": 180,
+  "label": "stretch",
+  "why": "frontend React role; his TypeScript is 'working', backend career"
+ },
+ {
+  "resume": "new-grad-dev",
+  "posting": 180,
+  "label": "stretch",
+  "why": "React+TypeScript exactly, but ~1.3 yrs vs 2+"
+ },
+ {
+  "resume": "new-grad-dev",
+  "posting": 62,
+  "label": "long shot",
+  "why": "one-year junior vs 8+ yrs senior"
+ },
+ {
+  "resume": "new-grad-dev",
+  "posting": 375,
+  "label": "long shot",
+  "why": "one-year junior vs 10+ yrs Go distributed systems"
+ },
+ {
+  "resume": "new-grad-dev",
+  "posting": 218,
+  "label": "stretch",
+  "why": "2-3 yrs full stack asked; he has ~1.3"
+ },
+ {
+  "resume": "electrician",
+  "posting": 180,
+  "label": "different field",
+  "why": "electrician vs frontend software"
+ },
+ {
+  "resume": "electrician",
+  "posting": 265,
+  "label": "good",
+  "why": "journeyman commercial electrician; licence is Arizona, posting wants Texas"
+ },
+ {
+  "resume": "electrician",
+  "posting": 177,
+  "label": "good",
+  "why": "wires panels/power circuits; test-bench building is adjacent electrical work"
+ },
+ {
+  "resume": "electrician",
+  "posting": 267,
+  "label": "stretch",
+  "why": "plant maintenance (mechanical, welding) \u2014 electrical half fits"
+ },
+ {
+  "resume": "warehouse",
+  "posting": 305,
+  "label": "strong",
+  "why": "5 yrs warehouse, forklift, RF, picking"
+ },
+ {
+  "resume": "warehouse",
+  "posting": 364,
+  "label": "stretch",
+  "why": "warehouse yes, but 4 yrs leadership asked and he has none"
+ },
+ {
+  "resume": "warehouse",
+  "posting": 410,
+  "label": "stretch",
+  "why": "5 yrs warehouse fits; 2+ yrs supervisory missing"
+ },
+ {
+  "resume": "warehouse",
+  "posting": 427,
+  "label": "strong",
+  "why": "material handler \u2014 exactly his work"
+ },
+ {
+  "resume": "maria",
+  "posting": 297,
+  "label": "strong",
+  "why": "9 yrs retail team lead, supervisory, cash, scheduling"
+ },
+ {
+  "resume": "maria",
+  "posting": 44,
+  "label": "strong",
+  "why": "keyholder: retail lead with opening/closing"
+ },
+ {
+  "resume": "maria",
+  "posting": 76,
+  "label": "good",
+  "why": "1 yr customer service asked; she has 9 (overqualified)"
+ },
+ {
+  "resume": "maria",
+  "posting": 356,
+  "label": "stretch",
+  "why": "restaurant ops manager; she leads retail teams \u2014 adjacent field"
+ },
+ {
+  "resume": "maria",
+  "posting": 40,
+  "label": "good",
+  "why": "2+ yrs leading talent customer-facing: she has 8"
+ },
+ {
+  "resume": "maria",
+  "posting": 364,
+  "label": "stretch",
+  "why": "shipping-ops leadership asked; retail leadership is adjacent"
+ },
+ {
+  "resume": "kitchen-manager",
+  "posting": 356,
+  "label": "strong",
+  "why": "restaurant manager 5+ incl 2 managing: she has 9 incl 5 managing"
+ },
+ {
+  "resume": "kitchen-manager",
+  "posting": 223,
+  "label": "good",
+  "why": "chef de partie; seasoned line cook/sous, no sea service"
+ },
+ {
+  "resume": "kitchen-manager",
+  "posting": 295,
+  "label": "good",
+  "why": "crew member \u2014 overqualified, same field"
+ },
+ {
+  "resume": "kitchen-manager",
+  "posting": 435,
+  "label": "good",
+  "why": "shift lead, food handling; she manages a kitchen"
+ },
+ {
+  "resume": "kitchen-manager",
+  "posting": 98,
+  "label": "different field",
+  "why": "kitchen manager vs software engineer"
+ },
+ {
+  "resume": "account-executive",
+  "posting": 174,
+  "label": "strong",
+  "why": "SaaS AE with 5 yrs and 128% quota"
+ },
+ {
+  "resume": "account-executive",
+  "posting": 162,
+  "label": "strong",
+  "why": "3+ yrs outbound, pipeline; he has 5 yrs SaaS sales"
+ },
+ {
+  "resume": "account-executive",
+  "posting": 436,
+  "label": "strong",
+  "why": "2+ yrs sales, beating quota"
+ },
+ {
+  "resume": "account-executive",
+  "posting": 307,
+  "label": "good",
+  "why": "SDR \u2014 he did this, now overqualified"
+ },
+ {
+  "resume": "account-executive",
+  "posting": 28,
+  "label": "good",
+  "why": "customer-facing SaaS in logistics; account management adjacent to his sales"
+ },
+ {
+  "resume": "account-executive",
+  "posting": 63,
+  "label": "different field",
+  "why": "sales vs registered nurse"
+ },
+ {
+  "resume": "medical-assistant",
+  "posting": 60,
+  "label": "strong",
+  "why": "MA certificate, BLS, clinic experience"
+ },
+ {
+  "resume": "medical-assistant",
+  "posting": 154,
+  "label": "strong",
+  "why": "2+ yrs, BLS, MA certification"
+ },
+ {
+  "resume": "medical-assistant",
+  "posting": 143,
+  "label": "good",
+  "why": "front desk/scheduling/insurance shown; clinical MA is adjacent"
+ },
+ {
+  "resume": "medical-assistant",
+  "posting": 63,
+  "label": "long shot",
+  "why": "healthcare, but the job turns on an RN licence she lacks"
+ },
+ {
+  "resume": "support-lead",
+  "posting": 405,
+  "label": "strong",
+  "why": "call center trainer: 6 yrs call center, built training curriculum"
+ },
+ {
+  "resume": "support-lead",
+  "posting": 268,
+  "label": "long shot",
+  "why": "must speak Spanish fluently; not on his r\u00e9sum\u00e9"
+ },
+ {
+  "resume": "support-lead",
+  "posting": 344,
+  "label": "good",
+  "why": "customer experience coordinator; strong service background"
+ },
+ {
+  "resume": "support-lead",
+  "posting": 40,
+  "label": "stretch",
+  "why": "area ops manager for caf\u00e9s; leads a team but not in F&B/retail ops"
+ },
+ {
+  "resume": "teacher",
+  "posting": 418,
+  "label": "good",
+  "why": "math teacher + business operations; teaching half exact"
+ },
+ {
+  "resume": "teacher",
+  "posting": 433,
+  "label": "long shot",
+  "why": "career coach needs Somali; coaching is adjacent"
+ },
+ {
+  "resume": "teacher",
+  "posting": 405,
+  "label": "stretch",
+  "why": "trainer role, but call-center experience asked"
+ },
+ {
+  "resume": "teacher",
+  "posting": 375,
+  "label": "different field",
+  "why": "teacher vs senior backend engineer"
+ },
+ {
+  "resume": "cashier",
+  "posting": 76,
+  "label": "good",
+  "why": "1 yr customer service retail, register; meets the minimum"
+ },
+ {
+  "resume": "cashier",
+  "posting": 297,
+  "label": "long shot",
+  "why": "4+ yrs retail and supervisory asked; one year, no lead duty"
+ },
+ {
+  "resume": "cashier",
+  "posting": 295,
+  "label": "good",
+  "why": "entry crew role, customer-facing, she qualifies"
+ },
+ {
+  "resume": "cashier",
+  "posting": 44,
+  "label": "stretch",
+  "why": "keyholder needs lead/opening duties; she has a year as cashier"
+ },
+ {
+  "resume": "accountant",
+  "posting": 282,
+  "label": "strong",
+  "why": "1-3 yrs accounting; CPA with 5"
+ },
+ {
+  "resume": "accountant",
+  "posting": 420,
+  "label": "strong",
+  "why": "2+ yrs public/private accounting; she has both"
+ },
+ {
+  "resume": "accountant",
+  "posting": 89,
+  "label": "strong",
+  "why": "reconciliations, month-end; senior staff accountant now"
+ },
+ {
+  "resume": "tasha",
+  "posting": 282,
+  "label": "different field",
+  "why": "marketing grad vs staff accountant"
+ },
+ {
+  "resume": "tasha",
+  "posting": 156,
+  "label": "stretch",
+  "why": "paid media coordinator; social media intern, no paid media shown"
+ },
+ {
+  "resume": "tasha",
+  "posting": 279,
+  "label": "long shot",
+  "why": "4+ yrs marketing asked; new grad"
+ },
+ {
+  "resume": "admin",
+  "posting": 264,
+  "label": "strong",
+  "why": "12 yrs admin support, scheduling, coordination"
+ },
+ {
+  "resume": "admin",
+  "posting": 409,
+  "label": "good",
+  "why": "admin specialist; order processing/ServiceTitan not shown"
+ },
+ {
+  "resume": "admin",
+  "posting": 143,
+  "label": "good",
+  "why": "medical receptionist; office manager at a dental group"
+ },
+ {
+  "resume": "nurse",
+  "posting": 63,
+  "label": "good",
+  "why": "RN med-surg/telemetry vs home health RN; state licence differs"
+ },
+ {
+  "resume": "nurse",
+  "posting": 317,
+  "label": "stretch",
+  "why": "BSN required; she has ADN with BSN in progress"
+ },
+ {
+  "resume": "rn-home-health",
+  "posting": 63,
+  "label": "strong",
+  "why": "home health RN with CHF, wound care, IV \u2014 exact"
+ },
+ {
+  "resume": "rn-home-health",
+  "posting": 46,
+  "label": "good",
+  "why": "LPN role; RN overqualified but same field"
+ },
+ {
+  "resume": "warehouse",
+  "posting": 98,
+  "label": "different field",
+  "why": "warehouse vs software engineer"
+ },
+ {
+  "resume": "maria",
+  "posting": 375,
+  "label": "different field",
+  "why": "retail lead vs backend engineer"
+ },
+ {
+  "resume": "dev",
+  "posting": 356,
+  "label": "different field",
+  "why": "engineer vs restaurant operations manager"
+ },
+ {
+  "resume": "nurse",
+  "posting": 180,
+  "label": "different field",
+  "why": "nurse vs frontend developer"
+ },
+ {
+  "resume": "electrician",
+  "posting": 66,
+  "label": "stretch",
+  "why": "assembly/integration tech; wiring and tools carry over, aerospace not"
+ },
+ {
+  "resume": "kitchen-manager",
+  "posting": 297,
+  "label": "stretch",
+  "why": "retail person-in-charge; leads a crew but not retail"
+ }
+]

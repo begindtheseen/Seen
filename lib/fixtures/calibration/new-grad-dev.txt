@@ -1,0 +1,23 @@
+Ethan Park
+Seattle, WA | ethan.park.dev@example.com | github.com/ethanpark
+
+SUMMARY
+Junior software developer, one year out of school, building React and Node.js features for a small e-commerce team.
+
+EXPERIENCE
+Junior Software Developer — Cartwheel Commerce, Seattle, WA    Aug 2025 – Present
+• Build React and TypeScript components for the storefront checkout and account pages
+• Wrote Node.js/Express endpoints for order history; added Jest tests for new code
+• Fix bugs from the support queue and take part in code review
+
+Software Engineering Intern — Cartwheel Commerce, Seattle, WA    Jun 2024 – Aug 2024
+• Built an internal admin page in React for refunds
+
+PROJECTS
+Course planner — React, Node.js, PostgreSQL; deployed on Render
+
+EDUCATION
+B.S. Computer Science — University of Washington, 2025
+
+SKILLS
+JavaScript, TypeScript, React, Node.js, Express, PostgreSQL, Git, Jest, HTML, CSS

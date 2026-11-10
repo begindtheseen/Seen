@@ -125,9 +125,11 @@ test('v6 (director G3): a package that changes nothing of substance is free — 
   assert.equal(r.code, 200, JSON.stringify(r.body).slice(0, 300));
   assert.equal(r.body.charged, false);
   assert.equal(r.body.no_gain, true);
-  assert.match(r.body.note, /No credit was used/);
+  assert.match(r.body.note, /no credit (?:was|is) used/i);
   assert.ok(r.body.tailored && r.body.tailored.kept_as_is, 'the finished résumé says it was kept as is');
-  assert.ok(!r.body.tailored.changes.some((c) => c.default === 'applied' && c.substantive));
+  // free for a stated reason (T3 charge rule): nothing of substance, or nothing more where a recruiter reads first
+  assert.ok(['no_change', 'no_visible_gain'].includes(r.body.charge_reason), r.body.charge_reason);
+  assert.equal(r.body.tailored.charge.charge, false);
   assert.equal(state.charges, before);
   // and the charged package carries the finished résumé with every change shown before → after
   const paid = await optimize({}, '99999999-9999-4999-8999-999999999999');
@@ -137,7 +139,7 @@ test('v6 (director G3): a package that changes nothing of substance is free — 
   assert.ok(t.score_after >= t.score_before);
   assert.equal(t.score_before, paid.body.fit_score, 'one score in one package');
   assert.ok(t.changes.some((c) => c.default === 'applied' && c.substantive));
-  for (const c of t.changes) { assert.ok(['reorder', 'summary', 'skills', 'rewrite', 'cut', 'move'].includes(c.type)); assert.ok(['applied', 'needs_ok'].includes(c.default)); assert.ok(c.why && c.why.length > 20, c.why); }
+  for (const c of t.changes) { assert.ok(['reorder', 'summary', 'skills', 'rewrite', 'cut', 'move', 'format'].includes(c.type)); assert.ok(['applied', 'needs_ok'].includes(c.default)); assert.ok(c.why && c.why.length > 20, c.why); }
   assert.equal(t.doc.basics.summary, t.changes.find((c) => c.type === 'summary').after, 'the doc carries the applied summary');
 });
 

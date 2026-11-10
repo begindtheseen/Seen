@@ -10,6 +10,7 @@
 
 import { pickRenewalReminders } from '../lib/server/renewalReminders.js';
 import { isVercelCron, hasCronSecret, hasAdminSession } from '../lib/server/cronAuth.js';
+import { recordCronRun } from '../lib/server/cronRun.js';
 import { ilikeExact } from '../lib/server/pgrest.js';
 import { escapeHtml } from '../lib/server/escapeHtml.js';
 
@@ -86,9 +87,11 @@ export default async function handler(req, res) {
       sent++;
     }
 
+    if (isVercelCron(req)) await recordCronRun('employer-renewals', 'ok', `checked ${perks.length}, due ${due.length}, sent ${sent}`);
     return res.status(200).json({ ok: true, checked: perks.length, due: due.length, sent, skipped });
   } catch (e) {
     console.error('[employer-renewals] error:', e?.message || e);
+    if (isVercelCron(req)) await recordCronRun('employer-renewals', 'failed', 'internal error');
     return res.status(500).json({ error: 'Internal server error' });
   }
 }

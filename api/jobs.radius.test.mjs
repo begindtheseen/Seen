@@ -91,7 +91,7 @@ test('remote (radius 0) is unchanged: only listings that say remote', async () =
 
 test('a place the table does not know still goes to the geocoder', async () => {
   urls.length = 0;
-  await call({ query: 'cashier', location: 'Ahwatukee Foothills Village', radius: '25', db_only: true });
+  await call({ query: 'cashier', location: 'Quillmoor Heights', radius: '25', db_only: true }); // no such place in the table
   assert.ok(urls.some((u) => u.includes('geocode_cache')), 'fell back to geocodeLocation');
 });
 

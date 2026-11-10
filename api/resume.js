@@ -4,7 +4,8 @@ import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { gateAI, resolveProAccess, resolveAuthedUser } from '../lib/server/credits.js';
 import { RESUME_OPTIMIZE_COST } from '../lib/server/creditRules.js';
-import { previewOnlyOrFetch } from '../lib/server/postingGate.js';
+import { postingTextForReader } from '../lib/server/jobInsights.js';
+import { readPosting } from '../lib/server/postingRead.js';
 import { optimizeCacheKey, readCachedOptimize, writeCachedOptimize } from '../lib/server/optimizeCache.js';
 import { buildPaidOptimize, unoptimizableListing } from '../lib/server/optimizePackage.js';
 import { runAdvantage, requirementsStated, extractEmployment, extractCareerSignal, buildResumeDocument, resumeFileName } from '../lib/server/resumeAnalysis.js';
@@ -99,16 +100,20 @@ export function gateFailure(gate) {
 }
 const SIGNIN_REQUIRED = { error: 'signin_required', message: 'Sign in to continue.', signin_required: true };
 
-// The credit rule for a tailored résumé (tool:optimize and action:tailor): charged only when the document changed
-// substantively (a default-applied change of substance) AND the fit did not drop. Otherwise free, with a plain note.
-export function tailorCharge(tailored, company = '') {
-  if (!tailored) return { charge: false, note: 'Nothing could be tailored for this posting, so no credit was used.' };
+// The credit rule for a tailored résumé (tool:optimize AND action:tailor): ONE decision, made in
+// lib/resume/tailor/paid.js chargeDecision AFTER the package is built, carried on `tailored.charge`. Charged only when
+// nothing blocks the application, at least one applied change of substance beyond formatting was made, and the
+// document is measurably better for this posting (more of what the résumé proves sits where a recruiter reads first,
+// or a thin / cliché summary was replaced) — and never when the fit would drop. Otherwise free, with one sentence.
+export function tailorCharge(tailored) {
+  if (!tailored) return { charge: false, reason: 'no_document', note: 'Nothing could be tailored for this posting, so no credit was used.' };
   const before = tailored.score_before, after = tailored.score_after;
-  const substantive = (tailored.changes || []).some((c) => c.default === 'applied' && c.substantive);
-  if (!substantive) return { charge: false, note: `${tailored.kept_as_is || `Your résumé already fits this ${company ? `${company} ` : ''}posting as written.`} No credit was used.` };
-  if (typeof before === 'number' && typeof after === 'number' && after < before) return { charge: false, note: `The changes would lower your match (${before} → ${after}), so they are not applied and no credit was used.` };
-  return { charge: true, note: null };
+  if (typeof before === 'number' && typeof after === 'number' && after < before) return { charge: false, reason: 'fit_drop', note: `The changes would lower your match (${before} → ${after}), so they are not applied and no credit was used.` };
+  const c = tailored.charge || { charge: false, reason: 'no_change', sentence: tailored.kept_as_is || 'Nothing of substance changed for this posting, so no credit was used.' };
+  return { charge: !!c.charge, reason: c.reason, note: c.charge ? null : c.sentence };
 }
+
+export { readPosting };
 
 export default async function handler(req, res) {
   const _o = req.headers.origin || '';
@@ -589,9 +594,13 @@ async function handleOptimizeTool(req, res, body) {
     if (!authed?.uid) return res.status(401).json(SIGNIN_REQUIRED);
     if (!body.resume) return res.status(400).json({ error: 'Resume required' });
     if (!isReadableResume(body.resume)) return res.status(400).json({ error: 'RESUME_CORRUPTED' });
-    // a teaser with a saved job behind it becomes the fetched posting on `body` (lib/server/fullPosting.js)
-    const preview = await previewOnlyOrFetch(body);
+    // a teaser with a saved job behind it becomes the fetched posting on `body` (lib/server/fullPosting.js); a pasted
+    // link is read and its own title / employer are what the result names
+    const original = String(body.resume);
+    const { preview, posting } = await readPosting(body);
     if (preview) return res.status(preview.status).json({ ...preview.body, charged: false });
+    // the SAME posting text the fit check and Job Insights read (markup turned into lines)
+    body.jobDescription = postingTextForReader(body.jobDescription);
     const { job, company, jobDescription, jobId } = body;
     // The canonical text and the shared taxonomy — the same inputs the free fit check and the Studio
     // score, so the three screens print one number (lib/resume/canonical.js, skillTaxonomy.js).
@@ -608,15 +617,14 @@ async function handleOptimizeTool(req, res, body) {
     // probe or not, before the credit gate (the modal said "No score" and then charged a credit).
     const unoptimizable = unoptimizableListing({ resume, jobDescription, job, company, taxonomy });
     if (unoptimizable) return res.status(422).json({ error: 'no_requirements', ...unoptimizable, cost: 0, charged: false });
-    if (body.probe) return res.status(200).json({ cached: false, price: RESUME_OPTIMIZE_COST, charged: false });
-
-    // The package is built BEFORE the credit: a résumé the tailor could not substantively improve (or whose
-    // match the changes would lower) is returned free with no_gain and a plain note (tailorCharge).
-    const result = buildPaidOptimize({ resume, jobDescription, job, company, pro: false, jobId, taxonomy, fit });
-    const rule = tailorCharge(result.tailored, company);
+    // The package is built BEFORE the credit — on the probe too, so the offer can say exactly what a credit buys (or
+    // that this one is free, and why) before anything is spent.
+    const result = buildPaidOptimize({ resume, resumeIsCanonical: true, original, jobDescription, job, company, pro: false, jobId, taxonomy, fit, posting });
+    const rule = tailorCharge(result.tailored);
+    if (body.probe) return res.status(200).json({ cached: false, price: RESUME_OPTIMIZE_COST, cost: rule.charge ? RESUME_OPTIMIZE_COST : 0, charged: false, charge: { charge: rule.charge, reason: rule.reason, sentence: rule.note || (result.charge && result.charge.sentence) || null }, change_counts: result.change_counts, posting: result.posting, blocked: result.blocked, field_match: result.field_match, fit_score: result.fit_score, requirements_listed: result.requirements_listed });
     if (!rule.charge) {
       const proNow = (await resolveProAccess(req)).pro;
-      const out = { ...result, no_gain: true, note: rule.note };
+      const out = { ...result, no_gain: true, note: rule.note, charge_reason: rule.reason };
       const stored = await writeCachedOptimize(authed.uid, key, out);
       return res.status(200).json({ ...out, cached: false, cache_saved: stored, charged: false, pro: !!proNow });
     }
@@ -664,8 +672,10 @@ async function handleStudio(req, res, body) {
       case 'tailor': {
         // a posting that is only a preview is never charged (a title-only tailor stays allowed)
         if (String(body.jobDescription || '').trim()) {
-          const preview = await previewOnlyOrFetch(body);
-          if (preview) return res.status(preview.status).json({ ...preview.body, charged: false });
+          const read = await readPosting(body);
+          if (read.preview) return res.status(read.preview.status).json({ ...read.preview.body, charged: false });
+          body._posting = read.posting;
+          body.jobDescription = postingTextForReader(body.jobDescription);
         }
         const [taxonomy, fit] = await Promise.all([loadSkillTaxonomy(), fitContext({ company: body.company, jobDescription: body.jobDescription })]);
         // A posting that states no requirements has nothing to tailor against: refused free, before
@@ -678,10 +688,11 @@ async function handleStudio(req, res, body) {
         // engineer's résumé went 70 → 70 and paid 1 credit, round 1) is returned free, with a plain reason.
         if (!(await resolveAuthedUser(req))) return res.status(401).json(SIGNIN_REQUIRED);
         const out = await tailorAction(body, { taxonomy, fit });
-        const rule = tailorCharge(out.tailored, body.company);
+        if (body._posting) out.posting = { ...body._posting, title: body._posting.title || body.jobTitle || null };
+        const rule = tailorCharge(out.tailored);
         if (!rule.charge) {
           const proNow = (await resolveProAccess(req)).pro;
-          return res.status(200).json({ ...out, charged: false, no_gain: true, pro: !!proNow, note: rule.note });
+          return res.status(200).json({ ...out, charged: false, no_gain: true, pro: !!proNow, note: rule.note, charge_reason: rule.reason });
         }
         const gate = await gateAI(req, 'resume_tailor');
         if (!gate.ok) return res.status(gate.status).json(gateFailure(gate));

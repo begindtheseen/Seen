@@ -229,3 +229,14 @@
   .whereText { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .whereEdit { flex: none; display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--sp-4); border: 1px solid var(--border-2); border-radius: var(--r-pill); color: var(--text-1); font-size: var(--fs-sm); font-weight: 600; }
 }
+
+/* Area search (a place, no title): the remote toggle under the results header, and the end-of-list line. */
+.areaRemote { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: 0 0 var(--sp-4); }
+.areaRemote button { min-height: 44px; }
+.areaEnd {
+  margin: var(--sp-4) 0 0;
+  font-family: var(--body);
+  font-size: var(--fs-sm);
+  color: var(--text-3);
+  text-align: center;
+}

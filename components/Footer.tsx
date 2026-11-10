@@ -43,7 +43,7 @@ const COLS: Array<{ title: string; links: Array<{ href: string; label: string }>
 export default function Footer() {
   const pathname = usePathname()
   // The employer portal supplies its own footer/chrome — hide the seeker footer there.
-  if (pathname?.startsWith('/employers')) return null
+  if (pathname?.startsWith('/employers') || pathname?.startsWith('/admin')) return null
   return (
     <footer className={styles.footer}>
       <div className={styles.wrap}>

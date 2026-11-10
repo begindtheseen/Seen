@@ -19,6 +19,7 @@
 import { logError } from '../lib/server/errlog.js';
 import { pruneStaleJobs, PRUNE_DEFAULTS } from '../lib/server/jobPrune.js';
 import { isVercelCron } from '../lib/server/cronAuth.js';
+import { recordCronRun } from '../lib/server/cronRun.js';
 
 export default async function handler(req, res) {
   const cronSecret = process.env.CRON_SECRET;
@@ -67,10 +68,12 @@ export default async function handler(req, res) {
       `long-dead row(s) past expires_at+${summary.graceDays}d (cutoff ${summary.cutoff}` +
       `${summary.capped ? `, capped at ${summary.limit} — more next run` : ''})`
     );
+    if (isCron) await recordCronRun('prune-jobs', 'ok', { dry_run: !apply, ...summary });
     return res.status(200).json({ ok: true, date: new Date().toISOString(), dry_run: !apply, ...summary });
   } catch (err) {
     console.error('prune-jobs error:', err.message);
     logError('prune-jobs', err.message, { isCron });
+    if (isCron) await recordCronRun('prune-jobs', 'failed', err.message);
     return res.status(500).json({ error: err.message });
   }
 }

@@ -69,6 +69,8 @@ type Pack = {
   noteKeys?: Record<string, string>
   job_text?: string
   posting_pay?: string | null
+  notice?: { text: string; field_match?: string; gate?: string } | null
+  field_match?: string
 }
 // The fillable things beside the questions: the intro and the two emails (lib/server/prepFills.js).
 const INTRO_KEY = '__intro__'
@@ -583,6 +585,12 @@ function PackView({ pack, company, fu, onFill, onRebuild, building }: { pack: Pa
   return (
     <div className={s.pack}>
       <div className={s.offerTitle}>Your prep for {company}</div>
+      {pack.notice?.text && (
+        // a change of field or a failed hard gate is said first, plainly (the prep below is built for it)
+        <div className={s.block}>
+          <p className={s.watch}>{pack.notice.text}</p>
+        </div>
+      )}
       {pack.guide && (
         <div className={s.block}>
           <div className={s.label}>How {pack.guide.company} interviews</div>
