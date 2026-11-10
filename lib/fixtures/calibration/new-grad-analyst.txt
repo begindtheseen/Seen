@@ -1,0 +1,18 @@
+Priya Raman
+Columbus, OH | priya.raman@example.com
+
+EDUCATION
+B.S. Data Analytics — Ohio State University, expected May 2027
+Coursework: SQL, statistics, Python, data visualization
+
+EXPERIENCE
+Data Analytics Intern — Nationwide Insurance, Columbus, OH   Summer 2026
+• Built SQL queries and Tableau dashboards for claims trends used by 3 managers
+• Cleaned 2M rows of policy data in Python (pandas) and documented the steps
+
+Business Intelligence Intern — Huntington Bank, Columbus, OH   Summer 2025
+• Automated a weekly Excel report with Power Query, saving the team 4 hours a week
+• Wrote SQL to reconcile branch metrics against the source system
+
+SKILLS
+SQL, Python (pandas), Tableau, Excel, Power BI, statistics
