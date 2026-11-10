@@ -17,7 +17,7 @@ import { BulkBar, List, Row, RowActions } from '../../ui/List.tsx'
 import { EmptyState } from '../../ui/states.tsx'
 import {
   FLAG_TEXT, GROUP_TEXT, HELD_VIEWS, MAX_BULK, approvableIds, filterNote, fmt, groupOf, heldHasRules, heldSearchFields,
-  heldViewCounts, heldWhy, isDuplicate, label, matchesHeldView, matchesQuery, newRequestId, outcomeTone, parseHeldView,
+  heldViewCounts, heldWhy, label, matchesHeldView, matchesQuery, newRequestId, outcomeTone, parseHeldView,
   plural, approvePlan, pruneSelection, nothingToPublishLine, snippet, when, type HeldRow, type HeldView,
 } from './adapter.ts'
 import { Chips, Choice, CursorRow, KeysHint, Line, Meta, RecomputeLine } from './parts.tsx'
