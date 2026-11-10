@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { ActionView } from '../core/hooks.tsx'
 import ResultLine from './ResultLine.tsx'
+import { checkingText, isChecking, type Checking } from './bits.tsx'
 import Button from '@/components/ui/Button'
 import type { AdminErr } from '../contract.ts'
 import { EmptyState, ErrorState, RefreshFailed, Skeleton } from './states.tsx'
@@ -120,13 +121,18 @@ export function RowActions({ children }: { children: ReactNode }) {
 }
 
 /** Sticky above the phone bar while rows are selected: "12 selected · Approve · Reject · Clear". */
-export function BulkBar({ count, noun, children, onClear }: { count: number; noun: string; children: ReactNode; onClear: () => void }) {
+export function BulkBar({ count, noun, children, onClear, checking }: {
+  count: number; noun: string; children: ReactNode; onClear: () => void
+  /** The selection's count is still being checked: its buttons wait (disabled) and the bar says so. */
+  checking?: Checking | null
+}) {
   if (count <= 0) return null
   return (
     <div className={styles.bulk} role="region" aria-label="Selected rows" data-testid="bulk-bar">
-      <span className={styles.bulkCount}>{fmt(count)} {noun} selected</span>
+      <span className={styles.bulkCount}>{fmt(count)} {noun} selected{isChecking(checking) ? ` · ${checkingText(checking)}` : ''}</span>
       <div className={styles.bulkActions}>
-        {children}
+        {/* A disabled fieldset disables every button the section put here until the count is final. */}
+        <fieldset className={styles.bulkFieldset} disabled={isChecking(checking)} aria-busy={isChecking(checking) || undefined}>{children}</fieldset>
         <Button variant="ghost" onClick={onClear}>Clear</Button>
       </div>
     </div>

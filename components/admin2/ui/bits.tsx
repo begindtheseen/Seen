@@ -132,7 +132,15 @@ export const SearchField = forwardRef<HTMLInputElement, {
   )
 })
 
-export type ChipOption = { value: string; label: string; count?: number | null }
+/** A count still being checked (a counts read saying `checked: n of m`): never a number that will change. */
+export type Checking = { checked: number; total: number }
+export const isChecking = (c?: Checking | null): c is Checking => !!c && c.checked < c.total
+/** "checking 82 more…". Pure. */
+export function checkingText(c: Checking): string {
+  return `checking ${Math.max(0, Math.round(c.total - c.checked)).toLocaleString('en-US')} more…`
+}
+
+export type ChipOption = { value: string; label: string; count?: number | null; checking?: Checking | null }
 
 /** One choice out of a few. The chosen chip is the accent tint; the value lives in the URL. */
 export function FilterChips({ options, value, onChange, label }: { options: ChipOption[]; value: string; onChange: (v: string) => void; label: string }) {
@@ -140,7 +148,7 @@ export function FilterChips({ options, value, onChange, label }: { options: Chip
     <div className={styles.chips} role="group" aria-label={label}>
       {options.map((o) => (
         <button key={o.value} type="button" className="ui-chip" aria-pressed={o.value === value} onClick={() => onChange(o.value)}>
-          {o.label}{typeof o.count === 'number' ? <span className={styles.chipCount}>{fmt(o.count)}</span> : null}
+          {o.label}{isChecking(o.checking) ? <span className={styles.chipCount}>{checkingText(o.checking)}</span> : typeof o.count === 'number' ? <span className={styles.chipCount}>{fmt(o.count)}</span> : null}
         </button>
       ))}
     </div>

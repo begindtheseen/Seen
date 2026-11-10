@@ -17,6 +17,7 @@
 import type { AdminJobState, AdminSkipped, AdminUndo } from '../contract.ts'
 import type { AdminApi, ApiResult } from './api.ts'
 import type { UndoBus } from './action.ts'
+import { counted } from './words.ts'
 
 export type JobSpec = {
   action: string
@@ -119,7 +120,7 @@ function skippedText(skipped: AdminSkipped[]): string {
 
 /** The one-line summary for a finished, stopped or failed job. */
 export function jobSummary(j: Job, lastMessage = ''): string {
-  const did = `${j.past} ${fmt(j.changed)} ${j.noun}${j.detail && typeof j.detail_total === 'number' ? ` (${fmt(j.detail_total)} ${j.detail.noun})` : ''}`
+  const did = `${j.past} ${counted(j.changed, j.noun)}${j.detail && typeof j.detail_total === 'number' ? ` (${counted(j.detail_total, j.detail.noun)})` : ''}`
   const skip = skippedText(j.skipped)
   const left = typeof j.remaining === 'number' && j.remaining > 0 ? `${fmt(j.remaining)} left` : ''
   const tail = [skip, left].filter(Boolean).join(' · ')

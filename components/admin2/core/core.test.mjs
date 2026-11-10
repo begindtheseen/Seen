@@ -208,7 +208,7 @@ test('action: a large Undo answers in rounds and is called until complete', asyn
   const api = async (action, body) => { calls.push({ action, body }); const [st, b] = answers.shift(); return toResult(st, JSON.stringify(b)) }
   const r = createActionRunner({ api, cache: new QueryCache(), action: 'review_held' })
   await r.run({ ids: ['*'] }); await r.undo()
-  assert.deepEqual(calls.slice(1).map((c) => c.body), [{ audit_id: '9' }, { audit_id: '9' }])
+  assert.deepEqual(calls.slice(1).map((c) => c.body.audit_id), ['9', '9']); assert.deepEqual(calls.slice(1).map((c) => c.body.round), [1, 2], 'undo rounds are named')
   assert.equal(r.state().result.changed, 300); assert.match(r.state().result.message, /^300 rows put back\./); assert.equal(r.state().undone, true)
 })
 
@@ -284,7 +284,7 @@ test('action: success re-reads only touched keys; Undo is itself an action that 
   assert.equal(r.state().result.skipped[0].count, 46)
   reads.length = 0
   await r.undo(); await flush()
-  assert.deepEqual(sent[1], { action: 'undo', body: { audit_id: 'a1' } })
+  assert.equal(sent[1].action, 'undo'); assert.equal(sent[1].body.audit_id, 'a1')
   assert.deepEqual(reads, ['held']); assert.equal(r.state().undone, true); assert.equal(r.state().result.undo, undefined, 'no second Undo')
 })
 
@@ -428,7 +428,7 @@ test('action: an Undo that answers in rounds continues as a visible, resumable j
   const j = jobs.get(st.jobId)
   assert.equal(j.changed, 1200); assert.equal(j.remaining, 0)
   assert.deepEqual(sent.slice(2).map((c) => ({ audit_id: c.body.audit_id, cursor: c.body.cursor, round: c.body.round })), [{ audit_id: '7', cursor: 'c400', round: 2 }, { audit_id: '7', cursor: 'c800', round: 3 }], 'same audit_id, cursor passed back, rounds named')
-  assert.match(j.message, /^Restored 1,200 rows in 3 rounds\./)
+  assert.match(j.message, /^Put back 1,200 rows in 3 rounds\./)
 })
 
 test('jobs: a round that moves its cursor with nothing changed is progress; the server sentence is kept', async () => {
@@ -621,4 +621,35 @@ test('round 7: a single write\'s replay shows the recorded sentence and its reco
   assert.equal(r.changed, 5); assert.equal(r.message, 'Added 5 credits · balance 10.')
   const busy = toResult(409, JSON.stringify({ ok: false, code: 'in_progress', retryable: true, error: 'Still running from the first press.' }))
   assert.equal(busy.code, 'in_progress')
+})
+
+test('round 8: one plural rule — "1 report" / "2 reports"; summaries use it', async () => {
+  const { counted, singularNoun } = await import('./words.ts')
+  assert.equal(counted(1, 'reports'), '1 report'); assert.equal(counted(2, 'reports'), '2 reports'); assert.equal(counted(1040, 'reports'), '1,040 reports')
+  assert.equal(singularNoun('duplicate copies'), 'duplicate copy'); assert.equal(singularNoun('listings nobody saved'), 'listing nobody saved')
+  assert.equal(singularNoun('groups of duplicate names'), 'group of duplicate names'); assert.equal(singularNoun('company scores'), 'company score')
+  assert.equal(singularNoun('stale listings'), 'stale listing'); assert.equal(singularNoun('companies'), 'company'); assert.equal(singularNoun('boxes'), 'box')
+  const base = { id: 'x', key: 'k', action: 'a', args: {}, label: 'L', past: 'Put back', noun: 'rows', remaining: 0, rounds: 1, message: '', skipped: [], lost_rounds: 0, started_at: '', status: 'done' }
+  assert.equal(jobSummary({ ...base, changed: 1 }), 'Put back 1 row in 1 round.')
+  assert.equal(jobSummary({ ...base, changed: 1, noun: 'groups', detail: { field: 'merged', noun: 'companies' }, detail_total: 1 }), 'Put back 1 group (1 company) in 1 round.')
+})
+
+test('round 8: a large Undo waits long, checks an unknown answer with the same id, never says "Undo failed" for a client timeout', async () => {
+  const { undoSentence } = await import('./action.ts')
+  assert.equal(undoSentence('Undid it: 140 reports are back in the review queue.'), '140 reports are back in the review queue.')
+  assert.equal(undoSentence('140 reports are back.'), '140 reports are back.')
+  const seen = []
+  const answers = [[200, { ok: true, changed: 140, message: 'Approved 140.', undo: { action: 'undo', args: { audit_id: '5' }, label: 'Undo' } }], [504, ''], [200, ''], [200, { ok: true, changed: 0, replayed: true, recorded_changed: 140, message: 'Undid it: 140 reports are back in the review queue.' }]]
+  const api = async (a, b, o) => { seen.push({ a, b, t: o?.timeoutMs }); const [s, x] = answers.shift(); return toResult(s, typeof x === 'string' ? x : JSON.stringify(x)) }
+  const r = createActionRunner({ api, cache: new QueryCache(), action: 'review_held', sleep: async () => {}, checkDelaysMs: [1, 1, 1] })
+  await r.run({ ids: ['*'] }); await r.undo()
+  const st = r.state()
+  assert.equal(st.undone, true); assert.equal(st.result.message, '140 reports are back in the review queue.'); assert.equal(st.result.changed, 140)
+  const undoCalls = seen.filter((c) => c.a === 'undo')
+  assert.equal(new Set(undoCalls.map((c) => c.b.request_id)).size, 1, 'one request_id for the Undo press'); assert.equal(undoCalls[0].t, 75000, 'the long timeout')
+  // never answered: "Not known yet" with Check again, which reuses the id
+  const api2 = async (a) => (a === 'undo' ? toResult(504, '') : toResult(200, JSON.stringify({ ok: true, changed: 1, message: 'x', undo: { action: 'undo', args: { audit_id: '6' }, label: 'Undo' } })))
+  const r2 = createActionRunner({ api: api2, cache: new QueryCache(), action: 'review_held', sleep: async () => {}, checkDelaysMs: [1] })
+  await r2.run({}); await r2.undo()
+  assert.equal(r2.state().error.code, 'unknown_outcome'); assert.ok(r2.state().result.undo, 'the Undo stays available to check again'); assert.ok(r2.state().undoRid)
 })
