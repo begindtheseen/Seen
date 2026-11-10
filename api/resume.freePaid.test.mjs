@@ -64,3 +64,27 @@ test('free == paid: one fit score, one band, one requirement count, on 30 real p
   }
   assert.equal(compared, 30, `compared ${compared}`);
 });
+
+// round 6 (director): the Studio tailor screen receives the SAME statements as the free check — same status, the verdict's
+// evidence [{ line, why }] array (never one string), and the same `candidate` ({ line, why }) — and so does the paid result.
+test('free == paid == Studio: each statement\'s status, evidence lines and candidate agree', async () => {
+  const shape = (sts) => new Map((sts || []).map((s) => [s.id, { status: s.status, evidence: (Array.isArray(s.evidence) ? s.evidence : []).map((e) => e.line), candidate: s.candidate ? s.candidate.line || null : null }]));
+  let compared = 0;
+  for (let i = 0; i < 6; i++) {
+    const resume = PERSONAS[i % PERSONAS.length];
+    const j = POSTINGS[i];
+    const free = await call(optimizerHandler, { action: 'optimize', resumeText: resume, jobTitle: j.title, company: j.company, jobDescription: j.description });
+    if (free.code !== 200 || !Array.isArray(free.body.statements) || !free.body.statements.length) continue;
+    const paid = await call(resumeHandler, { tool: 'optimize', resume, job: j.title, company: j.company, jobDescription: j.description, jobId: `agree-${i}`, fresh: true }, '44444444-4444-4444-8444-444444444444');
+    const s = await call(resumeHandler, { action: 'structure', text: resume });
+    const studio = await call(resumeHandler, { action: 'tailor', doc: s.body.doc, jobTitle: j.title, company: j.company, jobDescription: j.description }, '44444444-4444-4444-8444-444444444444');
+    const f = shape(free.body.statements.filter((x) => x.display !== false && x.kind !== 'promise'));
+    for (const [name, got] of [['paid', paid.body.statements], ['studio', studio.body && studio.body.statements]]) {
+      assert.ok(Array.isArray(got), `${j.title}: ${name} sent no statements`);
+      for (const x of got) assert.ok(Array.isArray(x.evidence), `${j.title}: ${name} evidence is an array`);
+      assert.deepEqual(shape(got), f, `${j.title}: ${name} statements differ from the free check`);
+    }
+    compared++;
+  }
+  assert.ok(compared >= 4, `compared ${compared}`);
+});
