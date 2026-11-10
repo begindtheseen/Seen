@@ -536,7 +536,7 @@ function AnswerEditor({ a, company, values, notes, onSave, defaultOpen, title, t
   const queue = () => { if (timer.current) clearTimeout(timer.current); timer.current = setTimeout(() => flush(), 600) }
   return (
     <details className={`${s.answer}${finished && n ? ` ${s.done}` : ''}`} open={defaultOpen}>
-      <summary>{a.company && <span className={s.chip}>{company}</span>}{title || a.q}{n > 0 && <span className={s.state}>{finished ? '✓ finished' : touched ? `${vals.filter(v => v?.trim()).length}/${n} filled` : `${n} ${n === 1 ? 'blank' : 'blanks'} to fill`}</span>}</summary>
+      <summary>{a.company && <span className={s.chip}>{company}</span>}{title || a.q}{n > 0 ? <span className={s.state}>{finished ? '✓ ready to use' : touched ? `${vals.filter(v => v?.trim()).length}/${n} filled` : `${n} ${n === 1 ? 'blank' : 'blanks'} to fill`}</span> : !a.exercise && <span className={s.state}>✓ ready to use</span>}</summary>
       <p className={s.tag}>{tag}</p>
       {a.exercise ? (
         <p className={s.prose}>{a.practice}</p>
@@ -627,7 +627,7 @@ function PackView({ pack, company, fu, onFill, onRebuild, building }: { pack: Pa
         </div>
       )}
       <div className={s.block}>
-        <div className={s.label}>Your answers · {done}/{pack.answers.filter(a => !a.exercise).length} finished</div>
+        <div className={s.label}>Your answers · {done} of {pack.answers.filter(a => !a.exercise).length} ready to use</div>
         <p className={s.dim} style={{ margin: '0 0 .5rem' }}>Every answer starts from your résumé or the posting. Type the part only you know into each blank, and the finished answer is yours — saved here, on every device.</p>
         {pack.answers.map((a, i) => (
           <AnswerEditor key={a.q} a={a} company={company} values={fills[a.q] || []} notes={notes[a.q]} onSave={(vals, urgent) => onFill(a.q, vals, urgent)} defaultOpen={i === 0} />

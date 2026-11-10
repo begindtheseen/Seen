@@ -64,3 +64,9 @@
 .steps li[data-done='1'] { opacity: 1; transform: none; }
 .steps li svg { flex-shrink: 0; color: var(--good-text); }
 @media (prefers-reduced-motion: reduce) { .steps li { transition: none; } }
+
+.headline { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: var(--fs-lead); }
+.fmtBox > summary::-webkit-details-marker { display: none; }
+.fmtSum { min-height: 44px; display: flex; align-items: center; cursor: pointer; list-style: none; font-size: var(--fs-ui); font-weight: 600; color: var(--text-2); }
+.fmtSum:focus-visible { outline: none; box-shadow: var(--sh-focus); border-radius: var(--r-chip); }
+.fmtBox[open] > .fmtSum { margin-bottom: var(--sp-2); }

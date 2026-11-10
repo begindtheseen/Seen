@@ -9,7 +9,7 @@
 // legacy dashboard read; GET only ever reads.
 
 import { fail, logSafe, AdminError } from '../lib/server/admin/respond.js';
-import { requireAdmin } from '../lib/server/admin/auth.js';
+import { checkAdmin, adminDenied } from '../lib/server/admin/auth.js';
 import { makeDb } from '../lib/server/admin/batch.js';
 import { login, logout } from '../lib/server/admin/session.js';
 import { legacyDashboard } from '../lib/server/admin/legacyDashboard.js';
@@ -82,8 +82,10 @@ async function route(req, res) {
 
   if (req.method === 'POST' && body.action === 'admin_login') return login(req, res, { db, url, key, body });
 
-  const sess = await requireAdmin(req, { url, key, body });
-  if (!sess) return fail(res, 401, 'Session expired — log in again', { code: 'unauthorized', retryable: false });
+  // A session that cannot be READ (slow or failing database) is 503 retryable, never "signed out".
+  const check = await checkAdmin(req, { url, key, body });
+  if (!check.sess) { const d = adminDenied(check.status); return res.status(d.status).json(d.body); }
+  const sess = check.sess;
 
   const t0 = Date.now();
   const ctx = { req, res, db, url, key, sess, body, action: null, t0, deadline: t0 + REQUEST_BUDGET_MS };

@@ -38,3 +38,12 @@
 .disclose > summary::-webkit-details-marker { display: none; }
 .disclose[open] > summary { margin-bottom: var(--sp-2); }
 .disclose > :not(summary) + :not(summary) { margin-top: var(--sp-4); }
+
+/* Yes / No / Skip on what only the person can say (outlined — the screen's one filled button is the footer's) */
+.answers { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-1); }
+.ans { min-height: 44px; min-width: 64px; padding: 0 var(--sp-3); background: transparent; border: 1px solid var(--border-2); border-radius: var(--r-control); color: var(--text-1); font: inherit; font-size: var(--fs-ui); font-weight: 600; cursor: pointer; }
+.ans:hover { border-color: var(--border-3); }
+.said { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2); margin: var(--sp-1) 0 0; font-size: var(--fs-sm); color: var(--text-2); line-height: var(--lh-body); overflow-wrap: anywhere; }
+.said > span { min-width: 0; flex: 1 1 200px; }
+.change { min-height: 44px; padding: 0 var(--sp-2); background: none; border: 0; color: var(--accent); font: inherit; font-size: var(--fs-sm); font-weight: 600; cursor: pointer; }
+.ans:focus-visible, .change:focus-visible { outline: none; box-shadow: var(--sh-focus); }

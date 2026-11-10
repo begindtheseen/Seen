@@ -17,7 +17,8 @@ The UI codes to THIS file and to `components/admin2/contract.ts`. Everything her
 |---|---|---|---|
 | 400 | `bad_request` | false | a field is missing or invalid (the sentence names it) |
 | 400 | `unknown_action` | false | the action is not one of ours — the answer carries `actions: string[]` |
-| 401 | `unauthorized` | false | no token / expired / signed out. UI: "Session ended — sign in", replay after |
+| 401 | `unauthorized` | false | the session row was read and is missing, expired or the account is disabled. UI: "Session ended — sign in", replay after |
+| 503 | `upstream` | true | the session could not be READ (slow or failing database): "Couldn’t check your session — try again." — never a sign-out |
 | 403 | `forbidden` | false | a moderator asked for an admin-only action (extra code, not in the contract comment) |
 | 404 | `not_found` | false | the row is gone |
 | 409 | `conflict` | false | it changed while you looked (e.g. already decided by someone else) |
@@ -177,7 +178,12 @@ scheduled interval + 1 h grace.
 Every pending row is read (keyset pages internally, no 1,000 cap; `truncated` true only past 20,000).
 `flags` may include `possible_duplicate`, `anti_gaming_hold`, `not_a_hiring_outcome`, `no_source_link`.
 
-### `review_held` `{ decision: "approve"|"reject", ids: string[], request_id?: uuid, include_duplicates?: boolean }` → `AdminOk`  (THE bulk fix)
+### `review_held` `{ decision: "approve"|"reject", ids?: string[], scope?: "all", group?: "needs_eyes"|"positive"|"employee_review", include_ids?: string[], request_id?: uuid }` → `AdminOk`  (THE bulk fix)
+- `ids` (1–5,000) OR `scope: "all"` ("all matching": the server takes every pending report, narrowed by `group`).
+- **Bulk approve scope guard:** an approval of more than one report (several ids, or `scope:"all"`) SKIPS anti-gaming
+  holds (`anti_gaming_hold`) and possible duplicates (`possible_duplicate`), each with its count and ids, unless that
+  id is also listed in `include_ids` (the admin named it on purpose). A single-id approve is never filtered;
+  rejections are never filtered. `include_duplicates` is gone. The legacy `review_reports` alias has the same guard.
 Send ONE `request_id` per press and reuse it on Retry / continuation: rows that press already decided are then
 reported as `already_done_last_try` and one Undo covers every row of the press.
 Any number of ids (1–5,000) in the body. Written in chunks of ≤100 ids per PostgREST call, or in one
@@ -195,7 +201,7 @@ bulk approve unless `include_duplicates: true`.
   "recompute": { "queued": 41, "done": 41, "remaining": 0, "mode": "table" },
   "remaining": 0, "complete": true }
 ```
-- `skipped` reasons: `possible_duplicate` (approve only), `already_decided` (held but already rejected/duplicate,
+- `skipped` reasons: `anti_gaming_hold` and `possible_duplicate` (bulk approve only — see the guard above), `already_decided` (held but already rejected/duplicate,
   or decided by someone else — **never** a row this same admin decided in the last 10 minutes: a retry after a
   timeout counts those as `changed` again via the audit trail, `message` says "already done by your last try"),
   `not_held` (live rows), `not_found` (no such id), `invalid_id`.
@@ -364,7 +370,8 @@ Legal audit PDF / package: `POST /api/admin-company-audit-pdf|package` `{ compan
   "balance": 7 } ] }
 ```
 Server-side search over every profile (email contains, or an exact user id). `pro` = an active `pro_until`.
-### `user_detail` `{ user_id }` → `AdminOk` `rows:[UserRow & { ledger: [{ delta, reason, created_at }], applications: number|null, reports: number|null }]`
+### `user_detail` `{ user_id }` → `AdminOk` `rows:[UserRow & { ledger: [{ delta, reason, created_at }], credits_earned: number|null, credits_spent: number|null, applications: number|null, reports: number|null }]`
+`ledger` is the newest 50 entries; `credits_earned` / `credits_spent` are summed over every entry (keyset pages).
 ### `set_pro_window` `{ user_id, until: ISO-date | null }` → `AdminOk`
 Writes `ai_credits.pro_until` ONLY on a grant (never `balance`, `pro` or `comped`, never a purchase row — so a grant can
 never read as revenue). `null` ends it now; ending also clears an older grant's lifetime `pro` / `comped` flags (else the
@@ -400,7 +407,8 @@ Only flags code reads (registry in `lib/server/admin/system.js FLAG_READERS`, he
 ### `set_flag` `{ flag_name, status, percentage?, confirm? }` → `AdminOk` (undoable). A flag not in the registry → 400.
 A `dangerous` flag needs `confirm` equal to the flag name (typed confirmation), else 400 "Type the flag name to confirm".
 ### `errors_list` `{ after?, endpoint? }` → `AdminList<{ id, endpoint, error_msg, created_at, ref }>` (+ `by_route` for 24 h).
-### `revenue_summary` `{ days?: 7|30|90|365 }` → `AdminOk` `rows:[{ days, total_cents, consumer: [{sku, count, cents}], employer_cents, source: "credit_transactions purchase_<sku> × creditRules price; employer_purchases.amount_cents" }]`
+### `revenue_summary` `{ days?: 7|30|90|365 }` → `AdminOk` `rows:[{ days, total_cents, consumer: [{sku, name, count, cents}], employer_cents, credits: { earned, spent, rows, source }, source }]`
+Every total is an exact count × price or a sum over every row (keyset pages); a total that could not be read whole is null.
 ### `revenue_funnel` `{ days? }` (POST alias of the GET). `search_opportunities` (unchanged).
 ### `recent_events` `{ since }` — unchanged (`events`, `server_time`).
 ### `export_csv` `{}` → `AdminOk` + `{ csv, filename }` (no subscription lines; counts are exact counts).

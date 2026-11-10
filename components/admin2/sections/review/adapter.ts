@@ -203,6 +203,57 @@ export function approvableIds(rows: HeldRow[], ids: string[], includeDuplicates 
   return ids.filter((id) => !dup.has(id))
 }
 
+export type ApprovePlan = {
+  /** Ids that will be published. */
+  ids: string[]
+  /** Send include_duplicates (only when the owner ticked a possible duplicate himself). */
+  includeDuplicates: boolean
+  /** What stays for the owner to read, by reason. */
+  heldBack: { duplicates: number; antiGaming: number; needsEyes: number; employee: number }
+  /** "140 clear positives will be published · 24 possible duplicates and 29 anti-gaming holds stay for you to read." */
+  sentence: string
+}
+
+/**
+ * What a bulk approve publishes (audit AB #7: "Approve all (319)" published 119 needs-your-eyes rows and
+ * 29 anti-gaming holds behind one confirm). Anti-gaming holds and possible duplicates are NEVER in a bulk
+ * approve unless the owner ticked that row himself (`picked`). `scope`: 'positive' = the clear positives
+ * only; 'selection' = the selected rows.
+ */
+export function approvePlan(rows: HeldRow[], scope: 'positive' | 'selection', selected: Set<string> = new Set(), picked: Set<string> = new Set()): ApprovePlan {
+  const pool = scope === 'positive' ? rows.filter((r) => groupOf(r) === 'positive') : rows.filter((r) => selected.has(r.id))
+  const ids: string[] = []
+  const heldBack = { duplicates: 0, antiGaming: 0, needsEyes: 0, employee: 0 }
+  let includeDuplicates = false
+  for (const r of pool) {
+    const own = picked.has(r.id)
+    if (flagsOf(r).includes('anti_gaming_hold') && !own) { heldBack.antiGaming++; continue }
+    if (isDuplicate(r) && !own) { heldBack.duplicates++; continue }
+    if (isDuplicate(r)) includeDuplicates = true
+    ids.push(r.id)
+  }
+  if (scope === 'positive') {
+    for (const r of rows) {
+      if (groupOf(r) === 'positive') continue
+      if (flagsOf(r).includes('anti_gaming_hold')) heldBack.antiGaming++
+      else if (groupOf(r) === 'employee_review') heldBack.employee++
+      else heldBack.needsEyes++
+    }
+  }
+  const pub = ids.length
+  const what = scope === 'positive' ? (pub === 1 ? 'clear positive' : 'clear positives') : (pub === 1 ? 'report' : 'reports')
+  const stay = [
+    heldBack.duplicates ? plural(heldBack.duplicates, 'possible duplicate') : '',
+    heldBack.antiGaming ? plural(heldBack.antiGaming, 'anti-gaming hold') : '',
+    heldBack.needsEyes ? `${fmt(heldBack.needsEyes)} that ${heldBack.needsEyes === 1 ? 'needs' : 'need'} your eyes` : '',
+    heldBack.employee ? plural(heldBack.employee, 'employee review') : '',
+  ].filter(Boolean)
+  const head = pub ? `${fmt(pub)} ${what} will be published` : 'Nothing here can be published in bulk'
+  const stays = heldBack.duplicates + heldBack.antiGaming + heldBack.needsEyes + heldBack.employee === 1 ? 'stays' : 'stay'
+  const tail = stay.length ? ` · ${listWords(stay)} ${stays} for you to read${scope === 'selection' && (heldBack.duplicates || heldBack.antiGaming) ? ' (tick one yourself to include it)' : ''}` : ''
+  return { ids, includeDuplicates, heldBack, sentence: `${head}${tail}.` }
+}
+
 /** What the held list shows under its filters: "Showing 120 of 343 held reports (all loaded)". */
 export function filterNote(shown: number, loaded: number, opts: { total?: number | null; truncated?: boolean; filtered: boolean; noun: string }): string {
   const { total, truncated, filtered, noun } = opts

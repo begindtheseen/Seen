@@ -20,7 +20,7 @@ import { EmptyState } from '../../ui/states.tsx'
 import {
   FLAG_TEXT, GROUP_TEXT, HELD_VIEWS, MAX_BULK, approvableIds, filterNote, fmt, groupOf, heldHasRules, heldSearchFields,
   heldViewCounts, heldWhy, isDuplicate, label, matchesHeldView, matchesQuery, newRequestId, outcomeTone, parseHeldView,
-  plural, positiveIds, pruneSelection, snippet, when, type HeldRow, type HeldView,
+  plural, approvePlan, pruneSelection, snippet, when, type HeldRow, type HeldView,
 } from './adapter.ts'
 import { Chips, Choice, CursorRow, KeysHint, Meta } from './parts.tsx'
 import { useListKeys } from './reviewHooks.tsx'
@@ -50,6 +50,10 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
   const searchRef = useRef<HTMLInputElement>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [confirmReject, setConfirmReject] = useState(false)
+  // Which bulk approve is waiting for its confirm: the clear positives, or the selection.
+  const [confirmApprove, setConfirmApprove] = useState<'positive' | 'selection' | null>(null)
+  // Rows the owner ticked one by one: only these can bring an anti-gaming hold or a possible duplicate into a bulk approve.
+  const [picked, setPicked] = useState<Set<string>>(new Set())
   const [lastRow, setLastRow] = useState<string | null>(null)
   const [lastTarget, setLastTarget] = useState<string | null>(null)
   const [limit, setLimit] = useState(PAGE)
@@ -64,7 +68,8 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
   const filtered = useMemo(() => rows.filter((r) => matchesHeldView(r, view) && matchesQuery(heldSearchFields(r), q)), [rows, view, q])
   const isFiltered = view !== 'all' || !!q.trim()
   const shown = filtered.slice(0, limit)
-  const positives = useMemo(() => positiveIds(rows), [rows])
+  const positivePlan = useMemo(() => approvePlan(rows, 'positive'), [rows])
+  const selectionPlan = useMemo(() => approvePlan(rows, 'selection', selected, picked), [rows, selected, picked])
 
   // Rows decided elsewhere (the sheet, another tab) leave the selection too.
   useEffect(() => { setSelected((s) => pruneSelection(s, rows)) }, [rows])
@@ -94,7 +99,7 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
     onSettled: (res, args) => {
       const ids = args.ids as string[]
       if (res.ok) {
-        if (ids.length > 1) setSelected(new Set())
+        if (ids.length > 1) { setSelected(new Set()); setPicked(new Set()) }
         else setSelected((s) => { if (!s.has(ids[0])) return s; const n = new Set(s); n.delete(ids[0]); return n })
         const rc = (res as AdminOk & { recompute?: Recompute }).recompute
         if (rc && (rc.remaining || 0) > 0) {
@@ -102,6 +107,7 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
         }
       }
       setConfirmReject(false)
+      setConfirmApprove(null)
     },
   })
 
@@ -109,12 +115,17 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
     if (!ids.length) return
     setLastTarget(target)
     if (target !== 'bulk') setLastRow(target)
-    void decide.run({ decision, ids: ids.slice(0, MAX_BULK), request_id: newRequestId(), ...extra }, target)
+    void decide.run({ decision, request_id: newRequestId(), ...extra, ids: ids.slice(0, MAX_BULK) }, target)
   }
   const one = (decision: 'approve' | 'reject', r: HeldRow) => run(decision, [r.id], r.id, decision === 'approve' && isDuplicate(r) ? { include_duplicates: true } : {})
   const byId = (id: string) => rows.find((r) => r.id === id)
 
-  const toggle = (id: string) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  const toggle = (id: string) => {
+    const on = !selected.has(id)
+    setSelected((s) => { const n = new Set(s); if (on) n.add(id); else n.delete(id); return n })
+    setPicked((s) => { const n = new Set(s); if (on) n.add(id); else n.delete(id); return n })
+  }
+  const clearSelection = () => { setSelected(new Set()); setPicked(new Set()); setConfirmReject(false); setConfirmApprove(null) }
   const allMatchingSelected = filtered.length > 0 && filtered.every((r) => selected.has(r.id))
   const selectedIds = [...selected]
   const overCap = selectedIds.length > MAX_BULK
@@ -158,13 +169,24 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
 
       {rows.length ? (
         <div className={styles.actions}>
-          {positives.length ? (
-            <Button variant="primary" icon="check" onClick={() => run('approve', positives, 'bulk')} loading={decide.busy('bulk')} disabled={decide.busy('bulk')} data-testid="held-approve-positive">
-              Approve all positive ({fmt(positives.length)})
+          {positivePlan.ids.length && confirmApprove !== 'positive' ? (
+            <Button variant="primary" icon="check" onClick={() => setConfirmApprove('positive')} disabled={decide.busy('bulk')} data-testid="held-approve-positive">
+              Approve all positive ({fmt(positivePlan.ids.length)})
             </Button>
           ) : null}
+          {confirmApprove === 'positive' ? (
+            <ConfirmStep
+              title={`Publish ${plural(positivePlan.ids.length, 'clear positive')}?`}
+              body={<span data-testid="held-positive-plan">{positivePlan.sentence} Undo puts them back in this queue.</span>}
+              confirmLabel={`Publish ${fmt(positivePlan.ids.length)}`}
+              tone="primary"
+              busy={decide.busy('bulk')}
+              onCancel={() => setConfirmApprove(null)}
+              onConfirm={() => run('approve', positivePlan.ids, 'bulk')}
+            />
+          ) : null}
           {filtered.length ? (
-            <Button variant="secondary" onClick={() => setSelected(allMatchingSelected ? new Set() : new Set(filtered.map((r) => r.id)))} data-testid="held-select-all">
+            <Button variant="secondary" onClick={() => (allMatchingSelected ? clearSelection() : setSelected(new Set(filtered.map((r) => r.id))))} data-testid="held-select-all">
               {allMatchingSelected ? 'Clear selection' : isFiltered ? `Select all ${fmt(filtered.length)} matching` : `Select all ${fmt(filtered.length)}`}
             </Button>
           ) : null}
@@ -245,8 +267,18 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
         </div>
       ) : null}
 
-      <BulkBar count={selected.size} noun={selected.size === 1 ? 'report' : 'reports'} onClear={() => { setSelected(new Set()); setConfirmReject(false) }}>
-        {confirmReject ? (
+      <BulkBar count={selected.size} noun={selected.size === 1 ? 'report' : 'reports'} onClear={clearSelection}>
+        {confirmApprove === 'selection' ? (
+          <ConfirmStep
+            inline
+            title={selectionPlan.ids.length ? `Publish ${plural(Math.min(selectionPlan.ids.length, MAX_BULK), 'selected report')}?` : 'Nothing selected can be published in bulk'}
+            body={<span data-testid="held-selection-plan">{selectionPlan.sentence} Undo puts them back in this queue.</span>}
+            confirmLabel={`Publish ${fmt(Math.min(selectionPlan.ids.length, MAX_BULK))}`}
+            busy={decide.busy('bulk')}
+            onCancel={() => setConfirmApprove(null)}
+            onConfirm={() => { if (selectionPlan.ids.length) run('approve', selectionPlan.ids, 'bulk', selectionPlan.includeDuplicates ? { include_duplicates: true } : {}) }}
+          />
+        ) : confirmReject ? (
           <ConfirmStep
             inline
             title={`Reject ${plural(Math.min(selectedIds.length, MAX_BULK), 'held report')}?`}
@@ -258,8 +290,8 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
           />
         ) : (
           <>
-            <Button variant="secondary" onClick={() => run('approve', selectedIds, 'bulk')} disabled={decide.busy('bulk')} data-testid="held-bulk-approve">
-              {overCap ? `Approve the first ${fmt(MAX_BULK)}` : 'Approve'}
+            <Button variant="secondary" onClick={() => setConfirmApprove('selection')} disabled={decide.busy('bulk')} data-testid="held-bulk-approve">
+              {overCap ? `Approve the first ${fmt(MAX_BULK)}…` : 'Approve…'}
             </Button>
             <Button variant="ghost" onClick={() => setConfirmReject(true)} disabled={decide.busy('bulk')} data-testid="held-bulk-reject">
               {overCap ? `Reject the first ${fmt(MAX_BULK)}…` : 'Reject…'}

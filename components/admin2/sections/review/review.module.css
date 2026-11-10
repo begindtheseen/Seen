@@ -16,7 +16,7 @@
 .toolRow > * { min-width: 0; }
 .grow { flex: 1 1 240px; min-width: 0; }
 .choice { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
-.choiceChip { min-height: 44px; display: inline-flex; align-items: center; gap: var(--sp-2); }
+.choiceChip { min-height: 44px; min-width: 44px; justify-content: center; display: inline-flex; align-items: center; gap: var(--sp-2); }
 .select { min-height: 44px; max-width: 100%; }
 .selectLabel { display: inline-flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); color: var(--text-3); }
 

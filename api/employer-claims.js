@@ -9,7 +9,7 @@
 // (migration 053) is the defense-in-depth boundary for direct anon-key access; the authz that
 // matters operationally is enforced here.
 
-import { requireAdmin } from '../lib/server/admin/auth.js';
+import { checkAdmin, adminDenied } from '../lib/server/admin/auth.js';
 import { createHmac, timingSafeEqual } from 'crypto';
 import {
   normalizeClaimCompany,
@@ -214,10 +214,9 @@ async function listClaimsForUser(db, uid) {
 // ── Admin actions: verify session, list all claims, approve, reject ────────────
 async function adminRoute(req, res, { db, body, adminToken }) {
   // THE admin-session check, shared with api/admin-stats.js (lib/server/admin/auth.js requireAdmin).
-  const sess = await requireAdmin(req, { body, token: adminToken });
-  if (!sess) {
-    return res.status(401).json({ ok: false, error: 'Session expired — log in again', code: 'unauthorized', retryable: false });
-  }
+  const check = await checkAdmin(req, { body, token: adminToken });
+  if (!check.sess) { const d = adminDenied(check.status); return res.status(d.status).json(d.body); }
+  const sess = check.sess;
 
   // A human-readable reviewer name for the audit trail (requireAdmin resolves it; falls back to the admin id).
   const reviewer = sess.username && sess.username !== 'admin' ? sess.username : await adminUsername(db, sess.admin_id);

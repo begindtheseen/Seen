@@ -331,7 +331,9 @@ export default function JobsPage() {
         {area && status === 'done' && area.remoteTotal > 0 && (
           <div className={bar.areaRemote}>
             <Chip selected={includeRemote} onClick={() => setIncludeRemote(!includeRemote)} icon="globe" data-testid="area-remote">
-              {includeRemote ? `Including ${area.remoteTotal.toLocaleString('en-US')} remote` : `Also show ${area.remoteTotal.toLocaleString('en-US')} remote job${area.remoteTotal === 1 ? '' : 's'} based here`}
+              {/* The remote listings counted here are remote-only roles whose listing names a place in this area
+                  ("Remote - Phoenix, AZ", "Remote (Tempe)"). */}
+              {includeRemote ? `Showing ${area.remoteTotal.toLocaleString('en-US')} remote listing${area.remoteTotal === 1 ? '' : 's'} for ${area.label} — hide` : `Also show ${area.remoteTotal.toLocaleString('en-US')} remote listing${area.remoteTotal === 1 ? '' : 's'} for ${area.label}`}
             </Chip>
           </div>
         )}
@@ -364,12 +366,14 @@ export default function JobsPage() {
           {hasMore && (
             <Button variant="secondary" full onClick={() => loadMore()} loading={loadingMore} data-testid="show-more" className={j.more}>
               {loadingMore ? 'Loading…' : area
-                ? `Show ${Math.min(60, area.total - filtered.length)} more · ${(area.total - filtered.length).toLocaleString('en-US')} left`
+                ? (area.jobsTotal < area.total
+                  ? `Show more · ${(area.total - filtered.length).toLocaleString('en-US')} more locations`
+                  : `Show ${Math.min(60, area.total - filtered.length)} more · ${(area.total - filtered.length).toLocaleString('en-US')} left`)
                 : 'Show 60 more'}
             </Button>
           )}
           {area && !hasMore && filtered.length >= 60 && (
-            <p className={bar.areaEnd}>That’s all {area.total.toLocaleString('en-US')}.</p>
+            <p className={bar.areaEnd}>That’s all {area.jobsTotal < area.total ? `${area.jobsTotal.toLocaleString('en-US')} jobs (${area.total.toLocaleString('en-US')} locations)` : `${area.total.toLocaleString('en-US')} jobs`}.</p>
           )}
           </>
         ) : view === 'error' ? (

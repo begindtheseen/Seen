@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 import {
   KINDS, parseKind, kindCount, waitingLine, matchesHeldView, heldViewCounts, positiveIds, approvableIds, filterNote,
   pruneSelection, moderationFor, patchRows, sourceHref, when, newRequestId, ticketSummary, signalText, heldHasRules,
-  parseHeldView, label, snippet, outcomeTone,
+  parseHeldView, label, snippet, outcomeTone, approvePlan,
 } from './adapter.ts'
 
 const row = (id, group, flags = [], extra = {}) => ({ id, company_name: 'Acme', outcome: group === 'positive' ? 'interview' : 'ghosted', review: { group, flags }, ...extra })
@@ -138,4 +138,23 @@ test('Review sends every request through the core api and never reloads or navig
     assert.ok(!/window\.(confirm|alert|prompt)/.test(src), `${f} uses a native dialog`)
     assert.ok(!/id=in\./.test(src), `${f} builds an id list into a URL`)
   }
+})
+
+test('bulk approve never publishes anti-gaming holds or possible duplicates unless the owner ticked that row', () => {
+  const rows = [
+    row('p1', 'positive'), row('p2', 'positive'), row('pd', 'positive', ['possible_duplicate']),
+    row('n1', 'needs_eyes'), row('ag', 'needs_eyes', ['anti_gaming_hold']), row('e1', 'employee_review', ['not_a_hiring_outcome']),
+  ]
+  const pos = approvePlan(rows, 'positive')
+  assert.deepEqual(pos.ids, ['p1', 'p2'])
+  assert.equal(pos.includeDuplicates, false)
+  assert.equal(pos.sentence, '2 clear positives will be published · 1 possible duplicate, 1 anti-gaming hold, 1 that needs your eyes and 1 employee review stay for you to read.')
+  const all = new Set(rows.map((r) => r.id))
+  const sel = approvePlan(rows, 'selection', all)
+  assert.deepEqual(sel.ids, ['p1', 'p2', 'n1', 'e1'], 'select-all leaves holds and duplicates out')
+  assert.match(sel.sentence, /^4 reports will be published · 1 possible duplicate and 1 anti-gaming hold stay for you to read \(tick one yourself to include it\)\.$/)
+  const mine = approvePlan(rows, 'selection', all, new Set(['ag', 'pd']))
+  assert.deepEqual(mine.ids.sort(), ['ag', 'e1', 'n1', 'p1', 'p2', 'pd'])
+  assert.equal(mine.includeDuplicates, true)
+  assert.equal(approvePlan(rows, 'selection', new Set(['ag'])).sentence, 'Nothing here can be published in bulk · 1 anti-gaming hold stays for you to read (tick one yourself to include it).')
 })

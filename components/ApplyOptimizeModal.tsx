@@ -32,7 +32,7 @@ import { afterPendingBack } from '@/lib/nav/urlState'
 import { markQuiet } from '@/lib/quietWindow'
 import { markOptimized } from '@/lib/optimizedJobs'
 import { RequirementsView, Checklist, PlanChanges, CopyBtn, planChangeCount, type Verdict, type RequirementRow, type ConstraintRow, type PaidPlan } from './optimizer/Verdict'
-import FitRead, { type Statement, type FieldMatch } from './optimizer/FitRead'
+import FitRead, { type Statement, type FieldMatch, type Answer, type Answers } from './optimizer/FitRead'
 import { PaidResult, BlockedResult, ResultTopLine, PaidOffer, BuildSteps, usePaidVersion, type Tailored, type Charge, type Blocked, type ChangeCounts, type Question } from './optimizer/PaidResult'
 import { renderText } from '@/lib/resume/engine-client'
 import PostingInput, { PostingReadRow, type PostingRead } from './jobs/PostingInput'
@@ -146,6 +146,12 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
   const [noReqNote, setNoReqNote] = useState('')
   const [copied, setCopied] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
+  // the person's Yes / No / Skip on what only they can say — kept on this device for this job, sent with the build as
+  // `confirmed` (the server decides what to do with it; the screen never writes it into the résumé)
+  const answersKey = `seen_confirm_v1:${user?.id || 'guest'}:${job.id}`
+  const [answers, setAnswers] = useState<Answers>(() => { try { return JSON.parse(localStorage.getItem(answersKey) || '{}') as Answers } catch { return {} } })
+  const onAnswer = (id: string, a: Answer | null) => setAnswers((x) => { const n = { ...x }; if (a) n[id] = a; else delete n[id]; try { localStorage.setItem(answersKey, JSON.stringify(n)) } catch { /* storage unavailable */ } return n })
+  const confirmed = Object.entries(answers).filter(([, a]) => a !== 'skip').map(([statementId, answer]) => ({ statementId, answer }))
   // the downloadable version: built from the CURRENT document (accepted changes only), pre-built so the
   // download runs inside the tap (iOS); keyed by the document so a toggle never serves a stale file
   const [pdf, setPdf] = useState<{ key: string; blob: Blob } | null>(null)
@@ -207,19 +213,20 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
   // the server can tell a teaser from a posting, the job id for the cache key, and the title/employer to score
   // under — never this job's title for a DIFFERENT posting (the server then takes the link's own).
   function postingBody(c: PostingCtx) {
-    const who = { job: c.title, jobTitle: c.title, company: c.company }
+    const who = { job: c.title, jobTitle: c.title, company: c.company, ...(confirmed.length ? { confirmed } : {}) }
     return c.pasted
       ? { ...who, jobDescription: c.pasted, postingPasted: true, jobId: c.other ? `${job.id}:other` : job.id }
       : { ...who, jobDescription: job.description || '', jobSource: job.source || null, jobId: job.id }
   }
 
-  function readFrom(c: PostingCtx, d: { matched_requirements?: RequirementRow[]; unsupported_requirements?: RequirementRow[]; posting?: PostingEcho; requirements_listed?: number; statements?: Statement[] } | null): PostingRead | null {
+  function readFrom(c: PostingCtx, d: { posting?: PostingEcho; requirement_count?: number; verdict?: Verdict } | null): PostingRead | null {
     if (!c.pasted) return null
     // the server's ONE count when it sends it (requirements_listed); else the rows it listed
     // the same count the fit read and the build steps use: the reader's statements when sent (not promises), else
     // the server's one listed count — never two different numbers on one screen
-    const sts = d && Array.isArray((d as { statements?: Statement[] }).statements) ? ((d as { statements?: Statement[] }).statements || []).filter((x) => x.kind !== 'promise') : null
-    const n = d ? (sts && sts.length ? sts.length : typeof d.requirements_listed === 'number' ? d.requirements_listed : requirementCounts({ matched: d.matched_requirements || [], missing: d.unsupported_requirements || [] }).total) : null
+    // the server's ONE count (requirement_count, the verdict's); a client count never reaches the screen
+    const rc = d ? ((d as { requirement_count?: number }).requirement_count ?? (d as { verdict?: Verdict }).verdict?.requirement_count) : null
+    const n = typeof rc === 'number' ? rc : null
     const echo = d?.posting || null
     return readFacts({ pasted: c.pasted, server: echo ? { title: echo.title, company: echo.company } : (c.other ? { title: c.title, company: c.company } : null), job: { title: c.title, company: c.company }, requirements: n })
   }
@@ -384,6 +391,10 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
   function applyWithoutOptimize() { openPosting() }
   function goTo(href: string) { onClose(); setTimeout(() => afterPendingBack(() => router.push(href)), 0) }
   const matchedJobsHref = '/jobs'
+  // jobs in the person's OWN field: their latest job title, as written on the résumé
+  const latestTitle = (resumeDoc?.experience || []).map((e) => String((e as { displayTitle?: string }).displayTitle || e.title || '')).find((t) => t && t.split(/\s+/).length <= 6) || ''
+  const fieldJobsHref = latestTitle ? `/jobs?q=${encodeURIComponent(latestTitle)}` : ''
+  const fieldLabel = latestTitle ? `Find ${latestTitle} jobs` : ''
 
   const head = ctx.other ? (read?.title || ctx.title || (read?.host ? `The posting at ${read.host}` : 'The posting you pasted')) : job.title
   const headCo = ctx.other ? (read?.company || ctx.company) : job.company
@@ -403,14 +414,13 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
     if (!result || !tailored) return [] as string[]
     const out: string[] = []
     // one source for both counts: the reader's statements (the same rows the fit read lists); else the one listed count
-    const st = (result.statements || []).filter((x) => x.kind !== 'promise')
+    const rc = (result as { requirement_count?: number }).requirement_count ?? result.verdict?.requirement_count
+    const st = (result.statements || []).filter((x) => x.kind !== 'promise' && x.display !== false)
     const proved = st.filter((x) => x.status === 'shown' || x.status === 'partly').length
     const asks = st.filter((x) => x.status === 'cannot_tell').length
-    if (st.length) {
-      out.push(`Read ${st.length} thing${st.length === 1 ? '' : 's'} the posting asks for`)
-      if (proved) out.push(`Matched ${proved} of them to lines on your résumé`)
-      if (asks) out.push(`Left ${asks} for you to answer — hours, lifting and the like`)
-    } else if (typeof result.requirements_listed === 'number') out.push(`Read ${result.requirements_listed} requirement${result.requirements_listed === 1 ? '' : 's'} in the posting`)
+    if (typeof rc === 'number') out.push(`Read the posting: ${rc} requirement${rc === 1 ? '' : 's'}`)
+    if (proved) out.push(`Found your own line for ${proved} of the things it asks`)
+    if (asks) out.push(`Left ${asks} for you to answer — hours, lifting and the like`)
     const built = (tailored.changes || []).filter((c) => c.type !== 'format' && c.type !== 'heading').length
     out.push(built ? `Built ${built} change${built === 1 ? '' : 's'} to your résumé` : 'Found nothing worth changing in your lines')
     const qn = (result.questions || []).length
@@ -584,12 +594,12 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
               {blocked
                 ? <>
                     {diag && <FitRead data={diag} note="free" compact brief />}
-                    <BlockedResult b={blocked} jobsHref={matchedJobsHref} showLink={false} />
+                    <BlockedResult b={blocked} jobsHref={matchedJobsHref} showLink={false} fieldHref={fieldJobsHref} fieldLabel={fieldLabel} />
                   </>
                 : <>
                     {diag
                       ? <>
-                          <FitRead data={diag} note="free" />
+                          <FitRead data={diag} note="free" answers={answers} onAnswer={onAnswer} />
                           {!diag.statements?.length && <Checklist constraints={diag.constraints} />}
                         </>
                       : <p className={s.fine}>The free check didn&apos;t load. You can still optimize, or close and try again.</p>}
@@ -606,7 +616,7 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
             <>
               {readRow}
               <ResultTopLine charge={result.charge} charged={!!result.charged} cached={!!result.cached} pro={pro} balance={balance} cost={cost} />
-              <BlockedResult b={blocked} jobsHref={matchedJobsHref} showLink={false} />
+              <BlockedResult b={blocked} jobsHref={matchedJobsHref} showLink={false} fieldHref={fieldJobsHref} fieldLabel={fieldLabel} />
               <FitRead data={result} compact brief />
             </>
           )}
@@ -637,7 +647,7 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
                   </div>
                 </details>
               )}
-              <FitRead data={result} compact />
+              <FitRead data={result} compact answers={answers} onAnswer={onAnswer} />
               {result.cached && (
                 <p className={s.ledger}>
                   You built this version with this résumé in the last 7 days. {pro === true ? 'Rebuilding is unlimited with Pro.' : `A rebuild costs ${cost}.`}{' '}
@@ -667,7 +677,7 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
                   <div className={s.section}><p className={s.msg}>{result.application_message}</p><CopyBtn text={result.application_message} label="Copy message" /></div>
                 </details>
               )}
-              <FitRead data={result} compact />
+              <FitRead data={result} compact answers={answers} onAnswer={onAnswer} />
             </>
           )}
         </div>

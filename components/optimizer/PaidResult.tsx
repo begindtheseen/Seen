@@ -30,7 +30,7 @@ export interface Change {
   added?: { term: string; line?: string; requirement?: string | null }[]
   items?: FormatItem[]
 }
-export interface Charge { charge: boolean; reason: string; sentence: string | null }
+export interface Charge { charge: boolean; reason: string; sentence: string | null; headline?: string | null; detail?: string | null }
 export interface Blocked { reason: string; sentence: string; what_would_change_it?: string[]; carries_over?: { requirement: string; line: string }[] }
 export interface Question { id: string; kind: string; question: string; unit?: string; requirement?: string | null; statement?: string | null; answer_kind?: string | null; term?: string; itemId?: string; role?: string; company?: string; template?: string; why?: string; bulletId?: string; line?: string; slot?: string }
 export interface Tailored { doc: ResumeDoc; text?: string; changes: Change[]; kept_as_is?: string | null; visibility?: { of: number; before: number; after: number }; charge?: Charge; score_before?: number | null; score_after?: number | null }
@@ -69,14 +69,41 @@ export type PaidVersion = ReturnType<typeof usePaidVersion>
 const q = (t?: string | null, n = 160) => { const x = String(t || '').replace(/\s+/g, ' ').trim(); return x.length > n ? `${x.slice(0, n).replace(/\s+\S*$/, '')}…` : x }
 const arr = (v?: string | string[]) => (Array.isArray(v) ? v : v ? [v] : [])
 
-function FormatLine({ it }: { it: FormatItem }) {
-  if (it.kind === 'heading_renamed') return <li>Heading “{it.from}” is now “{it.to}”.</li>
-  if (it.kind === 'line_moved') return <li>“{q(it.line, 90)}” now sits under {it.to_section ? `“${it.to_section}”` : 'another section'}{it.from_section ? ` (it was under “${it.from_section}”)` : ''}.</li>
-  if (it.kind === 'lines_joined') return <li>{arr(it.before).map((b) => `“${q(b, 50)}”`).join(' and ')} joined to the line it belongs to: “{q(arr(it.after)[0], 90)}”.</li>
-  if (it.kind === 'line_split') return <li>“{q(arr(it.before)[0], 70)}” split into {arr(it.after).map((a) => `“${q(a, 50)}”`).join(' and ')}.</li>
-  if (it.kind === 'line_restyled') return arr(it.before)[0] ? <li>“{q(arr(it.before)[0], 90)}” → “{q(arr(it.after)[0], 90)}”.</li> : <li>Added as a line of its own: “{q(arr(it.after)[0], 90)}”.</li>
-  if (it.kind === 'unplaced') return <li className={s.warnLine}><Icon name="triangle-alert" size={14} label="Check" />“{q(it.line, 90)}” could not be placed — check where it sits before you send.</li>
-  return null
+// The re-typesetting, in plain words, one line per kind of change (the server's structured items — never its
+// parser prose). Collapsed by default: it is how the document is laid out, not what the credit bought.
+const titleCase = (t?: string) => String(t || '').toLowerCase().replace(/(^|\s|\/)([a-z])/g, (m, p1, c) => p1 + c.toUpperCase())
+const bare = (t?: string) => q(String(t || '').replace(/^[-•·*]\s*/, ''), 80)
+export function formatLines(items: FormatItem[]): { text: string; warn?: boolean }[] {
+  const out: { text: string; warn?: boolean }[] = []
+  const of = (k: string) => items.filter((x) => x.kind === k)
+  for (const x of of('heading_renamed')) out.push({ text: `Your heading “${x.from}” is printed as “${titleCase(x.to)}” — the name applicant systems look for.` })
+  const seenMoved = new Set<string>()
+  for (const x of of('line_moved')) {
+    const k = bare(x.line).toLowerCase(); if (seenMoved.has(k)) continue; seenMoved.add(k)
+    if (!x.to_section) continue
+    out.push({ text: `“${bare(x.line)}” now sits under ${titleCase(x.to_section)}${x.from_section ? ` (it was under ${titleCase(x.from_section)})` : ''}.` })
+  }
+  const joined = of('lines_joined').reduce((n, x) => n + arr(x.before).length, 0)
+  if (joined) out.push({ text: `${joined === 1 ? 'A line that stood on its own (a date or a place) was' : `${joined} lines that stood on their own (dates, places) were`} joined to the job ${joined === 1 ? 'it belongs' : 'they belong'} to.` })
+  const split = of('line_split').length
+  if (split) out.push({ text: `${split === 1 ? 'A line that ran two parts together was' : `${split} lines that ran two parts together were`} split where they belong.` })
+  const restyled = of('line_restyled').filter((x) => arr(x.before)[0]).length
+  if (restyled) out.push({ text: `${restyled === 1 ? 'One line keeps' : `${restyled} lines keep`} the same words with the separators applicant systems read (“|” between title, employer and dates).` })
+  for (const x of of('line_restyled').filter((y) => !arr(y.before)[0])) out.push({ text: `“${bare(arr(x.after)[0])}” now sits on a line of its own.` })
+  for (const x of of('unplaced')) out.push({ text: `“${bare(x.line)}” could not be placed — check where it sits before you send.`, warn: true })
+  return out
+}
+function FormatCard({ c }: { c: Change }) {
+  const lines = formatLines(c.items || [])
+  if (!lines.length) return null
+  return (
+    <li id={`chg-${c.id}`} className={s.card} data-type="format" data-testid="change-card">
+      <details className={s.fmtBox}>
+        <summary className={s.fmtSum}>Formatting ({lines.length}) — your words are unchanged</summary>
+        <ul className={s.fmt}>{lines.map((l, i) => <li key={i} className={l.warn ? s.warnLine : undefined}>{l.warn && <Icon name="triangle-alert" size={14} label="Check" />}{l.text}</li>)}</ul>
+      </details>
+    </li>
+  )
 }
 
 function ChangeCard({ c, v, stuck, readOnly = false }: { c: Change; v: PaidVersion; stuck: boolean; readOnly?: boolean }) {
@@ -100,8 +127,6 @@ function ChangeCard({ c, v, stuck, readOnly = false }: { c: Change; v: PaidVersi
         <ul className={s.moves}>
           {(c.moved || []).filter((m) => m.to < m.from).map((m, i) => <li key={i}><span className={s.moveNum}>line {m.from} → {m.to}</span> {m.text}</li>)}
         </ul>
-      ) : c.type === 'format' ? (
-        <ul className={s.fmt}>{(c.items || []).map((it, i) => <FormatLine key={i} it={it} />)}</ul>
       ) : (
         <div className={s.pair}>
           {c.before ? <p className={s.before}>{c.type === 'cut' ? c.before : c.before}</p> : null}
@@ -125,7 +150,9 @@ function QuestionCard({ qn, v }: { qn: Question; v: PaidVersion }) {
   const existing = v.answered.find((a) => a.id === qn.id)
   const [answer, setAnswer] = useState('')
   // a number added to the END of a line needs what it counts too ("…WMS (Manhattan), 25." says nothing)
-  const bare = kind === 'number' && qn.slot !== 'insert' && answer.trim().split(/\s+/).length < 2
+  // a line with two blanks ("Do [number] cycle counts [a shift / a week]") needs the number AND how often
+  const slots = (String(qn.template || '').match(/\[[^\]]+\]/g) || []).length
+  const bare = kind === 'number' && (qn.slot !== 'insert' || slots > 1) && answer.trim().split(/\s+/).length < 2
   const line = answer.trim() && !bare ? bulletFromAnswer(prompt as Parameters<typeof bulletFromAnswer>[0], answer) : ''
   const add = () => { if (!line) return; v.setAnswered((xs) => [...xs.filter((x) => x.id !== qn.id), { id: qn.id, itemId: qn.itemId, bulletId: qn.bulletId, kind: qn.kind, answerKind: prompt.answerKind, line }]) }
   const remove = () => v.setAnswered((xs) => xs.filter((x) => x.id !== qn.id))
@@ -148,15 +175,15 @@ function QuestionCard({ qn, v }: { qn: Question; v: PaidVersion }) {
               <input autoComplete="off" className={s.input} value={answer} maxLength={kind === 'number' ? 60 : 160}
                 // a number slot inside the line ("Do ___ cycle counts") takes digits; a number added to the end of a line
                 // takes the number AND what it counts ("about 150 orders a shift")
-                inputMode={kind === 'number' && qn.slot === 'insert' ? 'decimal' : 'text'}
-                placeholder={kind === 'number' ? (qn.slot === 'insert' ? 'The number' : 'The number and what it counts') : kind === 'tool' ? 'Where you used it, and for what' : 'What you did, in your words'}
+                inputMode={kind === 'number' && qn.slot === 'insert' && slots < 2 ? 'decimal' : 'text'}
+                placeholder={kind === 'number' ? (qn.slot === 'insert' ? (slots > 1 ? 'The number, and how often' : 'The number') : 'The number and what it counts') : kind === 'tool' ? 'Where you used it, and for what' : 'What you did, in your words'}
                 onChange={(e) => setAnswer(e.target.value)} data-testid="question-input" />
             )}
           </label>
           {kind === 'number' && qn.template && <p className={s.why}>Your line becomes: “{line || blankLine(qn.template)}”</p>}
           {kind !== 'number' && kind !== 'credential' && line && <p className={s.after}>“{line}”</p>}
           {kind !== 'number' && kind !== 'credential' && answer.trim() && !line && <p className={s.why}>Start with what you did (“Ran…”, “Used…”), in a few words.</p>}
-          {kind === 'number' && answer.trim() && !line && <p className={s.why}>{qn.slot === 'insert' ? 'Type the number itself (digits).' : bare ? 'Add what the number counts, so the line still reads as a sentence.' : 'Include the number itself, in digits.'}</p>}
+          {kind === 'number' && answer.trim() && !line && <p className={s.why}>{slots > 1 ? 'Give the number and how often — both blanks in the line.' : qn.slot === 'insert' ? 'Type the number itself (digits).' : bare ? 'Add what the number counts, so the line still reads as a sentence.' : 'Include the number itself, in digits.'}</p>}
           {qn.why && <p className={s.why}>{qn.why}</p>}
           <div className={s.qActions}>
             {kind === 'credential'
@@ -173,7 +200,7 @@ function QuestionCard({ qn, v }: { qn: Question; v: PaidVersion }) {
 export function ChangeList({ t, v, readOnly = false }: { t: Tailored; v: PaidVersion; readOnly?: boolean }) {
   const changes = [...(t.changes || [])].sort((a, b) => SUB_ORDER.indexOf(a.type) - SUB_ORDER.indexOf(b.type))
   if (!changes.length) return null
-  return <ol className={s.list} data-testid="change-list">{changes.map((c) => <ChangeCard key={c.id} c={c} v={v} stuck={!readOnly && v.stuck.includes(c.id)} readOnly={readOnly} />)}</ol>
+  return <ol className={s.list} data-testid="change-list">{changes.map((c) => c.type === 'format' ? <FormatCard key={c.id} c={c} /> : <ChangeCard key={c.id} c={c} v={v} stuck={!readOnly && v.stuck.includes(c.id)} readOnly={readOnly} />)}</ol>
 }
 
 export function QuestionList({ questions, v }: { questions: Question[]; v: PaidVersion }) {
@@ -195,7 +222,9 @@ export function ResultTopLine({ charge, charged, cached, pro, balance, cost }: {
     : 'No credit used'
   return (
     <div className={s.top} data-testid="result-top">
-      {charge?.sentence && <p className={s.bought}>{charge.sentence}</p>}
+      {charge?.headline
+        ? <><p className={`${s.bought} ${s.headline}`} data-testid="result-headline">{charge.headline}</p>{charge.detail && <p className={s.why}>{charge.detail}</p>}</>
+        : charge?.sentence && <p className={s.bought}>{charge.sentence}</p>}
       <p className={s.truth}><Icon name={charged && !cached ? 'circle-dollar-sign' : 'circle-check'} size={16} />{truth}</p>
     </div>
   )
@@ -229,7 +258,11 @@ export function PaidResult({ t, questions, v, defaultView }: { t: Tailored; ques
 }
 
 /** A different field or a failed hard gate: the server's sentence, what carries over, what would change it. */
-export function BlockedResult({ b, jobsHref, showLink = true }: { b: Blocked; jobsHref: string; showLink?: boolean }) {
+// "what would change it" is shown only as whole sentences the server wrote — a fragment is left out, never patched
+const isSentence = (t: string) => /^[A-Z“"]/.test(t.trim()) && /[.!?]["”]?$/.test(t.trim()) && t.trim().split(/\s+/).length >= 5
+
+export function BlockedResult({ b, jobsHref, showLink = true, fieldHref = '', fieldLabel = '' }: { b: Blocked; jobsHref: string; showLink?: boolean; fieldHref?: string; fieldLabel?: string }) {
+  const changes = (b.what_would_change_it || []).filter(isSentence)
   return (
     <section className={s.blocked} data-testid="blocked" aria-label="Why nothing was changed">
       <p className={s.blockedText}>{b.sentence}</p>
@@ -239,12 +272,13 @@ export function BlockedResult({ b, jobsHref, showLink = true }: { b: Blocked; jo
           <ul className={s.plain}>{(b.carries_over || []).map((c, i) => <li key={i}><b>{c.requirement}</b> — “{q(c.line, 120)}”</li>)}</ul>
         </div>
       )}
-      {(b.what_would_change_it || []).length > 0 && (
+      {changes.length > 0 && (
         <div className={s.section}>
           <p className={s.label}>What would change this</p>
-          <ul className={s.plain}>{(b.what_would_change_it || []).map((w, i) => <li key={i}>{w}</li>)}</ul>
+          <ul className={s.plain}>{changes.map((w, i) => <li key={i}>{w}</li>)}</ul>
         </div>
       )}
+      {fieldHref && fieldLabel && <a className={s.textLink} href={fieldHref} data-testid="blocked-field-jobs">{fieldLabel}<Icon name="arrow-right" size={14} /></a>}
       {showLink && <a className={s.textLink} href={jobsHref}>Jobs matched to your résumé<Icon name="arrow-right" size={14} /></a>}
     </section>
   )

@@ -14,6 +14,7 @@ import ConfirmStep from '../../ui/ConfirmStep.tsx'
 import ResultLine from '../../ui/ResultLine.tsx'
 import { EmptyState, ErrorState, RefreshFailed, Skeleton } from '../../ui/states.tsx'
 import styles from '../listings/listings.module.css'
+import CompanyReports from './CompanyReports.tsx'
 import { displayName, evidence, fmt, perkLines, readCompanyDetail, scoreLine } from './adapter.ts'
 
 function saveJson(filename: string, data: unknown) {
@@ -133,6 +134,8 @@ export default function CompanyItem({ kind, id, setTitle, open }: ItemViewProps)
           </ul>
         ) : <p className={styles.quiet}>Never merged with another company.</p>}
       </div>
+
+      <CompanyReports name={name} onOpenReport={(rid) => open('report', rid)} />
 
       <div className={styles.itemPart}>
         <h3 className={styles.h2}>Employer perks</h3>

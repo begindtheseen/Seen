@@ -103,7 +103,7 @@ const placesOf = (r) => {
   return String(r.location).split(/;/).map((s) => geocodePlace(s)).filter((g) => g && !g.stateOnly);
 };
 const truth = (miles, center = PHX) => POOL.filter((r) => r.company !== 'Seen Jobs' && !/remote/i.test(r.location) && !/toronto/i.test(r.location)
-  && placesOf(r).some((p) => distanceMiles(center, p) <= miles));
+  && placesOf(r).some((p) => Math.round(distanceMiles(center, p) * 10) / 10 <= miles)); // the distance as shown (tenths)
 
 test('a place and no title is a valid search: every row in the radius, total = rows paged, nearest first, no repeats', async () => {
   _clearAreaCache();

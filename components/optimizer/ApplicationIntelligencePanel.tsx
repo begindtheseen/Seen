@@ -7,6 +7,7 @@
 // copy; `needs_confirmation` bullets are visually gated and never presented as final copy.
 
 import { useState } from 'react'
+import { bandTone } from './fitRead.js'
 
 // ── V2 package shape (mirrors lib/application-intelligence/index.js pubMatch/pubBullet) ──
 export type MatchType = 'exact' | 'adjacent' | 'transferable' | 'weak' | 'missing'
@@ -85,7 +86,8 @@ export interface ConfirmedAnswer { id: string; forRequirement: string | null; un
 const mono = 'var(--mono)'
 // Score rings: green / amber / NEUTRAL. A low score means the résumé lacks the listing's keywords
 // — a to-do, not an alarm — so it is never painted red.
-function scoreColor(s: number): string { return s >= 70 ? 'var(--green)' : s >= 45 ? 'var(--amber)' : 'var(--sub)' }
+// colour from the server's band word only (fitBand); other scores are ink — never a client threshold
+function bandColor(band?: string | null): string { const t = bandTone(band); return t === 'good' ? 'var(--good-text)' : t === 'caution' ? 'var(--caution-text)' : 'var(--text-2)' }
 function pct(n: number): string { return `${Math.round((n || 0) * 100)}%` }
 
 // Render-safe text coercion. The panel renders many fields straight from a complex local engine;
@@ -238,8 +240,8 @@ export default function ApplicationIntelligencePanel({
       <Card>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           {!compact && (
-            <div style={{ flexShrink: 0, width: 60, height: 60, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `3px solid ${scoreColor(pkg.fit_score)}` }}>
-              <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-h3)', color: scoreColor(pkg.fit_score) }}>{pkg.fit_score}</span>
+            <div style={{ flexShrink: 0, width: 60, height: 60, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `3px solid ${bandColor((pkg as { fit_band?: string | null }).fit_band)}` }}>
+              <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-h3)', color: bandColor((pkg as { fit_band?: string | null }).fit_band) }}>{pkg.fit_score}</span>
             </div>
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -260,7 +262,7 @@ export default function ApplicationIntelligencePanel({
         <Card>
           {kicker('ATS simulation')}
           <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.75rem' }}>
-            <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-lead)', color: scoreColor(ats.ats_score) }}>{Math.round(ats.ats_score)}<span style={{ fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>/100</span></span>
+            <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-lead)', color: 'var(--text-1)' }}>{Math.round(ats.ats_score)}<span style={{ fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>/100</span></span>
             <span style={{ fontFamily: mono, fontSize: 'var(--fs-meta)', color: 'var(--muted)' }}>keyword-match score (simulated)</span>
           </div>
           {ats.missing_exact_keywords?.length > 0 && (

@@ -180,8 +180,9 @@ const kicker = (text: string, color = 'var(--dim)') => (
 )
 
 
-function scoreColor(s: number): string {
-  return s >= 70 ? 'var(--green)' : s >= 45 ? 'var(--amber)' : 'var(--red)'
+// a factor bar / grade / HumanProof figure is ink — the only fit colour is the server's band (fitBand); no client thresholds
+function scoreColor(_s: number): string {
+  return 'var(--text-2)'
 }
 
 // ── Card wrapper ──

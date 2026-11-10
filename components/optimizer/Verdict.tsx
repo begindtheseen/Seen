@@ -16,6 +16,7 @@ import { bulletFromAnswer } from '@/lib/resume/engine-client'
 // display spelling of canonical skills — the same table the verdict sentence uses
 import { displaySkill } from '@/lib/optimizer/explainScore.js'
 import { requirementCounts, groupByProof, countHeadline } from '@/lib/requirementList.js'
+import { bandTone } from './fitRead.js'
 import s from './Verdict.module.css'
 
 export interface Verdict {
@@ -52,7 +53,8 @@ export interface PaidPlan {
 
 // display spelling (P&L, SQL…), first letter up so a row reads as a label ("Customer service")
 const show = (x: string): string => { const d = displaySkill(x); return /^[a-z]/.test(d) ? d[0].toUpperCase() + d.slice(1) : d }
-const tone = (score: number | null): 'good' | 'caution' | undefined => score == null ? undefined : score >= 65 ? 'good' : score >= 45 ? 'caution' : undefined
+// tone from the server's band word (fitBand), never a client threshold
+const tone = (band: string | null | undefined): 'good' | 'caution' | undefined => bandTone(band) as 'good' | 'caution' | undefined
 
 /** Score ring (or a dash) + band word + the one sentence; the hard gate is the first line. */
 export function VerdictCard({ verdict, title = 'Fit', note, cached }: { verdict: Verdict; title?: string; note?: string; cached?: boolean }) {
@@ -65,7 +67,7 @@ export function VerdictCard({ verdict, title = 'Fit', note, cached }: { verdict:
         <p data-testid="verdict-gate" className={s.gate}><Icon name="triangle-alert" size={16} /><span>{verdict.gate}</span></p>
       )}
       <div className={s.vTop}>
-        <div aria-label={sc == null ? 'No score' : `Score ${sc} of 100`} className={s.ring} data-tone={tone(sc)}>{sc == null ? '–' : sc}</div>
+        <div aria-label={sc == null ? 'No score' : `Score ${sc} of 100`} className={s.ring} data-tone={tone(verdict.band)}>{sc == null ? '–' : sc}</div>
         <div className={s.vText}>
           <div className={s.band}>{verdict.band || 'No score'}</div>
           <div className={s.vMeta}>{title}{note ? ` · ${note}` : ''}{cached ? ' · already built, no credit used' : ''}</div>

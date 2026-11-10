@@ -173,13 +173,13 @@ function FlagsBlock({ undoRef }: { undoRef: MutableRefObject<(() => void) | null
                     {f.updated_at ? ` Last changed ${formatPacific(f.updated_at)}${f.updated_by ? ` by ${f.updated_by}` : ''}.` : ''}
                   </p>
                   {confirm === f.name ? (
-                    <ConfirmStep title={`Turn ${f.name} ${on ? 'off' : 'on'}?`} body={dangerConsequence(f, !on)}
-                      confirmLabel={on ? 'Turn it off' : 'Turn it on'} typeToConfirm={f.name} busy={set.busy(f.name)}
+                    <ConfirmStep title={`Turn ${f.name} ${on ? 'off' : 'on'}?`} body={`${dangerConsequence(f, !on)} Undo is offered after.`}
+                      confirmLabel={on ? 'Turn it off' : 'Turn it on'} typeToConfirm={f.dangerous ? f.name : undefined} tone="danger" busy={set.busy(f.name)}
                       onCancel={() => setConfirm(null)} onConfirm={() => toggle(f, !on)} />
                   ) : (
                     <div className={styles.actions}>
-                      <Button variant={f.dangerous && on ? 'danger' : 'secondary'} onClick={() => (f.dangerous ? setConfirm(f.name) : toggle(f, !on))} loading={set.busy(f.name)} data-testid={`flag-toggle-${f.name}`}>
-                        {on ? 'Turn off' : 'Turn on'}{f.dangerous ? '…' : ''}
+                      <Button variant={f.dangerous && on ? 'danger' : 'secondary'} onClick={() => setConfirm(f.name)} loading={set.busy(f.name)} data-testid={`flag-toggle-${f.name}`}>
+                        {on ? 'Turn off…' : 'Turn on…'}
                       </Button>
                     </div>
                   )}

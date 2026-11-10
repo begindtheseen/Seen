@@ -66,7 +66,7 @@ export default function ListingsSection({ active }: SectionProps) {
 
 // ── Clear stale (a long job) ─────────────────────────────────────────────────────────────────────
 function StaleBlock({ stale, kept }: { stale: number | null; kept: number | null }) {
-  const job = useAdminJob({ action: 'purge_stale_jobs', label: 'Clearing stale listings', past: 'Cleared', noun: 'stale listings' })
+  const job = useAdminJob({ action: 'purge_stale_jobs', label: 'Clearing stale listings', past: 'Cleared', noun: 'listings (stale, or expired and nobody kept them)' })
   const [confirming, setConfirming] = useState(false)
   // The confirm stays on screen (busy) through the first round, so a double tap lands on a disabled button.
   useEffect(() => { if (confirming && job.job && (job.job.rounds > 0 || !job.running)) setConfirming(false) }, [confirming, job.job, job.running])
@@ -136,10 +136,15 @@ function Browser({ active }: { active: boolean }) {
   const list = useAdminList<JobRow>(key, ({ after }) => api<AdminList<JobRow>>('listings_browse', { filters, after: after || undefined }), { staleMs: 30_000, enabled: kind === 'empty' || kind === 'text' })
   const byUrl = useAdminQuery<AdminSearch>(`listings_url?${q}`, () => api<AdminSearch>('search', { q }), { enabled: kind === 'url', staleMs: 30_000 })
   const nFilters = activeFilterCount(u)
+  // Take a listing down straight from the list (one nobody reported, too), with an inline confirm and Undo.
+  const [confirmDown, setConfirmDown] = useState<string | null>(null)
+  const takeDown = useAdminAction('delete_listing', { onSettled: () => setConfirmDown(null) })
   const clearFilters = () => { setStatus(''); setVisible(''); setEmployer(''); setSince(''); setSort(''); setSource('') }
 
   const row = (r: JobRow) => {
     const st = jobState(r)
+    const onSite = st.tone === 'good' || st.tone === 'caution'
+    const ts = takeDown.state(r.id)
     return (
       <Row
         testId={`job-row-${r.id}`}
@@ -148,6 +153,14 @@ function Browser({ active }: { active: boolean }) {
         sub={jobSub(r) || undefined}
         status={<StatusChip tone={st.tone} label={st.label} />}
         meta={<span>{jobMeta(r)}</span>}
+        pending={takeDown.busy(r.id)}
+        actions={onSite && confirmDown !== r.id && ts.status !== 'done' ? (
+          <Button variant="ghost" icon="ban" onClick={() => setConfirmDown(r.id)} data-testid={`takedown-row-${r.id}`}>Take down</Button>
+        ) : undefined}
+        below={confirmDown === r.id ? (
+          <ConfirmStep inline title="Take this listing down?" body="It leaves search now and its apply link is blocked so a source cannot bring it back. Undo puts it back."
+            confirmLabel="Take it down" busy={takeDown.busy(r.id)} onCancel={() => setConfirmDown(null)} onConfirm={() => { void takeDown.run({ job_id: r.id }, r.id) }} />
+        ) : ts.status !== 'idle' ? <ResultLine state={ts} onUndo={() => takeDown.undo(r.id)} onRetry={() => takeDown.retry(r.id)} onDismiss={() => takeDown.dismiss(r.id)} runningText="Taking it down…" /> : undefined}
       />
     )
   }

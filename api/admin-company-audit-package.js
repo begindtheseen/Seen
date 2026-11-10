@@ -7,8 +7,8 @@
 //
 // Admin-only (same admin_sessions auth as the PDF endpoint; moderators are refused). No external AI.
 
-import { requireAdmin } from '../lib/server/admin/auth.js';
-import { buildCompanyAuditBundle, auditBundleHash } from './_utils/companyAuditBundle.js';
+import { checkAdmin, adminDenied } from '../lib/server/admin/auth.js';
+import { buildCompanyAuditBundle } from './_utils/companyAuditBundle.js';
 import { buildAuditPackage } from '../lib/server/companyAuditPackage.js';
 import { pacificDate } from '../lib/time/pacific.js';
 
@@ -41,8 +41,9 @@ export default async function handler(req, res) {
   try {
     // ── Admin session auth (mirrors admin-stats / the PDF endpoint) ──
     // THE admin-session check (lib/server/admin/auth.js), shared by every admin endpoint.
-    const sess = await requireAdmin(req, { url: SB, key: SK });
-    if (!sess) return res.status(401).json({ ok: false, error: 'Session expired — log in again', code: 'unauthorized', retryable: false });
+    const check = await checkAdmin(req, { url: SB, key: SK });
+    if (!check.sess) { const d = adminDenied(check.status); return res.status(d.status).json(d.body); }
+    const sess = check.sess;
     const adminRole = sess.role;
     if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
 

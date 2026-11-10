@@ -63,9 +63,15 @@ const ASK_VERB = /^(?:stand|walk|lift|push|pull|carry|climb|stoop|kneel|bend|sit
 
 /** A statement only the person can answer, phrased as a question to them (never as a failure). */
 export function askQuestion(text) {
-  const t = clean(text).replace(/[.;:]+$/, '');
+  // the reader keeps a line's own wrapping and lead-ins: "(On call during the weekend only…)", "Additionally, …"
+  let t = clean(text).replace(/^\((.*)\)$/, '$1').replace(/^(?:additionally|also|please note|note)\s*[,:]\s*/i, '').replace(/[.;:]+$/, '').trim();
   if (!t) return '';
+  const m = t.match(/^must\s+(?:be\s+)?(.*)$/i);
+  if (m && /^must\s+be\b/i.test(t)) return `Are you ${m[1]}?`;
+  if (m) t = m[1];
   if (ASK_VERB.test(t)) return `Can you ${t.charAt(0).toLowerCase()}${t.slice(1)}?`;
+  // a policy or schedule the posting states ("some roles require…", "on call…") is a fit question, a trait a self-check
+  if (/\b(?:may|might|some roles|required|requires?|on[- ]call|shifts?|weekends?|schedule|travel|drug test|background check)\b/i.test(t)) return `“${t.charAt(0).toUpperCase()}${t.slice(1)}” — does that work for you?`;
   return `${t} — is that true for you?`;
 }
 
@@ -76,7 +82,8 @@ export function askQuestion(text) {
  * @param {{ statements?: Array<Record<string, any>> }} d
  */
 export function fitGroups(d) {
-  const sts = d && Array.isArray(d.statements) ? d.statements.filter((s) => s && clean(s.text)) : [];
+  // the reader marks a malformed or low-confidence line `display: false`: it never reaches a screen
+  const sts = d && Array.isArray(d.statements) ? d.statements.filter((s) => s && s.display !== false && clean(s.text)) : [];
   if (!sts.length) return null;
   const rows = [];
   const promises = [];
@@ -110,6 +117,19 @@ export function fitGroups(d) {
     if (firstBy.has(k)) r.sameAs = firstBy.get(k); else firstBy.set(k, r.text);
   }
   return { groups, promises, total: rows.length };
+}
+
+const STATE_RANK = { not_shown: 0, partly: 1, shown: 2 };
+/**
+ * The first rows a person reads: required before duties, and within each what is NOT shown (or only partly) before
+ * what is — so the top of the screen is what matters. Questions only the person can answer are not in it.
+ * @param {{ groups: Array<{ key: string, rows: Array<Record<string, any>> }> } | null} model
+ */
+export function topRows(model, n = 5) {
+  if (!model) return [];
+  const pick = (k) => ((model.groups.find((g) => g.key === k) || { rows: [] }).rows).map((r, i) => ({ r, i }))
+    .sort((a, b) => (STATE_RANK[a.r.state] ?? 3) - (STATE_RANK[b.r.state] ?? 3) || a.i - b.i).map((x) => x.r);
+  return [...pick('required'), ...pick('duty')].slice(0, n);
 }
 
 /** Group heading: plain label + the count of THIS group's rows that are shown (states from the server). */
@@ -161,6 +181,14 @@ export function verdictSentence(v) {
   if (!v) return '';
   const t = clean(v.sentence);
   return v.withheld ? t : t.replace(/^\d+\s*[—-]\s*/, '');
+}
+
+/** A tone from the SERVER's band word (lib/optimizer/explainScore.js fitBand) — never a client score threshold. */
+export function bandTone(band) {
+  const b = String(band || '');
+  if (/^(?:strong|good)\b/i.test(b)) return 'good';
+  if (/^partial\b/i.test(b)) return 'caution';
+  return undefined;
 }
 
 export const STATE_WORD = { shown: 'Shown', partly: 'Partly', not_shown: 'Not shown', ask: 'Only you can say' };

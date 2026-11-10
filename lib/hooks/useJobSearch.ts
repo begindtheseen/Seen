@@ -22,7 +22,10 @@ interface CachedSearch { jobs: Job[]; ts: number; hasMore: boolean; pages: numbe
 
 // An area search (a place, no title — api/jobs.js handleAreaSearch): what the server counted.
 export interface AreaInfo {
+  /** Listings (one per location) in the area. */
   total: number
+  /** Jobs = cards: one per employer + title, however many locations it lists. */
+  jobsTotal: number
   remoteTotal: number
   label: string
   kind: 'point' | 'state'
@@ -41,10 +44,13 @@ export interface AreaProblem { message: string; suggestions: string[]; reason: s
 /** The results header for an area search: exactly what is listed. */
 export function areaStatus(a: AreaInfo): string {
   const n = a.total
-  const jobs = `${n.toLocaleString('en-US')} job${n === 1 ? '' : 's'}`
+  const j = Math.min(a.jobsTotal || n, n)
+  const fmt = (x: number) => x.toLocaleString('en-US')
+  // One number per thing: cards are jobs; a job open in several places counts each place as a location.
+  const jobs = j < n ? `${fmt(j)} job${j === 1 ? '' : 's'} (${fmt(n)} locations)` : `${fmt(n)} job${n === 1 ? '' : 's'}`
   const where = a.kind === 'state' ? `in ${a.label}` : `within ${a.radius} mile${a.radius === 1 ? '' : 's'} of ${a.label}`
   if (!n) return `No jobs ${where}`
-  const remote = a.includeRemote && a.remoteTotal ? ` · ${a.remoteTotal.toLocaleString('en-US')} of them remote` : ''
+  const remote = a.includeRemote && a.remoteTotal ? ` · including ${fmt(a.remoteTotal)} remote listing${a.remoteTotal === 1 ? '' : 's'}` : ''
   const partial = a.complete ? '' : ' found so far — still counting'
   return `${jobs} ${where}${remote}${partial} · ${a.kind === 'state' || a.sort === 'recent' ? 'newest first' : 'nearest first'}`
 }
@@ -792,7 +798,7 @@ export function useJobSearch() {
     return `|${loc}|${rad}|${sortRef.current === 'recent' ? 'recent' : 'nearest'}|${includeRemoteRef.current ? 'r' : ''}|${f.niche}|${f.level}|${f.jobType}|${f.posted}|${f.pay ? 'p' : ''}`
   }
   type AreaResponse = {
-    jobs?: unknown[]; total?: number; remote_total?: number; include_remote?: boolean; has_more?: boolean; next_cursor?: string | null
+    jobs?: unknown[]; total?: number; jobs_total?: number; remote_total?: number; include_remote?: boolean; has_more?: boolean; next_cursor?: string | null
     area?: { kind: 'point' | 'state'; label: string; radius: number | null } | null; wider?: { radius: number; total: number } | null
     complete?: boolean; pending?: boolean; unplaced?: { reason: string | null; suggestions: string[] }; message?: string; need_title?: boolean
   }
@@ -852,7 +858,7 @@ export function useJobSearch() {
         const entry: CachedSearch = d.area
           ? {
               jobs: rows, ts: Date.now(), hasMore: d.has_more === true, pages: 1, notice: null, label: null, cursor: d.next_cursor ?? null, problem: null,
-              area: { total: d.total ?? rows.length, remoteTotal: d.remote_total ?? 0, label: d.area.label, kind: d.area.kind, radius: d.area.radius, includeRemote: d.include_remote === true, wider: d.wider ?? null, complete: d.complete !== false, typed: loc, sort: sortRef.current === 'recent' ? 'recent' : 'nearest' },
+              area: { total: d.total ?? rows.length, jobsTotal: d.jobs_total ?? d.total ?? rows.length, remoteTotal: d.remote_total ?? 0, label: d.area.label, kind: d.area.kind, radius: d.area.radius, includeRemote: d.include_remote === true, wider: d.wider ?? null, complete: d.complete !== false, typed: loc, sort: sortRef.current === 'recent' ? 'recent' : 'nearest' },
             }
           : { jobs: [], ts: Date.now(), hasMore: false, pages: 1, notice: null, label: null, cursor: null, area: null,
               problem: { message: d.message || 'That place could not be searched.', suggestions: d.unplaced?.suggestions || [], reason: d.unplaced?.reason ?? null, needTitle: d.need_title === true } }

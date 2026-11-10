@@ -2,7 +2,7 @@
 // Transpiles the file and every repo-local TS/TSX file it imports (relative or '@/…') with the
 // TypeScript compiler into a temp folder, points bare 'react*' imports at the installed packages and
 // swaps 'next/link' for a plain <a> stub, then imports the entry. Used by components/ui/ui.test.mjs.
-import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, existsSync } from 'node:fs'
+import { readFileSync, writeFileSync, mkdirSync, mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname, resolve, relative } from 'node:path'
 import { pathToFileURL, fileURLToPath } from 'node:url'
@@ -23,11 +23,18 @@ export async function loadTsx(entry) {
   const stub = join(out, '__next_link.mjs')
   writeFileSync(stub, `import { createElement, forwardRef } from ${JSON.stringify(BARE.react)};
 export default forwardRef(function Link({ href, prefetch, ...p }, ref) { return createElement('a', { ref, href, ...p }) })\n`)
+  // a CSS module renders its class names as written (server markup only needs a string per class)
+  const cssStub = join(out, '__css_module.mjs')
+  writeFileSync(cssStub, 'export default new Proxy({}, { get: (_, k) => (typeof k === "string" ? k : undefined) })\n')
   const done = new Map()
+  const sources = new Map()
+  // read each candidate directly (no exists-then-read: the file is read once, inside try/catch, and that read is used)
   const resolveRepo = (spec, from) => {
     const base = spec.startsWith('@/') ? join(ROOT, spec.slice(2)) : resolve(dirname(from), spec)
     for (const cand of [base, base + '.tsx', base + '.ts', join(base, 'index.tsx'), join(base, 'index.ts')]) {
-      if (existsSync(cand) && /\.(tsx?|m?js)$/.test(cand)) return cand
+      if (!/\.(tsx?|m?js)$/.test(cand)) continue
+      if (sources.has(cand)) return cand
+      try { sources.set(cand, readFileSync(cand, 'utf8')); return cand } catch { /* not this candidate */ }
     }
     return null
   }
@@ -37,16 +44,11 @@ export default forwardRef(function Link({ href, prefetch, ...p }, ref) { return 
     const target = join(out, relative(ROOT, file)).replace(/\.tsx?$/, '.mjs')
     const url = pathToFileURL(target).href
     done.set(file, url)
-    let src = readFileSync(file, 'utf8').replace(/^'use client'\s*\n/, '')
+    let src = (sources.has(file) ? sources.get(file) : readFileSync(file, 'utf8')).replace(/^'use client'\s*\n/, '')
     src = src.replace(/(from\s+|import\s*\(\s*)(['"])([^'"]+)\2/g, (m, pre, q, spec) => {
       if (BARE[spec]) return `${pre}${q}${BARE[spec]}${q}`
       if (spec === 'next/link') return `${pre}${q}${pathToFileURL(stub).href}${q}`
-      // a CSS module renders its class names as written (server markup only needs a string per class)
-      if (/\.module\.css$/.test(spec)) {
-        const cssStub = join(out, '__css_module.mjs')
-        if (!existsSync(cssStub)) writeFileSync(cssStub, 'export default new Proxy({}, { get: (_, k) => (typeof k === "string" ? k : undefined) })\n')
-        return `${pre}${q}${pathToFileURL(cssStub).href}${q}`
-      }
+      if (/\.module\.css$/.test(spec)) return `${pre}${q}${pathToFileURL(cssStub).href}${q}`
       if (spec.startsWith('.') || spec.startsWith('@/')) {
         const hit = resolveRepo(spec, file)
         if (!hit) throw new Error(`tsxForTest: cannot resolve ${spec} from ${file}`)

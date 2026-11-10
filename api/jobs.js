@@ -54,7 +54,7 @@ import { geocodePlace, placesWithin } from '../lib/geo/usPlaces.js';
 import { placeListing, withinRadius, inState as geoInState, placeSearch, RADIUS_OPTIONS, stateName, isNonUsLocation } from '../lib/geo/radius.js';
 import { readAreaRows, rankArea, pageArea } from '../lib/server/areaSearch.js';
 import { MIN_HOURLY } from '../lib/jobs/pay.js';
-import { collapseLocationVariants } from '../lib/jobs/groupListings.js';
+import { collapseLocationVariants, roleKey } from '../lib/jobs/groupListings.js';
 
 // ── Where a listing is ──────────────────────────────────────────────────────────────────────
 // A row's point: its own coordinates, else its location text placed by the vendored US places
@@ -1232,7 +1232,10 @@ async function handleAreaSearch(req, res, body) {
       mode: place.kind === 'state' ? 'state' : 'area',
       pending: pending === true,
       jobs, in_radius: jobs.length,
-      total: list.length, onsite_total: onsiteTotal, remote_total: remoteTotal, include_remote: includeRemote,
+      // The page shows one card per employer + job title (lib/jobs/groupListings.js — "+N more locations"), so the
+      // count of jobs is told apart from the count of listings (locations).
+      total: list.length, jobs_total: new Set(list.map((x) => roleKey(x.row))).size,
+      onsite_total: onsiteTotal, remote_total: remoteTotal, include_remote: includeRemote,
       has_more: hasMore, next_cursor: nextCursor, offset: before, page_size: AREA_PAGE, sort,
       radius: miles,
       area: { kind: place.kind, label: place.label, name: place.name, state: place.state, state_name: place.state ? stateName(place.state) : null, zip: place.zip, lat: place.lat, lng: place.lng, radius: miles },
