@@ -1,0 +1,27 @@
+/* The one "paste a job" box and the "what Seen read" row (DESIGN.md: ink labels, 44px targets, tokens only). */
+.box { display: flex; flex-direction: column; gap: var(--sp-2); width: 100%; min-width: 0; }
+.label { font-size: var(--fs-ui); font-weight: 600; color: var(--text-1); }
+.text {
+  width: 100%; box-sizing: border-box; min-height: 104px; resize: vertical;
+  background: var(--surface-1); border: 1px solid var(--border-2); border-radius: var(--r-control);
+  color: var(--text-1); padding: var(--sp-3); font: inherit; font-size: var(--fs-body); line-height: 1.5;
+}
+.text::placeholder { color: var(--text-4); }
+.text:focus-visible { outline: none; border-color: var(--accent); box-shadow: var(--sh-focus); }
+.hint { margin: 0; font-size: var(--fs-sm); color: var(--text-3); line-height: 1.5; }
+.hint[data-short='1'] { color: var(--caution-text); }
+
+.read { display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-3); background: var(--surface-2); border: 1px solid var(--border-1); border-radius: var(--r-control); min-width: 0; }
+.readLine { margin: 0; display: flex; gap: var(--sp-2); align-items: flex-start; font-size: var(--fs-body); color: var(--text-2); line-height: 1.5; overflow-wrap: anywhere; }
+.readIco { flex-shrink: 0; margin-top: 2px; color: var(--good-text); }
+.readKey { font-weight: 600; color: var(--text-1); }
+.readNote { margin: 0; font-size: var(--fs-sm); color: var(--text-3); line-height: 1.5; }
+.readActs { display: flex; flex-wrap: wrap; column-gap: var(--sp-4); }
+.textBtn { min-height: 44px; padding: 0; background: none; border: 0; color: var(--accent); font: inherit; font-size: var(--fs-sm); font-weight: 600; cursor: pointer; text-align: left; }
+.textBtn:hover { text-decoration: underline; }
+.textBtn:focus-visible { outline: none; box-shadow: var(--sh-focus); border-radius: var(--r-chip); }
+.fix { display: flex; flex-direction: column; gap: var(--sp-1); }
+.fixLabel { font-size: var(--fs-sm); font-weight: 600; color: var(--text-2); margin-top: var(--sp-1); }
+.input { min-height: 44px; box-sizing: border-box; width: 100%; background: var(--surface-1); border: 1px solid var(--border-2); border-radius: var(--r-control); color: var(--text-1); padding: 0 var(--sp-3); font: inherit; font-size: var(--fs-body); }
+.input:focus-visible { outline: none; border-color: var(--accent); box-shadow: var(--sh-focus); }
+.fixActs { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-4); margin-top: var(--sp-2); }

@@ -2,6 +2,9 @@
 // each row's status, shrinking the "stale jobs" KPI. This is the SCHEDULED front-end for the
 // shared engine in lib/server/staleRefresh.js (the same engine scripts/refresh-stale-jobs.mjs
 // drives from the CLI, so cron and CLI can never drift — mirrors refresh-jobs.js ↔ jobSources.js).
+// The live/dead/unknown verdict is the on-open liveness check's (lib/server/listingLiveness.js probeSource),
+// so this run can never revive a row the source says is gone, never revives on a redirect to a front door,
+// and never expires a row on a bare 404/410 (round 2, 2026-11-10).
 //
 // SAFETY: writes are OFF until STALE_REFRESH_APPLY=1 is set in the environment. Until then every
 // scheduled run is a dry-run (reads + classifies + logs what it WOULD change, zero writes), so

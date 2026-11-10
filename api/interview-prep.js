@@ -40,12 +40,29 @@ import { CLIENT_EVENTS, funnelRow, recordFunnelEvent } from '../lib/server/funne
 import { guideFor } from '../lib/server/interviewGuides.js';
 import { carryFills, fillTarget, SPECIAL_FILL_KEYS } from '../lib/server/prepFills.js';
 import { inList, ilikeExact } from '../lib/server/pgrest.js';
+import { hasEngineKey } from '../lib/optimizer/types.js';
 
 /** The events a browser may post here (checkout and build steps are written by the server). */
 export const FUNNEL_EVENTS = CLIENT_EVENTS;
 
 /** The same readable-résumé bar the build and `mine` use: at least 200 characters of text. */
 const readableResume = (text) => String(text || '').replace(/\s+/g, ' ').length >= 200;
+
+/**
+ * A pack built 2026-11-09 → 11-10 can print an engine key ("Tell me about your experience with term:design").
+ * Such a pack is never served: it is rebuilt from its own posting and the current résumé by the same
+ * deterministic engine (no charge — the person already has this prep), keeping what they typed (carryFills),
+ * and saved over the old row. Every other pack is returned untouched. Pure apart from `save`.
+ */
+export async function healStoredPack(pack, { company, role, resumeText, save = async () => {} }) {
+  if (!pack || pack.pending || !hasEngineKey(pack) || !readableResume(resumeText)) return pack;
+  const rebuilt = localPack({ company, role, resumeText, jobText: String(pack.job_text || ''), pay: pack.pay || null, stage: pack.stage || '' });
+  const full = { ...pack, ...rebuilt, built_at: new Date().toISOString(), posting_pay: rebuilt.posting_pay || null, fills: {}, notes: {} };
+  const carried = carryFills(pack, full);
+  full.fills = carried.fills; full.notes = carried.notes; full.noteKeys = carried.noteKeys;
+  try { await save(full); } catch { /* the healed pack is still served; the next read heals again */ }
+  return full;
+}
 
 /**
  * The free preview, from the deterministic pack only (no model, no cost): the first 2 role questions from
@@ -200,6 +217,11 @@ export default async function handler(req, res) {
     return Array.isArray(rows) && rows[0]?.pack ? rows[0].pack : null;
   };
   const readCached = async (uid) => { const p = await readRow(uid); return p && !p.pending ? p : null; };
+  // overwrite this person's stored pack (a healed rebuild — healStoredPack); a refused write is logged, never hidden
+  const savePack = async (uid, full) => {
+    const w = await db('interview_preps?on_conflict=user_id,prep_key', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ user_id: uid, prep_key: prepKey(company, role), company, role, pack: full, updated_at: new Date().toISOString() }) }).catch(() => null);
+    if (!w || !w.ok) console.error('[interview-prep] healed prep write failed', w ? w.status : 'no response');
+  };
 
   if (action === 'stash') {
     if (await applyRateLimit(req, res, 'interview-record')) return;
@@ -233,7 +255,7 @@ export default async function handler(req, res) {
       db(`profiles?id=eq.${encodeURIComponent(uid)}&select=resume_text&limit=1`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
     ]);
     const text = Array.isArray(pr) && pr[0] ? String(pr[0].resume_text || '') : null;
-    const pack = row && !row.pending ? row : null;
+    const pack = row && !row.pending ? await healStoredPack(row, { company, role, resumeText: text, save: (full) => savePack(uid, full) }) : null;
     // the posting stashed before checkout, so the card can build with it the moment Pro is on
     return res.status(200).json({ ok: true, pack, pending_job_text: !pack && row?.pending ? String(row.job_text || '') : '', has_resume: text == null ? null : text.replace(/\s+/g, ' ').length >= 200 });
   }
@@ -246,7 +268,12 @@ export default async function handler(req, res) {
     {
       const owner = await uidFromToken(req, SUPABASE_URL, SERVICE_KEY);
       const row = owner ? await readRow(owner) : null;
-      const cached = row && !row.pending ? row : null;
+      let cached = row && !row.pending ? row : null;
+      if (cached && hasEngineKey(cached)) {
+        const pr = await db(`profiles?id=eq.${encodeURIComponent(owner)}&select=resume_text&limit=1`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+        const text = Array.isArray(pr) && pr[0] ? String(pr[0].resume_text || '') : '';
+        cached = await healStoredPack(cached, { company, role, resumeText: text, save: (full) => savePack(owner, full) });
+      }
       if (cached && !body.refresh) return res.status(200).json({ ok: true, cached: true, pack: cached });
       // a rebuild keeps what the person already typed (pinned to the sentence it finished — prepFills.js), and
       // the posting they pasted before: on the earlier build, or stashed before checkout

@@ -36,6 +36,7 @@ import ListingScoreRing from '@/components/jobs/ListingScoreRing'
 import EmployerGradeChip from '@/components/jobs/EmployerGradeChip'
 import { JOB_INSIGHTS_VERSION } from '@/lib/jobInsightsVersion.js'
 import PastePosting from '@/components/jobs/PastePosting'
+import { useListingLiveness, LivenessNotice, similarJobsHref } from '@/components/jobs/JobDetailDrawer'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Icon from '@/components/ui/Icon'
@@ -131,6 +132,10 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const [reportedInactive, setReportedInactive] = useState(false)
   const [reportingInactive, setReportingInactive] = useState(false)
   const [scoreWhy, setScoreWhy] = useState<ScoreExplanation | null>(null)
+  // Is it still open? One check when the page opens (components/jobs/JobDetailDrawer.tsx useListingLiveness).
+  const liveness = useListingLiveness(job)
+  const closed = liveness?.state === 'gone'
+  const checkedOpen = liveness?.state === 'open' && liveness.fresh
 
   async function reportInactive() {
     if (!isLoggedIn) { notify({ title: 'Sign in to report listings', severity: 'info', duration: 2600 }); return }
@@ -435,7 +440,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
         {/* Optimize (paid) and Share live here; the sticky bar below keeps Apply one tap away on a long page
             with the company check beside it (phone tester 2026-11-02). */}
-        {!job.filled && (
+        {!job.filled && !closed && (
           <div className={d.inlineActions}>
             {postingHref && !takesSeenApply(job) && (
               <Button variant="secondary" size="sm" data-testid="detail-optimize-btn" onClick={() => setShowApplyModal(true)} icon="sparkles" title={`Optimize your résumé for this job · ${priceLabel(RESUME_OPTIMIZE_COST, pro)}`}>
@@ -464,10 +469,11 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
         {/* Status: one line each, only from fields that exist (no invented data). */}
         <div className={d.status}>
-          {avail === 'active' && <Badge tone="info" icon="radio">Active listing — seen recently</Badge>}
-          {avail === 'stale' && <p className={d.notice} data-tone="caution"><Icon name="triangle-alert" size={14} />This listing hasn&apos;t been seen in 7+ days and may be closed. Verify before applying.</p>}
+          <LivenessNotice liveness={liveness} sourceHref={postingHref} />
+          {!closed && avail === 'active' && <Badge tone="info" icon="radio">Active listing — seen recently</Badge>}
+          {!closed && !checkedOpen && avail === 'stale' && <p className={d.notice} data-tone="caution"><Icon name="triangle-alert" size={14} />This listing hasn&apos;t been seen in 7+ days and may be closed. Verify before applying.</p>}
           {job.filled && <p className={d.notice} data-tone="good"><Icon name="circle-check" size={14} />This position has been filled — the employer closed it on Seen.</p>}
-          {avail === 'expired' && !job.filled && <p className={d.notice} data-tone="bad"><Icon name="circle-x" size={14} />This listing is likely closed — it hasn&apos;t been seen in 14+ days. Check the company&apos;s careers page directly.</p>}
+          {avail === 'expired' && !job.filled && !closed && !checkedOpen && <p className={d.notice} data-tone="bad"><Icon name="circle-x" size={14} />This listing is likely closed — it hasn&apos;t been seen in 14+ days. Check the company&apos;s careers page directly.</p>}
           {job.freshness?.label && <p className={d.fine}>{job.freshness.label}</p>}
           {job.edited_at && <p className={d.fine}><Icon name="pencil" size={12} /> Edited by the employer {new Date(job.edited_at).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric', year: 'numeric' })}</p>}
           {!reportedInactive ? (
@@ -480,7 +486,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         </div>
 
         {/* AI insights — only when there is a posting to read (one "no description" message, below). */}
-        {insightsState !== 'no_desc' && (
+        {insightsState !== 'no_desc' && (!closed || insightsState === 'done') && (
           <section className={d.card} aria-labelledby="jd-insights">
             <h2 id="jd-insights" className="ui-eyebrow">What {companyName || 'this company'} is hiring for</h2>
             {(insightsState === 'loading' || insightsState === 'generating') && <Skeleton widths={[80, 65, 72, 58, 68]} h={10} />}
@@ -560,8 +566,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         </section>
 
         {/* SeenFit — the free fit check; HumanProof — runs after it (both under rebuild, untouched here). */}
-        <SeenFitPanel job={job} />
-        <HumanProofPanel job={job} optimized={optimized} />
+        {/* not run against a job its source says is closed */}
+        {!closed && <SeenFitPanel job={job} />}
+        {!closed && <HumanProofPanel job={job} optimized={optimized} />}
 
         {/* Report your experience — the strategy's data engine: one tap per outcome. */}
         <section className={d.card} aria-labelledby="jd-report">
@@ -584,7 +591,10 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           <Button variant="secondary" href={`/company/${companySlug(job.company)}`} prefetch={false} icon="building-2" className={d.check}>Check {companyName || 'company'}</Button>
           {job.filled ? (
             <Button variant="secondary" disabled className={d.grow}>Position filled</Button>
-          ) : <>
+          ) : closed ? <>
+            {/* the source took it down: the next step is another job (the original is a link in the notice) */}
+            <Button variant="primary" href={similarJobsHref(job)} className={d.main} icon="search" data-testid="detail-similar">Find similar jobs</Button>
+          </> : <>
             {takesSeenApply(job) && (
               <Button variant="primary" onClick={() => setShowSeenApply(true)} className={d.main} iconRight="arrow-right">Apply on Seen</Button>
             )}

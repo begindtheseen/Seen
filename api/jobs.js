@@ -4,6 +4,7 @@ import { getQueryExpansion } from '../lib/server/expand.js';
 import { applyRateLimit, rateLimit, rateLimitGlobal, resolveRateBucket } from '../lib/server/ratelimit.js';
 import { jobsReadFromQuery, setPublicCache } from '../lib/server/publicRead.js';
 import { logError } from '../lib/server/errlog.js';
+import { checkLiveness, checkableId } from '../lib/server/listingLiveness.js';
 import { filterAndRank, relevanceScore, isTitleRelated, sortByProximity, locationDbTerm, expandQueryTerms, parseLocation, locationScore, searchFitFromSignal } from './_utils/jobRelevance.js';
 import { sortByPriority, companyMatchesQuery, queryNamesCompany, isSeedListing } from '../lib/server/jobPriority.js';
 import { waitUntil } from '@vercel/functions';
@@ -300,6 +301,26 @@ export default async function handler(req, res) {
   if (_body.action === 'recommended') {
     if (await applyRateLimit(req, res, 'job-read', { bucketKey: rlBucket.key })) return;
     return handleRecommended(req, res, _body);
+  }
+
+  // ── Is this job still open? One polite request to its source, asked when its page/drawer opens ──
+  // (lib/server/listingLiveness.js). A row checked in the last 24 h is answered from the row; a job the
+  // source says is gone is hidden from search at once and kept for anyone who saved or applied to it.
+  if (_body.action === 'liveness') {
+    if (await applyRateLimit(req, res, 'job-read', { bucketKey: rlBucket.key })) return;
+    const id = checkableId(_body.id);
+    if (!id) return res.status(200).json({ state: 'unknown', checked_at: null, via: 'no_row', fresh: false });
+    const U = process.env.SUPABASE_URL, K = process.env.SUPABASE_SERVICE_KEY;
+    if (!U || !K) return res.status(503).json({ error: 'DB unavailable' });
+    const db = (path, opts = {}) => fetch(`${U}/rest/v1/${path}`, { ...opts, headers: { apikey: K, Authorization: `Bearer ${K}`, 'Content-Type': 'application/json', ...(opts.headers || {}) } });
+    try {
+      const out = await checkLiveness({ jobId: id, db });
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json(out);
+    } catch (e) {
+      logError('jobs/liveness', e.message);
+      return res.status(200).json({ state: 'unknown', checked_at: null, via: 'error', fresh: false });
+    }
   }
 
   // ── Get single job by ID — direct link / refresh fallback ──────────────────

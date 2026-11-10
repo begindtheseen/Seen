@@ -67,6 +67,54 @@ type InsightsState = 'loading' | 'done' | 'unavailable' | 'no_desc' | 'uncached'
 
 const L1_TTL = 24 * 60 * 60 * 1000
 
+// ── Is this job still open? (lib/server/listingLiveness.js via /api/jobs action:'liveness') ──────────────
+// Asked once when the listing opens. The server answers from the row when it was checked in the last 24 h,
+// else makes ONE request to the listing's source. 'gone' only on the source's own word (404/410, a closed
+// page); a wall or a timeout is 'unknown' and changes nothing on screen. Shared with the /jobs/[id] page.
+export interface Liveness { state: 'open' | 'gone' | 'unknown'; fresh: boolean; checked_at: string | null }
+const STORED_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export function useListingLiveness(job: Pick<Job, 'id' | 'employer_posted'> | null): Liveness | null {
+  const [liveness, setLiveness] = useState<Liveness | null>(null)
+  const id = job?.id || ''
+  // a live search result (j_<hash>) has no stored row; an employer's own post has no outside source
+  const skip = !job || !!job.employer_posted || !STORED_ID.test(id)
+  useEffect(() => {
+    setLiveness(null)
+    if (skip) return
+    let live = true
+    fetch('/api/jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'liveness', id }) })
+      .then(r => (r.ok ? r.json() : null))
+      .then((d: Liveness | null) => { if (live && d && (d.state === 'open' || d.state === 'gone' || d.state === 'unknown')) setLiveness(d) })
+      .catch(() => { /* no answer = nothing changes on screen */ })
+    return () => { live = false }
+  }, [id, skip])
+  return liveness
+}
+
+/** The closed notice, or the quiet "checked just now" line. Nothing for 'unknown' or an old check. */
+export function LivenessNotice({ liveness, sourceHref }: { liveness: Liveness | null; sourceHref?: string | null }) {
+  if (liveness?.state === 'gone') {
+    return (
+      <p className={d.notice} data-tone="bad" role="status" data-testid="listing-closed">
+        <Icon name="circle-x" size={14} />
+        <span>This listing looks closed — the site it came from has taken it down.{sourceHref ? <> <a href={sourceHref} target="_blank" rel="noopener noreferrer" className={d.link}>See the original</a></> : null}</span>
+      </p>
+    )
+  }
+  if (liveness?.state === 'open' && liveness.fresh) {
+    return <p className={d.fine} data-testid="listing-checked"><Icon name="circle-check" size={14} />Checked just now · still open at the source</p>
+  }
+  return null
+}
+
+/** Where to look instead: the same title near the same place. */
+export function similarJobsHref(job: Pick<Job, 'title' | 'location'>): string {
+  const q = encodeURIComponent(String(job.title || '').trim())
+  const loc = String(job.location || '').trim()
+  return `/jobs?q=${q}${loc ? `&loc=${encodeURIComponent(loc)}` : ''}`
+}
+
 function Skeleton({ widths, h }: { widths: number[]; h: number }) {
   return (
     <div className={d.skel} role="status" aria-label="Loading">
@@ -107,6 +155,11 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
   const seenApply = mode === 'seen' || mode === 'both'
   const externalApply = mode !== 'seen' && !!job.apply_url
   const [seenApplyOpen, setSeenApplyOpen] = useState(false)
+  const liveness = useListingLiveness(job)
+  // the source says the job is gone: no Apply as the main action, no tools against it
+  const closed = liveness?.state === 'gone'
+  // a check made just now beats the age-based guess ("may be closed")
+  const checkedOpen = liveness?.state === 'open' && liveness.fresh
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setVisible(true))
@@ -318,9 +371,10 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
           </div>
 
           <div className={d.status}>
-            {avail === 'active' && <Badge tone="info" icon="radio">Active listing — seen recently</Badge>}
-            {avail === 'stale' && <p className={d.notice} data-tone="caution"><Icon name="triangle-alert" size={14} />May be closed — verify before applying.</p>}
-            {avail === 'expired' && <p className={d.notice} data-tone="bad"><Icon name="circle-x" size={14} />Likely closed — check the company&apos;s careers page.</p>}
+            <LivenessNotice liveness={liveness} sourceHref={postingHref} />
+            {!closed && avail === 'active' && <Badge tone="info" icon="radio">Active listing — seen recently</Badge>}
+            {!closed && !checkedOpen && avail === 'stale' && <p className={d.notice} data-tone="caution"><Icon name="triangle-alert" size={14} />May be closed — verify before applying.</p>}
+            {!closed && !checkedOpen && avail === 'expired' && <p className={d.notice} data-tone="bad"><Icon name="circle-x" size={14} />Likely closed — check the company&apos;s careers page.</p>}
             {/* Factual freshness — literally-true observations of OUR data (never an employer verdict). */}
             {job.freshness?.label && <p className={d.fine}>{job.freshness.label}</p>}
             {!reportedInactive ? (
@@ -333,7 +387,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
           </div>
 
           {/* AI Insights — only when there is a posting to read (one "no description" message, below). */}
-          {insightsState !== 'no_desc' && (
+          {insightsState !== 'no_desc' && (!closed || insightsState === 'done') && (
             <section className={d.card} aria-label={`What ${companyName || 'this company'} is hiring for`}>
               <h3 className="ui-eyebrow">What {companyName || 'this company'} is hiring for</h3>
               {/* One sentence, then the paste button on its own line (the posting itself is the Apply button below). */}
@@ -432,8 +486,9 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
           <Button variant="ghost" size="sm" onClick={() => onCheckCompany(job.company)} icon="building-2" className={w.check}>Check {companyName}</Button>
           <div className={d.footRow}>
             <button type="button" onClick={toggleSave} aria-label={saved ? 'Remove from saved' : 'Save'} aria-pressed={saved} className={d.iconBtn} data-on={saved ? '1' : '0'}><Icon name="heart" size={18} /></button>
-            {seenApply && <Button variant="primary" onClick={() => setSeenApplyOpen(true)} className={d.main} iconRight="arrow-right">Apply on Seen</Button>}
-            {externalApply
+            {closed && <Button variant="primary" href={similarJobsHref(job)} className={d.main} icon="search" data-testid="drawer-similar">Find similar jobs</Button>}
+            {!closed && seenApply && <Button variant="primary" onClick={() => setSeenApplyOpen(true)} className={d.main} iconRight="arrow-right">Apply on Seen</Button>}
+            {closed ? null : externalApply
               ? <>
                   {/* FREE: opens the posting in a new tab, then the tracker checkpoint asks "Did you apply?" —
                       the existing add path. Nothing is spent. */}

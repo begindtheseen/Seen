@@ -20,8 +20,8 @@ import { gateAI } from '../lib/server/credits.js';
 import { runOptimizer, ENGINE_VERSION } from '../lib/optimizer/index.js';
 import { previewOnlyOrFetch } from '../lib/server/postingGate.js';
 import { freeDiagnostic } from '../lib/server/optimizePackage.js';
-import { extractJobFacts } from '../lib/optimizer/extractJobFacts.js';
-import { termFromLabel } from '../lib/optimizer/postingTerms.js';
+import { extractJobFacts, postingTermKey } from '../lib/optimizer/extractJobFacts.js';
+import { termFromLabel, POSTING_TERMS_VERSION } from '../lib/optimizer/postingTerms.js';
 import { runHumanProof, HUMANPROOF_ENGINE_VERSION } from '../lib/humanizer/index.js';
 import { buildHumanProofPackage, normalizeBulletList } from '../lib/server/humanizePackage.js';
 import { loadSkillTaxonomy } from '../lib/server/skillTaxonomy.js';
@@ -150,27 +150,33 @@ async function loadPhraseRules(db) {
 async function loadTaxonomy() { return loadSkillTaxonomy(); }
 
 // ── cached job_facts per job_id (fast repeat runs) ──
-async function getCachedJobFacts(db, jobId) {
+const TERM_ROW_MARK = 'term:'; // job_facts.normalized_label prefix of a posting-term row (storage encoding only)
+export async function getCachedJobFacts(db, jobId) {
   if (!jobId) return null;
   try {
     const r = await db(`job_facts?job_id=eq.${encodeURIComponent(String(jobId))}&select=fact_type,label,normalized_label,weight,confidence,importance&limit=500`);
     if (!r.ok) return null;
     const rows = await r.json();
     if (!rows?.length) return null;
-    return rows.map((row) => ({
-      factType: row.fact_type,
-      label: row.label,
-      normalizedLabel: row.normalized_label,
-      importance: row.importance || 'required',
-      weight: Number(row.weight) || (row.importance === 'preferred' ? 0.6 : 1),
-      confidence: Number(row.confidence) || 0.8,
-      // a requirement in the posting's own words is matched by its words (lib/optimizer/postingTerms.js)
-      ...(String(row.normalized_label || '').startsWith('term:') ? { term: termFromLabel(row.label), hard: false } : {}),
-    }));
+    return rows.map((row) => {
+      // A requirement in the posting's own words is matched by its words (lib/optimizer/postingTerms.js).
+      // The table has no column for that, so the cache marks the stored row (TERM_ROW_MARK, storage only —
+      // never in a fact) and the fact is rebuilt from its label: key = the label's own words, as the reader makes it.
+      const isTerm = String(row.normalized_label || '').startsWith(TERM_ROW_MARK);
+      return {
+        factType: row.fact_type,
+        label: row.label,
+        normalizedLabel: isTerm ? postingTermKey(row.label) : row.normalized_label,
+        importance: row.importance || 'required',
+        weight: Number(row.weight) || (row.importance === 'preferred' ? 0.6 : 1),
+        confidence: Number(row.confidence) || 0.8,
+        ...(isTerm ? { term: termFromLabel(row.label), hard: false, extractor: POSTING_TERMS_VERSION } : {}),
+      };
+    });
   } catch { return null; }
 }
 
-async function cacheJobFacts(db, jobId, facts) {
+export async function cacheJobFacts(db, jobId, facts) {
   if (!jobId || !facts?.length) return;
   try {
     await db(`job_facts?job_id=eq.${encodeURIComponent(String(jobId))}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
@@ -182,7 +188,7 @@ async function cacheJobFacts(db, jobId, facts) {
           job_id: String(jobId),
           fact_type: f.factType,
           label: f.label,
-          normalized_label: f.normalizedLabel,
+          normalized_label: f.term ? `${TERM_ROW_MARK}${f.normalizedLabel}` : f.normalizedLabel,
           weight: f.weight,
           confidence: f.confidence,
           importance: f.importance,
