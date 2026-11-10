@@ -628,6 +628,8 @@ test('round 8: one plural rule — "1 report" / "2 reports"; summaries use it', 
   assert.equal(counted(1, 'reports'), '1 report'); assert.equal(counted(2, 'reports'), '2 reports'); assert.equal(counted(1040, 'reports'), '1,040 reports')
   assert.equal(singularNoun('duplicate copies'), 'duplicate copy'); assert.equal(singularNoun('listings nobody saved'), 'listing nobody saved')
   assert.equal(singularNoun('groups of duplicate names'), 'group of duplicate names'); assert.equal(singularNoun('company scores'), 'company score')
+  const { checkingText, isChecking } = await import('./words.ts')
+  assert.equal(checkingText({ checked: 257, total: 343 }), 'checking 86 more…'); assert.equal(isChecking({ checked: 343, total: 343 }), false)
   assert.equal(singularNoun('stale listings'), 'stale listing'); assert.equal(singularNoun('companies'), 'company'); assert.equal(singularNoun('boxes'), 'box')
   const base = { id: 'x', key: 'k', action: 'a', args: {}, label: 'L', past: 'Put back', noun: 'rows', remaining: 0, rounds: 1, message: '', skipped: [], lost_rounds: 0, started_at: '', status: 'done' }
   assert.equal(jobSummary({ ...base, changed: 1 }), 'Put back 1 row in 1 round.')

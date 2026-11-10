@@ -132,13 +132,8 @@ export const SearchField = forwardRef<HTMLInputElement, {
   )
 })
 
-/** A count still being checked (a counts read saying `checked: n of m`): never a number that will change. */
-export type Checking = { checked: number; total: number }
-export const isChecking = (c?: Checking | null): c is Checking => !!c && c.checked < c.total
-/** "checking 82 more…". Pure. */
-export function checkingText(c: Checking): string {
-  return `checking ${Math.max(0, Math.round(c.total - c.checked)).toLocaleString('en-US')} more…`
-}
+import { checkingText, isChecking, type Checking } from '../core/words.ts'
+export { checkingText, isChecking, type Checking }
 
 export type ChipOption = { value: string; label: string; count?: number | null; checking?: Checking | null }
 

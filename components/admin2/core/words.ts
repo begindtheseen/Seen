@@ -17,3 +17,11 @@ export function counted(n: number, nounPlural: string, one?: string): string {
   const num = Math.round(n).toLocaleString('en-US')
   return `${num} ${Math.round(n) === 1 ? (one || singularNoun(nounPlural)) : nounPlural}`
 }
+
+/** A count still being checked (a counts read saying `checked: n of m`): never show a number that will change. */
+export type Checking = { checked: number; total: number }
+export const isChecking = (c?: Checking | null): c is Checking => !!c && c.checked < c.total
+/** "checking 82 more…". Pure. */
+export function checkingText(c: Checking): string {
+  return `checking ${Math.max(0, Math.round(c.total - c.checked)).toLocaleString('en-US')} more…`
+}
