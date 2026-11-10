@@ -29,6 +29,7 @@ import { buildHumanProofPackage, normalizeBulletList } from '../lib/server/human
 import { loadSkillTaxonomy } from '../lib/server/skillTaxonomy.js';
 import { fitContext, postingSaysRemote } from '../lib/server/fitContext.js';
 import { canonicalResumeText } from '../lib/resume/canonical.js';
+import { knowledgeHealth } from '../lib/server/knowledgeHealth.js';
 
 // ── auth: derive the user id from the Supabase JWT (same pattern as api/apply.js) ──
 function verifyJWT(token, secret) {
@@ -200,6 +201,11 @@ export async function cacheJobFacts(db, jobId, facts) {
   } catch (e) { console.error('optimizer cacheJobFacts:', e.message); }
 }
 
+function healthAsked(req) {
+  if (req.query && req.query.health != null) return true;
+  try { return new URL(req.url || '', 'http://x').searchParams.has('health'); } catch { return false; }
+}
+
 export default async function handler(req, res) {
   const _o = req.headers.origin || '';
   const _devO = !_o || _o.includes('localhost') || _o.includes('127.0.0.1');
@@ -207,6 +213,12 @@ export default async function handler(req, res) {
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
+  // GET ?health=1 — which shipped data files this deployed function can read (lib/server/knowledgeHealth.js).
+  // No database, no rate-limit row, nothing about anyone: true / false per data set and the engine version.
+  if (req.method === 'GET' && healthAsked(req)) {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).json(knowledgeHealth());
+  }
   if (await applyRateLimit(req, res, 'optimizer')) return;
   if (req.method !== 'POST') return res.status(405).end('Method not allowed');
 
