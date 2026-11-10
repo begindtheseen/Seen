@@ -29,7 +29,7 @@ export function userSub(u: UserRow): string {
 }
 
 export const FILTERS = [
-  { value: 'all', label: 'Everyone' }, { value: 'pro', label: 'Pro now' }, { value: 'new_today', label: 'Joined today' }, { value: 'new_week', label: 'Joined this week' },
+  { value: 'all', label: 'Everyone' }, { value: 'pro', label: 'Pro now' }, { value: 'free', label: 'Free' }, { value: 'new_today', label: 'Joined today' }, { value: 'new_week', label: 'Joined this week' },
 ]
 
 // ── One account (user_detail) ────────────────────────────────────────────────────────────────────

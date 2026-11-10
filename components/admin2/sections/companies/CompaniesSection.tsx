@@ -11,7 +11,7 @@ import { useAdminAction, useAdminJob, useAdminList, useAdminQuery, useApi } from
 import { useUrlFilter } from '../../core/place.ts'
 import type { SectionProps } from '../../core/sections.tsx'
 import { useShell } from '../../core/shellContext.ts'
-import { KeyHint, SearchField, SectionHeader, StatusChip } from '../../ui/bits.tsx'
+import { KeyHint, SearchField, SectionHeader, StatStrip, StatTile, StatusChip } from '../../ui/bits.tsx'
 import ConfirmStep from '../../ui/ConfirmStep.tsx'
 import { List, Row } from '../../ui/List.tsx'
 import ResultLine from '../../ui/ResultLine.tsx'
@@ -49,6 +49,10 @@ export default function CompaniesSection({ active }: SectionProps) {
           <h2 id="co-search" className={styles.h2}>Every graded company</h2>
           <div className={styles.keys}><span><KeyHint keys="/" /> search</span><span><KeyHint keys="j" /><KeyHint keys="k" /> move</span><span><KeyHint keys="Enter" /> open</span></div>
         </div>
+        <StatStrip label="Companies">
+          <StatTile label={typeof (list.data as Record<string, unknown> | undefined)?.total_label === 'string' ? String((list.data as Record<string, unknown>).total_label) : 'Companies with a score'}
+            value={list.data ? (typeof list.total === 'number' ? list.total : null) : undefined} sub="an exact count of score rows" testId="co-total" />
+        </StatStrip>
         <SearchField ref={search} value={typed} onChange={setTyped} label="Search companies" placeholder="Company name" testId="companies-q"
           onEnter={() => { const v = typed.trim(); pushed.current = v; setQ(v) }} />
         <div ref={listRef}>
@@ -65,6 +69,8 @@ export default function CompaniesSection({ active }: SectionProps) {
       </section>
       <DuplicatesBlock />
       <MergesBlock />
+      <TopSearchedBlock />
+      <EnrichmentBlock />
     </div>
   )
 }
@@ -188,6 +194,78 @@ function MergesBlock() {
         <Button type="submit" variant="secondary" disabled={name.trim().length < 2} loading={resplit.busy()} data-testid="co-resplit">Separate</Button>
       </form>
       <ResultLine state={resplit.state()} onRetry={() => resplit.retry()} onDismiss={() => resplit.dismiss()} runningText="Separating…" />
+    </section>
+  )
+}
+
+// ── Most searched, last 7 days (top_searched) ───────────────────────────────────────────────────
+// What it counts: /jobs search text as typed (a job title or a company name), per query — not resolved companies.
+type TopRow = { query?: string; key?: string; count?: number }
+function TopSearchedBlock() {
+  const api = useApi()
+  const q = useAdminQuery<Record<string, unknown>>('top_searched', () => api<Record<string, unknown>>('top_searched', { limit: 15 }, { timeoutMs: 30_000 }), { staleMs: 10 * 60_000 })
+  const d = q.data
+  const rows = (Array.isArray(d?.rows) ? d!.rows : []) as TopRow[]
+  const max = Math.max(1, ...rows.map((r) => (typeof r.count === 'number' ? r.count : 0)))
+  return (
+    <section className={styles.block} aria-labelledby="co-top" data-testid="co-top">
+      <div className={styles.blockHead}><h2 id="co-top" className={styles.h2}>Most searched, last 7 days</h2></div>
+      <p className={styles.quiet}>What people typed into the job search (a job title or a company name), counted per query as written — not matched to companies.</p>
+      {q.loading ? <Skeleton rows={3} label="Counting searches" /> : null}
+      {q.error && !d ? <ErrorState what="the most searched queries" error={q.error} onRetry={() => void q.refresh()} retrying={q.fetching} /> : null}
+      {d ? (
+        d.ready === false ? <EmptyState icon="search" title="Searches aren’t recorded yet." body="The search log table isn’t there, so there is nothing to count." />
+          : (
+            <>
+              <RefreshFailed error={q.error} onRetry={() => void q.refresh()} />
+              <p className={styles.text} data-testid="co-top-label">{typeof d.label === 'string' && d.label ? `Counted from ${d.label}.` : 'The server did not say how many searches it read.'}</p>
+              {rows.length ? (
+                <ul className={styles.lines} aria-label="Most searched queries">
+                  {rows.map((r, i) => (
+                    <li key={r.key || i} className={styles.barRow}>
+                      <span>{r.query || r.key || '—'}</span>
+                      <span className={styles.barNum}>{typeof r.count === 'number' ? `${fmt(r.count)} ${r.count === 1 ? 'search' : 'searches'}` : '—'}</span>
+                      <span className={styles.barTrack} aria-hidden="true"><span className={styles.barFill} style={{ transform: `scaleX(${(typeof r.count === 'number' ? r.count : 0) / max})` }} /></span>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className={styles.quiet}>No searches in the last 7 days.</p>}
+            </>
+          )
+      ) : null}
+    </section>
+  )
+}
+
+// ── Self-filling company pages: the enrichment queue (enrichment_queue_stats) ────────────────────
+const dash = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? fmt(v) : '—')
+function EnrichmentBlock() {
+  const api = useApi()
+  const q = useAdminQuery<Record<string, unknown>>('enrichment_queue', () => api<Record<string, unknown>>('enrichment_queue_stats'), { staleMs: 2 * 60_000 })
+  const row = (Array.isArray(q.data?.rows) ? q.data!.rows[0] : null) as Record<string, unknown> | null
+  const labels = (row?.labels && typeof row.labels === 'object' ? row.labels : {}) as Record<string, string>
+  const tile = (key: string, fallback: string) => (
+    <div className={styles.fact}><dt className={styles.factLabel}>{labels[key] || fallback}</dt><dd className={styles.factValue} data-testid={`enq-${key}`}>{dash(row?.[key])}</dd></div>
+  )
+  return (
+    <section className={styles.block} aria-labelledby="co-enq" data-testid="co-enrichment">
+      <div className={styles.blockHead}><h2 id="co-enq" className={styles.h2}>Self-filling company pages</h2></div>
+      <p className={styles.quiet}>Companies waiting to have their page filled in from public sources, and how the queue is doing. “—” means that count couldn’t be read.</p>
+      {q.loading ? <Skeleton rows={2} label="Reading the queue" /> : null}
+      {q.error && !q.data ? <ErrorState what="the enrichment queue" error={q.error} onRetry={() => void q.refresh()} retrying={q.fetching} /> : null}
+      {q.data ? (
+        !row || row.ready === false ? <EmptyState icon="database" title="The enrichment queue isn’t set up yet." body="The queue table isn’t there, so nothing is waiting." />
+          : (
+            <>
+              <RefreshFailed error={q.error} onRetry={() => void q.refresh()} />
+              {q.data.message ? <p className={styles.text} data-testid="enq-message">{String(q.data.message)}</p> : null}
+              <dl className={styles.facts}>
+                {tile('waiting', 'Waiting')}{tile('running', 'Running')}{tile('done_today', 'Done today')}{tile('failed', 'Failed')}
+              </dl>
+              {row.oldest_waiting_company ? <p className={styles.quiet}>Oldest waiting: {String(row.oldest_waiting_company)}{row.oldest_waiting_at ? `, since ${formatPacific(String(row.oldest_waiting_at))}` : ''}.</p> : null}
+            </>
+          )
+      ) : null}
     </section>
   )
 }

@@ -58,6 +58,12 @@ function AccountsView({ active }: { active: boolean }) {
       <SearchField ref={search} value={typed} onChange={setTyped} label="Find an account" placeholder="Email (or part of it), or the account id" placeholderShort="Email or account id" testId="people-q"
         onEnter={() => { const v = typed.trim(); pushed.current = v; setQ(v) }} />
       <FilterChips label="Accounts" value={f} onChange={(v) => setFilter(v === 'all' ? '' : v)} options={FILTERS} />
+      {f === 'free' && list.data ? (
+        <p className={styles.quiet} data-testid="people-free-label">
+          {typeof list.total === 'number' ? `${fmt(list.total)} ${list.total === 1 ? 'account' : 'accounts'}` : 'The count couldn’t be read'}
+          {typeof (list.data as Record<string, unknown>).label === 'string' ? ` — ${(list.data as Record<string, unknown>).label}` : ''}
+        </p>
+      ) : null}
       <div ref={listRef}>
         <List<UserRow>
           rows={list.rows} idOf={(r) => r.id} noun="accounts" loading={list.loading} error={list.error} onRetry={() => void list.refresh()}
