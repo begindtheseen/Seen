@@ -13,7 +13,7 @@ import ConfirmStep from '../../ui/ConfirmStep.tsx'
 import ResultLine from '../../ui/ResultLine.tsx'
 import { EmptyState, ErrorState, RefreshFailed, Skeleton } from '../../ui/states.tsx'
 import styles from '../listings/listings.module.css'
-import { endOfPacificDay, fmt, ledgerWords, pacificPlusDays, proLine, readUserDetail } from './adapter.ts'
+import { endOfPacificDay, fmt, ledgerWords, pacificPlusDays, proLine, readUserDetail, signupWords } from './adapter.ts'
 
 export default function UserItem({ kind, id, setTitle, close }: ItemViewProps) {
   const api = useApi()
@@ -27,6 +27,7 @@ export default function UserItem({ kind, id, setTitle, close }: ItemViewProps) {
   const del = useAdminAction('delete_user', { onSettled: (res) => { if (!res.ok) setConfirmDel(false) } })
   const [until, setUntil] = useState(pacificPlusDays(30))
   const [amount, setAmount] = useState('5')
+  const [grantWhy, setGrantWhy] = useState('')
   const [password, setPassword] = useState('')
   const [reason, setReason] = useState('')
   const [confirmPw, setConfirmPw] = useState(false)
@@ -58,6 +59,8 @@ export default function UserItem({ kind, id, setTitle, close }: ItemViewProps) {
         <StatTile label="Credits" value={u.balance} sub="balance now" testId="user-balance" />
         <StatTile label="Applications" value={u.applications} sub="tracked" />
         <StatTile label="Reports" value={u.reports} sub="sent to Seen" />
+        <StatTile label="Credits earned" value={u.earned} sub="every credit ever added" />
+        <StatTile label="Credits spent" value={u.spent} sub="every credit ever used" />
       </StatStrip>
 
       <div className={styles.itemPart}>
@@ -79,9 +82,11 @@ export default function UserItem({ kind, id, setTitle, close }: ItemViewProps) {
 
       <div className={styles.itemPart}>
         <h3 className={styles.h2}>Credits</h3>
-        <form className={styles.inline} onSubmit={(e) => { e.preventDefault(); if (amountOk) void grant.run({ user_id: u.id, amount: n }) }}>
+        <form className={styles.inline} onSubmit={(e) => { e.preventDefault(); if (amountOk) void grant.run({ user_id: u.id, amount: n, reason: grantWhy.trim() || undefined }) }}>
           <label className={`${styles.field} ${styles.narrow}`}><span>Credits to add (1–500)</span>
             <input className="ui-input" type="number" inputMode="numeric" min={1} max={500} value={amount} onChange={(e) => setAmount(e.target.value)} aria-invalid={!amountOk} data-testid="user-credits-amount" /></label>
+          <label className={styles.field}><span>Why (kept on the ledger line)</span>
+            <input className="ui-input" value={grantWhy} maxLength={200} onChange={(e) => setGrantWhy(e.target.value)} autoComplete="off" data-testid="user-credits-why" /></label>
           <Button type="submit" variant="secondary" icon="plus" disabled={!amountOk} loading={grant.busy()} data-testid="user-credits-add">Add {amountOk ? fmt(n) : ''} credits</Button>
         </form>
         <ResultLine state={grant.state()} onUndo={() => grant.undo()} onRetry={() => grant.retry()} onDismiss={() => grant.dismiss()} runningText="Adding credits…" />
@@ -91,6 +96,11 @@ export default function UserItem({ kind, id, setTitle, close }: ItemViewProps) {
           </ul>
         ) : <p className={styles.quiet}>No credit history.</p>}
         {u.ledger.length >= 50 ? <p className={styles.quiet}>The 50 most recent changes.</p> : null}
+      </div>
+
+      <div className={styles.itemPart}>
+        <h3 className={styles.h2}>Where they signed up from</h3>
+        <p className={styles.text} data-testid="user-signup">{signupWords(u.signup)}</p>
       </div>
 
       <div className={styles.itemPart}>

@@ -19,12 +19,12 @@ const FORMATS: FormatInfo[] = [
   { id: 'json', label: 'JSON Resume', extension: 'json', templated: false, description: 'The open schema — portable to any JSON Resume tool.' },
 ]
 
-type Props = { doc: ResumeDoc; pro: boolean | null; isLoggedIn: boolean; onNeedPro: () => void; role?: string }
+type Props = { doc: ResumeDoc; pro: boolean | null; isLoggedIn: boolean; onNeedPro: () => void; role?: string; paid?: { exportToken?: string; exportKey?: string } | null }
 
 // The template accent a renderer reports for 'no accent' (lib/resume/render/templates.js); compared, never painted.
 const BLACK = '#000000' // colour-literal: compared against templates.js, never painted
 
-export default function ExportPanel({ doc, pro, isLoggedIn, onNeedPro, role }: Props) {
+export default function ExportPanel({ doc, pro, isLoggedIn, onNeedPro, role, paid }: Props) {
   const templates = useMemo(() => listTemplates(), [])
   const [template, setTemplate] = useState('classic')
   const [format, setFormat] = useState<FormatInfo['id']>('pdf')
@@ -38,7 +38,7 @@ export default function ExportPanel({ doc, pro, isLoggedIn, onNeedPro, role }: P
   async function download() {
     setBusy('download'); setError('')
     try {
-      const res = await fetch('/api/resume', { method: 'POST', headers: await aiHeaders(), body: JSON.stringify({ action: 'export', doc, format, template, paper, fontScale: Number(scale), role: role || undefined }) })
+      const res = await fetch('/api/resume', { method: 'POST', headers: await aiHeaders(), body: JSON.stringify({ action: 'export', doc, format, template, paper, fontScale: Number(scale), role: role || undefined, ...(paid && paid.exportToken && paid.exportKey ? { exportToken: paid.exportToken, exportKey: paid.exportKey } : {}) }) })
       if (!res.ok) { const d = (await res.json().catch(() => ({}))) as { error?: string }; setError(d.error || 'Could not build the file. Try again.'); setBusy(null); return }
       const blob = await res.blob()
       // always a name with its extension (an export once landed as "download")

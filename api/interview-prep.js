@@ -137,7 +137,9 @@ export async function readRecord({ supabaseUrl, serviceKey, company, role }) {
   // (round 2). A role with no clear field gets the company-wide range, labelled as such.
   const fam = prepFamily(role);
   const pool = fam !== 'general' ? jobs.filter((j) => prepFamily(j.title || '') === fam) : jobs;
-  const unit = /^(?:software_engineering|data_analytics|marketing|finance_accounting|education|project_management)$/.test(fam) ? { unit: 'year' } : {};
+  // salaried fields are quoted per year; hourly occupations per hour only — never an hourly job at $39k–$45k/yr
+  const unit = /^(?:software_engineering|data_analytics|marketing|finance_accounting|education|project_management)$/.test(fam) ? { unit: 'year' }
+    : /^(?:warehouse|retail|food_service|hospitality|customer_service|delivery_logistics|healthcare_support|skilled_trades|valet_parking|security|administrative)$/.test(fam) && !/\b(?:manager|director|supervisor|superintendent|head|chief|lead)\b/i.test(String(role || '')) ? { unit: 'hour' } : {};
   let pay = payRange(pool, unit);
   let scope = pay ? (fam !== 'general' ? 'role' : 'company') : null;
   // too few of the company's own listings state pay (round 3: Amazon, Grubhub, Stripe all null) → the same

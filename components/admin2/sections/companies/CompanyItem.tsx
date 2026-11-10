@@ -6,7 +6,8 @@
 import { useEffect, useState } from 'react'
 import { formatPacific } from '@/lib/time/pacific'
 import Button from '@/components/ui/Button'
-import { useAdminAction, useAdminQuery, useApi } from '../../core/hooks.tsx'
+import { saveText } from '../../core/api.ts'
+import { useAdminAction, useAdminDownload, useAdminQuery, useApi } from '../../core/hooks.tsx'
 import type { ItemViewProps } from '../../core/items.tsx'
 import { ItemNotFound } from '../../core/SheetHost.tsx'
 import { StatTile, StatStrip, StatusChip } from '../../ui/bits.tsx'
@@ -17,15 +18,6 @@ import styles from '../listings/listings.module.css'
 import CompanyReports from './CompanyReports.tsx'
 import { displayName, evidence, fmt, perkLines, readCompanyDetail, scoreLine } from './adapter.ts'
 
-function saveJson(filename: string, data: unknown) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-  const href = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = href; a.download = filename; a.rel = 'noopener'
-  document.body.appendChild(a); a.click(); a.remove()
-  setTimeout(() => URL.revokeObjectURL(href), 10_000)
-}
-
 export default function CompanyItem({ kind, id, setTitle, open }: ItemViewProps) {
   const api = useApi()
   const key = id.toLowerCase().trim()
@@ -35,7 +27,10 @@ export default function CompanyItem({ kind, id, setTitle, open }: ItemViewProps)
   useEffect(() => { if (d) setTitle(displayName(d.name), d.score ? scoreLine(d) : 'No score yet') }, [d, setTitle])
 
   const recompute = useAdminAction('company_recompute')
-  const exp = useAdminAction('export_company', { onSettled: (res) => { if (res.ok && (res as Record<string, unknown>).bundle) saveJson(`seen-company-evidence-${key.replace(/[^a-z0-9]+/g, '-')}.json`, (res as Record<string, unknown>).bundle) } })
+  const slug = key.replace(/[^a-z0-9]+/g, '-')
+  const exp = useAdminAction('export_company', { onSettled: (res) => { const b = res.ok ? (res as Record<string, unknown>).bundle : null; if (b) saveText(JSON.stringify(b, null, 2), `seen-company-evidence-${slug}.json`, 'application/json') } })
+  const pdf = useAdminDownload()
+  const pkg = useAdminDownload()
   const merge = useAdminAction('merge', { onSettled: () => setConfirmMerge(false) })
   const separate = useAdminAction('undo_merge', { onSettled: () => setConfirmSep(null) })
   const [dir, setDir] = useState<'absorb' | 'into'>('absorb')
@@ -83,10 +78,12 @@ export default function CompanyItem({ kind, id, setTitle, open }: ItemViewProps)
           <Button variant="secondary" icon="refresh-cw" onClick={() => void recompute.run({ name })} loading={recompute.busy()} data-testid="co-recompute">Recompute the score</Button>
           <Button variant="ghost" icon="download" onClick={() => void exp.run({ company: name })} loading={exp.busy()} data-testid="co-export">Download the evidence (JSON)</Button>
         </div>
-        <p className={styles.quiet}>
-          The legal audit PDF and the audit package are built by their own download endpoints, which the new admin cannot save as files yet.
-          They are in the <a className={styles.link} href="/admin/legacy">legacy admin</a> (Advanced tools → Company score audit), same sign-in.
-        </p>
+        <ResultLine state={pdf.state} onRetry={pdf.retry} onDismiss={pdf.dismiss} runningText="Building the legal audit PDF…" />
+        <ResultLine state={pkg.state} onRetry={pkg.retry} onDismiss={pkg.dismiss} runningText="Building the audit package (PDF + source data, zipped)…" />
+        <div className={styles.actions}>
+          <Button variant="ghost" icon="file-text" loading={pdf.busy} onClick={() => void pdf.run('/api/admin-company-audit-pdf', { company: name }, { fallbackName: `seen-legal-audit-${slug}.pdf`, timeoutMs: 90_000 })} data-testid="co-audit-pdf">Legal audit PDF</Button>
+          <Button variant="ghost" icon="download" loading={pkg.busy} onClick={() => void pkg.run('/api/admin-company-audit-package', { company: name }, { fallbackName: `seen-legal-audit-package-${slug}.zip`, timeoutMs: 90_000 })} data-testid="co-audit-package">Audit package (.zip)</Button>
+        </div>
       </div>
 
       <div className={styles.itemPart}>

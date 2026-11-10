@@ -346,7 +346,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
   // One real question for free, so the offer is not a blind buy (round 2: "nothing to preview").
   const sample = data?.sample_question
     ? { q: data.sample_question.q, why: data.sample_question.why, company: true }
-    : data?.pay
+    : data?.pay && !pack?.posting_pay
       ? { q: 'What are your pay expectations?', why: data.pay.scope === 'market' ? `${role || 'This job'} listings at other employers on Seen pay about ${money(data.pay)} (${poss(company)} own listings don't say). Give a range you would accept.` : `${poss(company)} similar listings on Seen pay about ${money(data.pay)}. Give a range you would accept.` }
       : { q: `What do you know about ${company}?`, why: 'Name what they sell, who their customers are, and one recent thing you read about them.' }
 
@@ -385,7 +385,8 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
             {!!rec?.process?.length && (
               <p className={s.fact}>Applicants to {company} mention {processLine(rec.process)}.</p>
             )}
-            {data?.pay && (
+            {/* one pay on the card: when the posting the person gave states pay, that is the only pay shown (P2 round 4) */}
+            {data?.pay && !pack?.posting_pay && (
               <p className={s.fact}>{data.pay.scope === 'market' ? <>Pay for this job at other employers on Seen ({poss(company)} listings don&apos;t say): </> : <>Pay on {poss(company)} {data.pay.scope === 'role' ? 'similar ' : ''}listings: </>}<b>{money(data.pay)}</b> <span className={s.dim}>({data.pay.listings} listings)</span></p>
             )}
             {pickDay}

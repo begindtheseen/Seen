@@ -33,15 +33,18 @@ export const FILTERS = [
 ]
 
 // ── One account (user_detail) ────────────────────────────────────────────────────────────────────
-export type LedgerLine = { delta: number | null; reason: string; created_at: string }
-export type UserDetail = UserRow & { ledger: LedgerLine[]; applications: number | null; reports: number | null }
+export type LedgerLine = { delta: number | null; reason: string; note?: string | null; by?: string | null; created_at: string }
+export type SignupSource = { landing_path: string | null; referrer_host: string | null; utm_source: string | null; utm_medium: string | null; utm_campaign: string | null; ref_code: string | null; first_seen_at: string | null; landing_group: string | null; referrer_group: string | null }
+export type UserDetail = UserRow & { ledger: LedgerLine[]; applications: number | null; reports: number | null; earned: number | null; spent: number | null; signup: SignupSource | null }
 
 export function readUserDetail(raw: unknown): UserDetail | null {
   const o = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
   const d = Array.isArray(o.rows) && o.rows[0] && typeof o.rows[0] === 'object' ? o.rows[0] as Record<string, unknown> : null
   if (!d || !d.id) return null
-  const ledger = (Array.isArray(d.ledger) ? d.ledger : []).map((l: Record<string, unknown>) => ({ delta: num(l.delta), reason: str(l.reason), created_at: str(l.created_at) }))
-  return { ...readUser(d), ledger, applications: num(d.applications), reports: num(d.reports) }
+  const ledger = (Array.isArray(d.ledger) ? d.ledger : []).map((l: Record<string, unknown>) => ({ delta: num(l.delta), reason: str(l.reason), note: l.note ? str(l.note) : null, by: l.by ? str(l.by) : null, created_at: str(l.created_at) }))
+  const sg = d.signup_source && typeof d.signup_source === 'object' ? d.signup_source as Record<string, unknown> : null
+  const signup = sg ? Object.fromEntries(['landing_path', 'referrer_host', 'utm_source', 'utm_medium', 'utm_campaign', 'ref_code', 'first_seen_at', 'landing_group', 'referrer_group'].map((k) => [k, sg[k] ? str(sg[k]) : null])) as SignupSource : null
+  return { ...readUser(d), ledger, applications: num(d.applications), reports: num(d.reports), earned: num(d.credits_earned), spent: num(d.credits_spent), signup }
 }
 
 const REASONS: Record<string, string> = {
@@ -52,7 +55,16 @@ const REASONS: Record<string, string> = {
 export function ledgerWords(l: LedgerLine): string {
   const d = l.delta === null ? '' : l.delta > 0 ? `+${fmt(l.delta)}` : `−${fmt(Math.abs(l.delta))}`
   const why = REASONS[l.reason] || (l.reason.startsWith('purchase_') ? `Bought ${l.reason.slice(9).replace(/_/g, ' ')}` : l.reason.replace(/_/g, ' ') || 'No reason recorded')
-  return `${d} ${why}`.trim()
+  const tail = [l.note ? `“${l.note}”` : '', l.by ? `by ${l.by}` : ''].filter(Boolean).join(' ')
+  return `${d} ${why}${tail ? ` — ${tail}` : ''}`.trim()
+}
+
+/** "Landed on /company/walmart from google.com (utm reddit / social / fall) · invite code X". */
+export function signupWords(s: SignupSource | null): string {
+  if (!s) return 'Not recorded — the account has no sign-up source row (accounts before the tracking started have none).'
+  const from = s.referrer_host ? `from ${s.referrer_host}` : 'with no referring site (typed or bookmarked)'
+  const utm = [s.utm_source, s.utm_medium, s.utm_campaign].filter(Boolean).join(' / ')
+  return [`First page ${s.landing_path || 'unknown'} ${from}`, utm ? `tagged link: ${utm}` : '', s.ref_code ? `invite code ${s.ref_code}` : '', s.first_seen_at ? `first visit ${formatPacific(s.first_seen_at)}` : ''].filter(Boolean).join(' · ') + '.'
 }
 
 /** The ISO end of a California day picked in a date field ("2026-11-24" → that day's last second, PT). */

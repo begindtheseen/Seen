@@ -38,7 +38,7 @@ type Props = {
   savedJobs: SavedJob[]
   initialJob: TailorJob | null
   onNeed: (reason: 'credits' | 'pro' | 'signin') => void
-  onUseVariant: (variant: ResumeDoc, meta: { role: string; company: string; jobId: string; scoreBefore: number | null; scoreAfter: number | null }) => void
+  onUseVariant: (variant: ResumeDoc, meta: { role: string; company: string; jobId: string; scoreBefore: number | null; scoreAfter: number | null; exportToken?: string; exportKey?: string }) => void
 }
 
 const TIER_LABEL: Record<string, string> = { core: 'Core', supporting: 'Supporting', context: 'Context', omit: 'Not relevant' }
@@ -46,6 +46,12 @@ const TIER_CLASS: Record<string, string> = { core: 'chipGreen', supporting: 'chi
 const DECISION_LABEL: Record<string, string> = { keep: 'Keep in full', trim: 'Trim to the relevant bullets', condense: 'One line (Additional Experience)', drop: 'Leave off this version' }
 
 function clone<T>(v: T): T { return JSON.parse(JSON.stringify(v)) as T }
+
+// the export token of a credit-bought result travels with the version it bought (an unbought result carries none)
+function paidTokenOf(x: TailorExtra): { exportToken?: string; exportKey?: string } {
+  const t = (x && x.charged ? x.tailored : null) as unknown as { export_token?: string; export_key?: string } | null
+  return t && t.export_token && t.export_key ? { exportToken: t.export_token, exportKey: t.export_key } : {}
+}
 
 export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJob, onNeed, onUseVariant }: Props) {
   const { user } = useAuth()
@@ -65,7 +71,7 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
   const [showAll, setShowAll] = useState(false)
   const [extra, setExtra] = useState<TailorExtra>({})
   // read-only list of every change the server made (the overrides below are how a person overrules them here)
-  const changeView = usePaidVersion(extra.tailored && extra.tailored.doc ? extra.tailored : null, 'studio')
+  const changeView = usePaidVersion(extra.tailored && extra.tailored.doc ? extra.tailored : null, '') // read-only list: nothing stored
 
   useEffect(() => { if (initialJob) setJob(initialJob) }, [initialJob])
 
@@ -250,7 +256,7 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
               <div className={s.muted} style={{ color: 'var(--amber)', marginTop: '.25rem' }}>⚠ This puts an older role above your current job. Store-level and hourly recruiters read that top-down as a gap — keep Chronological unless the older role is the only relevant one.</div>
             )}
             <div className={s.findingActions} style={{ marginTop: '.75rem' }}>
-              <button type="button" className={s.btnGreen} onClick={() => onUseVariant(finalVariant, { role: job.title, company: job.company, jobId: job.jobId, scoreBefore: plan.score.before, scoreAfter: plan.score.after })}>Use this version →</button>
+              <button type="button" className={s.btnGreen} onClick={() => onUseVariant(finalVariant, { role: job.title, company: job.company, jobId: job.jobId, scoreBefore: plan.score.before, scoreAfter: plan.score.after, ...paidTokenOf(extra) })}>Use this version →</button>
               <span className={s.muted} style={{ alignSelf: 'center' }}>Your base résumé stays exactly as it is.</span>
             </div>
           </div>

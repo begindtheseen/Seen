@@ -79,3 +79,16 @@ test('the export token: bound to the user, the result and the expiry; tampering 
   const payload = Buffer.from(b64, 'base64url').toString('utf8').replace(/\.\d+$/, `.${now + 365 * 24 * 3600 * 1000}`);
   assert.equal(verifyPaidExport(U1, `${Buffer.from(payload).toString('base64url')}.${mac}`, 'posting-A', now), false, 'tampered expiry');
 });
+
+test('Studio: a credit-bought tailor issues an export token for THAT result; the export of it is unbranded', async () => {
+  const s = await call({ action: 'structure', text: RESUME }, U1);
+  const t = await call({ action: 'tailor', doc: s.body.doc, jobTitle: A.title, company: A.company, jobDescription: A.jd }, U1);
+  assert.equal(t.code, 200, JSON.stringify(t.body).slice(0, 300));
+  assert.equal(t.body.charged, true, `the thin-summary résumé is a paid tailor: ${t.body.note}`);
+  const tok = t.body.tailored.export_token, key = t.body.tailored.export_key;
+  assert.ok(tok && /^studio:/.test(key));
+  const ex = await call({ action: 'export', doc: t.body.variant, format: 'pdf', exportToken: tok, exportKey: key }, U1);
+  assert.equal(ex.headers['X-Seen-Branded'], '0');
+  const base = await call({ action: 'export', doc: s.body.doc, format: 'pdf' }, U1);
+  assert.equal(base.headers['X-Seen-Branded'], '1', 'the base résumé keeps the free rule');
+});

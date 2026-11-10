@@ -6,6 +6,7 @@ import { gateAI, resolveProAccess, resolveAuthedUser } from '../lib/server/credi
 import { RESUME_OPTIMIZE_COST } from '../lib/server/creditRules.js';
 import { postingTextForReader } from '../lib/server/jobInsights.js';
 import { readPosting } from '../lib/server/postingRead.js';
+import { createHash } from 'crypto';
 import { paidExportToken, paidExportAllowed } from '../lib/server/paidExport.js';
 import { optimizeCacheKey, readCachedOptimize, writeCachedOptimize } from '../lib/server/optimizeCache.js';
 import { buildPaidOptimize, unoptimizableListing } from '../lib/server/optimizePackage.js';
@@ -705,6 +706,14 @@ async function handleStudio(req, res, body) {
         }
         const gate = await gateAI(req, 'resume_tailor');
         if (!gate.ok) return res.status(gate.status).json(gateFailure(gate));
+        // a credit-bought Studio version exports without the footer: a token bound to this user and THIS result (a stable
+        // key over the posting and the base document), carried by the Studio to the export of that version only
+        const who = await resolveAuthedUser(req);
+        if (out.tailored && who && who.uid) {
+          const studioKey = `studio:${createHash('sha256').update(`${String(body.jobDescription || '')}\n${String(body.jobTitle || '')}\n${serializeToText(docFromBody(body))}`).digest('base64url').slice(0, 32)}`;
+          out.tailored.export_token = paidExportToken(who.uid, studioKey);
+          out.tailored.export_key = studioKey;
+        }
         return res.status(200).json({ ...out, balance: gate.balance, pro: !!gate.pro, charged: !gate.pro });
       }
       default: return res.status(400).json({ error: `Unknown action: ${body.action}` });

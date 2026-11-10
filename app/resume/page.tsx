@@ -271,7 +271,8 @@ function RewriteView({ out, copy, copied, onRerun, pro }: { out: PaidOptimize; c
   // the finished résumé (phase-B contract) when the answer carries it; the legacy plan otherwise
   const x = out as PaidOptimize & { tailored?: Tailored | null; charge?: Charge | null; blocked?: Blocked | null; questions?: Question[]; charged?: boolean; balance?: number }
   const tailored = !x.blocked && x.tailored && x.tailored.doc ? x.tailored : null
-  const version = usePaidVersion(tailored, `resume:${tailored ? tailored.text?.length || 0 : 0}`)
+  const { user: me } = useAuth()
+  const version = usePaidVersion(tailored, me?.id ? `${me.id}:resume:${tailored ? tailored.text?.length || 0 : 0}` : '')
   if (x.blocked) return (
     <div className="ai-stack" data-testid="resume-blocked">
       <ResultTopLine charge={x.charge} charged={!!x.charged} cached={!!out.cached} pro={pro} balance={x.balance ?? null} cost={OPTIMIZE_PRICE} />
@@ -282,7 +283,7 @@ function RewriteView({ out, copy, copied, onRerun, pro }: { out: PaidOptimize; c
     <div className="ai-stack" data-testid="resume-version">
       <ResultTopLine charge={x.charge || tailored.charge} charged={!!x.charged} cached={!!out.cached} pro={pro} balance={x.balance ?? null} cost={OPTIMIZE_PRICE} />
       <PaidResult t={tailored} questions={(x.questions || []) as Question[]} v={version} />
-      <DownloadVersion doc={version.doc} />
+      <DownloadVersion doc={version.doc} paid={tailored} />
       {out.application_message && (
         <details>
           <summary style={{ minHeight: 44, display: 'flex', alignItems: 'center', cursor: 'pointer', color: 'var(--accent)', fontWeight: 600, fontSize: 'var(--fs-sm)' }}>Message to the employer</summary>

@@ -226,9 +226,9 @@ function StudioInner() {
   function undoFixes() { if (!undo) return; onChange(undo.doc); setUndo(null); showToast('Restored your original wording.') }
 
   // ── variants ──
-  function useVariant(v: ResumeDoc, meta: { role: string; company: string; jobId: string; scoreBefore: number | null; scoreAfter: number | null }) {
+  function useVariant(v: ResumeDoc, meta: { role: string; company: string; jobId: string; scoreBefore: number | null; scoreAfter: number | null; exportToken?: string; exportKey?: string }) {
     const label = [meta.role, meta.company].filter(Boolean).join(' @ ') || 'Tailored'
-    const rec: StoredVariant = { id: v.id, label, role: meta.role, company: meta.company, jobId: meta.jobId, createdAt: new Date().toISOString(), doc: v, baseHash: '', scoreBefore: meta.scoreBefore ?? undefined, scoreAfter: meta.scoreAfter ?? undefined }
+    const rec: StoredVariant = { id: v.id, label, role: meta.role, company: meta.company, jobId: meta.jobId, createdAt: new Date().toISOString(), doc: v, baseHash: '', scoreBefore: meta.scoreBefore ?? undefined, scoreAfter: meta.scoreAfter ?? undefined, ...(meta.exportToken && meta.exportKey ? { exportToken: meta.exportToken, exportKey: meta.exportKey } : {}) } as StoredVariant
     setVariants(ResumeDocStore.saveVariant(user?.id, rec)); setActiveId(v.id); setVariantDoc(v); setTab('export')
     showToast('Tailored version ready — review it, then export.')
   }
@@ -240,6 +240,8 @@ function StudioInner() {
   function removeVariant(id: string) { setVariants(ResumeDocStore.removeVariant(user?.id, id)); if (activeId === id) switchTo(null) }
 
   const active = activeId ? variants.find((v) => v.id === activeId) : null
+  // the bought version's export token (only for that version; the base résumé keeps the free rule)
+  const paidOf = (v: StoredVariant) => { const x = v as StoredVariant & { exportToken?: string; exportKey?: string }; return x.exportToken && x.exportKey ? { exportToken: x.exportToken, exportKey: x.exportKey } : null }
   const panelTab: Exclude<Tab, 'edit'> = tab === 'edit' ? 'health' : tab
   const showEditor = !narrow || tab === 'edit'
   const showPanel = !narrow || tab !== 'edit'
@@ -343,7 +345,7 @@ function StudioInner() {
                   {panelTab === 'health' && fixPreview && fixAll && <FixPreview log={fixAll.log} onApply={applyFixes} onCancel={() => setFixPreview(false)} />}
                   {panelTab === 'health' && health && <HealthPanel health={health} doc={doc} onJump={jump} onApplyRewrite={applyRewrite} onApplyVerb={applyVerb} onFixAll={fixAllNow} fixAllCount={fixAllCount} />}
                   {panelTab === 'tailor' && <TailorPanel doc={doc} isLoggedIn={isLoggedIn} pro={pro} savedJobs={savedJobs} initialJob={initialJob} onNeed={(r) => { if (r === 'signin') { setError('Sign in to tailor your résumé (1 credit).'); router.push('/login?next=/resume/studio?tab=tailor') } else { setUpgradeFeature(undefined); setShowUpgrade(r) } }} onUseVariant={useVariant} />}
-                  {panelTab === 'export' && <ExportPanel doc={doc} pro={pro} isLoggedIn={isLoggedIn} onNeedPro={() => { setUpgradeFeature('unbranded downloads'); setShowUpgrade('pro') }} role={active?.role} />}
+                  {panelTab === 'export' && <ExportPanel doc={doc} pro={pro} isLoggedIn={isLoggedIn} onNeedPro={() => { setUpgradeFeature('unbranded downloads'); setShowUpgrade('pro') }} role={active?.role} paid={active ? paidOf(active) : null} />}
                 </div>
               )}
             </div>

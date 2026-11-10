@@ -33,7 +33,7 @@ export interface Change {
 export interface Charge { charge: boolean; reason: string; sentence: string | null; headline?: string | null; detail?: string | null }
 export interface Blocked { reason: string; sentence: string; what_would_change_it?: string[]; carries_over?: { requirement: string; line: string }[] }
 export interface Question { id: string; kind: string; question: string; unit?: string; requirement?: string | null; statement?: string | null; answer_kind?: string | null; term?: string; itemId?: string; role?: string; company?: string; template?: string; why?: string; bulletId?: string; line?: string; slot?: string }
-export interface Tailored { doc: ResumeDoc; text?: string; changes: Change[]; kept_as_is?: string | null; visibility?: { of: number; before: number; after: number }; charge?: Charge; score_before?: number | null; score_after?: number | null }
+export interface Tailored { doc: ResumeDoc; text?: string; changes: Change[]; kept_as_is?: string | null; visibility?: { of: number; before: number; after: number }; charge?: Charge; score_before?: number | null; score_after?: number | null; export_token?: string | null; export_key?: string | null }
 export interface ChangeCounts { reorder?: number; summary?: number; skills?: number; rewrites?: number; proposals?: number; questions?: number; availability?: number; formatting?: number }
 
 const SUB_ORDER = ['summary', 'reorder', 'skills', 'rewrite', 'cut', 'heading', 'format']
@@ -41,18 +41,20 @@ const KIND_LABEL: Record<string, string> = { summary: 'New summary', reorder: 'L
 
 // ── the person's version: toggles + answered lines, kept for this tab (a reload restores it) ──
 type Answered = { id: string; itemId?: string; bulletId?: string; kind?: string; answerKind?: string | null; line: string }
+// `key` carries the user id; an empty key (no account) keeps the toggles in memory only — never under a shared key
 export function usePaidVersion(t: Tailored | null | undefined, key: string) {
-  const store = `seen_paid_v1:${key}`
+  const store = key ? `seen_paid_v1:${key}` : ''
   const [on, setOn] = useState<Record<string, boolean>>({})
   const [answered, setAnswered] = useState<Answered[]>([])
   const loaded = useRef('')
   useEffect(() => {
     if (!t || loaded.current === store) return
     loaded.current = store
+    if (!store) return
     try { const v = JSON.parse(sessionStorage.getItem(store) || 'null'); if (v) { setOn(v.on || {}); setAnswered(v.answered || []) } else { setOn({}); setAnswered([]) } } catch { /* storage unavailable */ }
   }, [t, store])
   useEffect(() => {
-    if (!t || loaded.current !== store) return
+    if (!t || !store || loaded.current !== store) return
     try { sessionStorage.setItem(store, JSON.stringify({ on, answered })) } catch { /* storage unavailable */ }
   }, [t, store, on, answered])
   const applied = useMemo(() => (t && t.doc ? applyToggles(t.doc, t.changes || [], on, answered) : null), [t, on, answered])
@@ -336,8 +338,15 @@ export function PaidOffer({ probe, price, onPay, fallback }: { probe: { charge?:
   )
 }
 
+/** A version bought with a credit downloads without Seen's footer: the server signs a token for that result
+ *  (lib/server/paidExport.js) and the export call must carry it — a free result has none and keeps the footer. */
+export type PaidExport = { export_token?: string | null; export_key?: string | null }
+export function paidExportFields(t?: PaidExport | null): { exportToken?: string; exportKey?: string } {
+  return t && t.export_token && t.export_key ? { exportToken: t.export_token, exportKey: t.export_key } : {}
+}
+
 /** Download the person's CURRENT version (accepted changes only) through the Studio export — never the upload. */
-export function DownloadVersion({ doc }: { doc: ResumeDoc | null }) {
+export function DownloadVersion({ doc, paid }: { doc: ResumeDoc | null; paid?: PaidExport | null }) {
   const [state, setState] = useState<'idle' | 'busy' | 'failed'>('idle')
   if (!doc) return null
   const name = (() => { const n = String(doc.basics?.name || '').replace(/[^\w .'-]/g, '').trim(); return /^[A-Za-z][\w.'-]*(\s+[A-Za-z][\w.'-]*){1,3}$/.test(n) ? `${n} - Resume` : 'Resume' })()
@@ -345,7 +354,7 @@ export function DownloadVersion({ doc }: { doc: ResumeDoc | null }) {
     setState('busy')
     try {
       const { aiHeaders } = await import('@/lib/aiHeaders')
-      const res = await fetch('/api/resume', { method: 'POST', headers: await aiHeaders(), body: JSON.stringify({ action: 'export', doc, format }) })
+      const res = await fetch('/api/resume', { method: 'POST', headers: await aiHeaders(), body: JSON.stringify({ action: 'export', doc, format, ...paidExportFields(paid) }) })
       if (!res.ok) { setState('failed'); return }
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)

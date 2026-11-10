@@ -3,11 +3,14 @@
 // System (audit §3.1): one row per scheduled job (schedule in words, last run in California time, result,
 // next run; "No run recorded yet" where nothing records it), errors by route, database size, the feature
 // flags code actually reads, the activity log with Undo, and the revenue detail (one-time purchases only).
-import { useMemo, useRef, useState, type MutableRefObject } from 'react'
+import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import { formatPacific } from '@/lib/time/pacific'
 import Button from '@/components/ui/Button'
 import type { AdminList } from '../../contract.ts'
-import { useAdminAction, useAdminJob, useAdminList, useAdminQuery, useApi } from '../../core/hooks.tsx'
+import type { ActionState } from '../../core/action.ts'
+import { createAdminApi } from '../../core/api.ts'
+import { useAdminAction, useAdminJob, useAdminList, useAdminQuery, useApi, useRuntime } from '../../core/hooks.tsx'
+import { tokenStore } from '../../core/runtime.ts'
 import { useUrlFilter } from '../../core/place.ts'
 import type { SectionProps } from '../../core/sections.tsx'
 import { useShell } from '../../core/shellContext.ts'
@@ -21,7 +24,7 @@ import { EmptyState, ErrorState, RefreshFailed, Skeleton } from '../../ui/states
 import { useSectionKeys } from '../listings/sectionKeys.ts'
 import styles from '../listings/listings.module.css'
 import {
-  ACTION_FILTERS, canOpen, cronInWords, cronLines, cronState, cronSummary, dangerConsequence, flagDoes, flagEnv, flagIsOn, flagStateWords,
+  ACTION_FILTERS, canOpen, cronDetail, cronInWords, cronLines, cronState, cronSummary, dbSizeLine, dbSizeTone, readDbSize, dangerConsequence, flagDoes, flagEnv, flagIsOn, flagStateWords,
   fmt, money, readActivity, readCron, readFlags, readFunnel, readRevenue, readRoutes, type ActivityRow, type CronRow, type Flag,
 } from './adapter.ts'
 
@@ -64,21 +67,73 @@ function CronsBlock() {
           <ul className={styles.table} aria-label="Scheduled jobs">
             {q.rows.map((c) => {
               const st = cronState(c)
+              const detail = cronDetail(c)
               return (
                 <li key={c.path || c.name} className={st.tone === 'bad' ? `${styles.tr} ${styles.trBad}` : styles.tr} data-testid={`cron-${c.name}`}>
                   <span className={styles.trName}>{c.name}<span className={styles.quiet}><br />{cronInWords(c.schedule)}</span></span>
                   <span className={styles.trBody}>
                     {cronLines(c).map((l) => <span key={l}>{l}</span>)}
-                    {c.detail ? <span className={styles.quiet}>{c.detail.replace(/^Next:[^·]*·\s*/, '')}</span> : null}
+                    {detail ? <span className={styles.quiet}>{detail}</span> : null}
+                    {c.path === '/api/demand' ? <DemandRun /> : c.path === '/api/refresh-jobs' ? <RefreshJobsRun /> : null}
                   </span>
                   <span className={styles.trSide}><StatusChip tone={st.tone} label={st.word} icon={st.tone === 'neutral' ? 'circle-help' : undefined} /></span>
                 </li>
               )
             })}
           </ul>
+          <p className={styles.quiet}>Only the jobs that can safely be started by hand have a Run button: refreshing demand data and refreshing listings.</p>
         </>
       ) : null}
     </section>
+  )
+}
+
+/** Refresh demand data: a job action (one round), with progress in the job chip. */
+function DemandRun() {
+  const job = useAdminJob({ action: 'refresh_demand', label: 'Refreshing demand data', past: 'Refreshed', noun: 'demand rows' })
+  return (
+    <span className={styles.blockFlat}>
+      {job.job ? <JobProgress job={job.job} onCancel={job.cancel} onResume={job.resume} onDismiss={job.dismiss} /> : null}
+      {!job.job || !job.running ? <span className={styles.actions}><Button variant="secondary" icon="refresh-cw" onClick={() => job.start()} data-testid="run-demand">Run now</Button></span> : null}
+    </span>
+  )
+}
+
+// Refresh listings runs on its own endpoint (up to 5 minutes; this admin's function has 60 s). One press: the
+// request is held here (the section stays mounted when the owner leaves it), and a second press is ignored.
+let refreshJobsInFlight: Promise<void> | null = null
+let refreshJobsState: ActionState = { status: 'idle', target: 'refresh-jobs' }
+const refreshJobsSubs = new Set<() => void>()
+function setRefreshJobs(s: ActionState) { refreshJobsState = s; refreshJobsSubs.forEach((f) => f()) }
+
+function refreshJobsMessage(r: Record<string, unknown>): string {
+  const n = (k: string) => (typeof r[k] === 'number' ? fmt(r[k] as number) : '?')
+  const fails = typeof r.failed_batches === 'number' && r.failed_batches > 0 ? ` · ${n('failed_batches')} batches failed to save` : ''
+  return `Listings refreshed: ${n('found')} found in ${n('searches')} searches · ${n('inserted')} new · ${n('updated')} updated${fails}.`
+}
+
+function RefreshJobsRun() {
+  const { gate } = useRuntime()
+  const [, tick] = useState(0)
+  useEffect(() => { const f = () => tick((x) => x + 1); refreshJobsSubs.add(f); return () => { refreshJobsSubs.delete(f) } }, [])
+  const st = refreshJobsState
+  const start = () => {
+    if (refreshJobsInFlight) return
+    const call = createAdminApi({ endpoint: '/api/refresh-jobs', getToken: tokenStore.get, reauth: () => (tokenStore.get() ? gate.wait() : Promise.resolve(false)), defaultTimeoutMs: 310_000 })
+    setRefreshJobs({ status: 'running', target: 'refresh-jobs' })
+    refreshJobsInFlight = (async () => {
+      const res = await call<Record<string, unknown>>('refresh_jobs', {})
+      if (res.ok) setRefreshJobs({ status: 'done', target: 'refresh-jobs', result: { ...res, message: refreshJobsMessage(res as Record<string, unknown>) } })
+      else setRefreshJobs({ status: 'error', target: 'refresh-jobs', error: res })
+      refreshJobsInFlight = null
+    })()
+  }
+  return (
+    <span className={styles.blockFlat} data-testid="run-refresh-jobs-wrap">
+      <ResultLine state={st} onRetry={start} onDismiss={() => setRefreshJobs({ status: 'idle', target: 'refresh-jobs' })}
+        runningText="Refreshing listings… This can take up to 5 minutes. You can leave this screen." />
+      {st.status !== 'running' ? <span className={styles.actions}><Button variant="secondary" icon="refresh-cw" onClick={start} data-testid="run-refresh-jobs">Run now</Button></span> : null}
+    </span>
   )
 }
 
@@ -127,10 +182,24 @@ function ErrorsBlock() {
 
 // ── Database size ────────────────────────────────────────────────────────────────────────────────
 function StorageBlock() {
+  const api = useApi()
+  const q = useAdminQuery<Record<string, unknown>>('db_size', () => api<Record<string, unknown>>('db_size'), { staleMs: 5 * 60_000 })
+  const d = q.data ? readDbSize(q.data) : null
   return (
     <section className={styles.block} aria-labelledby="sy-db" data-testid="sy-db">
-      <div className={styles.blockHead}><h2 id="sy-db" className={styles.h2}>Database size</h2><StatusChip tone="neutral" label="Couldn’t read" icon="circle-slash" /></div>
-      <p className={styles.text}>The new admin&apos;s server has no read for the database size against the storage guard yet. The <a className={styles.link} href="/admin/legacy">legacy admin</a> shows it under Jobs (same sign-in).</p>
+      <div className={styles.blockHead}>
+        <h2 id="sy-db" className={styles.h2}>Database size</h2>
+        {q.data ? (d ? <StatusChip tone={dbSizeTone(d)} label={d.usedPct === null ? 'Guard share unknown' : `${Math.round(d.usedPct)}% of the guard`} /> : <StatusChip tone="neutral" label="Couldn’t read" icon="circle-slash" />) : null}
+      </div>
+      {q.loading ? <Skeleton rows={1} label="Reading the database size" /> : null}
+      {q.error && !q.data ? <ErrorState what="the database size" error={q.error} onRetry={() => void q.refresh()} retrying={q.fetching} /> : null}
+      {q.data ? (
+        <>
+          <RefreshFailed error={q.error} onRetry={() => void q.refresh()} />
+          <p className={styles.text} data-testid="sy-db-line">{d ? dbSizeLine(d) : 'The database size couldn’t be read.'}{d?.asOf ? ` Read ${formatPacific(d.asOf)}.` : ''}</p>
+          <p className={styles.quiet}>Past the guard, new aggregated listings are skipped (existing ones still refresh; employer posts are allowed).</p>
+        </>
+      ) : null}
     </section>
   )
 }

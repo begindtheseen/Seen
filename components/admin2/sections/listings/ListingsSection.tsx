@@ -3,7 +3,7 @@
 // Listings (audit §3.1): the counts (each saying what it counts), Clear stale as a long job, every listing
 // in a keyset browser with search and filters in the URL (a listing opens as `?item=job:<id>`), duplicate
 // listings as scan → a plan the owner can read → remove, the aggregation target, and each source's health.
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { formatPacific } from '@/lib/time/pacific'
 import Button from '@/components/ui/Button'
 import type { AdminList, AdminSearch } from '../../contract.ts'
@@ -19,8 +19,8 @@ import ResultLine from '../../ui/ResultLine.tsx'
 import { EmptyState, ErrorState, RefreshFailed, Skeleton } from '../../ui/states.tsx'
 import {
   activeFilterCount, browseFilters, browseKey, classifyQuery, countWords, EMPLOYER_OPTIONS, fmt, jobMeta, jobState, jobSub, jobTitle,
-  KNOWN_SOURCES, planSentence, readListingCounts, SINCE_OPTIONS, SORT_OPTIONS, SOURCE_STATE, sourceHealth, STATUS_OPTIONS, VISIBLE_OPTIONS,
-  type BrowseUrl, type JobRow, type SourceHealth,
+  planSentence, readListingCounts, readSourceRow, SINCE_OPTIONS, sourceCounts, SORT_OPTIONS, SOURCE_STATE, STATUS_OPTIONS, VISIBLE_OPTIONS,
+  type BrowseUrl, type JobRow, type SourceRow,
 } from './adapter.ts'
 import { useSectionKeys } from './sectionKeys.ts'
 import { useDupeScan } from './useDupeScan.ts'
@@ -241,16 +241,7 @@ function DupesBlock() {
   // A plan read before the last finished removal is out of date: scan again before removing more.
   const planStale = !!(rjEnded && s.finishedAt && s.finishedAt < rjEnded)
   const plan = s.status === 'done' && !planStale ? s.plan : undefined
-  // A removal round that only read part of a big table changes nothing yet still moves its cursor forward.
-  // The job manager stops on "no change"; when the cursor moved, that was progress — carry on.
-  const lastCursor = useRef<string | undefined>(undefined)
   const rj = remove.job
-  useEffect(() => {
-    if (rj && rj.status === 'error' && rj.stopped === 'no_progress' && rj.cursor && rj.cursor !== lastCursor.current) {
-      lastCursor.current = rj.cursor
-      remove.resume()
-    }
-  }, [rj, remove])
   useEffect(() => { if (confirming && rj && (rj.rounds > 0 || !remove.running)) setConfirming(false) }, [confirming, rj, remove.running])
 
   const scanning = s.status === 'running'
@@ -351,51 +342,36 @@ function TargetBlock() {
   )
 }
 
-// ── Sources health (derived from the listings table) ─────────────────────────────────────────────
-type BrowseAnswer = AdminList<JobRow>
+// ── Sources health (server: source_health) ──────────────────────────────────────────────────────
+type SourceRowRaw = Record<string, unknown>
 function SourcesBlock() {
   const api = useApi()
-  const q = useAdminQuery<{ sources: SourceHealth[] }>('source_health', async () => {
-    const out: SourceHealth[] = []
-    const one = async (src: string) => {
-      // Three one-row reads, each with its exact count: every listing, the newest "last seen", the live ones.
-      // ("Recently seen" order skips listings never seen, so it cannot give the total.)
-      const [all, seen, live] = await Promise.all([
-        api<BrowseAnswer>('listings_browse', { filters: { source: src, limit: 1 } }),
-        api<BrowseAnswer>('listings_browse', { filters: { source: src, sort: 'seen', limit: 1 } }),
-        api<BrowseAnswer>('listings_browse', { filters: { source: src, status: 'active', limit: 1 } }),
-      ])
-      const allAns = all.ok ? { total: (all as BrowseAnswer).total, rows: seen.ok ? (seen as BrowseAnswer).rows : [] } : null
-      out.push(sourceHealth(src, allAns, live.ok ? live as BrowseAnswer : null))
-    }
-    // Four at a time: a count per source, never the whole table.
-    for (let i = 0; i < KNOWN_SOURCES.length; i += 4) await Promise.all(KNOWN_SOURCES.slice(i, i + 4).map(one))
-    out.sort((a, b) => KNOWN_SOURCES.indexOf(a.source) - KNOWN_SOURCES.indexOf(b.source))
-    if (out.every((s) => s.state === 'unknown')) return { ok: false, code: 'upstream', error: 'None of the sources could be read.', retryable: true }
-    return { ok: true, changed: 0, skipped: [], message: '', touched: [], sources: out }
-  }, { staleMs: 5 * 60_000 })
-  const rows = useMemo(() => (q.data?.sources || []).filter((r) => r.state !== 'empty'), [q.data])
-  const empty = useMemo(() => (q.data?.sources || []).filter((r) => r.state === 'empty').map((r) => r.source), [q.data])
+  const q = useAdminList<SourceRow>('source_health', async () => {
+    const res = await api<AdminList<SourceRowRaw>>('source_health', {}, { timeoutMs: 45_000 })
+    return res.ok ? { ...res, rows: (res.rows || []).map(readSourceRow), next: undefined } : res
+  }, { staleMs: 5 * 60_000, idOf: (r) => r.source })
+  const failing = q.rows.filter((r) => r.failing === true).length
   return (
     <section className={styles.block} aria-labelledby="ls-sources" data-testid="sources-block">
       <div className={styles.blockHead}>
         <h2 id="ls-sources" className={styles.h2}>Sources</h2>
         <Button variant="ghost" icon="refresh-cw" onClick={() => void q.refresh()} disabled={q.fetching} data-testid="sources-refresh">Re-read</Button>
       </div>
-      <p className={styles.quiet}>Read from the listings table: each source&apos;s listings, how many are live, and the newest time its source showed one. Quiet = nothing new for over a day; silent = over a week.</p>
+      <p className={styles.quiet}>Per source: live listings, how many were added in the last 24 hours and since midnight (California), and the last time its source showed one. A source is failing when it has no live listings or showed nothing for 48 hours.</p>
       {q.loading ? <Skeleton rows={3} label="Reading the sources" /> : null}
       {q.error && !q.data ? <ErrorState what="the sources" error={q.error} onRetry={() => void q.refresh()} retrying={q.fetching} /> : null}
       {q.data ? (
         <>
           <RefreshFailed error={q.error} onRetry={() => void q.refresh()} />
+          <p className={styles.text} data-testid="sources-summary">{q.rows.length ? (failing ? `${fmt(failing)} of ${fmt(q.rows.length)} sources ${failing === 1 ? 'is' : 'are'} failing.` : `None of the ${fmt(q.rows.length)} sources is failing.`) : 'The server listed no sources.'}</p>
           <ul className={styles.table} aria-label="Sources">
-            {rows.map((r) => {
+            {q.rows.map((r) => {
               const st = SOURCE_STATE[r.state]
               return (
-                <li key={r.source} className={r.state === 'silent' ? `${styles.tr} ${styles.trBad}` : styles.tr} data-testid={`source-${r.source}`}>
+                <li key={r.source} className={r.state === 'failing' ? `${styles.tr} ${styles.trBad}` : styles.tr} data-testid={`source-${r.source}`}>
                   <span className={styles.trName}>{r.source}</span>
                   <span className={styles.trBody}>
-                    <span>{r.total === null ? 'Count couldn’t be read' : `${fmt(r.total)} listings`} · {r.live === null ? 'live count couldn’t be read' : `${fmt(r.live)} live`}</span>
+                    <span>{sourceCounts(r)}</span>
                     <span>{r.line}</span>
                   </span>
                   <span className={styles.trSide}><StatusChip tone={st.tone} label={st.word} /></span>
@@ -403,7 +379,6 @@ function SourcesBlock() {
               )
             })}
           </ul>
-          {empty.length ? <p className={styles.quiet}>No listings from: {empty.join(', ')}.</p> : null}
         </>
       ) : null}
     </section>

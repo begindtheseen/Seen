@@ -6,7 +6,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   readListingCounts, browseFilters, browseKey, classifyQuery, activeFilterCount, jobState, jobTitle, formValues, buildPatch,
-  readJobDetail, holdersLine, readDupePlan, planSentence, sourceHealth,
+  readJobDetail, holdersLine, readDupePlan, planSentence, readSourceRow, sourceCounts,
 } from './adapter.ts'
 
 const U = { q: '', status: 'all', visible: '', employer: '', since: '', sort: 'newest', source: '' }
@@ -73,12 +73,12 @@ test('duplicate plan: counts, examples, protected copies in one sentence', () =>
   assert.match(planSentence(readDupePlan({})), /did not say/)
 })
 
-test('source health: unread is unknown, old is silent, never a guess', () => {
-  const now = Date.parse('2026-11-10T12:00:00Z')
-  assert.equal(sourceHealth('lever', null, null, now).state, 'unknown')
-  assert.equal(sourceHealth('lever', { total: 0, rows: [] }, { total: 0 }, now).state, 'empty')
-  assert.equal(sourceHealth('lever', { total: 5, rows: [{ last_seen_at: '2026-11-10T02:00:00Z' }] }, { total: 4 }, now).state, 'fresh')
-  assert.equal(sourceHealth('lever', { total: 5, rows: [{ last_seen_at: '2026-11-07T02:00:00Z' }] }, { total: 4 }, now).state, 'slow')
-  assert.equal(sourceHealth('lever', { total: 5, rows: [{ last_seen_at: '2026-10-01T02:00:00Z' }] }, null, now).state, 'silent')
-  assert.equal(sourceHealth('lever', { total: 5, rows: [] }, null, now).live, null)
+test('source health: the server’s failing flag and why; an unread count is "couldn’t read", never 0', () => {
+  const ok = readSourceRow({ source: 'lever', live: 120, added_24h: 4, added_today: 2, last_seen: '2026-11-10T02:00:00Z', failing: false, why: null })
+  assert.equal(ok.state, 'ok'); assert.match(ok.line, /^Last seen /)
+  const bad = readSourceRow({ source: 'adzuna', live: 0, added_24h: 0, added_today: 0, last_seen: '2026-11-01T02:00:00Z', failing: true, why: 'no live listings' })
+  assert.equal(bad.state, 'failing'); assert.match(bad.line, /^No live listings\. Last seen/)
+  const unk = readSourceRow({ source: 'x', live: null, added_24h: 3, failing: null })
+  assert.equal(unk.state, 'unknown')
+  assert.equal(sourceCounts(unk), 'live couldn’t be read · 3 added in 24 h · added today couldn’t be read')
 })

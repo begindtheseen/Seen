@@ -25,6 +25,7 @@ The UI codes to THIS file and to `components/admin2/contract.ts`. Everything her
 | 429 | `rate_limited` | true | login attempts (extra code) |
 | 502 | `upstream` | true | the database refused or failed; `changed` says what was written first |
 | 504 | `timeout` | true | ran out of time; `changed`/`remaining` say where it stopped |
+| 501 | `not_available` | false | this action cannot run in this function; `run` says where it can (extra code) |
 
 Every `AdminOk.message` is one plain sentence that says what happened, with counts. `touched` names the
 cache keys to re-read (AdminCacheKey). `undo` is present only when the server can reverse it:
@@ -339,6 +340,12 @@ Each round reads up to ~25 s of keyset pages (or one `admin_job_dupes_plan` page
 (scans first if needed, then deletes ≤100 ids per call). Touched `job_dupes, listings, listing_counts, overview`.
 Legacy `scan_job_dupes` / `dedupe_jobs` map here and keep their old fields (`suspected`, `deleted`).
 
+### `source_health` `{}` → `AdminList<SourceRow>` + `{ as_of, source: "admin_source_health"|"exact", failing: number }`
+SourceRow: `{ source, live, added_24h, added_today, last_seen, failing: boolean|null, why: string|null }`
+- `live` = active and not expired; `added_24h` = rolling 24 h; `added_today` = since midnight California; exact counts
+  (RPC `admin_source_health(p_today)` when deployed, else per-source exact counts). `failing` true when the source has no
+  live listings or nothing seen in 48 h (`why` says which); null when a count could not be read.
+
 ### `get_job_target` `{}` → `AdminOk` + `target`; `set_job_target` `{ target: 5..60 }` → `AdminOk` (`changed:1`). Touched `sources`.
 ### `get_jobs_grouped` `{}` / `get_company_jobs` `{ company }` — unchanged reads (+ `rows`).
 
@@ -353,11 +360,20 @@ CompanyRow: `{ id, name, overall_score, report_count, ghost_rate, response_rate 
 ### `find_duplicates` `{}` → `AdminList<{ key, auto, companies:[{id,name,report_count,overall_score}] }>` + `duplicates`, `total`
 ### `merge` `{ primary_id, secondary_id }` or `{ primary, secondary }` (exact names, case-insensitive, no wildcards)
 → `AdminOk` (`changed`=1, `moved_reports`, `merge_id`, undoable → reverses via `undo_merge`). Touched `companies, company_dupes, merges, company:<a>, company:<b>, activity`.
-### `auto_merge` `{}` → `AdminOk` job (`changed` = pairs merged, `remaining` groups, `complete`, `groups`).
+### `auto_merge` `{}` → `AdminOk` job in ONE unit, groups: `changed` = groups merged this round, `remaining` = groups
+left, `groups_total`, `complete`; `merged` = companies absorbed (detail only), `groups: [{canonical, absorbed[]}]`.
 ### `list_merges` `{}` → `AdminList<MergeRow>` + `merges`. MergeRow: `{ id, created_at, primary_name, secondary_name, moved_reports, undone_at }`.
 ### `undo_merge` `{ merge_id }` / `resplit_company` `{ name }` → `AdminOk` (`restored {…}`).
 ### `export_company` `{ company }` → `AdminOk` + `bundle` (read; audited).
-Legal audit PDF / package: `POST /api/admin-company-audit-pdf|package` `{ company }` with the same token (unchanged bodies).
+**Legal audit exports (binary, separate endpoints, for a core download helper):**
+- `POST /api/admin-company-audit-pdf` and `POST /api/admin-company-audit-package`, header `X-Admin-Token`, JSON body
+  `{ company: "<name>" }` (or `{ id: "<companies.id>" }`; GET `?company=` also works). Full admins only.
+- Success: 200 binary. PDF: `Content-Type: application/pdf`, `Content-Disposition: attachment;
+  filename="seen-legal-audit-<slug>-<YYYY-MM-DD>.pdf"`, `X-Source-Json-Sha256`. Package: `application/zip`,
+  `filename="seen-legal-audit-package-<slug>-<YYYY-MM-DD>.zip"`, `X-Source-Json-Sha256`, `X-Pdf-Sha256`.
+  Read the filename from Content-Disposition (same origin; no expose header needed).
+- Failure: JSON `AdminErr` for auth (401 `unauthorized`, 503 `upstream` retryable when the session can't be read),
+  JSON `{ error }` for 400 (company missing) / 403 (moderator) / 404 / 500 — treat any non-200 as an error with `error`.
 
 ---
 
@@ -370,7 +386,9 @@ Legal audit PDF / package: `POST /api/admin-company-audit-pdf|package` `{ compan
   "balance": 7 } ] }
 ```
 Server-side search over every profile (email contains, or an exact user id). `pro` = an active `pro_until`.
-### `user_detail` `{ user_id }` → `AdminOk` `rows:[UserRow & { ledger: [{ delta, reason, created_at }], credits_earned: number|null, credits_spent: number|null, applications: number|null, reports: number|null }]`
+### `user_detail` `{ user_id }` → `AdminOk` `rows:[UserRow & { ledger: [{ delta, reason, note, by, created_at }], credits_earned: number|null, credits_spent: number|null, signup_source: SignupSource|null, applications: number|null, reports: number|null }]`
+SignupSource (from `signup_attribution`; null when the account has no row or before that migration):
+`{ landing_path, referrer_host, utm_source, utm_medium, utm_campaign, ref_code, first_seen_at, landing_group, referrer_group }`.
 `ledger` is the newest 50 entries; `credits_earned` / `credits_spent` are summed over every entry (keyset pages).
 ### `set_pro_window` `{ user_id, until: ISO-date | null }` → `AdminOk`
 Writes `ai_credits.pro_until` ONLY on a grant (never `balance`, `pro` or `comped`, never a purchase row — so a grant can
@@ -379,11 +397,14 @@ account would stay Pro). Prior value in the audit row;
 undoable. `rows:[UserRow]`. Touched `users, user:<id>, activity`.
 `set_pro` (legacy) `{ user_id, pro }` → maps to `set_pro_window` (`pro:true` → now + 30 days, `pro:false` → null);
 it never touches a balance.
-### `grant_credits` `{ user_id, amount: 1..500 }` → `AdminOk` (`balance`; prior balance audited; undoable while the
-balance is unchanged). ### `set_user_password` `{ user_id, new_password, reason? }` → `AdminOk` (not undoable).
+### `grant_credits` `{ user_id, amount: 1..500, reason?: string (≤200) }` → `AdminOk` (`balance`; prior balance audited;
+undoable while the balance is unchanged). `reason` is stored on the ledger row (`credit_transactions.metadata.note`, shown
+as `note` in `user_detail.ledger`) and in the audit row's `metadata.reason`. ### `set_user_password` `{ user_id, new_password, reason? }` → `AdminOk` (not undoable).
 ### `delete_user` `{ user_id }` → `AdminOk` (`changed:1`; not undoable; the auth account is deleted FIRST now —
 app rows go only after it succeeds).
 ### `clusters_list` `{ status? }` → `AdminList<Cluster>`; Cluster: `{ id, user_ids, users:[{id,email}], signals, risk_score, status, admin_note, created_at }`
+### `cluster_detail` `{ cluster_id }` → `AdminOk` `rows:[{ id, user_ids, signals, risk_score, status, admin_note, created_at, updated_at, users: [UserRow & { found }] }]`
+Cluster ids: production uses positive integers, the rig seeds uuids — every cluster action accepts either.
 ### `update_cluster` `{ cluster_id, status, admin_note? }` → `AdminOk` (checked; undoable). `detect_duplicates_by_signals` → `AdminOk` (`changed` = clusters created).
 ### `signup_attribution` `{ days? }` (POST alias of the GET) → the report from `lib/server/attributionReport.js` + `ok`, `touched:[]`.
 
@@ -404,11 +425,25 @@ Only flags code reads (registry in `lib/server/admin/system.js FLAG_READERS`, he
   "description": "…", "updated_by": "owner", "updated_at": "…", "readers": ["lib/server/credits.js:128"],
   "dangerous": true, "exists": true } ], "unread": ["job_refresh_enabled", "admin_panel_enabled"] }
 ```
-### `set_flag` `{ flag_name, status, percentage?, confirm? }` → `AdminOk` (undoable). A flag not in the registry → 400.
+### `set_flag` `{ flag_name, status, percentage?, confirm? }` → `AdminOk` (undoable). Undo puts the prior status back; if the
+flag had no row before, Undo deletes the row this created (only while it still holds the status set). A flag not in the registry → 400.
 A `dangerous` flag needs `confirm` equal to the flag name (typed confirmation), else 400 "Type the flag name to confirm".
 ### `errors_list` `{ after?, endpoint? }` → `AdminList<{ id, endpoint, error_msg, created_at, ref }>` (+ `by_route` for 24 h).
 ### `revenue_summary` `{ days?: 7|30|90|365 }` → `AdminOk` `rows:[{ days, total_cents, consumer: [{sku, name, count, cents}], employer_cents, credits: { earned, spent, rows, source }, source }]`
 Every total is an exact count × price or a sum over every row (keyset pages); a total that could not be read whole is null.
+### `db_size` `{}` → `AdminOk` `rows:[DbSize|{db_size:null}]`, `db_size: DbSize|null`
+DbSize: `{ total_mb, jobs_mb, jobs_pct, guard_max_mb, guard_enabled, used_pct, as_of, source }`. From RPC
+`admin_db_size()` (with the jobs table's share), else `jobs_storage_status()` (what the legacy page reads: no jobs
+split → `jobs_mb:null`), else `db_size:null` and message "could not be read".
+
+### `refresh_demand` `{}` → `AdminOk` job (`complete:true`, `remaining:0`, `changed` = rows upserted, `result`)
+Runs the existing api/demand.js refresh in this function (both 60 s). A refresh that does not finish → 504/502 AdminErr.
+
+### `refresh_jobs` `{}` → 501 `AdminErr` `code:"not_available"`, `run: { method:"POST", path:"/api/refresh-jobs", auth:"X-Admin-Token", max_seconds:300 }`
+Refreshing listings needs up to 270 s (api/refresh-jobs.js HANDLER_BUDGET_MS, maxDuration 300) and this function has
+60 s; refresh-jobs exports only its handler. The UI runs it on its own endpoint (POST /api/refresh-jobs with the token;
+it answers its own JSON: `{ ok, found, upserted, inserted, updated, failed_batches, stale_sweep, … }`).
+
 ### `revenue_funnel` `{ days? }` (POST alias of the GET). `search_opportunities` (unchanged).
 ### `recent_events` `{ since }` — unchanged (`events`, `server_time`).
 ### `export_csv` `{}` → `AdminOk` + `{ csv, filename }` (no subscription lines; counts are exact counts).

@@ -4,7 +4,7 @@
 // Run: node --test components/admin2/sections/people/people.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { proLine, endOfPacificDay, readUserDetail, ledgerWords, readAttribution, readCluster, signalWords, userSub } from './adapter.ts'
+import { proLine, endOfPacificDay, readUserDetail, ledgerWords, signupWords, readAttribution, readCluster, signalWords, userSub } from './adapter.ts'
 import { companyLine, displayName, evidence, readCompanyDetail, readDupeGroups } from '../companies/adapter.ts'
 import { cronOneInWords, cronInWords, cronState, readCron, cronSummary, readFlags, flagIsOn, flagStateWords, dangerConsequence, readRevenue, readActivity, canOpen } from '../system/adapter.ts'
 
@@ -99,4 +99,12 @@ test('revenue and the activity log', () => {
   const a = readActivity({ id: 2103, at: 'x', action: 'review_held', target_kind: 'bulk', target_id: null, summary: 'Approved 288', undoable: true })
   assert.equal(a.id, '2103'); assert.equal(canOpen(a), false)
   assert.equal(canOpen(readActivity({ id: 1, target_kind: 'job', target_id: 'j1' })), true)
+})
+
+test('the ledger carries the grant reason and who; the sign-up source reads as words; earned/spent null stays null', () => {
+  const u = readUserDetail({ rows: [{ id: 'u1', ledger: [{ delta: 5, reason: 'admin_grant', note: 'refund for a bad prep', by: 'owner', created_at: 'x' }], credits_earned: null, credits_spent: 12, signup_source: { landing_path: '/company/walmart', referrer_host: 'google.com', utm_source: null } }] })
+  assert.equal(ledgerWords(u.ledger[0]), '+5 Granted by an admin — “refund for a bad prep” by owner')
+  assert.equal(u.earned, null); assert.equal(u.spent, 12)
+  assert.match(signupWords(u.signup), /^First page \/company\/walmart from google\.com\.$/)
+  assert.match(signupWords(null), /^Not recorded/)
 })

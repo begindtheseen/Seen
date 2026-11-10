@@ -51,11 +51,11 @@ export function cronInWords(schedule: string, ref = new Date()): string {
 }
 
 // ── Cron rows ────────────────────────────────────────────────────────────────────────────────────
-export type CronRow = { name: string; path: string; schedule: string; last_run: string | null; last_result: 'ok' | 'failed' | 'partial' | 'unknown'; next_run: string | null; overdue: boolean; detail: string }
+export type CronRow = { name: string; path: string; schedule: string; last_run: string | null; last_result: 'ok' | 'failed' | 'partial' | 'unknown'; next_run: string | null; overdue: boolean; detail: string; duration_ms: number | null }
 export function readCron(r: unknown): CronRow {
   const o = (r && typeof r === 'object' ? r : {}) as Record<string, unknown>
   const lr = str(o.last_result)
-  return { name: str(o.name) || str(o.path), path: str(o.path), schedule: str(o.schedule), last_run: o.last_run ? str(o.last_run) : null, last_result: (['ok', 'failed', 'partial'].includes(lr) ? lr : 'unknown') as CronRow['last_result'], next_run: o.next_run ? str(o.next_run) : null, overdue: o.overdue === true, detail: str(o.detail) }
+  return { name: str(o.name) || str(o.path), path: str(o.path), schedule: str(o.schedule), last_run: o.last_run ? str(o.last_run) : null, last_result: (['ok', 'failed', 'partial'].includes(lr) ? lr : 'unknown') as CronRow['last_result'], next_run: o.next_run ? str(o.next_run) : null, overdue: o.overdue === true, detail: str(o.detail), duration_ms: num(o.duration_ms) }
 }
 
 export type Tone = 'good' | 'caution' | 'bad' | 'info' | 'neutral'
@@ -67,11 +67,25 @@ export function cronState(c: CronRow): { word: string; tone: Tone } {
   return { word: 'No run recorded yet', tone: 'neutral' }
 }
 
+/** The lines under a cron's name. Nothing recorded → only the next run (the chip says "No run recorded yet",
+ *  once). A record → last run in California time and how long it took when the server says. */
 export function cronLines(c: CronRow): string[] {
-  return [
-    c.last_run ? `Last run ${formatPacific(c.last_run)}` : 'No run recorded yet — nothing writes this job’s runs down, so it is not known whether it ran.',
-    c.next_run ? `Next ${formatPacific(c.next_run)}` : '',
-  ].filter(Boolean)
+  const next = c.next_run ? `Next ${formatPacific(c.next_run)}` : ''
+  if (!c.last_run) return [next].filter(Boolean)
+  const took = typeof c.duration_ms === 'number' && c.duration_ms >= 0 ? ` · took ${durationWords(c.duration_ms)}` : ''
+  return [`Last run ${formatPacific(c.last_run)}${took}`, next].filter(Boolean)
+}
+
+/** The server's detail without what the lines already say ("Next: …", "Nothing records…"). */
+export function cronDetail(c: CronRow): string {
+  return c.detail.split(' · ').map((x) => x.trim()).filter((x) => x && !/^Next:/.test(x) && !/^Nothing records/.test(x)).join(' · ')
+}
+
+export function durationWords(ms: number): string {
+  const s = Math.round(ms / 1000)
+  if (s < 60) return `${s} s`
+  const m = Math.floor(s / 60), r = s % 60
+  return r ? `${m} min ${r} s` : `${m} min`
 }
 
 export function cronSummary(rows: CronRow[]): string {
@@ -176,3 +190,20 @@ export function readFunnel(raw: unknown): FunnelStep[] {
   const o = (o0.report && typeof o0.report === 'object' ? o0.report : o0) as Record<string, unknown>
   return (Array.isArray(o.steps) ? o.steps : []).map((s: Record<string, unknown>) => ({ key: str(s.key), label: str(s.label), n: num(s.n) }))
 }
+
+// ── Database size (db_size) ──────────────────────────────────────────────────────────────────────
+export type DbSize = { total: number | null; jobs: number | null; jobsPct: number | null; max: number | null; guard: boolean | null; usedPct: number | null; asOf: string | null }
+export function readDbSize(raw: unknown): DbSize | null {
+  const o = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  const d = (o.db_size && typeof o.db_size === 'object' ? o.db_size : Array.isArray(o.rows) && o.rows[0] && typeof o.rows[0] === 'object' && (o.rows[0] as Record<string, unknown>).total_mb !== undefined ? o.rows[0] : null) as Record<string, unknown> | null
+  if (!d) return null
+  return { total: num(d.total_mb), jobs: num(d.jobs_mb), jobsPct: num(d.jobs_pct), max: num(d.guard_max_mb), guard: typeof d.guard_enabled === 'boolean' ? d.guard_enabled : null, usedPct: num(d.used_pct), asOf: d.as_of ? str(d.as_of) : null }
+}
+export function dbSizeLine(d: DbSize): string {
+  const mb = (v: number) => `${fmt(v)} MB`
+  const head = d.total === null ? 'The total size couldn’t be read' : `${mb(d.total)} used`
+  const guard = d.max === null ? '' : d.guard === false ? ` of a ${mb(d.max)} guard that is switched off` : ` of the ${mb(d.max)} guard${d.usedPct !== null ? ` (${Math.round(d.usedPct)}%)` : ''}`
+  const jobs = d.jobs === null ? ' The listings table’s share couldn’t be read.' : ` Listings take ${mb(d.jobs)}${d.jobsPct !== null ? ` (${Math.round(d.jobsPct)}%)` : ''}.`
+  return `${head}${guard}.${jobs}`
+}
+export function dbSizeTone(d: DbSize): Tone { return d.usedPct === null ? 'neutral' : d.usedPct >= 90 ? 'bad' : d.usedPct >= 75 ? 'caution' : 'good' }

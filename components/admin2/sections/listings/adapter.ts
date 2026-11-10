@@ -235,28 +235,25 @@ export function planSentence(p: DupePlan): string {
   return `${fmt(p.suspected)} duplicate ${p.suspected === 1 ? 'listing' : 'listings'} can be removed${groups}.${prot}`
 }
 
-// ── Sources health (derived from the listings table — the server has no per-source read yet) ──────
-export const KNOWN_SOURCES = ['greenhouse', 'lever', 'ashby', 'smartrecruiters', 'workable', 'workday', 'adzuna', 'usajobs', 'career_site', 'indeed_local', 'employer']
+// ── Sources health (server: source_health) ──────────────────────────────────────────────────────
+export type SourceRow = { source: string; live: number | null; added24: number | null; addedToday: number | null; lastSeen: string | null; failing: boolean | null; why: string | null; state: 'ok' | 'failing' | 'unknown'; line: string }
 
-export type SourceHealth = { source: string; total: number | null; live: number | null; lastSeen: string | null; state: 'fresh' | 'slow' | 'silent' | 'empty' | 'unknown'; line: string }
-
-/** One source's health from two reads: every listing (newest "last seen" first) and the live ones. */
-export function sourceHealth(source: string, all: { total?: unknown; rows?: unknown[] } | null, live: { total?: unknown } | null, now = Date.now()): SourceHealth {
-  const total = all ? num(all.total) : null
-  const liveN = live ? num(live.total) : null
-  const first = all && Array.isArray(all.rows) ? all.rows[0] as Record<string, unknown> | undefined : undefined
-  const lastSeen = first && typeof first.last_seen_at === 'string' ? first.last_seen_at : null
-  if (total === null) return { source, total, live: liveN, lastSeen, state: 'unknown', line: 'Couldn’t read this source’s listings.' }
-  if (total === 0) return { source, total, live: liveN, lastSeen, state: 'empty', line: 'No listings from this source.' }
-  if (!lastSeen) return { source, total, live: liveN, lastSeen, state: 'silent', line: 'None of its listings has a “last seen” time.' }
-  const hours = (now - Date.parse(lastSeen)) / 3_600_000
-  const when = formatPacific(lastSeen)
-  if (hours <= 30) return { source, total, live: liveN, lastSeen, state: 'fresh', line: `Last seen ${when}.` }
-  if (hours <= 7 * 24) return { source, total, live: liveN, lastSeen, state: 'slow', line: `Nothing seen since ${when}.` }
-  return { source, total, live: liveN, lastSeen, state: 'silent', line: `Nothing seen since ${when} — over a week.` }
+export function readSourceRow(r: unknown): SourceRow {
+  const o = (r && typeof r === 'object' ? r : {}) as Record<string, unknown>
+  const failing = typeof o.failing === 'boolean' ? o.failing : null
+  const lastSeen = o.last_seen ? str(o.last_seen) : null
+  const why = o.why ? str(o.why) : null
+  const state: SourceRow['state'] = failing === null ? 'unknown' : failing ? 'failing' : 'ok'
+  const seen = lastSeen ? `Last seen ${formatPacific(lastSeen)}.` : 'Never seen by its source.'
+  const line = state === 'failing' ? `${why ? `${why[0].toUpperCase()}${why.slice(1)}${/[.!?]$/.test(why) ? '' : '.'} ` : ''}${seen}` : state === 'unknown' ? `Some counts couldn’t be read. ${lastSeen ? seen : ''}`.trim() : seen
+  return { source: str(o.source) || 'unknown', live: num(o.live), added24: num(o.added_24h), addedToday: num(o.added_today), lastSeen, failing, why, state, line }
 }
 
-export const SOURCE_STATE: Record<SourceHealth['state'], { word: string; tone: Tone }> = {
-  fresh: { word: 'Seen today', tone: 'good' }, slow: { word: 'Quiet', tone: 'caution' }, silent: { word: 'Silent', tone: 'bad' },
-  empty: { word: 'No listings', tone: 'neutral' }, unknown: { word: 'Couldn’t read', tone: 'neutral' },
+const n = (v: number | null, what: string) => (v === null ? `${what} couldn’t be read` : `${fmt(v)} ${what}`)
+export function sourceCounts(r: SourceRow): string {
+  return [n(r.live, 'live'), n(r.added24, 'added in 24 h'), n(r.addedToday, 'added today')].join(' · ')
+}
+
+export const SOURCE_STATE: Record<SourceRow['state'], { word: string; tone: Tone }> = {
+  ok: { word: 'Working', tone: 'good' }, failing: { word: 'Failing', tone: 'bad' }, unknown: { word: 'Couldn’t read', tone: 'neutral' },
 }

@@ -33,7 +33,7 @@ import { markQuiet } from '@/lib/quietWindow'
 import { markOptimized } from '@/lib/optimizedJobs'
 import { RequirementsView, Checklist, PlanChanges, CopyBtn, planChangeCount, type Verdict, type RequirementRow, type ConstraintRow, type PaidPlan } from './optimizer/Verdict'
 import FitRead, { type Statement, type FieldMatch, type Answer, type Answers } from './optimizer/FitRead'
-import { PaidResult, BlockedResult, ResultTopLine, PaidOffer, BuildSteps, usePaidVersion, type Tailored, type Charge, type Blocked, type ChangeCounts, type Question } from './optimizer/PaidResult'
+import { PaidResult, BlockedResult, ResultTopLine, PaidOffer, BuildSteps, usePaidVersion, paidExportFields, type Tailored, type Charge, type Blocked, type ChangeCounts, type Question } from './optimizer/PaidResult'
 import { renderText } from '@/lib/resume/engine-client'
 import PostingInput, { PostingReadRow, type PostingRead } from './jobs/PostingInput'
 import ResumePicker from './resume/ResumePicker'
@@ -148,9 +148,11 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
   const [confirming, setConfirming] = useState(false)
   // the person's Yes / No / Skip on what only they can say — kept on this device for this job, sent with the build as
   // `confirmed` (the server decides what to do with it; the screen never writes it into the résumé)
-  const answersKey = `seen_confirm_v1:${user?.id || 'guest'}:${job.id}`
-  const [answers, setAnswers] = useState<Answers>(() => { try { return JSON.parse(localStorage.getItem(answersKey) || '{}') as Answers } catch { return {} } })
-  const onAnswer = (id: string, a: Answer | null) => setAnswers((x) => { const n = { ...x }; if (a) n[id] = a; else delete n[id]; try { localStorage.setItem(answersKey, JSON.stringify(n)) } catch { /* storage unavailable */ } return n })
+  // user-scoped and swept on sign-out (lib/sessionLocalKeys.js); a signed-out visitor never reaches this step, and
+  // nothing is stored without an account (no guest key to carry into the next person's)
+  const answersKey = user?.id ? `seen_confirm_v1:${user.id}:${job.id}` : ''
+  const [answers, setAnswers] = useState<Answers>(() => { if (!answersKey) return {}; try { return JSON.parse(localStorage.getItem(answersKey) || '{}') as Answers } catch { return {} } })
+  const onAnswer = (id: string, a: Answer | null) => setAnswers((x) => { const n = { ...x }; if (a) n[id] = a; else delete n[id]; if (answersKey) { try { localStorage.setItem(answersKey, JSON.stringify(n)) } catch { /* storage unavailable */ } } return n })
   const confirmed = Object.entries(answers).filter(([, a]) => a !== 'skip').map(([statementId, answer]) => ({ statementId, answer }))
   // the downloadable version: built from the CURRENT document (accepted changes only), pre-built so the
   // download runs inside the tap (iOS); keyed by the document so a toggle never serves a stale file
@@ -335,7 +337,7 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
 
   // ── the person's version: the server's finished résumé + their toggles and answers (kept for this tab) ──
   const tailored = result && !result.blocked && result.tailored && result.tailored.doc ? result.tailored : null
-  const version = usePaidVersion(tailored, `${job.id}:${ctx.pasted ? 'p' : 'l'}:${resumeText.length}`)
+  const version = usePaidVersion(tailored, user?.id ? `${user.id}:${job.id}:${ctx.pasted ? 'p' : 'l'}:${resumeText.length}` : '')
   const docKey = version.doc ? JSON.stringify(version.doc) : ''
   const fileBase = (() => {
     const n = String(version.doc?.basics?.name || '').replace(/[^\w .'-]/g, '').trim()
@@ -344,7 +346,7 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
 
   async function exportVersion(format: 'pdf' | 'docx'): Promise<Blob | null> {
     if (!version.doc) return null
-    const res = await fetch('/api/resume', { method: 'POST', headers: await aiHeaders(), body: JSON.stringify({ action: 'export', doc: version.doc, format }) })
+    const res = await fetch('/api/resume', { method: 'POST', headers: await aiHeaders(), body: JSON.stringify({ action: 'export', doc: version.doc, format, ...paidExportFields(tailored) }) })
     if (!res.ok) return null
     return await res.blob()
   }

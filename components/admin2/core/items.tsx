@@ -32,10 +32,9 @@ ITEM_VIEWS.company = () => import('../sections/companies/CompanyItem.tsx')
 ITEM_VIEWS.user = () => import('../sections/people/UserItem.tsx')
 ITEM_VIEWS.cluster = () => import('../sections/people/ClusterItem.tsx')
 
-// Review (sections/review): reports and the seven decision kinds. `cluster` also belongs to People —
-// whichever line registers it first wins (??=).
+// Review (sections/review): reports and the decision kinds that have no other home (`cluster` is People's).
 ITEM_VIEWS.report = () => import('../sections/review/ReportItem.tsx')
-for (const k of ['ticket', 'dispute', 'claim', 'reply', 'purchase', 'issue', 'cluster'] as const) ITEM_VIEWS[k] ??= () => import('../sections/review/KindItem.tsx')
+for (const k of ['ticket', 'dispute', 'claim', 'reply', 'purchase', 'issue'] as const) ITEM_VIEWS[k] ??= () => import('../sections/review/KindItem.tsx')
 
 if (process.env.NEXT_PUBLIC_ADMIN_LAB === '1') {
   ITEM_VIEWS.report ??= () => import('./devlab/LabItem.tsx')
