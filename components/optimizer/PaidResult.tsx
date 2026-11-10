@@ -217,14 +217,19 @@ export function QuestionList({ questions, v }: { questions: Question[]; v: PaidV
 }
 
 /** The top line: what the credit bought (the server's own measure) and the charge truth. */
-export function ResultTopLine({ charge, charged, cached, pro, balance, cost }: { charge?: Charge | null; charged?: boolean; cached?: boolean; pro?: boolean | null; balance?: number | null; cost: string }) {
+export function ResultTopLine({ charge, charged, cached, pro, balance, cost, vis }: { charge?: Charge | null; charged?: boolean; cached?: boolean; pro?: boolean | null; balance?: number | null; cost: string; vis?: { of: number; before: number; after: number } | null }) {
+  // the result's headline number: ONE figure pair from the first-read planner (now / of), with "before" beside it —
+  // shown only when the credit bought it; a free result leads with the server's reason sentence instead
+  const fig = charge?.charge && vis && vis.of > 0 && vis.after > vis.before ? vis : null
   const truth = cached ? 'Already built for this job — no credit used'
     : charged && pro !== true ? `${cost} used${balance != null ? ` · ${balance} left` : ''}`
     : pro === true && charge?.charge ? 'Included with Pro'
     : 'No credit used'
   return (
     <div className={s.top} data-testid="result-top">
-      {charge?.headline
+      {fig && <p className={s.figure} data-testid="result-figure"><span className={s.figNum}>{fig.after} of {fig.of}</span><span className={s.figCap}>in your first lines · before, {fig.before}</span></p>}
+      {fig && (charge?.headline || charge?.sentence) ? <p className={s.why}>{charge?.headline || charge?.sentence}{charge?.detail ? ` ${charge.detail}` : ''}</p>
+        : charge?.headline
         ? <><p className={`${s.bought} ${s.headline}`} data-testid="result-headline">{charge.headline}</p>{charge.detail && <p className={s.why}>{charge.detail}</p>}</>
         : charge?.sentence && <p className={s.bought}>{charge.sentence}</p>}
       <p className={s.truth}><Icon name={charged && !cached ? 'circle-dollar-sign' : 'circle-check'} size={16} />{truth}</p>

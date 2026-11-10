@@ -182,6 +182,12 @@ Every pending row is read (keyset pages internally, no 1,000 cap; `truncated` tr
 - `possible_duplicate` covers a copy of another HELD row AND a copy of a published report (same company + outcome +
   text); then `review.duplicate_of` = the original's id and `review.duplicate_of_live: true`. The flag survives the
   original's approval, so a fresh tab never offers the copy for bulk approval.
+- The duplicate-of-live check does not hold the list up: it runs ≤4 reads in parallel for ~2.5 s. Each row carries
+  `review.duplicate_check: 'done'|'pending'`; the list carries `duplicate_check: 'done'|'pending'` and
+  `duplicate_check_pending` (how many rows). **`pending` means "not checked yet", never "not a duplicate"** — show it as
+  unchecked and re-read later. Names are compared trimmed and case-folded ("walmart " = "Walmart"); a row is `done` only
+  after that case-insensitive pass. The bulk guard re-checks the rows it would approve, exactly, at decision time, and skips
+  anything it cannot verify as `not_checked_for_duplicates` ("N not checked for duplicates — try again").
 - Every row carries `rules: "passes"|"fails"|null` and `rules_detail: { verdict, comment: boolean|null, post: boolean|null }`
   — Seen's strict first-hand rules read as a comment and as the post itself (null = the rules do not apply: not an
   imported public account, or too short). `reports_recent` rows carry the same two fields.

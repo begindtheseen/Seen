@@ -281,7 +281,7 @@ function RewriteView({ out, copy, copied, onRerun, pro }: { out: PaidOptimize; c
   )
   if (tailored) return (
     <div className="ai-stack" data-testid="resume-version">
-      <ResultTopLine charge={x.charge || tailored.charge} charged={!!x.charged} cached={!!out.cached} pro={pro} balance={x.balance ?? null} cost={OPTIMIZE_PRICE} />
+      <ResultTopLine charge={x.charge || tailored.charge} charged={!!x.charged} cached={!!out.cached} pro={pro} balance={x.balance ?? null} cost={OPTIMIZE_PRICE} vis={tailored.visibility || null} />
       <PaidResult t={tailored} questions={(x.questions || []) as Question[]} v={version} />
       <DownloadVersion doc={version.doc} paid={tailored} />
       {out.application_message && (

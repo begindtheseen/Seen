@@ -57,3 +57,4 @@
 
 .dense .mark { margin-right: var(--sp-1); vertical-align: baseline; }
 .gateText { margin: 0; font-size: var(--fs-sm); color: var(--text-2); line-height: var(--lh-body); overflow-wrap: anywhere; }
+.candidate { display: flex; flex-direction: column; gap: var(--sp-1); margin-top: var(--sp-1); padding-left: var(--sp-3); border-left: 2px solid var(--info-line); min-width: 0; }

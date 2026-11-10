@@ -107,6 +107,11 @@ const SIGNIN_REQUIRED = { error: 'signin_required', message: 'Sign in to continu
 // nothing blocks the application, at least one applied change of substance beyond formatting was made, and the
 // document is measurably better for this posting (more of what the résumé proves sits where a recruiter reads first,
 // or a thin / cliché summary was replaced) — and never when the fit would drop. Otherwise free, with one sentence.
+/** The scoring context with the person's answers (only when there are any: no answers = the context unchanged). */
+export function withConfirmed(fit, confirmed) {
+  return Array.isArray(confirmed) && confirmed.length ? { ...(fit || {}), confirmed } : fit;
+}
+
 export function tailorCharge(tailored) {
   if (!tailored) return { charge: false, reason: 'no_document', note: 'Nothing could be tailored for this posting, so no credit was used.' };
   const before = tailored.score_before, after = tailored.score_after;
@@ -607,12 +612,14 @@ async function handleOptimizeTool(req, res, body) {
     // The canonical text and the shared taxonomy — the same inputs the free fit check and the Studio
     // score, so the three screens print one number (lib/resume/canonical.js, skillTaxonomy.js).
     const resume = canonicalResumeText(body.resume);
-    const [taxonomy, fit] = await Promise.all([loadSkillTaxonomy(), fitContext({ company, jobDescription })]);
+    const [taxonomy, fit0] = await Promise.all([loadSkillTaxonomy(), fitContext({ company, jobDescription })]);
+    // the person's answers ride in the scoring context into every runOptimizer call of the package (confirmations.js)
+    const fit = withConfirmed(fit0, body.confirmed);
 
     // The cache key carries the parser + optimizer versions (optimizeCache.js): a result built by an
     // older engine is never served (Tasha got a pre-fix "(1,800 subscribers)." summary, 2026-10-25).
     // `fresh: true` (the "Re-run" button) skips the cache.
-    const key = optimizeCacheKey({ uid: authed.uid, jobId, jobDescription, resume });
+    const key = optimizeCacheKey({ uid: authed.uid, jobId, jobDescription, resume, confirmed: body.confirmed });
     const hit = body.fresh ? null : await readCachedOptimize(authed.uid, key);
     if (hit) {
       const paidBefore = !hit.output.no_gain;
@@ -697,7 +704,7 @@ async function handleStudio(req, res, body) {
         }
         // The plan is computed BEFORE the credit is taken: a tailor that cannot move the fit score (an
         // engineer's résumé went 70 → 70 and paid 1 credit, round 1) is returned free, with a plain reason.
-        const out = await tailorAction(body, { taxonomy, fit });
+        const out = await tailorAction(body, { taxonomy, fit: withConfirmed(fit, body.confirmed) });
         if (body._posting) out.posting = { ...body._posting, title: body._posting.title || body.jobTitle || null };
         const rule = tailorCharge(out.tailored);
         if (!rule.charge) {

@@ -100,7 +100,12 @@ export function fitGroups(d) {
       line: state === 'shown' || state === 'partly' ? proofOf(st) : '',
       // a role header ("Warehouse Associate — Midwest Distribution | 2021 – Present") is the person's JOB, not a line they wrote
       lineIsJob: false,
-      missing: state === 'partly' ? missingWords(st) : [],
+      // the reader writes `missing` as phrases now ("not shown: putting away inventory"): printed as written, never re-joined
+      missing: state === 'partly' ? (Array.isArray(st.missing) ? st.missing.map((m) => clean(m)).filter(Boolean) : []) : [],
+      // the closest résumé line the judge found but could not prove — asked, never claimed (`candidate: { line, why }`)
+      candidate: (state === 'not_shown' || state === 'partly') && st.candidate && clean(st.candidate.line) ? { line: proofText(st.candidate.line), why: clean(st.candidate.why) } : null,
+      // the server changed this row because of the person's own answer: printed "You said …", never "your résumé shows"
+      byYou: st.by === 'you',
       question: state === 'ask' ? askQuestion(st.text) : '',
       source: clean(st.source),
     });
@@ -148,7 +153,7 @@ export function groupHeading(g) {
 
 /** "Partly" in words: what the line shows is quoted; this says what it does not. */
 export function partlySentence(r) {
-  return r.missing.length ? `Not on your résumé: ${join(r.missing)}.` : 'Your line shows part of this, not all of it.';
+  return r.missing.length ? '' : 'Your line shows part of this, not all of it.';
 }
 
 /**

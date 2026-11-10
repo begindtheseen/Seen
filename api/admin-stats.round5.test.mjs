@@ -172,3 +172,40 @@ test('round 6: the list does not wait on the duplicate-of-live check; the bulk g
   assert.equal(list2.duplicate_check, 'done');
   assert.ok(list2.rows.every((r) => r.review.flags.includes('possible_duplicate')));
 });
+
+test('a held copy under a different letter case / spacing ("walmart " vs "Walmart") is still a possible duplicate', async () => {
+  const T = world({ held: 0, liveReports: 0 });
+  const text = 'Applied for cashier, interviewed twice, then silence for a month';
+  T.reports = [
+    { id: uid(1, '41'), company_name: 'Walmart', outcome: 'ghosted', role: 'Cashier', platform: 'Indeed', created_at: ago(5 * 3600e3), report_text: text, outcome_weight: 0.55, trust_reason: 'external_import', needs_review: false },
+    { id: uid(2, '41'), company_name: 'walmart ', outcome: 'ghosted', role: 'Cashier', platform: 'Indeed', created_at: ago(3600e3), report_text: text, outcome_weight: 0.55, trust_reason: 'external_import', needs_review: true },
+    { id: uid(3, '41'), company_name: 'Target (Store #12), Inc.', outcome: 'ghosted', role: 'Cashier', platform: 'Indeed', created_at: ago(3600e3), report_text: 'A different, clean held account', outcome_weight: 0.55, trust_reason: 'external_import', needs_review: true },
+  ];
+  const fake = createFakeRest({ tables: T, rpcs: RPCS });
+  const call = await caller(handler, fake);
+  const bulk = (await call({ action: 'review_held', decision: 'approve', ids: [uid(2, '41'), uid(3, '41')] })).jsonBody;
+  assert.equal(bulk.changed, 1, 'only the clean one (a name with commas and parentheses still works)');
+  assert.deepEqual(bulk.skipped.map((s) => [s.reason, s.ids]), [['possible_duplicate', [uid(2, '41')]]]);
+  const list = (await call({ action: 'list_held_reports' })).jsonBody;
+  assert.equal(list.duplicate_check, 'done');
+  assert.ok(list.rows[0].review.flags.includes('possible_duplicate'));
+  assert.equal(list.rows[0].review.duplicate_of, uid(1, '41'));
+});
+
+test('a read that answers after the time box is ignored (no late flag, the row stays pending)', async () => {
+  const { flagLiveCopies } = await import('../lib/server/admin/review.js');
+  const held = [{ id: uid(1, '51'), company_name: 'Walmart', outcome: 'ghosted', report_text: 'same words', trust_reason: 'external_import', needs_review: true }];
+  let answered = false;
+  const db = async () => {
+    await new Promise((r) => setTimeout(r, 200)); // answers well after the 50 ms box
+    answered = true;
+    return { ok: true, status: 200, headers: { get: () => null }, json: async () => [{ id: uid(9, '51'), company_name: 'Walmart', outcome: 'ghosted', report_text: 'same words' }] };
+  };
+  const out = await flagLiveCopies(db, held, { deadline: Date.now() + 50 });
+  assert.equal(out.complete, false);
+  assert.equal(held[0].review.duplicate_check, 'pending');
+  await new Promise((r) => setTimeout(r, 300));
+  assert.equal(answered, true, 'the slow read did answer');
+  assert.ok(!held[0].review.flags.includes('possible_duplicate'), 'its late result was not applied');
+  assert.equal(held[0].review.duplicate_check, 'pending');
+});

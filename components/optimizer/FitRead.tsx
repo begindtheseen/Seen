@@ -36,40 +36,59 @@ function StateMark({ state }: { state: State }) {
   return <span className={s.mark} data-state={state}><Icon name={ICON[state]} size={16} />{STATE_WORD[state]}</span>
 }
 
-interface Row { id: string; text: string; state: State; preferred: boolean; line: string; lineIsJob?: boolean; missing: string[]; question: string; sameAs?: string }
+interface Row { id: string; text: string; state: State; preferred: boolean; line: string; lineIsJob?: boolean; missing: string[]; question: string; sameAs?: string; candidate?: { line: string; why: string } | null; byYou?: boolean }
+type OnAnswer = (id: string, a: Answer | null, line?: string) => void
 
-function AnswerControls({ r, answer, onAnswer }: { r: Row; answer?: Answer; onAnswer?: (id: string, a: Answer | null) => void }) {
-  if (!onAnswer) return null
-  if (answer) return (
-    <p className={s.said} data-testid="fit-said">
-      <span>{answer === 'skip' ? 'You skipped this one' : `You said ${answer} to: “${r.text}”`}</span>
-      <button type="button" className={s.change} onClick={() => onAnswer(r.id, null)}>Change</button>
-    </p>
-  )
+function YesNo({ onYes, onNo, onSkip }: { onYes: () => void; onNo: () => void; onSkip?: () => void }) {
   return (
     <div className={s.answers} role="group" aria-label="Your answer">
-      {(['yes', 'no', 'skip'] as const).map((a) => <button key={a} type="button" className={s.ans} onClick={() => onAnswer(r.id, a)} data-testid={`fit-ans-${a}`}>{a === 'yes' ? 'Yes' : a === 'no' ? 'No' : 'Skip'}</button>)}
+      <button type="button" className={s.ans} onClick={onYes} data-testid="fit-ans-yes">Yes</button>
+      <button type="button" className={s.ans} onClick={onNo} data-testid="fit-ans-no">No</button>
+      {onSkip && <button type="button" className={s.ans} onClick={onSkip} data-testid="fit-ans-skip">Skip</button>}
     </div>
   )
 }
 
-function StatementRow({ r, answer, onAnswer, quoted, dense = false }: { r: Row; answer?: Answer; onAnswer?: (id: string, a: Answer | null) => void; quoted?: Set<string>; dense?: boolean }) {
+function StatementRow({ r, answer, onAnswer, quoted, dense = false }: { r: Row; answer?: Answer; onAnswer?: OnAnswer; quoted?: Set<string>; dense?: boolean }) {
   // in a partial list a "same line as … above" reference can point at a row that is not on screen: quote it instead
   const ref = r.sameAs && (!quoted || quoted.has(r.line.toLowerCase())) ? r.sameAs : ''
   if (quoted && r.line) quoted.add(r.line.toLowerCase())
+  // The row says what the SERVER decided. An answer changes it only when the server sends the row back `by: 'you'`;
+  // until then a Yes leaves the question standing (the screen never claims what the server did not accept). A No on a
+  // close line takes the question away: the row is then a plain "not on your résumé".
+  const askCandidate = !!r.candidate && !r.byYou && answer !== 'no'
   return (
     <li className={dense ? s.dense : s.row} data-state={r.state} data-testid="fit-row">
       {!dense && <StateMark state={r.state} />}
       <p className={s.text}>{dense && <><StateMark state={r.state} />{' '}</>}{r.state === 'ask' ? r.question : r.text}{r.preferred && r.state !== 'ask' ? <span className={s.tag}> · preferred</span> : null}</p>
+      {r.byYou && (
+        <p className={s.said} data-testid="fit-said">
+          <span>{r.candidate ? `You said this line shows it: “${clip(r.candidate.line, 160)}”` : r.state === 'ask' || !r.line ? `You said yes to: “${r.text}”` : 'You said this shows it.'}</span>
+          {onAnswer && <button type="button" className={s.change} onClick={() => onAnswer(r.id, null)}>Change</button>}
+        </p>
+      )}
       {r.line && !ref && <p className={dense ? `${s.quote} ${s.clamp}` : s.quote}>{r.lineIsJob ? 'On your résumé' : 'Your line'}: “{clip(r.line, 200)}”</p>}
       {r.line && ref && <p className={s.quote}>Shown by the same {r.lineIsJob ? 'job' : 'line'} as “{clip(ref, 60)}” above.</p>}
-      {r.state === 'partly' && <p className={s.note}>{partlySentence(r)}</p>}
-      {r.state === 'ask' && <AnswerControls r={r} answer={answer} onAnswer={onAnswer} />}
+      {r.state === 'partly' && r.missing.map((m, i) => <p key={i} className={s.note}>{m}</p>)}
+      {r.state === 'partly' && !r.missing.length && <p className={s.note}>{partlySentence(r)}</p>}
+      {askCandidate && (
+        <div className={s.candidate} data-testid="fit-candidate">
+          <p className={s.quote}>Closest line we found: “{clip(r.candidate!.line, 200)}”{onAnswer ? '. Does this show it?' : '.'}</p>
+          {r.candidate!.why && <p className={s.note}>{r.candidate!.why}</p>}
+          {onAnswer && <YesNo onYes={() => onAnswer(r.id, 'yes', r.candidate!.line)} onNo={() => onAnswer(r.id, 'no', r.candidate!.line)} />}
+        </div>
+      )}
+      {r.candidate && !r.byYou && answer === 'no' && (
+        <p className={s.note} data-testid="fit-candidate-no">Not on your résumé — you said “{clip(r.candidate.line, 80)}” does not show it.{onAnswer && <> <button type="button" className={s.change} onClick={() => onAnswer(r.id, null)}>Change</button></>}</p>
+      )}
+      {r.state === 'ask' && !r.byYou && onAnswer && (answer === 'skip'
+        ? <p className={s.said}><span>You skipped this one</span><button type="button" className={s.change} onClick={() => onAnswer(r.id, null)}>Change</button></p>
+        : <YesNo onYes={() => onAnswer(r.id, 'yes')} onNo={() => onAnswer(r.id, 'no')} onSkip={() => onAnswer(r.id, 'skip')} />)}
     </li>
   )
 }
 
-function Group({ g, answers, onAnswer }: { g: { key: string; rows: Row[] }; answers?: Answers; onAnswer?: (id: string, a: Answer | null) => void }) {
+function Group({ g, answers, onAnswer }: { g: { key: string; rows: Row[] }; answers?: Answers; onAnswer?: OnAnswer }) {
   const [all, setAll] = useState(false)
   const lim = LIMIT[g.key] || 6
   const rows = all ? g.rows : g.rows.slice(0, lim)
@@ -89,7 +108,7 @@ function Group({ g, answers, onAnswer }: { g: { key: string; rows: Row[] }; answ
  * @param brief   blocked: band only (the blocked card says why)
  * @param answers / onAnswer  the person's Yes / No / Skip on what only they can say (kept by the caller)
  */
-export default function FitRead({ data, note, compact = false, brief = false, answers, onAnswer }: { data: FitData; note?: string; compact?: boolean; brief?: boolean; answers?: Answers; onAnswer?: (id: string, a: Answer | null) => void }) {
+export default function FitRead({ data, note, compact = false, brief = false, answers, onAnswer }: { data: FitData; note?: string; compact?: boolean; brief?: boolean; answers?: Answers; onAnswer?: OnAnswer }) {
   const [open, setOpen] = useState(false)
   const [asking, setAsking] = useState(false)
   const v = data.verdict || null

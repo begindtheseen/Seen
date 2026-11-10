@@ -15,7 +15,7 @@ import ListingScoreRing from '@/components/jobs/ListingScoreRing'
 import { displayCompanyName } from '@/lib/companyDisplay'
 import { displayPay } from '@/lib/jobs/pay.js'
 
-export default function ResumeMatches({ jobs, loading, skills, city, citySource, onOpen }: {
+export default function ResumeMatches({ jobs, loading, skills, city, citySource, onOpen, noDirection }: {
   jobs: Job[]
   loading: boolean
   skills: string[]
@@ -23,6 +23,8 @@ export default function ResumeMatches({ jobs, loading, skills, city, citySource,
   /** Where the city came from — the profile, or the résumé's own contact line. */
   citySource?: 'profile' | 'resume' | null
   onOpen: (job: Job) => void
+  /** The server's `no_direction` state: the person's current title could not be placed (feature-detected; the page passes it). */
+  noDirection?: { title?: string | null } | null
 }) {
   const rows = jobs.slice(0, 5)
   return (
@@ -34,7 +36,11 @@ export default function ResumeMatches({ jobs, loading, skills, city, citySource,
           <span style={{ color: 'var(--dim)', letterSpacing: 'normal', textTransform: 'none', fontSize: 'var(--fs-meta)' }}>· near {city}{citySource === 'resume' ? ' (from your résumé)' : ''}{skills.length ? ` · ${skills.slice(0, 2).join(', ')}` : ''}</span>
         )}
       </div>
-      {loading ? (
+      {noDirection ? (
+        <p data-testid="rail-no-direction" style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--text-2)', lineHeight: 1.5, margin: 0 }}>
+          We couldn&apos;t place {noDirection.title ? `“${noDirection.title}”` : 'your current title'} yet — <a href="/jobs?focus=search" style={{ color: 'var(--accent)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>search by title or place</a>.
+        </p>
+      ) : loading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
           {[0, 1].map(i => <div key={i} style={{ height: 46, background: 'var(--raised)', borderRadius: 10, animation: `pulse 1.4s ${i * 0.15}s ease infinite` }} />)}
         </div>

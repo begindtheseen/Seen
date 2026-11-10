@@ -517,6 +517,8 @@ export default async function handler(req, res) {
         jobDescription,
         jobFacts,
         ...fit,
+        // the person's Yes / No on lines only they can answer (lib/optimizer/confirmations.js validates every entry)
+        ...(Array.isArray(body.confirmed) && body.confirmed.length ? { confirmed: body.confirmed } : {}),
       },
       { taxonomy }
     );

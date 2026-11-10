@@ -32,6 +32,7 @@ occupationOf('Medical Billing Specialist', { lines })   // lines break a tie amo
 relation('Plumbing Apprentice', 'Journeyman Plumber')   // → { relation: 'ladder', direction: 'up', why: 'Helpers--Pipelayers… assist in Plumbers… work' }
 relation('Phlebotomist', 'Medical Laboratory Technician') // → { relation: 'related', why: 'O*NET lists … as related …' }
 relation('Chef', 'Food Safety QA Technician', { lines: chefLines })  // → 'related' when the chef's lines name "food safety"; 'different' without
+relation('Chef', 'Food Safety QA Technician', { credentials: ['HACCP'] }) // → 'related': a named credential of the target's field (HACCP, ServSafe, PCQI, CDL …)
 relation('29-1141.00', '15-1252.00')                    // codes work too
 
 levelOf('Assistant Branch Manager')   // → { marker: 'assistant', rank: 6.5 }   ('Branch Manager' → manager 7)
@@ -52,6 +53,24 @@ single-word jargon needs the employer) → the full title exactly → without le
 modifiers (Dice ≥ 0.8) → the partial readings (one side of a comma/slash, a later dash segment) the same way → with `lines`, the
 occupation whose task statements the lines share ≥4 specific words with. A weak title match alone returns **null** (on real postings
 such guesses were wrong 9 times in 14). Title-only answers are cached (5k).
+
+## When to trust it (the contract)
+
+| `confidence` | meaning | how to use |
+|---|---|---|
+| `exact` | the whole normalised title IS an O*NET title of the occupation, with strong evidence (reported by incumbents and shown in My Next Move, several sources plus a report, or the occupation's own name), not contested by the titles that end with it, not tied — or a reviewed usage correction (back-end / platform engineer → Software Developers). Measured 74 of 74 correct on 351 labelled titles. | use as fact |
+| `close` | a weaker or contested filing, a partial reading (one side of a comma, a dash segment), a function + role-noun title, a head-word fuzzy match (Dice ≥ 0.8) or a military crosswalk mapping. `ambiguous: true` + `alternatives` when several occupations claim it equally (Account Executive, Medical Billing Specialist). ≈85–90% right. | use, but a contradicting résumé line or the employer wins; when `ambiguous`, pass `lines` / `employer` or show the alternatives |
+| `guess` | employer jargon without the employer, or the person's / posting's lines alone. ≈75% right. | never the basis for an emailed match or a "shown" verdict; a tie-break only |
+| `null` | unknown | say "unknown"; never fall back to another role's occupation as if it were this one |
+
+`relation` inherits the weaker side's confidence: treat `ladder`/`same` built on a `guess` title as a guess. `sameWord` → `true` is
+evidence, `false` is not a gap.
+
+**Stable exports** (names, arguments and return fields will not change; new fields may be added): `occupationOf`, `relation`,
+`levelOf`, `tasksOf`, `toolsOf`, `impliedDuties`, `militaryOccupation`, `occupation`, `groupOf`, `looksMilitary` from
+`lib/occupations/index.js`; `sameWord`, `relateWords`, `synonymsOf`, `lemmaOf` from `lib/text/synonyms.js`; `stem`,
+`inflectionCandidates`, `derivationCandidates`, `lemmaCandidates`, `words`, `isStopWord` from `lib/text/morph.js`. Not stable:
+`_internal`, `normalize.js` helpers, `parseGroupIds`, the data file formats (read them only through the API).
 
 ## What each function is safe to conclude — and what it is not
 
@@ -92,7 +111,7 @@ such guesses were wrong 9 times in 14). Title-only answers are cached (5k).
 
 **Matched jobs.** Place the person's current title with `occupationOf(title, { lines: thatRole'sBullets, employer })`; when it is
 null or a `guess`, try the previous role rather than inventing a field. For each job, `relation(personTitle, jobTitle, { lines })`:
-`same` and `ladder` (up one rung, `levelOf` gap ≤ ~1.5) are the rail's core; `related` is a side-step to show with its `why`; never
+pass the person's certifications as `credentials` too. `same` and `ladder` (up one rung, `levelOf` gap ≤ ~1.5) are the rail's core; `related` is a side-step to show with its `why`; never
 show `different` because a title was unknown — `why` says "could not place". Military roles: `militaryOccupation` first.
 
 **The verdict.** For "does this résumé show requirement R": (1) `impliedDuties(personTitle, lines)` — when R's content words sit in one

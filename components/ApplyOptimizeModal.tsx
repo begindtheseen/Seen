@@ -151,9 +151,24 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
   // user-scoped and swept on sign-out (lib/sessionLocalKeys.js); a signed-out visitor never reaches this step, and
   // nothing is stored without an account (no guest key to carry into the next person's)
   const answersKey = user?.id ? `seen_confirm_v1:${user.id}:${job.id}` : ''
-  const [answers, setAnswers] = useState<Answers>(() => { if (!answersKey) return {}; try { return JSON.parse(localStorage.getItem(answersKey) || '{}') as Answers } catch { return {} } })
-  const onAnswer = (id: string, a: Answer | null) => setAnswers((x) => { const n = { ...x }; if (a) n[id] = a; else delete n[id]; if (answersKey) { try { localStorage.setItem(answersKey, JSON.stringify(n)) } catch { /* storage unavailable */ } } return n })
-  const confirmed = Object.entries(answers).filter(([, a]) => a !== 'skip').map(([statementId, answer]) => ({ statementId, answer }))
+  // stored as { answers: { id: yes|no|skip }, lines: { id: the candidate line answered } } (round-2 shape: a bare map)
+  type Stored = { answers: Answers; lines: Record<string, string> }
+  const readStored = (): Stored => { if (!answersKey) return { answers: {}, lines: {} }; try { const v = JSON.parse(localStorage.getItem(answersKey) || '{}'); return v && v.answers ? { answers: v.answers, lines: v.lines || {} } : { answers: v || {}, lines: {} } } catch { return { answers: {}, lines: {} } } }
+  const [stored, setStored] = useState<Stored>(readStored)
+  const answers = stored.answers
+  const confirmedOf = (st: Stored) => Object.entries(st.answers).filter(([, a]) => a !== 'skip').map(([statementId, answer]) => ({ statementId, answer, ...(st.lines[statementId] ? { line: st.lines[statementId] } : {}) }))
+  const confirmed = confirmedOf(stored)
+  // An answer is sent and the SERVER is asked again (free check + probe); the rows show what it sends back — a Yes it
+  // did not accept leaves the question standing (x-integration "Confirmations": `{ statementId, answer, line? }` in,
+  // statements changed by an answer come back `by: 'you'`).
+  const onAnswer = (id: string, a: Answer | null, line?: string) => {
+    const n: Stored = { answers: { ...stored.answers }, lines: { ...stored.lines } }
+    if (a) n.answers[id] = a; else delete n.answers[id]
+    if (a && line) n.lines[id] = line; else if (!a) delete n.lines[id]
+    setStored(n)
+    if (answersKey) { try { localStorage.setItem(answersKey, JSON.stringify(n)) } catch { /* storage unavailable */ } }
+    if (a !== 'skip') void reask(confirmedOf(n))
+  }
   // the downloadable version: built from the CURRENT document (accepted changes only), pre-built so the
   // download runs inside the tap (iOS); keyed by the document so a toggle never serves a stale file
   const [pdf, setPdf] = useState<{ key: string; blob: Blob } | null>(null)
@@ -214,8 +229,8 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
   // What every call sends about the posting: the listing's text (or the pasted posting / link), its source so
   // the server can tell a teaser from a posting, the job id for the cache key, and the title/employer to score
   // under — never this job's title for a DIFFERENT posting (the server then takes the link's own).
-  function postingBody(c: PostingCtx) {
-    const who = { job: c.title, jobTitle: c.title, company: c.company, ...(confirmed.length ? { confirmed } : {}) }
+  function postingBody(c: PostingCtx, conf = confirmed) {
+    const who = { job: c.title, jobTitle: c.title, company: c.company, ...(conf.length ? { confirmed: conf } : {}) }
     return c.pasted
       ? { ...who, jobDescription: c.pasted, postingPasted: true, jobId: c.other ? `${job.id}:other` : job.id }
       : { ...who, jobDescription: job.description || '', jobSource: job.source || null, jobId: job.id }
@@ -262,6 +277,23 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
     } catch {
       setStep('choose')
     }
+  }
+
+  // Re-ask the server with the person's answers — quietly: the step and the scroll stay; only the verdict, the
+  // statements and the offer are replaced by what comes back. Never charges.
+  async function reask(conf: typeof confirmed) {
+    if (!resumeText) return
+    try {
+      const headers = await aiHeaders()
+      const body = postingBody(ctx, conf)
+      const [pr, dr] = await Promise.all([
+        step === 'choose' ? fetch('/api/resume', { method: 'POST', headers, body: JSON.stringify({ tool: 'optimize', probe: true, resume: resumeText, ...body }) }) : Promise.resolve(null),
+        fetch('/api/optimizer', { method: 'POST', headers, body: JSON.stringify({ action: 'optimize', resumeText, ...body, remoteOk: /remote/i.test(ctx.pasted || job.description || '') }) }),
+      ])
+      const d = dr.ok ? await dr.json() as FreeDiagnosis : null
+      if (d && d.verdict) setDiag(d)
+      if (pr && pr.ok) { const p = await pr.json() as OptimizeResult; if (!p.cached && (p.charge || p.change_counts)) setProbe(p) }
+    } catch { /* the rows keep the last answer the server gave */ }
   }
 
   // A pasted posting (text or link). A link to another site is another posting: the sheet says so.
@@ -628,7 +660,7 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
             <>
               {errorBox}
               {readRow}
-              <ResultTopLine charge={result.charge || tailored.charge} charged={!!result.charged} cached={!!result.cached} pro={pro} balance={balance} cost={cost} />
+              <ResultTopLine charge={result.charge || tailored.charge} charged={!!result.charged} cached={!!result.cached} pro={pro} balance={balance} cost={cost} vis={tailored.visibility || null} />
               <BuildSteps steps={steps} />
               <PaidResult t={tailored} questions={result.questions || []} v={version} />
               {result.availability && (
@@ -649,7 +681,7 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
                   </div>
                 </details>
               )}
-              <FitRead data={result} compact answers={answers} onAnswer={onAnswer} />
+              <FitRead data={diag && diag.statements ? diag : result} compact answers={answers} onAnswer={onAnswer} />
               {result.cached && (
                 <p className={s.ledger}>
                   You built this version with this résumé in the last 7 days. {pro === true ? 'Rebuilding is unlimited with Pro.' : `A rebuild costs ${cost}.`}{' '}

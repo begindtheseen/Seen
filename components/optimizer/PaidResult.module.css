@@ -70,3 +70,7 @@
 .fmtSum { min-height: 44px; display: flex; align-items: center; cursor: pointer; list-style: none; font-size: var(--fs-ui); font-weight: 600; color: var(--text-2); }
 .fmtSum:focus-visible { outline: none; box-shadow: var(--sh-focus); border-radius: var(--r-chip); }
 .fmtBox[open] > .fmtSum { margin-bottom: var(--sp-2); }
+
+.figure { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--sp-2); margin: 0; }
+.figNum { font-size: var(--fs-xl); font-weight: 600; color: var(--text-1); font-variant-numeric: tabular-nums; line-height: var(--lh-snug); }
+.figCap { font-size: var(--fs-sm); color: var(--text-2); }

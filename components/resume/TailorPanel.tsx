@@ -222,7 +222,7 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
       )}
       {state === 'done' && plan && finalVariant && !extra.blocked && (
         <>
-          {extra.charge && <ResultTopLine charge={extra.charge} charged={!!extra.charged} pro={pro} balance={extra.balance ?? null} cost={creditCostLabel(RESUME_OPTIMIZE_COST)} />}
+          {extra.charge && <ResultTopLine charge={extra.charge} charged={!!extra.charged} pro={pro} balance={extra.balance ?? null} cost={creditCostLabel(RESUME_OPTIMIZE_COST)} vis={extra.tailored?.visibility || null} />}
           {extra.fit && <div className={s.card}><FitRead data={extra.fit} compact /></div>}
           <div className={s.card}>
             {noRequirements || plan.score.after == null || plan.score.before == null ? (
