@@ -38,6 +38,29 @@ that failed (not 2xx) is not replayed: Retry runs it. Job actions (`purge_stale_
 idempotent when the call names its round (`round: n`). `review_held` and `dedupe_reports` keep their own batch rule
 (a retry finishes the rest). These records never appear in `activity_log`.
 
+### Additive writes: an unknown outcome is not a failure (round 8)
+Every write is classified in `lib/server/admin/idempotency.js WRITE_CLASS` as **additive** (repeating it changes
+things again) or **set** (repeating it changes nothing more), each with its reason; the contract test fails on an
+unclassified write. Additive today: `grant_credits` and `undo` (of a credit grant). For those:
+- Before its write the handler records its INTENT `{kind, prior, next, …}` on the request record (record status
+  `running`). If the record cannot take it, nothing is written → 503 `upstream`, retryable.
+- When the database's answer to the write is lost (timeout, reset, 5xx) — or a follow-up write it needs (the ledger
+  row) is not confirmed — the audit row is KEPT, the record becomes `unknown`, and the answer is
+  504 `timeout`, `retryable:true`, "… press Retry to check whether it went through". A plain 4xx refusal is a failure
+  (audit row dropped, record `failed`).
+- Retry with the same `request_id` on an `unknown` record, or a `running` record older than 70 s, first reads the
+  current state and compares it with the intent:
+  - current == next → it was done: missing ledger/audit rows are completed (never a second one), the record is
+    finished, and the answer is the normal `AdminOk` (with `undo`) plus `replayed:true`, `changed:0`,
+    `recorded_changed:1`.
+  - current == prior → nothing happened: the first try's kept audit row is removed and the write runs once.
+  - anything else → 409 `conflict`, `retryable:false`: "The balance changed since your first press (it is now N) —
+    check before granting again."
+- No counter and no record found: an additive write refuses — 503 "Couldn’t check whether this was already done —
+  nothing was changed." Set-style writes run.
+`fulfill_employer_purchase` (set): when the purchase is already marked fulfilled it checks the perk exists and
+re-grants it when it is missing.
+
 ## Audit before write, always
 A destructive write writes its audit row first, time-boxed (8 s); if that row cannot be written or does not answer,
 nothing is written and the answer is a retryable AdminErr (502 `upstream` or 504 `timeout`) saying "nothing was

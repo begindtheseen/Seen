@@ -286,12 +286,12 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
     try {
       const headers = await aiHeaders()
       const body = postingBody(ctx, conf)
-      const [pr, dr] = await Promise.all([
-        step === 'choose' ? fetch('/api/resume', { method: 'POST', headers, body: JSON.stringify({ tool: 'optimize', probe: true, resume: resumeText, ...body }) }) : Promise.resolve(null),
-        fetch('/api/optimizer', { method: 'POST', headers, body: JSON.stringify({ action: 'optimize', resumeText, ...body, remoteOk: /remote/i.test(ctx.pasted || job.description || '') }) }),
-      ])
+      // the free check answers in about a second and carries the rows; the probe (it builds the package) follows on its own
+      const probeP = step === 'choose' ? fetch('/api/resume', { method: 'POST', headers, body: JSON.stringify({ tool: 'optimize', probe: true, resume: resumeText, ...body }) }) : null
+      const dr = await fetch('/api/optimizer', { method: 'POST', headers, body: JSON.stringify({ action: 'optimize', resumeText, ...body, remoteOk: /remote/i.test(ctx.pasted || job.description || '') }) })
       const d = dr.ok ? await dr.json() as FreeDiagnosis : null
       if (d && d.verdict) setDiag(d)
+      const pr = probeP ? await probeP : null
       if (pr && pr.ok) { const p = await pr.json() as OptimizeResult; if (!p.cached && (p.charge || p.change_counts)) setProbe(p) }
     } catch { /* the rows keep the last answer the server gave */ }
   }

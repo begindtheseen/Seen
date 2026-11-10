@@ -226,9 +226,9 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
       </div>
 
       {pendingCheck ? (
-        <p className={styles.leftLine} role="status" data-testid="held-pending-check">
-          {plural(pendingCheck, 'report is', 'reports are')} still being checked against published reports for copies; they stay out of every bulk approve until checked.
-          <button type="button" className={styles.inlineLink} onClick={() => void list.refresh()}>Check again</button>
+        <p className={`${styles.leftLine} ${styles.hidePhone}`} role="status" data-testid="held-pending-check">
+          {plural(pendingCheck, 'report has', 'reports have')} not been checked against published reports yet; an approve checks them first and leaves out any copy.
+          <button type="button" className={styles.inlineLink} onClick={() => void list.refresh()}>Check now</button>
         </p>
       ) : null}
       {rows.length && (isFiltered || truncated) ? (

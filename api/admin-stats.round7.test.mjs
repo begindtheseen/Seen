@@ -82,11 +82,12 @@ test('the credit grant from the judge (F3): Retry after a slow first answer gran
   assert.equal(retry.jsonBody.replayed, true);
   assert.equal(fake.tables.ai_credits.find((c) => c.user_id === uid(1, '6')).balance, 12, 'balance 12, never 17');
   assert.equal(fake.tables.credit_transactions.filter((t) => t.reason === 'admin_grant').length, 1, 'one ledger row');
-  // A failed first try (no write) is NOT replayed: Retry runs it.
+  // A first try whose write answered 5xx (round 8: an unknown outcome, 504 retryable) — it did NOT land — Retry runs it.
   const f2 = createFakeRest({ tables: world(), rpcs: RPCS, faults: [{ match: '/ai_credits?user_id=eq.', method: 'PATCH', status: 500, times: 1 }] });
   const c2 = await caller(handler, f2);
   const failed = await c2({ ...body, request_id: 'press-grant-0002' });
-  assert.equal(failed.statusCode, 502);
+  assert.equal(failed.statusCode, 504);
+  assert.equal(failed.jsonBody.retryable, true);
   const again = await c2({ ...body, request_id: 'press-grant-0002' });
   assert.equal(again.statusCode, 200);
   assert.notEqual(again.jsonBody.replayed, true);

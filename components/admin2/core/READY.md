@@ -59,3 +59,16 @@ session (sign in → replay) and /admin/legacy checked against A1's real handler
   still offering that Undo.
 - **Narrow widths:** `SearchField` uses `placeholderShort` (or the placeholder cut at a whole word) under 560px; admin
   selects size to their label and take the full row on a phone.
+
+## Round 7 (server round 7 seams)
+- Every job call sends `{ request_id, round: n }` (one id per job run, `round` = the server's next round; a retry of a
+  lost round repeats the same number). A replay (`replayed: true, changed: 0, recorded_changed`) counts
+  `recorded_changed` once — the core sets `changed = recorded_changed` on any replay, so a single write's line shows the
+  recorded sentence and count, never "0 changed".
+- After a reload a job asks `job_status { kind }` (map `JOB_STATUS_KIND` in core/jobs.ts: purge_stale_jobs→clear_stale,
+  auto_merge→auto_merge, recompute_queue_drain→recompute, dedupe_reports→report_dupes, job_dupes_*/dedupe_jobs→job_dupes;
+  `JobSpec.statusKind` overrides). "Done" = saved total − remaining; with no kind or `remaining: null` it says "not known".
+- A second unit per round (`JobSpec.detail`, default `JOB_DETAIL.auto_merge = { field: 'merged', noun: 'companies' }`) is
+  summed and said beside the first: "Merged 69 groups (72 companies) in 2 rounds." Companies' auto-merge spec needs
+  nothing new.
+- 409 `in_progress` on a single write → "Checking" (re-ask with the same id), as for any unknown outcome.
