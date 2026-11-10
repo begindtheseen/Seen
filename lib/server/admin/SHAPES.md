@@ -259,11 +259,12 @@ Every pending row is read (keyset pages internally, no 1,000 cap; `truncated` tr
 - Each row carries
   `review.duplicate_check: 'done'|'pending'`; the list carries `duplicate_check: 'done'|'pending'` and
   `duplicate_check_pending` (how many rows). **`pending` means "not checked yet", never "not a duplicate"** — show it as
-  unchecked and re-read later. The list's check is the exact, indexed company-name match; `done` means that check covered
-  the row. A copy whose company name differs only in letter case or spacing ("walmart " vs "Walmart") can look clean in
-  the list: the bulk guard compares names trimmed and case-folded and skips it at approve time as `possible_duplicate`,
-  and its sentence says so ("… under a company name that differs only in letter case or spacing — the list showed it
-  as clean"); `review.duplicate_case_variant: true` marks such a row. The bulk guard re-checks the rows it would approve, exactly, at decision time, and skips
+  unchecked and re-read later. **One compare key** (`lib/server/reportReview.js duplicateKey`: company lower-cased with
+  whitespace collapsed and trimmed, outcome, text) is used by the held-vs-held check, the list's live check, its
+  remembered results and the bulk guard, and the list reads published reports with the same case-insensitive match as
+  the guard — so "home  depot" is a copy of "Home Depot" in the list, from the cache and at approve time alike (a cached
+  answer and a live answer are the same answer by construction). `review.duplicate_case_variant: true` marks a copy found
+  under the name written differently; the bulk sentence says "(N under the company name written differently)". The bulk guard re-checks the rows it would approve, exactly, at decision time, and skips
   anything it cannot verify as `not_checked_for_duplicates` ("N not checked for duplicates — try again"); a row its
   own check could not reach in its budget uses the list's remembered result, so with a warm cache `not_checked` is 0.
   `review_held` answers carry `not_checked: n` (that count) beside `skipped`.

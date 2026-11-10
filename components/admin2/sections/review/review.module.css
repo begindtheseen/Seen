@@ -89,8 +89,3 @@
 .x:hover { color: var(--text-1); background: var(--surface-2); }
 .leftLine { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-2); font-size: var(--fs-sm); color: var(--text-2); }
 .inlineLink { min-height: 44px; padding: 0 var(--sp-1); border: 0; background: transparent; color: var(--accent); font: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
-/* Desktop: the shell's result dock sits bottom-right, where the sticky bulk bar's buttons are; lift the bar above it
-   (until the core reserves that space itself). */
-@media (min-width: 768px) {
-  .panel { --admin-bottom-offset: calc(var(--sp-4) + 72px); }
-}

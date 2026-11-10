@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 import {
   KINDS, parseKind, kindCount, waitingLine, matchesHeldView, heldViewCounts, positiveIds, approvableIds, filterNote,
   pruneSelection, moderationFor, patchRows, sourceHref, when, newRequestId, ticketSummary, signalText, heldHasRules,
-  parseHeldView, label, snippet, outcomeTone, approvePlan, reviewQueues, nothingToPublishLine, tidyMessage, rulesReadings, outcomeWord, sourceWord,
+  parseHeldView, label, snippet, outcomeTone, approvePlan, reviewQueues, nothingToPublishLine, rulesReadings, outcomeWord, sourceWord,
 } from './adapter.ts'
 
 const row = (id, group, flags = [], extra = {}) => ({ id, company_name: 'Acme', outcome: group === 'positive' ? 'interview' : 'ghosted', review: { group, flags }, ...extra })
@@ -182,11 +182,6 @@ test('when nothing is left to publish, one line says what is left', () => {
   assert.equal(nothingToPublishLine(approvePlan(rows, 'positive')), 'No clear positives left · 1 possible duplicate')
 })
 
-test('a result sentence never repeats the status word beside it', () => {
-  assert.equal(tidyMessage('Undid it: 140 reports are back in the review queue.'), '140 reports are back in the review queue.')
-  assert.equal(tidyMessage('Approved 140 of 140.'), 'Approved 140 of 140.')
-  assert.equal(tidyMessage('Done: cleared 3.'), 'Cleared 3.')
-})
 
 test('the rules check is told both ways', () => {
   assert.deepEqual(rulesReadings({ verdict: 'passes', comment: false, post: true }), { comment: 'Read as a comment: fails.', post: 'Read as the post itself (its first sentence as the title): passes.' })

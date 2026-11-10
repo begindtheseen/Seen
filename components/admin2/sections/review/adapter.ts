@@ -487,13 +487,3 @@ export function nothingToPublishLine(plan: ApprovePlan): string {
   return `No clear positives left${left.length ? ` · ${left.join(' · ')}` : ''}`
 }
 
-/**
- * The status word beside a result line already says Done / Undone / Not done; a server sentence that
- * starts by saying it again ("Undid it: 140 reports…", "Done: …") loses that lead so it reads once:
- * "Undone — 140 reports are back in the review queue."
- */
-export function tidyMessage(message: string): string {
-  const m = String(message || '').replace(/^\s*(?:undid it|undone|done|success|ok|not done|failed)\s*[:—–-]\s*/i, '')
-  if (m === message) return message
-  return m ? m.charAt(0).toUpperCase() + m.slice(1) : message
-}

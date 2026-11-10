@@ -7,9 +7,9 @@ import { useEffect, useRef, type ReactNode } from 'react'
 import Icon from '@/components/ui/Icon'
 import Button from '@/components/ui/Button'
 import type { Job } from '../../core/jobs.ts'
-import { KeyHint, StatusChip } from '../../ui/bits.tsx'
+import { KeyHint, StatusChip, checkingText, isChecking, type Checking } from '../../ui/bits.tsx'
 import ResultLine, { type ResultLineProps } from '../../ui/ResultLine.tsx'
-import { fmt, tidyMessage, type KindKey, type Tone } from './adapter.ts'
+import { fmt, type KindKey, type Tone } from './adapter.ts'
 import styles from './review.module.css'
 
 /** Keep the chosen chip in view inside a sideways-scrolling row — horizontally only, never the page. */
@@ -60,14 +60,14 @@ export function KindChips({ chips, value, onChange }: { chips: KindChip[]; value
 
 /** A short choice (status / saved filter) — chips with optional counts. */
 export function Choice({ options, value, onChange, label, testId }: {
-  options: Array<{ value: string; label: string; count?: number | null }>; value: string; onChange: (v: string) => void; label: string; testId?: string
+  options: Array<{ value: string; label: string; count?: number | null; checking?: Checking | null }>; value: string; onChange: (v: string) => void; label: string; testId?: string
 }) {
   const ref = useActiveInView(value)
   return (
     <div ref={ref} className={styles.choice} role="group" aria-label={label} data-testid={testId}>
       {options.map((o) => (
         <button key={o.value} type="button" className={`ui-chip ${styles.choiceChip}`} aria-pressed={o.value === value} onClick={() => onChange(o.value)} data-testid={testId ? `${testId}-${o.value}` : undefined}>
-          {o.label}{typeof o.count === 'number' ? <span className={styles.kindCount}>{fmt(o.count)}</span> : null}
+          {o.label}{isChecking(o.checking) ? <span className={styles.kindCount}>{checkingText(o.checking)}</span> : typeof o.count === 'number' ? <span className={styles.kindCount}>{fmt(o.count)}</span> : null}
         </button>
       ))}
     </div>
@@ -130,12 +130,9 @@ export function Facts({ rows }: { rows: Array<[string, ReactNode] | null | false
   )
 }
 
-/** ResultLine, with the server's sentence tidied so it never repeats the status word beside it. */
+/** ResultLine (the core words the status; server sentences arrive final). */
 export function Line(props: ResultLineProps) {
-  const st = props.state
-  const msg = st.result?.message
-  const state = msg && tidyMessage(msg) !== msg ? { ...st, result: { ...st.result!, message: tidyMessage(msg) } } : st
-  return <ResultLine {...props} state={state} />
+  return <ResultLine {...props} />
 }
 
 /**

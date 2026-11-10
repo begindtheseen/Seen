@@ -189,3 +189,50 @@ test('undo of 300 rejections in rounds: a lost round is re-sent with the same nu
     assert.equal(st2.undone, true);
   } finally { system.UNDO_TUNING.roundMs = prev; }
 });
+
+// ── follow-up: one compare key for the live check and the remembered one ─────────────────────────
+const heldRow = (n, company, hoursAgo, extra = {}) => ({ id: uid(n, '61'), company_name: company, outcome: 'interview', role: 'Cashier', platform: 'Indeed', source: 'external', created_at: ago(hoursAgo * 3600e3), report_text: 'Applied online, phone screen in a week, then an in-store interview with the manager', outcome_weight: 0.55, trust_reason: 'external_import', needs_review: true, ...extra });
+
+test('"Home Depot" / "home  depot" held twice: the cached path marks the later copy; approve-all-positive with a no-budget guard publishes one and names the other', async () => {
+  resetDupMemory();
+  const { fake, call } = await rig((T) => { T.reports = [heldRow(1, 'Home Depot', 5), heldRow(2, 'home  depot', 1)]; }, {}, { held: 0, liveReports: 0 });
+  const prev = review.LIVE_CHECK.listBudgetMs, gPrev = review.LIVE_CHECK.guardBudgetMs;
+  try {
+    await call({ action: 'list_held_reports' }); // warm the cache
+    review.LIVE_CHECK.listBudgetMs = -1;
+    const l = (await call({ action: 'list_held_reports' })).jsonBody;
+    assert.equal(l.checked.complete, true, 'answered from the cache');
+    const copy = l.rows.find((r) => r.id === uid(2, '61'));
+    const orig = l.rows.find((r) => r.id === uid(1, '61'));
+    assert.ok(copy.review.flags.includes('possible_duplicate'), 'the later copy is marked');
+    assert.ok(!orig.review.flags.includes('possible_duplicate'), 'the oldest is not');
+    assert.equal(l.counts.clear_positives, 1);
+    review.LIVE_CHECK.guardBudgetMs = -1;
+    const a = await call({ action: 'review_held', decision: 'approve', scope: 'all', group: 'positive' });
+    assert.equal(a.statusCode, 200, JSON.stringify(a.jsonBody));
+    assert.equal(a.jsonBody.changed, 1);
+    assert.equal(a.jsonBody.not_checked, 0);
+    assert.deepEqual(a.jsonBody.skipped.filter((s) => s.reason === 'possible_duplicate').map((s) => s.ids), [[uid(2, '61')]]);
+    assert.equal(fake.tables.reports.find((r) => r.id === uid(1, '61')).needs_review, false, 'the original is published');
+    assert.equal(fake.tables.reports.find((r) => r.id === uid(2, '61')).needs_review, true, 'the copy stays held');
+  } finally { review.LIVE_CHECK.listBudgetMs = prev; review.LIVE_CHECK.guardBudgetMs = gPrev; }
+});
+
+test('held "home  depot" copying a PUBLISHED "Home Depot" report: the remembered answer equals the live one, and the no-budget guard skips it', async () => {
+  resetDupMemory();
+  const { call } = await rig((T) => { T.reports = [heldRow(9, 'Home Depot', 9, { needs_review: false, trust_reason: null }), heldRow(3, 'home  depot', 1), heldRow(4, 'Lowe’s', 1, { report_text: 'A different account entirely, with its own words' })]; }, {}, { held: 0, liveReports: 0 });
+  const prev = review.LIVE_CHECK.listBudgetMs, gPrev = review.LIVE_CHECK.guardBudgetMs;
+  try {
+    const live = (await call({ action: 'list_held_reports' })).jsonBody;
+    review.LIVE_CHECK.listBudgetMs = -1;
+    const cached = (await call({ action: 'list_held_reports' })).jsonBody;
+    const flag = (l) => l.rows.find((r) => r.id === uid(3, '61')).review.flags.includes('possible_duplicate');
+    assert.equal(flag(live), true, 'the live read finds the published original');
+    assert.equal(flag(cached), true, 'the remembered answer is the same answer');
+    assert.deepEqual(cached.counts, live.counts);
+    review.LIVE_CHECK.guardBudgetMs = -1;
+    const a = (await call({ action: 'review_held', decision: 'approve', scope: 'all', group: 'positive' })).jsonBody;
+    assert.equal(a.changed, 1, 'only the clean Lowe’s account');
+    assert.deepEqual(a.skipped.filter((s) => s.reason === 'possible_duplicate').map((s) => s.ids), [[uid(3, '61')]]);
+  } finally { review.LIVE_CHECK.listBudgetMs = prev; review.LIVE_CHECK.guardBudgetMs = gPrev; }
+});

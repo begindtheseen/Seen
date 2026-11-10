@@ -11,7 +11,7 @@ import type { AdminOk } from '../../contract.ts'
 import { useAdminAction, useAdminJobs, useRuntime, type ListView } from '../../core/hooks.tsx'
 import { useUrlFilter } from '../../core/place.ts'
 import { useShell } from '../../core/shellContext.ts'
-import { SearchField } from '../../ui/bits.tsx'
+import { SearchField, checkingText, type Checking } from '../../ui/bits.tsx'
 import ConfirmStep from '../../ui/ConfirmStep.tsx'
 import { BulkBar, List, Row, RowActions } from '../../ui/List.tsx'
 import { EmptyState } from '../../ui/states.tsx'
@@ -68,15 +68,22 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
   const filtered = useMemo(() => rows.filter((r) => matchesHeldView(r, view) && matchesQuery(heldSearchFields(r), q)), [rows, view, q])
   const isFiltered = view !== 'all' || !!q.trim()
   const shown = filtered.slice(0, limit)
-  const pendingCheck = useMemo(() => rows.filter((r) => r.review?.duplicate_check === 'pending').length, [rows])
-  // While the server still has rows to check for copies, read the list again a few times so the counts settle.
-  const recheck = useRef(0)
+  // THE count, from the server's answer (round 10): `counts.clear_positives` is what "Approve all positive" publishes,
+  // and `checked` says whether every row has been compared with published reports. While it has not, nothing shows a
+  // number that could still move: the button, the chips and the bulk bar say the server's "checking N more" label and
+  // Review re-reads (each read continues from the server's remembered checks) until it is complete.
+  const answer = list.data as { counts?: { clear_positives?: number; possible_duplicates?: number; unchecked?: number }; checked?: { n: number; of: number; complete: boolean; label?: string } } | undefined
+  const checkedInfo = answer?.checked
+  const checking: Checking | null = checkedInfo && !checkedInfo.complete ? { checked: checkedInfo.n, total: checkedInfo.of } : null
+  const serverClear = typeof answer?.counts?.clear_positives === 'number' ? answer.counts.clear_positives : null
+  const serverDupes = typeof answer?.counts?.possible_duplicates === 'number' ? answer.counts.possible_duplicates : null
+  const rereads = useRef(0)
   useEffect(() => {
-    if (!pendingCheck || recheck.current >= 10 || list.fetching) return
-    const t = setTimeout(() => { recheck.current += 1; void list.refresh() }, 4000)
+    if (!checking || list.fetching || rereads.current >= 30) return
+    const t = setTimeout(() => { rereads.current += 1; void list.refresh() }, 2000)
     return () => clearTimeout(t)
-  }, [pendingCheck, list.fetching]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (!pendingCheck) recheck.current = 0 }, [pendingCheck])
+  }, [checking?.checked, checking?.total, list.fetching]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!checking) rereads.current = 0 }, [checking])
   const positivePlan = useMemo(() => approvePlan(rows, 'positive'), [rows])
   const selectionPlan = useMemo(() => approvePlan(rows, 'selection', selected, picked), [rows, selected, picked])
 
@@ -168,7 +175,13 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
     searchRef,
   })
 
-  const viewOptions = HELD_VIEWS.filter((v) => v.value !== 'rules_fail' || hasRules).map((v) => ({ value: v.value, label: v.label, count: counts[v.value] }))
+  const viewOptions = HELD_VIEWS.filter((v) => v.value !== 'rules_fail' || hasRules).map((v) => ({
+    value: v.value, label: v.label,
+    // the two counts the copy check decides come from the server's own counts (one source), and wait while checking
+    count: v.value === 'positive' && serverClear != null ? serverClear : v.value === 'duplicates' && serverDupes != null ? serverDupes : counts[v.value],
+    checking: v.value === 'positive' || v.value === 'duplicates' ? checking : null,
+  }))
+  const clearCount = serverClear ?? positivePlan.ids.length
   const setView = (v: string) => { setViewRaw(v === 'all' ? '' : v); setLimit(PAGE) }
   const skipLinks = {
     possible_duplicate: { label: 'Review them', onSelect: () => setView('duplicates') },
@@ -197,12 +210,16 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
 
       {rows.length ? (
         <div className={styles.actions}>
-          {positivePlan.ids.length && confirmApprove !== 'positive' ? (
+          {checking ? (
+            <Button variant="primary" icon="check" disabled data-testid="held-approve-positive" aria-busy="true">
+              Approve all positive — {checkedInfo?.label || checkingText(checking)}
+            </Button>
+          ) : clearCount && confirmApprove !== 'positive' ? (
             <Button variant="primary" icon="check" onClick={() => setConfirmApprove('positive')} disabled={decide.busy('bulk')} data-testid="held-approve-positive">
-              Approve all positive ({fmt(positivePlan.ids.length)})
+              Approve all positive ({fmt(clearCount)})
             </Button>
           ) : null}
-          {!positivePlan.ids.length ? (
+          {!checking && !clearCount ? (
             <p className={styles.leftLine} data-testid="held-nothing-positive">
               {nothingToPublishLine(positivePlan)}
               {positivePlan.heldBack.duplicates ? <button type="button" className={styles.inlineLink} onClick={() => setView('duplicates')}>Review the duplicates</button> : null}
@@ -233,12 +250,6 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
         {recomputeJob ? <RecomputeLine job={recomputeJob} queued={recomputeQueued} onCancel={() => jobs.cancel(recomputeJob.id)} onResume={() => jobs.resume(recomputeJob.id)} onDismiss={() => jobs.dismiss(recomputeJob.id)} /> : null}
       </div>
 
-      {pendingCheck ? (
-        <p className={`${styles.leftLine} ${styles.hidePhone}`} role="status" data-testid="held-pending-check">
-          {plural(pendingCheck, 'report has', 'reports have')} not been checked against published reports yet: they stay out of Approve all positive until checked (a selection is checked when you approve it).
-          <button type="button" className={styles.inlineLink} onClick={() => void list.refresh()}>Check now</button>
-        </p>
-      ) : null}
       {rows.length && (isFiltered || truncated) ? (
         <p className={styles.note} data-testid="held-note">
           {filterNote(filtered.length, rows.length, { total: list.total, truncated, filtered: isFiltered, noun: 'held reports' })}
@@ -305,7 +316,7 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
         </div>
       ) : null}
 
-      <BulkBar count={selected.size} noun={selected.size === 1 ? 'report' : 'reports'} onClear={clearSelection}>
+      <BulkBar count={selected.size} noun={selected.size === 1 ? 'report' : 'reports'} onClear={clearSelection} checking={checking}>
         {confirmApprove === 'selection' ? (
           <ConfirmStep
             inline
