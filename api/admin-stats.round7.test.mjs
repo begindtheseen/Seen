@@ -177,7 +177,7 @@ test('sentences the server writes: held queue name, merge names, flag words', as
   await call({ action: 'merge', primary: 'walmart', secondary: 'walmart inc' });
   const log = (await call({ action: 'activity_log' })).jsonBody.rows;
   const m = log.find((r) => r.action === 'merge_companies');
-  assert.equal(m.summary, 'Merged walmart inc into walmart');
+  assert.equal(m.summary, 'Merged Walmart Inc into Walmart', 'display names, not stored keys (round 9)');
   assert.ok(!log.some((r) => r.action === 'request_result'), 'idempotency records are not activity');
   const rows = (await call({ action: 'list_held_reports' })).jsonBody.rows;
   assert.ok(rows.every((r) => r.outcome_label && r.source_label));

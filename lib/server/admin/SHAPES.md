@@ -157,6 +157,8 @@ Newest first, keyset (`next` → `after`). `filter_action` filters exactly; `tar
 Logins are hidden unless `include_logins: true` (the hourly automated login is most of the table). A bulk decision
 shows as its one batch row (`review_held`, whose Undo covers every report); the per-report rows appear with
 `include_batch_rows: true`, or when filtering by action or target.
+Company names in a summary are display names (`lib/companyNames.js displayCompanyName`), never the stored lower-case
+keys: "Merged Beacon Group into Beacon Holdings". The same holds for the merge / separate / undo-merge answers.
 `undoable` is true for: `review_held` (bulk), `approve_held_report`/`reject_held_report`, `*_report` moderation
 (approve/reject/hold/restore), `merge_companies` / `auto_merge_pair`, `delete_listing`, `dismiss_inactive_report`,
 `set_pro_window`, `set_flag`, `update_reddit_dispute`, `resolve_issue`/`dismiss_issue`, `update_cluster`,
@@ -429,8 +431,11 @@ SourceRow: `{ source, live, added_24h, added_today, last_seen, failing: boolean|
 
 ## Companies
 
-### `companies_list` `{ q?, after?, limit? }` → `AdminList<CompanyRow>`
+### `companies_list` `{ q?, after?, limit? }` → `AdminList<CompanyRow>` + `total`, `total_label` (first page)
 CompanyRow: `{ id, name, overall_score, report_count, ghost_rate, response_rate }`. Ordered by name; `q` = contains.
+`total` = the exact number of `company_scores` rows matching `q` (a Content-Range count — never the page length;
+`null` when the count could not be read); `total_label` = "companies with a score" (or "… matching the search").
+Sent on the first page only (absent when `after` is given).
 ### `company_detail` `{ name }` → `AdminOk` `rows:[{ score: CompanyRow & {…all score columns}, reports_total, held, merges: MergeRow[], perks }]`
 ### `company_recompute` `{ name }` → `AdminOk` (`changed`: 1 when a score row was written). Touched `company:<name>, companies`.
 ### `find_duplicates` `{}` → `AdminList<{ key, auto, companies:[{id,name,report_count,overall_score}] }>` + `duplicates`, `total`
@@ -457,13 +462,18 @@ Sentence: "Merged 57 groups (60 companies) · 12 groups left." A summary over ro
 
 ## People
 
-### `users_list` `{ q?, filter?: "all"|"pro"|"new_today"|"new_week", after?, limit? }` → `AdminList<UserRow>`
+### `users_list` `{ q?, filter?: "all"|"pro"|"free"|"new_today"|"new_week", after?, limit? }` → `AdminList<UserRow>`
 ```json
 { "ok": true, "total": 23, "next": "…", "rows": [ { "id": "5f0c…", "email": "jo@example.com",
   "created_at": "…", "pro_until": "2026-11-24T00:00:00.000Z", "pro_active": true, "comped": false,
   "balance": 7 } ] }
 ```
 Server-side search over every profile (email contains, or an exact user id). `pro` = an active `pro_until`.
+`free` = no active Pro window (`pro` true or `pro_until` in the future) AND no purchase on the ledger
+(`credit_transactions.reason` like `purchase_*`); welcome, earned and admin-granted credits do not make an account
+paid. The answer carries `label` (that definition, in words) and `filter:"free"`; `total` is exact (every profile,
+holder and purchaser read by keyset pages), on every page; same order and cursor as the other filters. A failed or
+incomplete read is 502 `upstream`, never a short list.
 ### `user_detail` `{ user_id }` → `AdminOk` `rows:[UserRow & { ledger: [{ delta, reason, note, by, created_at }], credits_earned: number|null, credits_spent: number|null, signup_source: SignupSource|null, applications: number|null, reports: number|null }]`
 SignupSource (from `signup_attribution`; null when the account has no row or before that migration):
 `{ landing_path, referrer_host, utm_source, utm_medium, utm_campaign, ref_code, first_seen_at, landing_group, referrer_group }`.
@@ -524,6 +534,25 @@ it answers its own JSON: `{ ok, found, upserted, inserted, updated, failed_batch
 
 ### `revenue_funnel` `{ days? }` (POST alias of the GET). `search_opportunities` (unchanged).
 ### `recent_events` `{ since }` — unchanged (`events`, `server_time`).
+### `top_searched` `{ limit? (1–50, default 10) }` → `AdminList<{ query, key, count }>` — most searched, last 7 days
+Reads `search_logs` (the /jobs searches) for the last 7 days by keyset pages, newest first, and counts by the
+trimmed, lower-cased query (`query` = its most common written form). `searches_read` = rows counted;
+`searches_total` = the week's exact count (Content-Range; null if unreadable); `distinct`; `complete` = every row of
+the week was read. Bounded at 100,000 rows / 15 s: then `complete:false` and `label` = "from the newest N searches of
+the last 7 days" (else "searches in the last 7 days (all N)"). These are search queries (job titles or company names
+as typed), not resolved companies. Table missing → `ok`, `ready:false`, no rows.
+```json
+{ "ok": true, "rows": [ { "query": "Cashier", "key": "cashier", "count": 1500 } ], "total": 1,
+  "searches_read": 2500, "searches_total": 2500, "complete": true, "distinct": 2,
+  "label": "searches in the last 7 days (all 2,500)", "message": "2,500 searches read · 2 different queries." }
+```
+### `enrichment_queue_stats` `{}` → `AdminOk` `rows:[EnrichmentQueueRow]`
+`company_enrichment_queue` (statuses queued | running | done | empty | error). Every number is an exact
+Content-Range count, `null` when that one count could not be read:
+`{ ready:true, waiting (queued), running, done_today (done or empty, done_at since midnight PT), failed (now in error),
+oldest_waiting_at, oldest_waiting_age_s, oldest_waiting_company (display name), labels:{waiting,running,done_today,failed} }`.
+Message: "1,201 waiting · 2 running · 5 done today · 3 failed · oldest waiting 3 hours." Oldest row unreadable →
+`skipped:[{reason:'oldest_unreadable'}]`. Table missing → `rows:[{ ready:false }]`.
 ### `export_csv` `{}` → `AdminOk` + `{ csv, filename }` (no subscription lines; counts are exact counts).
 ### `get_kpi_detail` `{ metric }` — legacy (rows ≤100), kept for `/admin/legacy`.
 

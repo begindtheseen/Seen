@@ -163,6 +163,8 @@ test('system', async () => {
   await run('search_opportunities', { action: 'search_opportunities' }, either, null);
   await run('list_growth_rewards', { action: 'list_growth_rewards' }, ok);
   await run('recent_events', { action: 'recent_events' }, ok);
+  await run('top_searched', { action: 'top_searched' }, lst());
+  await run('enrichment_queue_stats', { action: 'enrichment_queue_stats' }, ok);
   await run('export_csv', { action: 'export_csv' }, ok);
   await run('get_kpi_detail', { action: 'get_kpi_detail', metric: 'total_accounts' }, lst());
   await run('list_subscriptions', { action: 'list_subscriptions' }, lst());
