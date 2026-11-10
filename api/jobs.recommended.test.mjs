@@ -227,10 +227,14 @@ test('a job the person already applied to is not offered again; an application a
   assert.equal(res.body.jobs.length, 2);
 });
 
-test('summaries: the rail shows a teaser only for the person\'s own current title, marked summary_only', async () => {
-  state.jobsRows = [jobRow(1, { source: 'Adzuna', description: 'Hotel 1 is hiring a valet attendant to park guest cars at our downtown hotel…' })];
+test('summaries: the rail shows a teaser only for a job the person holds or held at the same level, marked summary_only', async () => {
+  // round 8 (director, class 2): the same title at the same level as a job held — even one that ended — may show
+  // as a summary, and the reason says the full listing could not be read; a different job type on a summary never.
+  state.jobsRows = [jobRow(1, { source: 'Adzuna', description: 'Hotel 1 is hiring a valet attendant to park guest cars at our downtown hotel…' }), jobRow(2, { title: 'Bellhop', source: 'Adzuna', description: 'Hotel 2 is hiring a bellhop for our downtown hotel…' })];
   let res = await call();
-  assert.deepEqual(res.body.jobs, [], 'her valet job ended in 2025: a summary is not enough');
+  assert.equal(res.body.jobs.length, 1, JSON.stringify(res.body.jobs.map((j) => j.title)));
+  assert.equal(res.body.jobs[0].summary_only, true);
+  assert.match(res.body.jobs[0].match_reason, /You were a Valet Attendant at Towne Park .*Seen could only read a summary of this listing\./);
   state.resumeText = RESUME.replace('Oct 2022 – Jan 2025', 'Oct 2022 – Present');
   res = await call();
   assert.equal(res.body.jobs.length, 1);

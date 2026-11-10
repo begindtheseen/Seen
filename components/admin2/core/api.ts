@@ -112,7 +112,9 @@ export function toResult<T = Record<string, unknown>>(status: number, text: stri
   return {
     ...(json as object),
     ok: true,
-    changed: num(json.changed),
+    // A replay (same request_id, same round) answers the RECORDED response with changed 0 + recorded_changed:
+    // what that press really changed is recorded_changed — count it once, show the recorded sentence.
+    changed: json.replayed === true && typeof json.recorded_changed === 'number' ? json.recorded_changed : num(json.changed),
     skipped: Array.isArray(json.skipped) ? json.skipped as AdminOk['skipped'] : [],
     touched: Array.isArray(json.touched) ? (json.touched as unknown[]).filter((t) => typeof t === 'string') as string[] : [],
     message: typeof json.message === 'string' ? json.message : '',

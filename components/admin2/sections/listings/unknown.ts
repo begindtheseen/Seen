@@ -5,6 +5,6 @@ import type { AdminErr } from '../../contract.ts'
 
 export function isUnknownAnswer(err: AdminErr | undefined): boolean {
   if (!err) return false
-  if (err.code === 'timeout' || err.code === 'network') return true
+  if (err.code === 'timeout' || err.code === 'network' || err.code === 'unknown_outcome' || err.code === 'in_progress') return true
   return /not known whether|may still finish|could not be read \(HTTP 2/i.test(err.error || '')
 }

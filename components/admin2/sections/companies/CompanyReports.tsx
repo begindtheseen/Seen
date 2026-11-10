@@ -25,20 +25,16 @@ export default function CompanyReports({ name, onOpenReport }: { name: string; o
   const [state, setState] = useState('')
   const key = `reports?company=${name.toLowerCase()}&state=${state}`
   const list = useAdminList<ReportRow>(key, ({ after }) => api<AdminList<ReportRow>>('reports_recent', { q: name, state: state || undefined, after: after || undefined, limit: 25 }), { staleMs: 30_000 })
-  // A decision can move the row out of the current filter; its result line (and Undo) then stays up here.
-  const [last, setLast] = useState<string | null>(null)
-  const mod = useAdminAction('moderate_report', { onSettled: (_res, args) => setLast(String(args.id)) })
+  // A decision can move the row out of the current filter: <List actions> keeps its slot as the result line with Undo.
+  const mod = useAdminAction('moderate_report', { dock: false })
   const act = (r: ReportRow, decision: string) => { void mod.run({ id: r.id, decision }, r.id) }
   return (
     <div className={styles.itemPart} data-testid="co-reports">
       <h3 className={styles.h2}>Reports</h3>
       <p className={styles.quiet}>Every report filed under a name containing “{displayName(name)}”, newest first. Approve makes a held report public; Hold takes a live one back to Review; Reject hides it and takes it out of the grade; Restore undoes a rejection.</p>
       <FilterChips label="Report state" value={state} onChange={setState} options={STATES} />
-      {last && !list.rows.some((r) => r.id === last) && mod.state(last).status !== 'idle' ? (
-        <ResultLine state={mod.state(last)} onUndo={() => mod.undo(last)} onRetry={() => mod.retry(last)} onDismiss={() => { mod.dismiss(last); setLast(null) }} />
-      ) : null}
       <List<ReportRow>
-        rows={list.rows} idOf={(r) => r.id} noun="reports" loading={list.loading} error={list.error} onRetry={() => void list.refresh()}
+        rows={list.rows} idOf={(r) => r.id} noun="reports" actions={[mod]} loading={list.loading} error={list.error} onRetry={() => void list.refresh()}
         hasMore={list.hasMore} loadingMore={list.loadingMore} onLoadMore={() => void list.loadMore()} newCount={list.newCount} onShowNew={list.showNew}
         empty={<EmptyState icon="file-text" title={state ? `No ${WORD[state]?.toLowerCase() || state} reports under this name.` : 'No reports under this name.'} />}
         renderRow={(r) => {

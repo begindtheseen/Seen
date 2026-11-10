@@ -73,3 +73,8 @@
 .barTrack { grid-column: 1 / -1; position: relative; height: 4px; border-radius: var(--r-pill); background: var(--surface-3); overflow: hidden; }
 .barFill { position: absolute; inset: 0; background: var(--text-3); transform-origin: left center; }
 .barNum { color: var(--text-1); font-weight: 600; }
+
+/* A finished job's line (the server's sentence). */
+.doneLine { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3); border-radius: var(--r-control); border: 1px solid var(--good-line); background: var(--good-tint); font-size: var(--fs-sm); line-height: var(--lh-ui); }
+.doneWord { display: inline-flex; align-items: center; gap: var(--sp-1); font-weight: 600; color: var(--good-text); white-space: nowrap; }
+.doneText { flex: 1 1 220px; min-width: 0; color: var(--text-2); overflow-wrap: anywhere; }

@@ -21,7 +21,7 @@ export default function ClusterItem({ kind, id, setTitle, open }: ItemViewProps)
   const raw = Array.isArray(q.data?.rows) ? (q.data!.rows as Record<string, unknown>[])[0] : undefined
   const c = raw ? readCluster(raw) : null
   useEffect(() => { if (c) setTitle(`${fmt(c.users.length)} ${c.users.length === 1 ? 'account' : 'accounts'} that look like one person`, `cluster ${c.id} · risk ${c.risk ?? 'unknown'}`) }, [c?.id, c?.users.length, c?.risk, setTitle]) // eslint-disable-line react-hooks/exhaustive-deps
-  const save = useAdminAction('update_cluster')
+  const save = useAdminAction('update_cluster', { dock: false })
   const [status, setStatus] = useState('')
   const [note, setNote] = useState('')
   useEffect(() => { if (c) { setStatus(c.status); setNote(c.note || '') } }, [c?.status, c?.note]) // eslint-disable-line react-hooks/exhaustive-deps

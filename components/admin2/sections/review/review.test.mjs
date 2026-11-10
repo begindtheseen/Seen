@@ -123,6 +123,7 @@ test('every press gets a fresh uuid request id (the server ignores anything else
 test('words: tickets, signals, labels, snippets, tones', () => {
   assert.equal(ticketSummary({ job_id: 'j', reports: { count: 3, expired: 2, unknown: 1 }, dispute: { id: 1, kind: 'still_active', status: 'open' } }), "3 seeker reports (2 say it's closed) · employer dispute: still active")
   assert.equal(ticketSummary({ job_id: 'j' }), 'No reports left')
+  assert.match(ticketSummary({ job_id: 'j', reports: { count: 1, expired: 1, unknown: 0 } }), /1 says it's closed/)
   assert.equal(signalText({ shared_ip: '203.0.113.4', accounts: 3 }), 'shared ip 203.0.113.4 · accounts 3')
   assert.equal(label('interview_received'), 'Interview received')
   assert.equal(snippet('a'.repeat(200), 20).length, 20)
@@ -206,4 +207,22 @@ test('outcomes and sources print in the site\'s words, never the raw enum', () =
   assert.equal(outcomeWord({}), 'No outcome')
   assert.equal(sourceWord({ source_label: 'Imported · LinkedIn', platform: 'LinkedIn' }), 'Imported · LinkedIn')
   assert.equal(sourceWord({ platform: 'Indeed' }), 'Indeed')
+})
+
+test('ONE Review number: the total equals the sum of the Review kinds shown (account clusters are People\'s)', () => {
+  const ov = { queues: [
+    { key: 'held_reports', label: 'Held reports', count: 343, section: 'review' },
+    { key: 'listing_tickets', label: 'Listing tickets', count: 24, section: 'review' },
+    { key: 'reddit_disputes', label: 'Reddit disputes', count: 4, section: 'review' },
+    { key: 'employer_claims', label: 'Employer claims', count: 4, section: 'review' },
+    { key: 'employer_replies', label: 'Employer replies', count: 4, section: 'review' },
+    { key: 'purchases_to_fulfil', label: 'Purchases to fulfil', count: 2, section: 'review' },
+    { key: 'data_issues', label: 'Data issues', count: 8, section: 'review' },
+    { key: 'account_clusters', label: 'Account clusters', count: 4, section: 'people' },
+  ] }
+  const shown = KINDS.map((k) => kindCount(k.key, ov)).filter((n) => typeof n === 'number').reduce((a, b) => a + b, 0)
+  const total = reviewQueues(ov).reduce((a, q) => a + (q.count || 0), 0)
+  assert.equal(shown, 389)
+  assert.equal(total, shown)
+  assert.equal(waitingLine(reviewQueues(ov)), '389 decisions are waiting.')
 })

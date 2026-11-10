@@ -31,7 +31,19 @@ export type JobSpec = {
   initial?: { changed: number; remaining: number | null; cursor?: string }
   /** The whole job's size when known up front ("58 company scores"). Later rounds' `remaining` keep it current. */
   total?: number
+  /** A second unit the server counts per round, summed and said beside the first: { field: 'merged', noun: 'companies' }. */
+  detail?: { field: string; noun: string }
+  /** The server's `job_status` kind for this job (defaults from JOB_STATUS_KIND by action). */
+  statusKind?: string
 }
+
+/** Which `job_status { kind }` reads the truth for a job action after a reload (SHAPES.md). No kind → "not known". */
+export const JOB_STATUS_KIND: Record<string, string> = {
+  purge_stale_jobs: 'clear_stale', auto_merge: 'auto_merge', recompute_queue_drain: 'recompute',
+  dedupe_reports: 'report_dupes', job_dupes_remove: 'job_dupes', job_dupes_scan: 'job_dupes', dedupe_jobs: 'job_dupes',
+}
+/** A second unit some job actions count per round (summed across rounds and said in both units). */
+export const JOB_DETAIL: Record<string, { field: string; noun: string }> = { auto_merge: { field: 'merged', noun: 'companies' } }
 
 /** The contract's job state plus what the core needs to resume and to summarise. Extra fields are optional. */
 export type Job = AdminJobState & {
@@ -59,6 +71,13 @@ export type Job = AdminJobState & {
   request_id?: string | null
   /** The Undo was started (as its own job). */
   undone?: boolean
+  /** The id every round of THIS run sends (with `round`), so a lost answer's retry is replayed, never re-run. */
+  rid?: string
+  /** Rounds the server answered (the next call is round `round_no + 1`; a retry of a lost round repeats it). */
+  round_no?: number
+  detail?: { field: string; noun: string }
+  detail_total?: number
+  status_kind?: string
   /** This job IS an Undo of that audit id (finishing it clears every line still offering that Undo). */
   undo_of?: string
   /** After a reload: the server is being asked what was really done before anything is said. */
@@ -71,6 +90,10 @@ export const JOB_LIMITS = { maxRounds: 120, budgetMs: 15 * 60_000, maxLostInARow
 export const JOBS_STORAGE_KEY = 'seen_admin_jobs_v1'
 
 const TRANSIENT = new Set(['timeout', 'network', 'upstream'])
+function newRid(): string {
+  try { if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID().replace(/-/g, '') } catch { /* fall through */ }
+  return `j${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`
+}
 const fmt = (n: number) => Math.round(n).toLocaleString('en-US')
 
 export function jobKey(action: string, args?: Record<string, unknown>): string {
@@ -96,7 +119,7 @@ function skippedText(skipped: AdminSkipped[]): string {
 
 /** The one-line summary for a finished, stopped or failed job. */
 export function jobSummary(j: Job, lastMessage = ''): string {
-  const did = `${j.past} ${fmt(j.changed)} ${j.noun}`
+  const did = `${j.past} ${fmt(j.changed)} ${j.noun}${j.detail && typeof j.detail_total === 'number' ? ` (${fmt(j.detail_total)} ${j.detail.noun})` : ''}`
   const skip = skippedText(j.skipped)
   const left = typeof j.remaining === 'number' && j.remaining > 0 ? `${fmt(j.remaining)} left` : ''
   const tail = [skip, left].filter(Boolean).join(' · ')
@@ -181,12 +204,15 @@ export function createJobManager(deps: {
     try { t = deps.statusRead ? await deps.statusRead(j) : null } catch { t = null }
     const cur = jobs.get(id)
     if (!cur || !cur.checking) return
+    // "Done" is computed, never guessed: the saved size minus what the server says is left.
+    const doneFrom = (rem: number | null) => t?.done ?? (typeof cur.total === 'number' && typeof rem === 'number' ? Math.max(cur.changed, cur.total - rem) : cur.changed)
     if (t && (t.complete || t.remaining === 0)) {
-      const done: Job = { ...cur, checking: false, status: 'done', resumable: false, remaining: 0, changed: t.done ?? cur.changed, ended_at: new Date(now()).toISOString() }
-      done.message = `Finished on the server while the page was closed. ${jobSummary(done)}`
+      const changed = doneFrom(0)
+      const done: Job = { ...cur, checking: false, status: 'done', resumable: false, remaining: 0, changed, ended_at: new Date(now()).toISOString() }
+      done.message = changed > 0 ? `Finished on the server while the page was closed. ${jobSummary(done)}` : 'Finished on the server while the page was closed — nothing is left to do.'
       jobs.set(id, done)
     } else {
-      const stopped: Job = { ...cur, checking: false, resumable: true, ...(t ? { remaining: t.remaining, changed: t.done ?? cur.changed } : {}) }
+      const stopped: Job = { ...cur, checking: false, resumable: true, ...(t && typeof t.remaining === 'number' ? { remaining: t.remaining, changed: doneFrom(t.remaining) } : {}) }
       stopped.message = jobSummary(stopped)
       jobs.set(id, stopped)
     }
@@ -223,7 +249,9 @@ export function createJobManager(deps: {
         jobs.set(id, paused); persist(); emit()
         return
       }
-      const body = { ...j.args, ...(j.cursor ? { cursor: j.cursor } : {}) }
+      // One request_id for the job, the round number naming each round: a retry of a lost round repeats the
+      // same round number, so the server replays its recorded answer instead of doing the round twice.
+      const body = { ...j.args, request_id: (j.args.request_id as string | undefined) || j.rid, round: (j.round_no || 0) + 1, ...(j.cursor ? { cursor: j.cursor } : {}) }
       const res: ApiResult = await deps.api(j.action, body, { timeoutMs: limits.roundTimeoutMs })
       roundsThisRun += 1
       const cur = jobs.get(id)!
@@ -249,6 +277,7 @@ export function createJobManager(deps: {
       if (res.touched?.length) deps.invalidate?.(res.touched)
       const skipped = mergeSkipped(cur.skipped, res.skipped)
       // A running total the server reports (undo's `restored`) wins over our sum: it survives a lost round.
+      const detailRound = cur.detail ? Number((res as Record<string, unknown>)[cur.detail.field]) : NaN
       const changedNow = typeof (res as { restored?: unknown }).restored === 'number' ? (res as unknown as { restored: number }).restored : cur.changed + (res.changed || 0)
       // One size for the job: the server's remaining when it says it, else what the known total leaves.
       const remainingNow = typeof res.remaining === 'number' ? res.remaining
@@ -257,6 +286,8 @@ export function createJobManager(deps: {
         ...cur,
         rounds: cur.rounds + 1,
         changed: changedNow,
+        round_no: (cur.round_no || 0) + 1,
+        ...(cur.detail && Number.isFinite(detailRound) ? { detail_total: (cur.detail_total || 0) + detailRound } : {}),
         remaining: remainingNow,
         total: typeof remainingNow === 'number' ? changedNow + remainingNow : cur.total,
         cursor: res.cursor || undefined,
@@ -307,6 +338,8 @@ export function createJobManager(deps: {
         total: typeof spec.total === 'number' ? spec.total : spec.initial && typeof spec.initial.remaining === 'number' ? spec.initial.changed + spec.initial.remaining : null,
         rounds: spec.initial ? 1 : 0, cursor: spec.initial?.cursor, message: `${spec.label}…`, skipped: [],
         lost_rounds: 0, started_at: new Date(now()).toISOString(),
+        rid: newRid(), round_no: spec.initial ? 1 : 0,
+        detail: spec.detail || JOB_DETAIL[spec.action], status_kind: spec.statusKind || JOB_STATUS_KIND[spec.action],
       }
       job.message = spec.initial ? jobSummary(job) : job.message
       jobs.set(id, job); persist(); emit()

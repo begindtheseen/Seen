@@ -426,7 +426,7 @@ export type Ticket = {
 export function ticketSummary(t: Ticket): string {
   const bits: string[] = []
   const rep = t.reports
-  if (rep && rep.count) bits.push(`${plural(rep.count, 'seeker report')}${rep.expired ? ` (${fmt(rep.expired)} say it's closed)` : ''}`)
+  if (rep && rep.count) bits.push(`${plural(rep.count, 'seeker report')}${rep.expired ? ` (${fmt(rep.expired)} ${rep.expired === 1 ? 'says' : 'say'} it's closed)` : ''}`)
   if (t.dispute) bits.push(`employer dispute: ${words(t.dispute.kind) || 'listing'}${t.dispute.status && t.dispute.status !== 'open' ? ` (${t.dispute.status})` : ''}`)
   if (t.removed) bits.push('taken down')
   return bits.length ? label(bits.join(' · ')) : 'No reports left'

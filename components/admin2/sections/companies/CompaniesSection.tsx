@@ -13,11 +13,11 @@ import type { SectionProps } from '../../core/sections.tsx'
 import { useShell } from '../../core/shellContext.ts'
 import { KeyHint, SearchField, SectionHeader, StatusChip } from '../../ui/bits.tsx'
 import ConfirmStep from '../../ui/ConfirmStep.tsx'
-import { JobProgress } from '../../ui/Job.tsx'
 import { List, Row } from '../../ui/List.tsx'
 import ResultLine from '../../ui/ResultLine.tsx'
 import { EmptyState, ErrorState, RefreshFailed, Skeleton } from '../../ui/states.tsx'
 import { useSectionKeys } from '../listings/sectionKeys.ts'
+import JobDone from '../listings/JobDone.tsx'
 import styles from '../listings/listings.module.css'
 import { companyLine, displayName, fmt, readCompanyRow, readDupeGroups, readMerge, type CompanyRow, type Merge } from './adapter.ts'
 
@@ -100,7 +100,7 @@ function DuplicatesBlock() {
                 ? `${fmt(view.groups.length)} ${view.groups.length === 1 ? 'group' : 'groups'} of matching names${view.total !== null ? ` among ${fmt(view.total)} companies` : ''}: ${fmt(auto.length)} can merge automatically, ${fmt(look.length)} ${look.length === 1 ? 'needs' : 'need'} you.`
                 : `No duplicate names${view.total !== null ? ` among ${fmt(view.total)} companies` : ''}.`}
             </p>
-            {job.job ? <JobProgress job={job.job} onCancel={job.cancel} onResume={job.resume} onDismiss={job.dismiss} /> : null}
+            {job.job ? <JobDone job={job.job} testId="automerge-done" onCancel={job.cancel} onResume={job.resume} onDismiss={job.dismiss} /> : null}
             {confirming ? (
               <ConfirmStep title={`Merge ${fmt(auto.length)} ${auto.length === 1 ? 'group' : 'groups'} automatically?`}
                 body="In each group the company with the most reports keeps the name; the others’ reports move to it. It runs in rounds and keeps going if you leave this section. Each merge can be undone in the history below."
@@ -152,8 +152,8 @@ function MergesBlock() {
     const res = await api<AdminList<Record<string, unknown>>>('list_merges')
     return res.ok ? { ...res, rows: (res.rows || []).map(readMerge), next: undefined } : res
   }, { staleMs: 60_000 })
-  const undo = useAdminAction('undo_merge', { onSettled: () => setConfirm(null) })
-  const resplit = useAdminAction('resplit_company')
+  const undo = useAdminAction('undo_merge', { dock: false, onSettled: () => setConfirm(null) })
+  const resplit = useAdminAction('resplit_company', { dock: false })
   const [confirm, setConfirm] = useState<string | null>(null)
   const [name, setName] = useState('')
   return (

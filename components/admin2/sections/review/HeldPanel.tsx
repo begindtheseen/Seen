@@ -221,7 +221,7 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
 
       <div className={styles.lines}>
         <Line state={bulkState} onUndo={() => decide.undo('bulk')} onRetry={() => decide.retry('bulk')} onDismiss={() => decide.dismiss('bulk')}
-          runningText={`${bulkState.args?.decision === 'reject' ? 'Rejecting' : 'Approving'} ${plural((bulkState.args?.ids as string[] | undefined)?.length || 0, 'report')}…`} skipLinks={skipLinks} />
+          runningText={`${bulkState.args?.decision === 'reject' ? 'Rejecting' : 'Approving'} ${plural((bulkState.args?.ids as string[] | undefined)?.length || 0, 'report')}…`} skipLinks={skipLinks} followUp={recomputeJob} />
         {recomputeJob ? <RecomputeLine job={recomputeJob} queued={recomputeQueued} onCancel={() => jobs.cancel(recomputeJob.id)} onResume={() => jobs.resume(recomputeJob.id)} onDismiss={() => jobs.dismiss(recomputeJob.id)} /> : null}
       </div>
 
@@ -247,6 +247,7 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
         total={isFiltered ? undefined : list.total}
         newCount={list.newCount}
         onShowNew={list.showNew}
+        actions={[decide]}
         empty={rows.length ? (
           <EmptyState icon="search" title={`No held reports match${view !== 'all' ? ` “${HELD_VIEWS.find((v) => v.value === view)?.label}”` : ''}${q.trim() ? ` “${q.trim()}”` : ''}.`}
             action={<Button variant="secondary" onClick={() => { setView('all'); setQ('') }}>Show every held report</Button>} />

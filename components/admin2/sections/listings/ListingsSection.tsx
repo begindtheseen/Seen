@@ -13,7 +13,6 @@ import type { SectionProps } from '../../core/sections.tsx'
 import { useShell } from '../../core/shellContext.ts'
 import { FilterChips, KeyHint, SearchField, SectionHeader, StatStrip, StatTile, StatusChip } from '../../ui/bits.tsx'
 import ConfirmStep from '../../ui/ConfirmStep.tsx'
-import { JobProgress } from '../../ui/Job.tsx'
 import { List, Row } from '../../ui/List.tsx'
 import ResultLine from '../../ui/ResultLine.tsx'
 import { EmptyState, ErrorState, RefreshFailed, Skeleton } from '../../ui/states.tsx'
@@ -25,6 +24,7 @@ import {
 import { useSectionKeys } from './sectionKeys.ts'
 import { isUnknownAnswer } from './unknown.ts'
 import { useDupeScan } from './useDupeScan.ts'
+import JobDone from './JobDone.tsx'
 import styles from './listings.module.css'
 
 type CountsAnswer = { counts?: Record<string, unknown>; failed?: string[] }
@@ -90,9 +90,9 @@ function StaleBlock({ counts, countsAt }: { counts: ListingCounts | null; counts
         A listing turns stale when its source hasn&apos;t shown it for 7 days. Clearing deletes stale and expired listings (and live ones
         their source hasn&apos;t shown for 7 days) that nobody saved or tracked; those are kept, hidden from search. Employer-posted listings are never touched.
       </p>
-      {job.job ? <JobProgress job={job.job} onCancel={job.cancel} onResume={nothingLeft ? undefined : job.resume} onDismiss={job.dismiss} /> : null}
+      {job.job ? <JobDone job={job.job} testId="stale-done" onCancel={job.cancel} onResume={nothingLeft ? undefined : job.resume} onDismiss={job.dismiss} /> : null}
       {job.job && !job.running && job.job.status !== 'done' && nothingLeft ? <p className={styles.quiet} data-testid="stale-nothing-left">The server has nothing left to clear: the stopped run finished its work before the page reloaded.</p> : null}
-      {done && kept !== null && kept !== undefined ? (
+      {done && kept !== null && kept !== undefined && (job.job?.rounds ?? 0) > 1 ? (
         <p className={styles.quiet} data-testid="stale-kept-line">{fmt(kept)} expired {kept === 1 ? 'listing stays' : 'listings stay'} stored and off the site because someone saved, tracked or applied to {kept === 1 ? 'it' : 'them'}.</p>
       ) : null}
       {confirming ? (
@@ -150,7 +150,7 @@ function Browser({ active }: { active: boolean }) {
   const nFilters = activeFilterCount(u)
   // Take a listing down straight from the list (one nobody reported, too), with an inline confirm and Undo.
   const [confirmDown, setConfirmDown] = useState<string | null>(null)
-  const takeDown = useAdminAction('delete_listing', { onSettled: (res) => { setConfirmDown(null); if (!res.ok && isUnknownAnswer(res as never)) void list.refresh() } })
+  const takeDown = useAdminAction('delete_listing', { dock: false, onSettled: (res) => { setConfirmDown(null); if (!res.ok && isUnknownAnswer(res as never)) void list.refresh() } })
   const clearFilters = () => { setStatus(''); setVisible(''); setEmployer(''); setSince(''); setSort(''); setSource('') }
 
   const row = (r: JobRow) => {
@@ -172,7 +172,7 @@ function Browser({ active }: { active: boolean }) {
         below={confirmDown === r.id ? (
           <ConfirmStep inline title="Take this listing down?" body="It leaves search now and its apply link is blocked so a source cannot bring it back. Undo puts it back."
             confirmLabel="Take it down" busy={takeDown.busy(r.id)} onCancel={() => setConfirmDown(null)} onConfirm={() => { void takeDown.run({ job_id: r.id }, r.id) }} />
-        ) : ts.status !== 'idle' ? <ResultLine state={ts} onUndo={() => takeDown.undo(r.id)} onRetry={isUnknownAnswer(ts.error) ? undefined : () => takeDown.retry(r.id)} onDismiss={() => takeDown.dismiss(r.id)} runningText="Taking it down…" /> : undefined}
+        ) : ts.status !== 'idle' ? <ResultLine state={ts} onUndo={() => takeDown.undo(r.id)} onRetry={() => takeDown.retry(r.id)} onDismiss={() => takeDown.dismiss(r.id)} runningText="Taking it down…" /> : undefined}
       />
     )
   }
@@ -184,7 +184,7 @@ function Browser({ active }: { active: boolean }) {
         <div className={styles.keys}><span><KeyHint keys="/" /> search</span><span><KeyHint keys="j" /><KeyHint keys="k" /> move</span><span><KeyHint keys="Enter" /> open</span></div>
       </div>
       <div className={styles.toolbar}>
-        <SearchField ref={search} value={typed} onChange={setTyped} label="Search listings" placeholder="Title, company, listing id or apply link" testId="listings-q"
+        <SearchField ref={search} value={typed} onChange={setTyped} label="Search listings" placeholder="Title, company, listing id or apply link" placeholderShort="Title, company, id or link" testId="listings-q"
           onEnter={() => { const v = typed.trim(); pushed.current = v; setQ(v); if (classifyQuery(v) === 'id') shell.openItem('job', v) }} />
         <FilterChips label="Listing state" value={status || 'all'} onChange={(v) => setStatus(v === 'all' ? '' : v)} options={STATUS_OPTIONS} />
         <div className={styles.actions}>
@@ -230,7 +230,7 @@ function Browser({ active }: { active: boolean }) {
             })()
         ) : (
           <List<JobRow>
-            rows={list.rows} idOf={(r) => r.id} noun="listings" loading={list.loading} error={list.error} onRetry={() => void list.refresh()}
+            rows={list.rows} idOf={(r) => r.id} noun="listings" actions={[takeDown]} loading={list.loading} error={list.error} onRetry={() => void list.refresh()}
             total={list.total} hasMore={list.hasMore} loadingMore={list.loadingMore} onLoadMore={() => void list.loadMore()}
             newCount={list.newCount} onShowNew={list.showNew} renderRow={row}
             empty={<EmptyState icon="briefcase" title={q || nFilters ? 'No listings match.' : 'No listings.'}
@@ -299,7 +299,7 @@ function DupesBlock() {
           ) : null}
         </div>
       ) : null}
-      {rj ? <JobProgress job={rj} onCancel={remove.cancel} onResume={remove.resume} onDismiss={remove.dismiss} /> : null}
+      {rj ? <JobDone job={rj} testId="dupes-done" onCancel={remove.cancel} onResume={remove.resume} onDismiss={remove.dismiss} /> : null}
       {rj?.status === 'done' ? <p className={styles.quiet}>Removed listings cannot be put back from here; the activity log keeps the title and link of each one.</p> : null}
       {confirming && plan ? (
         <ConfirmStep
@@ -329,7 +329,7 @@ function DupesBlock() {
 function TargetBlock() {
   const api = useApi()
   const q = useAdminQuery<{ target?: number }>('sources:target', () => api<{ target?: number }>('get_job_target'), { staleMs: 120_000 })
-  const set = useAdminAction('set_job_target')
+  const set = useAdminAction('set_job_target', { dock: false })
   const current = typeof q.data?.target === 'number' ? q.data.target : null
   const [value, setValue] = useState('')
   useEffect(() => { if (current !== null) setValue(String(current)) }, [current])

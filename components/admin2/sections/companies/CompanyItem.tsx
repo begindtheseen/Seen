@@ -27,13 +27,13 @@ export default function CompanyItem({ kind, id, setTitle, open }: ItemViewProps)
   const name = d?.name || id
   useEffect(() => { if (d) setTitle(displayName(d.name), d.score ? scoreLine(d) : 'No score yet') }, [d, setTitle])
 
-  const recompute = useAdminAction('company_recompute')
+  const recompute = useAdminAction('company_recompute', { dock: false })
   const slug = key.replace(/[^a-z0-9]+/g, '-')
-  const exp = useAdminAction('export_company', { onSettled: (res) => { const b = res.ok ? (res as Record<string, unknown>).bundle : null; if (b) saveText(JSON.stringify(b, null, 2), `seen-company-evidence-${slug}.json`, 'application/json') } })
+  const exp = useAdminAction('export_company', { dock: false, onSettled: (res) => { const b = res.ok ? (res as Record<string, unknown>).bundle : null; if (b) saveText(JSON.stringify(b, null, 2), `seen-company-evidence-${slug}.json`, 'application/json') } })
   const pdf = useAdminDownload()
   const pkg = useAdminDownload()
-  const merge = useAdminAction('merge', { onSettled: (res) => { setConfirmMerge(false); if (!res.ok && isUnknownAnswer(res as never)) void q.refresh() } })
-  const separate = useAdminAction('undo_merge', { onSettled: () => setConfirmSep(null) })
+  const merge = useAdminAction('merge', { dock: false, onSettled: (res) => { setConfirmMerge(false); if (!res.ok && isUnknownAnswer(res as never)) void q.refresh() } })
+  const separate = useAdminAction('undo_merge', { dock: false, onSettled: () => setConfirmSep(null) })
   const [dir, setDir] = useState<'absorb' | 'into'>('absorb')
   const [other, setOther] = useState('')
   const [confirmMerge, setConfirmMerge] = useState(false)
@@ -74,7 +74,7 @@ export default function CompanyItem({ kind, id, setTitle, open }: ItemViewProps)
       <div className={styles.itemPart} aria-live="polite">
         <ResultLine state={recompute.state()} onRetry={() => recompute.retry()} onDismiss={() => recompute.dismiss()} runningText="Recomputing from its reports…" />
         <ResultLine state={exp.state()} onRetry={() => exp.retry()} onDismiss={() => exp.dismiss()} runningText="Building the evidence file…" />
-        <ResultLine state={merge.state()} onUndo={() => merge.undo()} onRetry={isUnknownAnswer(merge.state().error) ? undefined : () => merge.retry()} onDismiss={() => merge.dismiss()} runningText="Merging…" />
+        <ResultLine state={merge.state()} onUndo={() => merge.undo()} onRetry={() => merge.retry()} onDismiss={() => merge.dismiss()} runningText="Merging…" />
         <div className={styles.actions}>
           <Button variant="secondary" icon="refresh-cw" onClick={() => void recompute.run({ name })} loading={recompute.busy()} data-testid="co-recompute">Recompute the score</Button>
           <Button variant="ghost" icon="download" onClick={() => void exp.run({ company: name })} loading={exp.busy()} data-testid="co-export">Download the evidence (JSON)</Button>

@@ -13,13 +13,13 @@ import { useAdminAction, useAdminJob, useAdminList, useAdminQuery, useApi, useRu
 import { tokenStore } from '../../core/runtime.ts'
 import { saveText } from '../../core/api.ts'
 import { isUnknownAnswer } from '../listings/unknown.ts'
+import JobDone from '../listings/JobDone.tsx'
 import { useUrlFilter } from '../../core/place.ts'
 import type { SectionProps } from '../../core/sections.tsx'
 import { useShell } from '../../core/shellContext.ts'
 import type { AdminItemKind } from '../../contract.ts'
 import { FilterChips, KeyHint, SectionHeader, StatusChip } from '../../ui/bits.tsx'
 import ConfirmStep from '../../ui/ConfirmStep.tsx'
-import { JobProgress } from '../../ui/Job.tsx'
 import { List, Row } from '../../ui/List.tsx'
 import ResultLine from '../../ui/ResultLine.tsx'
 import { EmptyState, ErrorState, RefreshFailed, Skeleton } from '../../ui/states.tsx'
@@ -97,7 +97,7 @@ function DemandRun() {
   const job = useAdminJob({ action: 'refresh_demand', label: 'Refreshing demand data', past: 'Refreshed', noun: 'demand rows' })
   return (
     <span className={styles.blockFlat}>
-      {job.job ? <JobProgress job={job.job} onCancel={job.cancel} onResume={job.resume} onDismiss={job.dismiss} /> : null}
+      {job.job ? <JobDone job={job.job} testId="demand-done" onCancel={job.cancel} onResume={job.resume} onDismiss={job.dismiss} /> : null}
       {!job.job || !job.running ? <span className={styles.actions}><Button variant="secondary" icon="refresh-cw" onClick={() => job.start()} data-testid="run-demand">Run now</Button></span> : null}
     </span>
   )
@@ -216,7 +216,7 @@ function StorageBlock() {
 
 // ── Metrics export (CSV) ─────────────────────────────────────────────────────────────────────────
 function ExportBlock() {
-  const exp = useAdminAction('export_csv', { onSettled: (res) => { const r = res as Record<string, unknown>; if (res.ok && typeof r.csv === 'string' && r.csv) saveText(r.csv, typeof r.filename === 'string' && r.filename ? r.filename : 'seen-metrics.csv', 'text/csv;charset=utf-8') } })
+  const exp = useAdminAction('export_csv', { dock: false, onSettled: (res) => { const r = res as Record<string, unknown>; if (res.ok && typeof r.csv === 'string' && r.csv) saveText(r.csv, typeof r.filename === 'string' && r.filename ? r.filename : 'seen-metrics.csv', 'text/csv;charset=utf-8') } })
   const st = exp.state()
   const empty = st.status === 'done' && !(st.result as Record<string, unknown> | undefined)?.csv
   return (
@@ -273,7 +273,7 @@ function SearchDemandBlock() {
 function FlagsBlock({ undoRef }: { undoRef: MutableRefObject<(() => void) | null> }) {
   const api = useApi()
   const q = useAdminQuery<Record<string, unknown>>('flags', () => api<Record<string, unknown>>('flags_list'), { staleMs: 60_000 })
-  const set = useAdminAction('set_flag', { onSettled: (_res, args) => { setConfirm(null); setLast(String(args.flag_name)) } })
+  const set = useAdminAction('set_flag', { dock: false, onSettled: (_res, args) => { setConfirm(null); setLast(String(args.flag_name)) } })
   const [confirm, setConfirm] = useState<string | null>(null)
   const [last, setLast] = useState<string | null>(null)
   const view = q.data ? readFlags(q.data) : null
@@ -389,7 +389,8 @@ function ActivityItem({ a, onOpen }: { a: ActivityRow; onOpen?: () => void }) {
       below={confirm && !job.job ? (
         <ConfirmStep inline title={`Undo “${a.summary}”?`} body="Only rows that still hold what this action wrote are put back; anything changed since is left as it is and counted."
           confirmLabel="Undo it" tone="danger" onCancel={() => setConfirm(false)} onConfirm={() => { setConfirm(false); job.start() }} />
-      ) : job.job ? <JobProgress job={job.job} onCancel={job.cancel} onResume={job.resume} onDismiss={job.dismiss} /> : undefined}
+      ) : job.job ? <JobDone job={job.job} testId="undo-done" onCancel={job.cancel} onResume={job.resume} onDismiss={job.dismiss}
+          summary={(j) => `Put back ${fmt(j.changed)} ${j.changed === 1 ? 'row' : 'rows'}${j.rounds > 1 ? ` in ${fmt(j.rounds)} rounds` : ''}.`} /> : undefined}
     />
   )
 }

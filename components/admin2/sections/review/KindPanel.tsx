@@ -130,6 +130,7 @@ export default function KindPanel({ cfg, on, visible }: { cfg: KindConfig<AnyRow
         onLoadMore={() => void list.loadMore()}
         newCount={list.newCount}
         onShowNew={list.showNew}
+        actions={Object.values(acts.all)}
         empty={<EmptyState icon={searching ? 'search' : 'circle-check'} title={searching ? `No ${cfg.noun} match “${q.trim()}”.` : cfg.empty(status)} />}
         renderRow={(r: AnyRow) => {
           const id = cfg.idOf(r)

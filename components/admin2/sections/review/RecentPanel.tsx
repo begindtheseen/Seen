@@ -82,6 +82,7 @@ export default function RecentPanel({ on, visible }: { on: boolean; visible: boo
         onLoadMore={() => void list.loadMore()}
         newCount={list.newCount}
         onShowNew={list.showNew}
+        actions={[mod]}
         empty={<EmptyState icon="search" title={query || state !== 'all' ? 'No reports match these filters.' : 'No reports yet.'} />}
         renderRow={(r) => {
           const st = r.state ? STATE_TEXT[r.state] : null

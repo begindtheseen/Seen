@@ -8,7 +8,7 @@ import type { ReactNode } from 'react'
 import { httpHref } from '@/lib/safeHref'
 import type { AdminItemKind } from '../../contract.ts'
 import {
-  hasOpenDispute, label, money, outcomeWord, plural, snippet, ticketSummary, when,
+  fmt, hasOpenDispute, label, money, outcomeWord, plural, snippet, ticketSummary, when,
   type Claim, type Dispute, type Issue, type KindKey, type Purchase, type Reply, type Ticket, type Tone,
 } from './adapter.ts'
 import { Block, Facts } from './parts.tsx'
@@ -100,7 +100,7 @@ const tickets: KindConfig<Ticket> = {
         ['Listing', t.title || '—'], ['Company', t.company || '—'], ['City', t.city || '—'],
         ['Apply link', <Ext key="a" href={httpHref(t.apply_url)}>Open the employer’s page</Ext>],
         ['Listing state', t.removed ? `Taken down ${t.removed.at ? when(t.removed.at) : ''} (${label(t.removed.reason)})` : label(t.availability_status) || '—'],
-        ['Seeker reports', t.reports ? `${plural(t.reports.count, 'report')} · ${t.reports.expired} say closed · ${t.reports.unknown} unsure${t.reports.latest ? ` · latest ${when(t.reports.latest)}` : ''}` : 'None'],
+        ['Seeker reports', t.reports ? `${plural(t.reports.count, 'report')} · ${fmt(t.reports.expired)} ${t.reports.expired === 1 ? 'says' : 'say'} it is closed · ${fmt(t.reports.unknown)} unsure${t.reports.latest ? ` · latest ${when(t.reports.latest)}` : ''}` : 'None'],
       ]} />
       {t.dispute ? (
         <Block title={`Employer dispute #${t.dispute.id}`}>

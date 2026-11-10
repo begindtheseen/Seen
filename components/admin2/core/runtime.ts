@@ -5,7 +5,7 @@ import { createAdminApi, createAdminDownload, createReauthGate, saveBlob, type A
 import { QueryCache } from './cache.ts'
 import { createUndoBus, type UndoBus } from './action.ts'
 import { createResultDock, type ResultDock } from './dock.ts'
-import { createJobManager, JOBS_STORAGE_KEY, type JobManager } from './jobs.ts'
+import { createJobManager, JOB_STATUS_KIND, JOBS_STORAGE_KEY, type JobManager } from './jobs.ts'
 import { TOKEN_KEY, USER_KEY } from './login.ts'
 
 export type AdminRuntime = { api: AdminApi; gate: ReauthGate; cache: QueryCache; jobs: JobManager; download?: AdminDownload; undoBus?: UndoBus; dock?: ResultDock }
@@ -44,10 +44,13 @@ export function getRuntime(): AdminRuntime {
     api,
     undoBus,
     statusRead: async (job) => {
-      // The server's truth for a job interrupted by a reload (A1's status read). Absent → null ("not known").
-      const r = await api<{ remaining?: number | null; done?: number | null; complete?: boolean }>('job_status', { job_action: job.action, args: job.args, cursor: job.cursor ?? null })
+      // The server's truth for a job a reload interrupted: `job_status { kind }` → { remaining, complete }
+      // (SHAPES.md). A job action with no kind keeps the honest "not known" (null).
+      const kind = job.status_kind || JOB_STATUS_KIND[job.action]
+      if (!kind) return null
+      const r = await api<{ remaining?: number | null; complete?: boolean }>('job_status', { kind })
       if (!r.ok) return null
-      return { remaining: typeof r.remaining === 'number' ? r.remaining : null, done: typeof r.done === 'number' ? r.done : null, complete: r.complete === true }
+      return { remaining: typeof r.remaining === 'number' ? r.remaining : null, done: null, complete: r.complete === true }
     },
     storage: { get: () => sget(JOBS_STORAGE_KEY), set: (v) => sset(JOBS_STORAGE_KEY, v) },
     invalidate: (touched) => cache.invalidate(touched),

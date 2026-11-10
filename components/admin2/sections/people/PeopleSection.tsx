@@ -55,7 +55,7 @@ function AccountsView({ active }: { active: boolean }) {
   return (
     <section className={styles.blockFlat} aria-label="Accounts">
       <div className={styles.keys}><span><KeyHint keys="/" /> search</span><span><KeyHint keys="j" /><KeyHint keys="k" /> move</span><span><KeyHint keys="Enter" /> open</span></div>
-      <SearchField ref={search} value={typed} onChange={setTyped} label="Find an account" placeholder="Email (or part of it), or the account id" testId="people-q"
+      <SearchField ref={search} value={typed} onChange={setTyped} label="Find an account" placeholder="Email (or part of it), or the account id" placeholderShort="Email or account id" testId="people-q"
         onEnter={() => { const v = typed.trim(); pushed.current = v; setQ(v) }} />
       <FilterChips label="Accounts" value={f} onChange={(v) => setFilter(v === 'all' ? '' : v)} options={FILTERS} />
       <div ref={listRef}>
@@ -138,7 +138,7 @@ function ClustersView() {
     const res = await api<AdminList<Record<string, unknown>>>('clusters_list', { status: st })
     return res.ok ? { ...res, rows: (res.rows || []).map(readCluster), next: undefined } : res
   }, { staleMs: 30_000 })
-  const detect = useAdminAction('detect_duplicates_by_signals')
+  const detect = useAdminAction('detect_duplicates_by_signals', { dock: false })
   return (
     <section className={styles.blockFlat} aria-label="Account clusters" data-testid="people-clusters">
       <p className={styles.text}>Accounts that signed in from the same address in the last 30 days. Open one to see the emails and decide.</p>
