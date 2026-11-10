@@ -72,3 +72,17 @@ session (sign in → replay) and /admin/legacy checked against A1's real handler
   summed and said beside the first: "Merged 69 groups (72 companies) in 2 rounds." Companies' auto-merge spec needs
   nothing new.
 - 409 `in_progress` on a single write → "Checking" (re-ask with the same id), as for any unknown outcome.
+
+## Round 8
+- **The dock never covers a control.** Desktop: the result dock lives in the rail's foot (nothing floats over the page).
+  Phone: every sticky BulkBar sits above the dock and the job bar (the core's `--admin-bottom-offset` includes their
+  measured height). **Review: delete the local lift** (`review.module.css` `.panel { --admin-bottom-offset: … + 72px }`).
+- **Undo of a large action:** one `request_id` per Undo press, `round` named, the long timeout (75 s), an unknown answer is
+  checked ("Checking"), never "Undo failed" for a client timeout ("Not known yet · Check again" reuses the id); a
+  `complete:false` Undo becomes a job and the dock shows "Undoing… 420 of 1,040", then the result.
+- **Prefix:** the dock/line word is "Undone"; the core strips a server "Undid it:" (`undoSentence`). Sections strip nothing.
+- **Plural:** `counted(n, 'reports')` → "1 report" / "2 reports" (core/words.ts; `singularNoun` for the head noun). Job
+  summaries use it.
+- **Counts still being checked:** `FilterChips` option `checking: { checked, total }` shows "checking N more…" instead of a
+  number; `<BulkBar checking={…}>` says it and disables every button inside until the count is final (`checkingText`,
+  `isChecking` from core/words.ts or ui/bits.tsx).

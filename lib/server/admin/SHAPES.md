@@ -164,21 +164,38 @@ keys: "Merged Beacon Group into Beacon Holdings". The same holds for the merge /
 `set_pro_window`, `set_flag`, `update_reddit_dispute`, `resolve_issue`/`dismiss_issue`, `update_cluster`,
 `grant_credits`, `job_update` — and the row is not already undone.
 
-### `undo` `{ audit_id }` → `AdminOk`
+### `undo` `{ audit_id, request_id?, round? }` → `AdminOk`
 ```json
 { "ok": true, "changed": 288, "skipped": [ { "reason": "changed_since", "count": 0 } ],
-  "message": "Undid it: 288 reports are back in the review queue.", "touched": ["held","reports","overview","activity"],
+  "message": "288 reports are back in the review queue.", "touched": ["held","reports","overview","activity"],
   "remaining": 0, "complete": true }
 ```
-A bulk undo (`review_held`) runs as a job, ~40 s per round:
+**Undo sentences say what is true now** (round 10) — never "Undid it: …"; the interface adds "Undone" itself. All of
+them come from `words.js undoSentence`: "288 reports are back in the review queue." · "… back in the review queue, no
+longer rejected." · "12 reports are no longer marked as copies." · "The report is back as it was." · "The outcome is
+Ghosted again." · "Walmart Inc is separate again · 4 reports moved back." · "The listing is back on the site and its
+reports are restored." · "The Pro window is back as it was." · "The flag X is Off again." · "Back to open." · "The
+balance is back to 7." · "The listing is back as it was before the edit." A no-op stays a no-op sentence ("It changed
+since, so it was left alone.").
+
+**A bulk undo (`review_held`, `dedupe_reports`) is a JOB** — the same contract as the action it reverses:
+- send `{ audit_id, request_id: <one per Undo press>, round: n }`, n = 1, 2, 3 … while `complete` is false. Each round
+  works ≤ ~8 s on the rows (plus ≤10 s reading the batch and ≤4 s of score recompute), so a round answers well inside the
+  client's normal timeout; give the first call the bulk timeout anyway.
+- a round whose answer is lost is RE-SENT with the same `request_id` and the same `round`: it replays
+  (`replayed: true, changed: 0, recorded_changed`) or answers 409 `in_progress` while it still runs — never run twice,
+  never "failed". After a reload ask `job_status { kind: "undo", audit_id }`.
+- a round re-sent after the last round finished answers `ok`, `complete: true, remaining: 0, already_undone: true` with
+  the done sentence (not 409).
 ```json
-{ "ok": true, "changed": 400, "skipped": [], "message": "Restoring 400 of 1,200 — keep going.", "touched": ["held","reports","overview","activity"],
-  "remaining": 800, "complete": false, "cursor": "eyJhdWRpdF9pZCI6…", "restored": 400, "total": 1200 }
+{ "ok": true, "changed": 40, "skipped": [], "message": "Restoring 80 of 1,040 — keep going.", "touched": ["held","reports","overview","activity"],
+  "remaining": 960, "complete": false, "cursor": "eyJhdWRpdF9pZCI6…", "restored": 80, "total": 1040 }
 ```
-`changed` = rows restored by THIS round; `restored` / `total` = running totals across rounds. Call again with the same
-`audit_id` (pass `cursor` back; the server re-reads the batch, so an interrupted or cancelled undo resumes from any
-later press). The audit row records `undo_progress` and is marked undone only by the round that completes.
-An already-undone row: 409 `conflict` "That was already undone." A row that cannot be undone: 400 `bad_request`.
+`changed` = rows restored by THIS round (sum them; count a replay's `recorded_changed` once); `restored` / `total` =
+running totals. The server re-reads the batch each round, so an interrupted or cancelled undo resumes from any later
+press. The audit row records `undo_progress` and is marked undone only by the round that completes.
+A single-row undo (`round` absent) is one call; `request_id` alone makes it idempotent. An already-undone row without
+`round`: 409 `conflict` "That was already undone." A row that cannot be undone: 400 `bad_request`.
 
 ### `cron_health` `{}` → `AdminList<AdminCron>`
 ```json
@@ -212,7 +229,10 @@ scheduled interval + 1 h grace.
 `sort`: `needs_eyes` (default) | `newest` | `oldest` | `company` | `outcome`.
 ```json
 { "ok": true, "sort": "needs_eyes", "total": 300, "as_of": "…",
-  "counts": { "total": 300, "needs_eyes": 120, "positive": 150, "employee_review": 30 },
+  "counts": { "total": 300, "needs_eyes": 120, "positive": 150, "employee_review": 30,
+              "clear_positives": 140, "possible_duplicates": 24, "unchecked": 0 },
+  "checked": { "n": 300, "of": 300, "complete": true, "label": "all 300 checked for copies" },
+  "duplicate_check": "done", "duplicate_check_pending": 0,
   "rows": [ { "id": "b1b2…-uuid", "company_name": "Tesla", "outcome": "rejected", "role": "Engineer",
     "platform": "Indeed", "source": "external", "created_at": "2026-10-18T00:00:00Z",
     "report_text": "Engineer interview - no offer", "outcome_weight": 0.55, "trust_reason": "external_import",
@@ -226,7 +246,17 @@ Every pending row is read (keyset pages internally, no 1,000 cap; `truncated` tr
 - `possible_duplicate` covers a copy of another HELD row AND a copy of a published report (same company + outcome +
   text); then `review.duplicate_of` = the original's id and `review.duplicate_of_live: true`. The flag survives the
   original's approval, so a fresh tab never offers the copy for bulk approval.
-- The duplicate-of-live check does not hold the list up: it runs ≤4 reads in parallel for ~2.5 s. Each row carries
+- **The duplicate-of-live check is remembered (round 10).** A result is kept per report id + a hash of its compare key
+  (`admin_dup_checks`, migration 20261111130000; before it, per-instance memory) for 15 minutes, and cleared for a company
+  whenever any of its reports changes state (approve / reject / restore / hold / outcome / merge / undo — every path that
+  queues the company's score). A read applies remembered results with no live reads and checks only the rest, ≤4 reads
+  in parallel, for at most 8 s from the session check (`LIVE_CHECK.listBudgetMs`); what it checks is remembered, so the
+  next read continues. `counts.clear_positives` (= what "Approve all positive" publishes: positive, no anti-gaming hold,
+  not a possible duplicate, checked) and `counts.possible_duplicates` come from the SAME results as the rows.
+  `checked: { n, of, complete, label }` counts rows that have a compare key; while `complete` is false the two counts
+  are lower bounds and the screen shows `checked.label` ("checked 82 of 343 for copies — checking 261 more") and
+  re-reads — it never shows a moving number as final. `counts.unchecked` = rows still `pending`.
+- Each row carries
   `review.duplicate_check: 'done'|'pending'`; the list carries `duplicate_check: 'done'|'pending'` and
   `duplicate_check_pending` (how many rows). **`pending` means "not checked yet", never "not a duplicate"** — show it as
   unchecked and re-read later. The list's check is the exact, indexed company-name match; `done` means that check covered
@@ -234,7 +264,9 @@ Every pending row is read (keyset pages internally, no 1,000 cap; `truncated` tr
   the list: the bulk guard compares names trimmed and case-folded and skips it at approve time as `possible_duplicate`,
   and its sentence says so ("… under a company name that differs only in letter case or spacing — the list showed it
   as clean"); `review.duplicate_case_variant: true` marks such a row. The bulk guard re-checks the rows it would approve, exactly, at decision time, and skips
-  anything it cannot verify as `not_checked_for_duplicates` ("N not checked for duplicates — try again").
+  anything it cannot verify as `not_checked_for_duplicates` ("N not checked for duplicates — try again"); a row its
+  own check could not reach in its budget uses the list's remembered result, so with a warm cache `not_checked` is 0.
+  `review_held` answers carry `not_checked: n` (that count) beside `skipped`.
 - Every row carries `rules: "passes"|"fails"|null` and `rules_detail: { verdict, comment: boolean|null, post: boolean|null }`
   — Seen's strict first-hand rules read as a comment and as the post itself (null = the rules do not apply: not an
   imported public account, or too short). `reports_recent` rows carry the same two fields.
@@ -385,7 +417,10 @@ UI reads `clear_plan` for Clear stale:
 applications row references; what it keeps: the referenced ones (`kept_referenced`; `expired_kept_referenced` = the
 "expired, stored because someone saved/tracked it" tile). Each count from its own exact read. Also on `overview.extra.clear_plan`.
 
-### `job_status` `{ kind: "clear_stale"|"auto_merge"|"recompute"|"report_dupes"|"job_dupes" }` → `AdminOk` `{ kind, remaining, complete, rows:[{kind, remaining}] }`
+### `job_status` `{ kind: "clear_stale"|"auto_merge"|"recompute"|"report_dupes"|"job_dupes"|"undo", audit_id? }` → `AdminOk` `{ kind, remaining, complete, rows:[{kind, remaining}] }`
+`kind: "undo"` needs `audit_id` (the action being undone): for a bulk decision it counts, from the reports themselves,
+`remaining` (rows still holding what the action wrote), `restored`, `total`, `changed_since`, `not_found`, `undone`;
+for a single action `remaining` is 0 once undone, else 1.
 What a resumable job still has to do, read from the database (after a reload, show "Nothing left" / "N left" from
 this, never the page's own counter). `job_dupes` answers `remaining: null` (known only after a scan).
 
