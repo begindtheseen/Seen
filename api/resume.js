@@ -91,6 +91,25 @@ async function listingPostedAt(body) {
   } catch (_) { return null; }
 }
 
+// A failed credit gate, said for what it is: a missing or expired session is `signin_required` (401) and is
+// never shown as "out of credits"; only a real shortfall carries `credits_required` (402).
+export function gateFailure(gate) {
+  if (gate && gate.status === 401) return { error: 'signin_required', message: gate.error || 'Sign in to continue.', signin_required: true };
+  return { error: gate.error, credits_required: !!gate.credits_required, ...(gate.pro_required ? { pro_required: true } : {}), balance: gate.balance ?? 0 };
+}
+const SIGNIN_REQUIRED = { error: 'signin_required', message: 'Sign in to continue.', signin_required: true };
+
+// The credit rule for a tailored résumé (tool:optimize and action:tailor): charged only when the document changed
+// substantively (a default-applied change of substance) AND the fit did not drop. Otherwise free, with a plain note.
+export function tailorCharge(tailored, company = '') {
+  if (!tailored) return { charge: false, note: 'Nothing could be tailored for this posting, so no credit was used.' };
+  const before = tailored.score_before, after = tailored.score_after;
+  const substantive = (tailored.changes || []).some((c) => c.default === 'applied' && c.substantive);
+  if (!substantive) return { charge: false, note: `${tailored.kept_as_is || `Your résumé already fits this ${company ? `${company} ` : ''}posting as written.`} No credit was used.` };
+  if (typeof before === 'number' && typeof after === 'number' && after < before) return { charge: false, note: `The changes would lower your match (${before} → ${after}), so they are not applied and no credit was used.` };
+  return { charge: true, note: null };
+}
+
 export default async function handler(req, res) {
   const _o = req.headers.origin || '';
   const _devO = !_o || _o.includes('localhost') || _o.includes('127.0.0.1');
@@ -166,7 +185,7 @@ export default async function handler(req, res) {
 
   // Credit gate — 1 credit per call; Pro users are never charged (consume_credit answers pro:true)
   const gate = await gateAI(req, `resume_${tool || 'tool'}`);
-  if (!gate.ok) return res.status(gate.status).json({ error: gate.error, credits_required: gate.credits_required, balance: gate.balance ?? 0 });
+  if (!gate.ok) return res.status(gate.status).json(gateFailure(gate));
 
   try {
     if (!tool) return res.status(400).json({ error: 'Missing tool parameter' });
@@ -369,13 +388,8 @@ export function buildResumePDF(document, meta = {}) {
          .text(d.name, LEFT, doc.y, { width: W, align: 'center' });
       doc.moveDown(0.22);
     }
-    // Subtle target-role context line (only when we know it) — not fabricated.
-    const targetLine = sanitizeForStandardFont([meta.role, meta.company].filter(Boolean).join('   ·   '));
-    if (targetLine) {
-      doc.fillColor(META).font('Times-Italic').fontSize(10.5)
-         .text(targetLine, LEFT, doc.y, { width: W, align: 'center' });
-      doc.moveDown(0.22);
-    }
+    // No target-role line under the name: the résumé says who the person is, never the job they want.
+    const targetLine = '';
     if (contactBits.length) {
       doc.fillColor(INK).font('Times-Roman').fontSize(10)
          .text(contactBits.join('   ·   '), LEFT, doc.y, { width: W, align: 'center' });
@@ -572,7 +586,7 @@ function drawFooter(doc, LEFT, W, RULE, FOOT, footerBand) {
 async function handleOptimizeTool(req, res, body) {
   try {
     const authed = await resolveAuthedUser(req);
-    if (!authed?.uid) return res.status(401).json({ error: 'Sign in to use AI features', credits_required: true });
+    if (!authed?.uid) return res.status(401).json(SIGNIN_REQUIRED);
     if (!body.resume) return res.status(400).json({ error: 'Resume required' });
     if (!isReadableResume(body.resume)) return res.status(400).json({ error: 'RESUME_CORRUPTED' });
     // a teaser with a saved job behind it becomes the fetched posting on `body` (lib/server/fullPosting.js)
@@ -596,9 +610,18 @@ async function handleOptimizeTool(req, res, body) {
     if (unoptimizable) return res.status(422).json({ error: 'no_requirements', ...unoptimizable, cost: 0, charged: false });
     if (body.probe) return res.status(200).json({ cached: false, price: RESUME_OPTIMIZE_COST, charged: false });
 
+    // The package is built BEFORE the credit: a résumé the tailor could not substantively improve (or whose
+    // match the changes would lower) is returned free with no_gain and a plain note (tailorCharge).
+    const result = buildPaidOptimize({ resume, jobDescription, job, company, pro: false, jobId, taxonomy, fit });
+    const rule = tailorCharge(result.tailored, company);
+    if (!rule.charge) {
+      const proNow = (await resolveProAccess(req)).pro;
+      const out = { ...result, no_gain: true, note: rule.note };
+      const stored = await writeCachedOptimize(authed.uid, key, out);
+      return res.status(200).json({ ...out, cached: false, cache_saved: stored, charged: false, pro: !!proNow });
+    }
     const gate = await gateAI(req, 'resume_optimize');
-    if (!gate.ok) return res.status(gate.status).json({ error: gate.error, credits_required: gate.credits_required, pro_required: gate.pro_required, balance: gate.balance ?? 0 });
-    const result = buildPaidOptimize({ resume, jobDescription, job, company, pro: gate.pro, jobId, taxonomy, fit });
+    if (!gate.ok) return res.status(gate.status).json(gateFailure(gate));
     const stored = await writeCachedOptimize(authed.uid, key, result);
     // charged is what the gate did: a Pro user is never charged (consume_credit answers pro:true)
     return res.status(200).json({ ...result, cached: false, cache_saved: stored, charged: !gate.pro, pro: !!gate.pro, balance: gate.balance });
@@ -653,15 +676,15 @@ async function handleStudio(req, res, body) {
         }
         // The plan is computed BEFORE the credit is taken: a tailor that cannot move the fit score (an
         // engineer's résumé went 70 → 70 and paid 1 credit, round 1) is returned free, with a plain reason.
-        if (!(await resolveAuthedUser(req))) return res.status(401).json({ error: 'Sign in to use AI features', credits_required: true });
+        if (!(await resolveAuthedUser(req))) return res.status(401).json(SIGNIN_REQUIRED);
         const out = await tailorAction(body, { taxonomy, fit });
-        const before = out?.plan?.score?.before, after = out?.plan?.score?.after;
-        if (typeof before === 'number' && typeof after === 'number' && after <= before) {
+        const rule = tailorCharge(out.tailored, body.company);
+        if (!rule.charge) {
           const proNow = (await resolveProAccess(req)).pro;
-          return res.status(200).json({ ...out, charged: false, no_gain: true, pro: !!proNow, note: `This posting scores ${before}/100 against your résumé as it is — tailoring would not raise it, so no credit was used.` });
+          return res.status(200).json({ ...out, charged: false, no_gain: true, pro: !!proNow, note: rule.note });
         }
         const gate = await gateAI(req, 'resume_tailor');
-        if (!gate.ok) return res.status(gate.status).json({ error: gate.error, credits_required: gate.credits_required, pro_required: gate.pro_required, balance: gate.balance ?? 0 });
+        if (!gate.ok) return res.status(gate.status).json(gateFailure(gate));
         return res.status(200).json({ ...out, balance: gate.balance, pro: !!gate.pro, charged: !gate.pro });
       }
       default: return res.status(400).json({ error: `Unknown action: ${body.action}` });
@@ -682,8 +705,9 @@ async function buildExportPdf({ resume, doc: docIn, job, company, jobDescription
   let doc = docIn && typeof docIn === 'object' ? normalizeDoc(docIn) : null;
   if (!doc || docIsEmpty(doc)) { try { doc = parseResume({ text: String(resume || ''), source: 'text' }); } catch { doc = null; } }
   if (doc && !docIsEmpty(doc) && (doc.experience.length || doc.skills.length || doc.basics.summary)) {
-    // The target role becomes the headline only when the candidate wrote none (never the company).
-    const r = await renderPdf(doc, { template: template || 'classic', pro, targetLine: !doc.basics.headline && job ? String(job).slice(0, 120) : '' });
+    // The document as given — never a target job title printed as the person's headline: a title they never
+    // held is a falsehood on their résumé (director's decision G).
+    const r = await renderPdf(doc, { template: template || 'classic', pro });
     return { buffer: r.buffer, name: doc.basics.name || '', pages: r.pages, template: r.template };
   }
   const legacy = buildResumeDocument({ resume, jobDescription, job, company });

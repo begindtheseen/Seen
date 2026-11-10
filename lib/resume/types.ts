@@ -19,7 +19,14 @@ export interface ResumeMeta {
   tailoredFor: { company: string; role: string; jobId?: string } | null
   provenance: Array<Record<string, unknown> & { kind: string }>
   baseDocId: string | null
+  /** parse-time source-line accounting (lib/resume/parse/fidelity.js): `unplaced` lines are kept under
+   *  "Additional Information" (keptIn) and should be shown as "N lines we could not place — check them" */
+  fidelity?: ResumeFidelity
 }
+export interface ResumeFidelityLine { line: string; index: number; nearestSection: string; keptIn?: string; missing?: string[] }
+/** a line filed by weak evidence (content over heading, an unfamiliar heading, an undated "job"): ask, don't assert */
+export interface ResumeFidelityUncertain { line: string; placedIn: string; why: string }
+export interface ResumeFidelity { version: string; placed: number; total: number; unplaced: ResumeFidelityLine[]; altered: ResumeFidelityLine[]; uncertain?: ResumeFidelityUncertain[] }
 export interface ResumeDoc {
   schema: string; id: string; kind: 'base' | 'variant'
   basics: ResumeBasics

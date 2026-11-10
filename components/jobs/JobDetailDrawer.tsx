@@ -14,7 +14,7 @@ import ApplyCheckpoint from '@/components/ApplyCheckpoint'
 import CreditConfirmDialog from '@/components/CreditConfirmDialog'
 import { trackApplyClick } from '@/lib/trackApply'
 import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
-import { JOB_INSIGHTS_COST, RESUME_OPTIMIZE_COST, creditCostLabel, dailyResetLabel, priceLabel, shortPriceLabel, usageLine } from '@/lib/creditRules'
+import { JOB_INSIGHTS_COST, RESUME_OPTIMIZE_COST, creditCostLabel, dailyResetLabel, priceLabel, usageLine } from '@/lib/creditRules'
 import { useProStatus } from '@/lib/hooks/useProStatus'
 import { displayCompanyName } from '@/lib/companyDisplay'
 import { displayPay, payLabel } from '@/lib/jobs/pay.js'
@@ -24,7 +24,9 @@ import { httpHref, loginHref } from '@/lib/safeHref.js'
 import { JobCache } from '@/lib/stores/JobCache'
 import { JOB_INSIGHTS_VERSION } from '@/lib/jobInsightsVersion.js'
 import ListingScoreRing from '@/components/jobs/ListingScoreRing'
-import PastePosting from '@/components/jobs/PastePosting'
+import PostingInput, { PostingReadRow, type PostingRead } from '@/components/jobs/PostingInput'
+import { readFacts } from '@/lib/postingRead.js'
+import { needsSignIn, signInHereHref, SIGNIN_EXPIRED_TEXT } from '@/lib/toolAuth.js'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Icon from '@/components/ui/Icon'
@@ -63,7 +65,7 @@ interface InsightsResponse extends Partial<Insights> {
 // credits → the paid call was refused (out of credits / signed out)
 // preview → the row is a source's teaser of the posting (Adzuna): nothing to analyze, nothing to sell
 // unread → the posting states nothing to read (answered free, never cached); a paste box is offered
-type InsightsState = 'loading' | 'done' | 'unavailable' | 'no_desc' | 'uncached' | 'generating' | 'credits' | 'preview' | 'unread'
+type InsightsState = 'loading' | 'done' | 'unavailable' | 'no_desc' | 'uncached' | 'generating' | 'credits' | 'signin' | 'preview' | 'unread' | 'link_failed'
 
 const L1_TTL = 24 * 60 * 60 * 1000
 
@@ -93,12 +95,13 @@ export function useListingLiveness(job: Pick<Job, 'id' | 'employer_posted'> | nu
 }
 
 /** The closed notice, or the quiet "checked just now" line. Nothing for 'unknown' or an old check. */
-export function LivenessNotice({ liveness, sourceHref }: { liveness: Liveness | null; sourceHref?: string | null }) {
+export function LivenessNotice({ liveness }: { liveness: Liveness | null; sourceHref?: string | null }) {
   if (liveness?.state === 'gone') {
     return (
       <p className={d.notice} data-tone="bad" role="status" data-testid="listing-closed">
         <Icon name="circle-x" size={14} />
-        <span>This listing looks closed — the site it came from has taken it down.{sourceHref ? <> <a href={sourceHref} target="_blank" rel="noopener noreferrer" className={d.link}>See the original</a></> : null}</span>
+        {/* no link to the taken-down ad (UX audit F7): the next step is another job (the footer's one action) */}
+        <span>This listing looks closed — the site it came from has taken it down.</span>
       </p>
     )
   }
@@ -143,7 +146,8 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
   const [insightsState, setInsightsState] = useState<InsightsState>('loading')
   // The text the insight runs on: the listing's own, or a full posting the person pasted.
   const [pastedDesc, setPastedDesc] = useState<string | null>(null)
-  useEffect(() => { setPastedDesc(null) }, [job.id])
+  const [pastedRead, setPastedRead] = useState<PostingRead | null>(null)
+  useEffect(() => { setPastedDesc(null); setPastedRead(null) }, [job.id])
   const [insightPrice, setInsightPrice] = useState<number>(JOB_INSIGHTS_COST)
   // The ledger line after a paid generation ("1 credit used · 4 left") and any refusal text.
   const [insightNote, setInsightNote] = useState('')
@@ -228,8 +232,10 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
       })
       const d = await res.json() as InsightsResponse
       if (d._src === 'unread') { setInsightNote(d.message || ''); setInsightsState('unread'); return }
-      if (d.credits_required || res.status === 401 || res.status === 402) {
-        setInsightNote(d.error || 'Out of AI credits.'); setInsightsState('credits'); return
+      // an expired session is a sign-in, never "out of credits" (UX audit F2)
+      if (needsSignIn(res.status, d)) { setInsightsState('signin'); return }
+      if (d.credits_required || res.status === 402) {
+        setInsightNote(d.error || 'You are out of credits for today.'); setInsightsState('credits'); return
       }
       // the ledger line says what the server did — a Pro account is never charged (d.pro)
       if (d.charged || d.pro) {
@@ -245,14 +251,16 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
 
   // A pasted full posting is probed like the listing's own text — free unless they tap Reveal.
   const analyzePasted = useCallback(async (text: string) => {
-    setPastedDesc(text); setInsightsState('loading'); setInsightNote('')
+    setPastedDesc(text); setInsightsState('loading'); setInsightNote(''); setPastedRead(null)
     try {
       const res = await fetch('/api/job-insights', {
         method: 'POST',
         headers: await aiHeaders(),
         body: JSON.stringify({ jobId: `${job.id}:pasted`, job: job.title, company: job.company, jobDescription: text, needsSummary: true, probe: true }),
       })
-      const d = await res.json() as InsightsResponse
+      const d = await res.json() as InsightsResponse & { link_failed?: boolean; reason?: string; posting?: { title?: string; company?: string } }
+      if (d.link_failed) { setInsightNote(d.reason === 'gone' ? 'That link says the job was taken down, so there is nothing left to read.' : "That site doesn't let Seen read it. Open it, select all of its text, and paste the text here."); setInsightsState('link_failed'); return }
+      setPastedRead(readFacts({ pasted: text, server: d.posting || null, job: { title: job.title, company: displayCompanyName(job.company) || job.company }, requirements: null }))
       if (d._src === 'unread') { setInsightNote(d.message || ''); setInsightsState('unread'); return }
       if (d._src === 'uncached') { setInsightPrice(typeof d.price === 'number' ? d.price : JOB_INSIGHTS_COST); setInsightsState('uncached'); return }
       if (d.what_they_want?.length) { setInsights(d as Insights); setInsightsState('done') } else setInsightsState('unavailable')
@@ -377,7 +385,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
             {!closed && !checkedOpen && avail === 'expired' && <p className={d.notice} data-tone="bad"><Icon name="circle-x" size={14} />Likely closed — check the company&apos;s careers page.</p>}
             {/* Factual freshness — literally-true observations of OUR data (never an employer verdict). */}
             {job.freshness?.label && <p className={d.fine}>{job.freshness.label}</p>}
-            {!reportedInactive ? (
+            {closed ? null : !reportedInactive ? (
               <button type="button" onClick={reportInactive} disabled={reportingInactive} className={d.textBtn}>
                 <Icon name="flag" size={14} />{reportingInactive ? 'Reporting…' : 'Not active? Report it'}
               </button>
@@ -391,32 +399,36 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
             <section className={d.card} aria-label={`What ${companyName || 'this company'} is hiring for`}>
               <h3 className="ui-eyebrow">What {companyName || 'this company'} is hiring for</h3>
               {/* One sentence, then the paste button on its own line (the posting itself is the Apply button below). */}
+              {pastedRead && insightsState !== 'loading' && <PostingReadRow read={pastedRead} onPasteAnother={() => { setPastedRead(null); setPastedDesc(null); setInsightsState(preview ? 'preview' : 'unread') }} />}
               {insightsState === 'preview' && (
                 <div className={d.stack}>
-                  <p className={d.p}>This source gives Seen only a preview of the posting, so there is nothing to analyze yet. The full posting is on the employer&apos;s site.</p>
-                  <PastePosting onAnalyze={analyzePasted} />
+                  <p className={d.p}>This source gives Seen only a preview of the posting, so there is nothing to read yet. Paste the posting&apos;s link or its full text.</p>
+                  <PostingInput onSubmit={analyzePasted} submitLabel="Read this job · free" testId="paste-posting" />
                 </div>
               )}
-              {insightsState === 'unread' && (
+              {(insightsState === 'unread' || insightsState === 'link_failed') && (
                 <div className={d.stack}>
-                  <p className={d.p}>{insightNote || "This listing doesn't state what it requires, so there is nothing to analyze — no credit used."}</p>
-                  <PastePosting onAnalyze={analyzePasted} />
+                  <p className={d.p}>{insightNote || "This listing doesn't state what it requires, so there is nothing to read — no credit used."}</p>
+                  <PostingInput onSubmit={analyzePasted} submitLabel="Read this job · free" testId="paste-posting" />
                 </div>
+              )}
+              {insightsState === 'signin' && (
+                <p className={d.p} data-testid="insights-signin">{SIGNIN_EXPIRED_TEXT} <a href={signInHereHref()} className={d.link}>Sign in again</a></p>
               )}
               {(insightsState === 'loading' || insightsState === 'generating') && <Skeleton widths={[80, 65, 72, 58, 68]} h={10} />}
-              {insightsState === 'unavailable' && <p className={d.p}>AI insights are unavailable for this listing.</p>}
+              {insightsState === 'unavailable' && <p className={d.p}>Job insights are unavailable for this listing.</p>}
               {insightsState === 'uncached' && (
                 <div className={d.stack}>
-                  <p className={d.p}>Read the posting against your résumé — {priceLabel(insightPrice, pro)}.</p>
-                  <Button variant="secondary" full onClick={revealInsights} data-testid="reveal-insights" icon="sparkles">Reveal AI insights · {priceLabel(insightPrice, pro)}</Button>
+                  <p className={d.p}>What the posting asks for, the expectations it leaves unstated, and a summary — {priceLabel(insightPrice, pro)}.</p>
+                  <Button variant="secondary" full onClick={revealInsights} data-testid="reveal-insights" icon="sparkles">Show job insights · {priceLabel(insightPrice, pro)}</Button>
                   <p className={d.fine}>Once generated it is free for everyone for 7 days.{pro === true ? '' : ` ${dailyResetLabel()}.`}</p>
                 </div>
               )}
               {insightsState === 'credits' && (
                 <p className={d.p}>
                   {isLoggedIn
-                    ? <>{insightNote || 'Out of AI credits.'} <a href="/tracker" className={d.link}>Earn credits</a> · <a href="/pricing" className={d.link}>Pricing</a></>
-                    : <><a href={typeof window !== 'undefined' ? loginHref(`${window.location.pathname}${window.location.search}`) : '/login'} className={d.link}>Sign in</a> to generate AI insights ({creditCostLabel(insightPrice)}; free once cached).</>}
+                    ? <>{insightNote || 'You are out of credits for today.'} <a href="/tracker" className={d.link}>Earn credits</a> · <a href="/pricing" className={d.link}>Pricing</a></>
+                    : <><a href={typeof window !== 'undefined' ? loginHref(`${window.location.pathname}${window.location.search}`) : '/login'} className={d.link}>Sign in</a> to see job insights ({creditCostLabel(insightPrice)}; free once built).</>}
                 </p>
               )}
               {insightsState === 'done' && insights && (
@@ -451,10 +463,10 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
               : descParas.length > 0
                 ? <>
                     {descParas.map((p, i) => <p key={i} className={d.para}>{p}</p>)}
-                    {preview && (
+                    {preview && !closed && (
                       <p className={d.notice} data-tone="caution"><Icon name="scissors" size={14} />Preview from {job.source || 'this source'}. The full posting is on the employer&apos;s site{postingHref ? <> — <a href={postingHref} target="_blank" rel="noopener noreferrer" className={d.link}>open it</a></> : '.'}</p>
                     )}
-                    {cutOff && !foldLabel && (
+                    {cutOff && !foldLabel && !closed && (
                       <p className={d.fine}>Continues on the employer&apos;s site{postingHref ? <> — <a href={postingHref} target="_blank" rel="noopener noreferrer" className={d.link}>open it</a></> : '.'}</p>
                     )}
                     {foldText && <Button variant="ghost" size="sm" onClick={() => setShowFull(true)} iconRight="chevron-down">{foldText}</Button>}
@@ -503,8 +515,8 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
                     iconRight="arrow-up-right"
                   >{seenApply ? 'Apply on their site' : preview ? 'Open posting' : 'Apply'}</Button>
                   {!seenApply && (
-                    <Button variant="secondary" data-testid="drawer-optimize-btn" onClick={() => onApply(job)} title={`Optimize your résumé for this job · ${priceLabel(RESUME_OPTIMIZE_COST, pro)}`} className={d.grow}>
-                      <span className="ui-btn__stack"><span>Optimize</span><small>{shortPriceLabel(RESUME_OPTIMIZE_COST, pro)}</small></span>
+                    <Button variant="secondary" data-testid="drawer-optimize-btn" onClick={() => onApply(job)} title={`Free fit check first; optimizing costs ${priceLabel(RESUME_OPTIMIZE_COST, pro)}`} className={d.grow}>
+                      <span className="ui-btn__stack"><span>Optimize</span><small>fit check free</small></span>
                     </Button>
                   )}
                 </>
@@ -520,7 +532,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
       {confirmOpen && (
         <CreditConfirmDialog
           cost={insightPrice}
-          action={`generate AI insights for ${companyName}`}
+          action={`build job insights for ${companyName}`}
           onConfirm={() => { setConfirmOpen(false); generateInsights() }}
           onCancel={() => setConfirmOpen(false)}
         />

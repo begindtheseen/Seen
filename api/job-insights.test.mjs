@@ -67,11 +67,16 @@ test('probe on a miss answers the price without gating, generating or charging',
   assert.ok(!calls.some(c => c.path === '/rest/v1/job_insights' && c.method === 'POST'), 'probe must not write');
 });
 
-test('probe on a hit returns the cached insight for free', async () => {
+test('probe on a hit is free and carries the full current build (items with quotes), not just the stored strings', async () => {
+  // v5: the row is the record that this text was paid for under this version; the answer is the
+  // deterministic build of the same text, so a hit has items / conditions / pay like a fresh answer
   installFetch({ cachedRow: { job_id: insightsCacheKey('j3', DESC), what_they_want: ['y'], hidden_requirements: [], insider_tip: '', description_summary: '' } });
   const res = await call({ jobId: 'j3', job: 'Specialist', company: 'Acme', jobDescription: DESC, probe: true }, { auth: false });
   assert.equal(res.body._src, 'db');
-  assert.deepEqual(res.body.what_they_want, ['y']);
+  assert.equal(res.body.cost, 0);
+  assert.equal(res.body.charged, false);
+  assert.ok(res.body.what_they_want.includes('Customer service'), JSON.stringify(res.body.what_they_want));
+  assert.ok(res.body.items.length && res.body.items.every((i) => DESC.includes(i.source)), JSON.stringify(res.body.items));
 });
 
 test('a real miss charges exactly one credit and reports it', async () => {

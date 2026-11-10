@@ -101,7 +101,8 @@ test('build for Pro uses only résumé lines, adds the record and emails, and ca
 });
 
 test('build reads the cache before generating', async () => {
-  const calls = installFetch({ pro: true, cached: { company: 'Ross Stores', questions: [{ q: 'Cached?' }] } });
+  const { PREP_ENGINE } = await import('../lib/server/prepLocal.js');
+  const calls = installFetch({ pro: true, cached: { company: 'Ross Stores', questions: [{ q: 'Cached?' }], engine: PREP_ENGINE } });
   const res = await call({ action: 'build', company: 'Ross Stores', role: 'Assistant Store Manager' });
   assert.equal(res.code, 200);
   assert.equal(res.body.cached, true);
@@ -312,4 +313,24 @@ test('round 7: a build whose row write is refused says saved:false (and tried tw
   installFetch({ pro: true });
   const ok = await call({ action: 'build', company: 'Ross Stores', role: 'Assistant Store Manager', application_id: 'app_1' });
   assert.equal(ok.body.saved, true);
+});
+
+// 2026-11-10 (judge's D2–D7): a pack built by an older engine is rebuilt on read from its own posting — same rows as a
+// fresh build — and keeps what the person typed where the sentence they finished is unchanged (prepFills rules).
+test('a pack from an older engine is rebuilt on read, the person\'s words kept', async () => {
+  const { healStoredPack, needsHeal } = await import('./interview-prep.js');
+  const { localPack, PREP_ENGINE } = await import('../lib/server/prepLocal.js');
+  const posting = 'Assistant Store Manager\nRequirements\n- Customer service\n- Scheduling\n- Inventory counts\nPay: $18 - $21 per hour.';
+  const fresh = localPack({ company: 'Ross Stores', role: 'Assistant Store Manager', resumeText: RESUME, jobText: posting });
+  assert.equal(fresh.engine, PREP_ENGINE);
+  assert.equal(needsHeal(fresh), false, 'a current pack is served as it is');
+  const intro = fresh.answers.find((a) => /\[/.test(a.answer));
+  const old = { ...fresh, engine: undefined, job_text: posting, posting_pay: '$2', fills: { [intro.q]: ['my words'] } };
+  assert.equal(needsHeal(old), true);
+  let saved = null;
+  const healed = await healStoredPack(old, { company: 'Ross Stores', role: 'Assistant Store Manager', resumeText: RESUME, save: async (p) => { saved = p; } });
+  assert.equal(healed.engine, PREP_ENGINE);
+  assert.equal(healed.posting_pay, '$18 – $21 an hour', 'pay re-read from the pay sentence');
+  assert.deepEqual(healed.fills[intro.q], ['my words']);
+  assert.ok(saved && saved.engine === PREP_ENGINE, 'written back');
 });

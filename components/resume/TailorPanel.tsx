@@ -18,6 +18,8 @@ import { markQuiet } from '@/lib/quietWindow'
 import { RESUME_OPTIMIZE_COST, priceLabel } from '@/lib/creditRules'
 import { httpHref } from '@/lib/safeHref.js'
 import { ResumeDocStore } from '@/lib/stores/ResumeDocStore'
+import PostingInput from '@/components/jobs/PostingInput'
+import { needsSignIn, outOfCredits } from '@/lib/toolAuth.js'
 
 const LINES_PER_PAGE = 46
 
@@ -98,7 +100,9 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
         body: JSON.stringify({ action: 'tailor', doc, jobTitle: job.title, company: job.company, jobDescription: job.description, jobId: job.jobId || undefined }),
       })
       const data = (await res.json().catch(() => ({}))) as TailorResponse & { message?: string }
-      if (res.status === 401 || res.status === 402 || data.credits_required || data.pro_required) { setState('idle'); onNeed(data.pro_required ? 'pro' : 'credits'); return }
+      // an expired session is a sign-in, never "out of credits" (UX audit F2)
+      if (needsSignIn(res.status, data)) { setState('idle'); onNeed('signin'); return }
+      if (outOfCredits(res.status, data)) { setState('idle'); onNeed(data.pro_required ? 'pro' : 'credits'); return }
       // A listing that is only a teaser (an Adzuna summary ending in "…") is refused BEFORE any
       // credit is spent — paste the full posting above and run again.
       if (res.status === 422 && data.error === 'preview_only') {
@@ -108,8 +112,8 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
         const link = httpHref((data as { apply_url?: string | null }).apply_url || job.url || '') || ''
         setPreviewLink(link)
         const gone = (data as { reason?: string }).reason === 'gone'
-        if (gone) { setError('The site Seen got this listing from says the job was taken down, so there is no posting left to read. If you still have it, paste it into the Job description box above and press again. No credit was used.'); setState('idle'); return }
-        setError(link ? 'Seen could only read a summary of this listing, and its page would not open from here. Open the listing, copy the posting, paste it into the Job description box above, and press again.' : (data.message || 'This listing only has a summary. Paste the full posting into the Job description box above, then press again.'))
+        if (gone) { setError('The site Seen got this listing from says the job was taken down, so there is no posting left to read. If you still have it, paste it into the job box above and press again. No credit was used.'); setState('idle'); return }
+        setError(link ? 'Seen could only read a summary of this listing, and its page would not open from here. Open the listing, copy the posting, paste it into the job box above, and press again.' : (data.message || 'This listing only has a summary. Paste the full posting into the job box above, then press again.'))
         setState('idle'); return
       }
       // A posting that states no requirements is refused free, before the credit gate (api/resume.js) — say so in words.
@@ -176,8 +180,8 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
           <div><span className={s.label}>Job title</span><input autoComplete="off" className={s.input} value={job.title} onChange={(e) => setJob({ ...job, title: e.target.value })} placeholder="Job title" /></div>
           <div><span className={s.label}>Company</span><input autoComplete="off" className={s.input} value={job.company} onChange={(e) => setJob({ ...job, company: e.target.value })} placeholder="Company" /></div>
         </div>
-        <span className={s.label}>Job description</span>
-        <textarea autoComplete="off" className={`${s.input} ${s.area}`} rows={5} value={job.description} onChange={(e) => { setJob({ ...job, description: e.target.value }); if (previewLink || error) { setPreviewLink(''); setError('') } }} placeholder="Paste the posting (requirements, responsibilities, the lot) or its link." />
+        {/* the one "paste a job" box (UX audit F8): the posting's link or its text */}
+        <PostingInput value={job.description} rows={5} testId="tailor-posting" onChange={(t) => { setJob({ ...job, description: t }); if (previewLink || error) { setPreviewLink(''); setError('') } }} />
         <div className={s.opts} style={{ marginTop: '.5rem', justifyContent: 'flex-end' }}>
           {/* one filled button per screen: once a plan is on screen, "Use this version" is it and a re-run is outlined */}
           <button type="button" className={plan ? s.btnOutline : s.btnPrimary} onClick={run} disabled={state === 'loading'}>

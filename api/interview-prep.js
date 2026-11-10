@@ -30,7 +30,7 @@
 
 import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { gateAI } from '../lib/server/credits.js';
-import { localPack } from '../lib/server/prepLocal.js';
+import { localPack, PREP_ENGINE } from '../lib/server/prepLocal.js';
 import { SCORABLE_REPORTS_FILTER } from '../lib/server/reportCounts.js';
 import { ONE_TIME_SKUS } from '../lib/server/creditRules.js';
 import {
@@ -41,6 +41,12 @@ import { guideFor } from '../lib/server/interviewGuides.js';
 import { carryFills, fillTarget, SPECIAL_FILL_KEYS } from '../lib/server/prepFills.js';
 import { inList, ilikeExact } from '../lib/server/pgrest.js';
 import { hasEngineKey } from '../lib/optimizer/types.js';
+import { cleanPostingText } from '../lib/server/prepPosting.js';
+import { loadSkillTaxonomy } from '../lib/server/skillTaxonomy.js';
+
+// The skill taxonomy the free fit check reads (lib/server/skillTaxonomy.js, cached): Prep consumes the same verdict, so
+// it reads the same overlay. A failed load is not the person's problem — the built-in taxonomy is used.
+async function prepTaxonomy() { try { return await loadSkillTaxonomy(); } catch { return null; } }
 
 /** The events a browser may post here (checkout and build steps are written by the server). */
 export const FUNNEL_EVENTS = CLIENT_EVENTS;
@@ -49,14 +55,23 @@ export const FUNNEL_EVENTS = CLIENT_EVENTS;
 const readableResume = (text) => String(text || '').replace(/\s+/g, ' ').length >= 200;
 
 /**
+ * A pack is rebuilt on read when it prints an engine key, or when it was built by an engine older than PREP_ENGINE
+ * (lib/server/prepLocal.js) — the 2026-11-10 rebuild: job-match rows from the fit check's verdict, pay only from a pay
+ * sentence, the full posting. The person's words are kept (carryFills: a fill stays with the sentence it finished).
+ */
+export function needsHeal(pack) {
+  return !!pack && !pack.pending && (hasEngineKey(pack) || pack.engine !== PREP_ENGINE);
+}
+
+/**
  * A pack built 2026-11-09 → 11-10 can print an engine key ("Tell me about your experience with term:design").
  * Such a pack is never served: it is rebuilt from its own posting and the current résumé by the same
  * deterministic engine (no charge — the person already has this prep), keeping what they typed (carryFills),
  * and saved over the old row. Every other pack is returned untouched. Pure apart from `save`.
  */
-export async function healStoredPack(pack, { company, role, resumeText, save = async () => {} }) {
-  if (!pack || pack.pending || !hasEngineKey(pack) || !readableResume(resumeText)) return pack;
-  const rebuilt = localPack({ company, role, resumeText, jobText: String(pack.job_text || ''), pay: pack.pay || null, stage: pack.stage || '' });
+export async function healStoredPack(pack, { company, role, resumeText, save = async () => {}, taxonomy = null }) {
+  if (!pack || pack.pending || !needsHeal(pack) || !readableResume(resumeText)) return pack;
+  const rebuilt = localPack({ company, role, resumeText, jobText: cleanPostingText(pack.job_text), pay: pack.pay || null, stage: pack.stage || '', taxonomy });
   const full = { ...pack, ...rebuilt, built_at: new Date().toISOString(), posting_pay: rebuilt.posting_pay || null, fills: {}, notes: {} };
   const carried = carryFills(pack, full);
   full.fills = carried.fills; full.notes = carried.notes; full.noteKeys = carried.noteKeys;
@@ -228,7 +243,7 @@ export default async function handler(req, res) {
     if (!company) return res.status(400).json({ error: 'company required' });
     const uid = await uidFromToken(req, SUPABASE_URL, SERVICE_KEY);
     if (!uid) return res.status(401).json({ error: 'Sign in' });
-    const jobText = cleanText(body.job_text, 6000);
+    const jobText = cleanPostingText(body.job_text);
     const row = await readRow(uid);
     // a built prep keeps its own posting; a stash only fills the gap before the first build
     if (row && !row.pending) return res.status(200).json({ ok: true, kept: false, reason: 'prep exists' });
@@ -255,7 +270,7 @@ export default async function handler(req, res) {
       db(`profiles?id=eq.${encodeURIComponent(uid)}&select=resume_text&limit=1`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
     ]);
     const text = Array.isArray(pr) && pr[0] ? String(pr[0].resume_text || '') : null;
-    const pack = row && !row.pending ? await healStoredPack(row, { company, role, resumeText: text, save: (full) => savePack(uid, full) }) : null;
+    const pack = row && !row.pending ? await healStoredPack(row, { company, role, resumeText: text, save: (full) => savePack(uid, full), taxonomy: needsHeal(row) ? await prepTaxonomy() : null }) : null;
     // the posting stashed before checkout, so the card can build with it the moment Pro is on
     return res.status(200).json({ ok: true, pack, pending_job_text: !pack && row?.pending ? String(row.job_text || '') : '', has_resume: text == null ? null : text.replace(/\s+/g, ' ').length >= 200 });
   }
@@ -269,10 +284,10 @@ export default async function handler(req, res) {
       const owner = await uidFromToken(req, SUPABASE_URL, SERVICE_KEY);
       const row = owner ? await readRow(owner) : null;
       let cached = row && !row.pending ? row : null;
-      if (cached && hasEngineKey(cached)) {
+      if (cached && needsHeal(cached)) {
         const pr = await db(`profiles?id=eq.${encodeURIComponent(owner)}&select=resume_text&limit=1`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
         const text = Array.isArray(pr) && pr[0] ? String(pr[0].resume_text || '') : '';
-        cached = await healStoredPack(cached, { company, role, resumeText: text, save: (full) => savePack(owner, full) });
+        cached = await healStoredPack(cached, { company, role, resumeText: text, save: (full) => savePack(owner, full), taxonomy: await prepTaxonomy() });
       }
       if (cached && !body.refresh) return res.status(200).json({ ok: true, cached: true, pack: cached });
       // a rebuild keeps what the person already typed (pinned to the sentence it finished — prepFills.js), and
@@ -300,18 +315,22 @@ export default async function handler(req, res) {
 
     // The posting: the card's own listing when it has one (round 2: the model was told "JOB POSTING: not
     // provided" while Seen held the exact listing), else what the client sent.
-    let jobText = cleanText(body.job_text, 6000) || priorJobText;
+    // ONE posting text (lib/server/prepPosting.js): lines kept, 20,000 characters — what the fit check reads
+    let jobText = cleanPostingText(body.job_text) || cleanPostingText(priorJobText);
     const jobId = String(body.job_id || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
     if (!jobText && jobId) {
       const jr = await db(`jobs?id=eq.${encodeURIComponent(jobId)}&select=title,company,description&limit=1`).catch(() => null);
       const job = jr && jr.ok ? (await readJson(jr))?.[0] : null;
-      if (job?.description) jobText = clean(`${job.title || ''} at ${job.company || ''}\n${job.description}`, 6000);
+      // the stored posting as the fit check reads it: its own lines, not flattened (Northwestern RN: 0 requirements
+      // read once every newline became a space), and no "<title> at <company>" line glued on top
+      if (job?.description) jobText = cleanPostingText(job.description);
     }
     const stage = ['Phone Screen', 'Interview', 'Final Round'].includes(body.stage) ? body.stage : '';
     const pay = recOut?.pay || null;
     // Seen's own engine, no model API (owner decision 2026-10-26): résumé lines told out loud, the
     // posting's requirements and your answer to each, questions to ask them.
-    const pack = localPack({ company, role, resumeText, jobText, pay, stage });
+    const taxonomy = jobText ? await prepTaxonomy() : null;
+    const pack = localPack({ company, role, resumeText, jobText, pay, stage, taxonomy });
 
     const name = signOffName(resumeText, clean(prof?.name, 80));
     const full = {

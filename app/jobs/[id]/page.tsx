@@ -11,8 +11,6 @@ import { useRouter } from 'next/navigation'
 import { JobCache } from '@/lib/stores/JobCache'
 import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import ListingCard from '@/components/ListingCard'
-import SeenFitPanel from '@/components/SeenFitPanel'
-import HumanProofPanel from '@/components/HumanProofPanel'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { notify } from '@/lib/notify'
 import { useAuth } from '@/lib/auth'
@@ -25,7 +23,7 @@ import SeenApplyModal from '@/components/jobs/SeenApplyModal'
 import { takesSeenApply } from '@/lib/seenApplyMode'
 import CreditConfirmDialog from '@/components/CreditConfirmDialog'
 import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
-import { JOB_INSIGHTS_COST, RESUME_OPTIMIZE_COST, creditCostLabel, priceLabel, shortPriceLabel, usageLine } from '@/lib/creditRules'
+import { JOB_INSIGHTS_COST, RESUME_OPTIMIZE_COST, creditCostLabel, priceLabel, usageLine } from '@/lib/creditRules'
 import { useProStatus } from '@/lib/hooks/useProStatus'
 import { displayCompanyName } from '@/lib/companyDisplay'
 import { displayPay, payLabel } from '@/lib/jobs/pay.js'
@@ -35,7 +33,9 @@ import { isGradeableScore } from '@/lib/gradeGate'
 import ListingScoreRing from '@/components/jobs/ListingScoreRing'
 import EmployerGradeChip from '@/components/jobs/EmployerGradeChip'
 import { JOB_INSIGHTS_VERSION } from '@/lib/jobInsightsVersion.js'
-import PastePosting from '@/components/jobs/PastePosting'
+import PostingInput, { PostingReadRow, type PostingRead } from '@/components/jobs/PostingInput'
+import { readFacts } from '@/lib/postingRead.js'
+import { needsSignIn, signInHereHref, SIGNIN_EXPIRED_TEXT } from '@/lib/toolAuth.js'
 import { useListingLiveness, LivenessNotice, similarJobsHref } from '@/components/jobs/JobDetailDrawer'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
@@ -83,6 +83,8 @@ interface InsightsResponse extends Partial<Insights> {
   error?: string
 }
 
+function companyNameOf(j: Job): string { return displayCompanyName(j.company) || j.company }
+
 function companySlug(name: string) {
   return encodeURIComponent(name.toLowerCase().replace(/\s+/g, '-'))
 }
@@ -112,7 +114,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   // permalink while signed in generated — and charged — an insight nobody asked for; the drawer had
   // been fixed (PR #351), the permalink page had not. Same two-step flow now.
   // unread → the posting states nothing to read (free, never cached); the person can paste the full posting
-  const [insightsState, setInsightsState] = useState<'loading' | 'done' | 'unavailable' | 'no_desc' | 'uncached' | 'generating' | 'credits' | 'preview' | 'unread'>('loading')
+  const [insightsState, setInsightsState] = useState<'loading' | 'done' | 'unavailable' | 'no_desc' | 'uncached' | 'generating' | 'credits' | 'signin' | 'preview' | 'unread' | 'link_failed'>('loading')
+  // what Seen read from a pasted posting (UX audit F8): title · employer · where from
+  const [pastedRead, setPastedRead] = useState<PostingRead | null>(null)
   // The posting text the insight runs on: the listing's own, or one the person pasted (preview rows).
   const [pastedDesc, setPastedDesc] = useState<string | null>(null)
   // "About this role": the summary first (it states the pay and what the job asks for), the full posting one tap away
@@ -306,8 +310,10 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       })
       const d = await res.json() as InsightsResponse
       if (d._src === 'unread') { setInsightNote(d.message || ''); setInsightsState('unread'); return }
-      if (d.credits_required || res.status === 401 || res.status === 402) {
-        setInsightNote(d.error || 'Out of AI credits.'); setInsightsState('credits'); return
+      // an expired session is a sign-in, never "out of credits" (UX audit F2)
+      if (needsSignIn(res.status, d)) { setInsightsState('signin'); return }
+      if (d.credits_required || res.status === 402) {
+        setInsightNote(d.error || 'You are out of credits for today.'); setInsightsState('credits'); return
       }
       // the ledger line says what the server did — a Pro account is never charged (d.pro)
       if (d.charged || d.pro) {
@@ -325,14 +331,17 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   // like the listing's own text — free unless they then tap Reveal.
   const analyzePasted = useCallback(async (text: string) => {
     if (!job) return
-    setPastedDesc(text); setInsightsState('loading'); setInsightNote('')
+    setPastedDesc(text); setInsightsState('loading'); setInsightNote(''); setPastedRead(null)
     try {
       const res = await fetch('/api/job-insights', {
         method: 'POST',
         headers: await aiHeaders(),
         body: JSON.stringify({ jobId: `${job.id}:pasted`, job: job.title, company: job.company, jobDescription: text, needsSummary: true, probe: true }),
       })
-      const d = await res.json() as InsightsResponse
+      const d = await res.json() as InsightsResponse & { link_failed?: boolean; reason?: string; posting?: { title?: string; company?: string } }
+      if (d.link_failed) { setInsightNote(d.reason === 'gone' ? 'That link says the job was taken down, so there is nothing left to read.' : "That site doesn't let Seen read it. Open it, select all of its text, and paste the text here."); setInsightsState('link_failed'); return }
+      // the job-insights answer carries no requirement count yet (server request) — the row shows none rather than a guess
+      setPastedRead(readFacts({ pasted: text, server: d.posting || null, job: { title: job.title, company: companyNameOf(job) }, requirements: null }))
       if (d._src === 'unread') { setInsightNote(d.message || ''); setInsightsState('unread'); return }
       if (d._src === 'uncached') { setInsightPrice(typeof d.price === 'number' ? d.price : JOB_INSIGHTS_COST); setInsightsState('uncached'); return }
       if (d.what_they_want?.length) { setInsights(d as Insights); setInsightsState('done') } else setInsightsState('unavailable')
@@ -404,8 +413,19 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   // ("Help define whether new da") that hid the requirements and the pay (2026-10-25).
   const fullParas = paragraphs(preview ? stripDanglingEllipsis(job.description || '') : (job.description || ''))
   const summaryParas = paragraphs(insights?.description_summary || '')
-  const descParas = !showFullDesc && summaryParas.length && fullParas.length ? summaryParas : fullParas
-  const foldToFull = !showFullDesc && summaryParas.length > 0 && fullParas.length > 0
+  // With no summary, a long posting is folded at a paragraph boundary near 700 characters (UX audit F6: the raw
+  // posting ran ~4,400px on a phone and pushed everything else down).
+  const FOLD_CHARS = 700
+  const fullChars = (job.description || '').length
+  let descParas = fullParas
+  if (!showFullDesc && summaryParas.length && fullParas.length) descParas = summaryParas
+  else if (!showFullDesc && fullChars > FOLD_CHARS + 300) {
+    const kept: string[] = []
+    let used = 0
+    for (const p of fullParas) { if (used && used + p.length > FOLD_CHARS) break; kept.push(p); used += p.length }
+    descParas = kept
+  }
+  const foldToFull = !showFullDesc && descParas !== fullParas && fullParas.length > 0
   const reportHref = (outcome: string) => `/report?from=company&company=${encodeURIComponent(job?.company || '')}&role=${encodeURIComponent(job?.title || '')}&outcome=${outcome}`
   const metaBits = [job.type, job.level].filter(Boolean) as string[]
 
@@ -443,8 +463,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         {!job.filled && !closed && (
           <div className={d.inlineActions}>
             {postingHref && !takesSeenApply(job) && (
-              <Button variant="secondary" size="sm" data-testid="detail-optimize-btn" onClick={() => setShowApplyModal(true)} icon="sparkles" title={`Optimize your résumé for this job · ${priceLabel(RESUME_OPTIMIZE_COST, pro)}`}>
-                Optimize · {shortPriceLabel(RESUME_OPTIMIZE_COST, pro)}
+              <Button variant="secondary" size="sm" data-testid="detail-optimize-btn" onClick={() => setShowApplyModal(true)} icon="sparkles" title={`Free fit check first; optimizing costs ${priceLabel(RESUME_OPTIMIZE_COST, pro)}`}>
+                {optimized ? 'Optimize · see your changes' : 'Optimize · fit check free'}
               </Button>
             )}
             <Button variant="ghost" size="sm" onClick={() => setShowShareCard(true)} icon="share-2" aria-label="Share this listing" title="Share this listing">Share</Button>
@@ -476,7 +496,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           {avail === 'expired' && !job.filled && !closed && !checkedOpen && <p className={d.notice} data-tone="bad"><Icon name="circle-x" size={14} />This listing is likely closed — it hasn&apos;t been seen in 14+ days. Check the company&apos;s careers page directly.</p>}
           {job.freshness?.label && <p className={d.fine}>{job.freshness.label}</p>}
           {job.edited_at && <p className={d.fine}><Icon name="pencil" size={12} /> Edited by the employer {new Date(job.edited_at).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric', year: 'numeric' })}</p>}
-          {!reportedInactive ? (
+          {closed ? null : !reportedInactive ? (
             <button type="button" onClick={reportInactive} disabled={reportingInactive} className={d.textBtn}>
               <Icon name="flag" size={14} />{reportingInactive ? 'Reporting…' : 'Not active? Report it'}
             </button>
@@ -490,31 +510,35 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           <section className={d.card} aria-labelledby="jd-insights">
             <h2 id="jd-insights" className="ui-eyebrow">What {companyName || 'this company'} is hiring for</h2>
             {(insightsState === 'loading' || insightsState === 'generating') && <Skeleton widths={[80, 65, 72, 58, 68]} h={10} />}
-            {insightsState === 'unavailable' && <p className={d.p}>AI insights are unavailable for this listing.</p>}
-            {/* One sentence, then the paste button on its own line (the posting itself is the Apply button below). */}
+            {insightsState === 'unavailable' && <p className={d.p}>Job insights are unavailable for this listing.</p>}
+            {pastedRead && insightsState !== 'loading' && <PostingReadRow read={pastedRead} onPasteAnother={() => { setPastedRead(null); setPastedDesc(null); setInsightsState(preview ? 'preview' : 'unread') }} />}
+            {/* One sentence, then the one paste box (the posting itself is the Apply button below). */}
             {insightsState === 'preview' && (
               <div className={d.stack}>
-                <p className={d.p}>This source gives Seen only a preview of the posting, so there is nothing to analyze yet. The full posting is on the employer&apos;s site.</p>
-                <PastePosting onAnalyze={analyzePasted} />
+                <p className={d.p}>This source gives Seen only a preview of the posting, so there is nothing to read yet. Paste the posting&apos;s link or its full text.</p>
+                <PostingInput onSubmit={analyzePasted} submitLabel="Read this job · free" testId="paste-posting" />
               </div>
             )}
-            {insightsState === 'unread' && (
+            {(insightsState === 'unread' || insightsState === 'link_failed') && (
               <div className={d.stack} data-testid="insights-unread">
-                <p className={d.p}>{insightNote || "This listing doesn't state what it requires, so there is nothing to analyze — no credit used."}</p>
-                <PastePosting onAnalyze={analyzePasted} />
+                <p className={d.p}>{insightNote || "This listing doesn't state what it requires, so there is nothing to read — no credit used."}</p>
+                <PostingInput onSubmit={analyzePasted} submitLabel="Read this job · free" testId="paste-posting" />
               </div>
             )}
             {insightsState === 'uncached' && (
               <div className={d.stack}>
-                <p className={d.p}>Read the posting against your résumé — {priceLabel(insightPrice, pro)}. Once generated it is free for everyone for 7 days.</p>
-                <Button variant="secondary" onClick={revealInsights} data-testid="reveal-insights" icon="sparkles">Reveal AI insights · {priceLabel(insightPrice, pro)}</Button>
+                <p className={d.p}>What the posting asks for, the expectations it leaves unstated, and a summary — {priceLabel(insightPrice, pro)}. Once built it is free for everyone for 7 days.</p>
+                <Button variant="secondary" onClick={revealInsights} data-testid="reveal-insights" icon="sparkles">Show job insights · {priceLabel(insightPrice, pro)}</Button>
               </div>
+            )}
+            {insightsState === 'signin' && (
+              <p className={d.p} data-testid="insights-signin">{SIGNIN_EXPIRED_TEXT} <a href={signInHereHref()} className={d.link}>Sign in again</a></p>
             )}
             {insightsState === 'credits' && (
               <p className={d.p}>
                 {isLoggedIn
-                  ? (insightNote || "You're out of AI credits for now — insights will be available again soon.")
-                  : <>Sign in to generate AI insights ({creditCostLabel(insightPrice)}; free once cached). <a href={loginHref(`/jobs/${encodeURIComponent(id)}`)} className={d.link}>Sign in</a></>}
+                  ? (insightNote || "You're out of credits for today — they reset daily.")
+                  : <>Sign in to see job insights ({creditCostLabel(insightPrice)}; free once built). <a href={loginHref(`/jobs/${encodeURIComponent(id)}`)} className={d.link}>Sign in</a></>}
               </p>
             )}
             {insightsState === 'done' && insightNote && <p className={d.fine}>{insightNote}</p>}
@@ -554,10 +578,10 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                       Read the full posting ({(job.description || '').length.toLocaleString()} characters)
                     </Button>
                   )}
-                  {preview && (
+                  {preview && !closed && (
                     <p className={d.notice} data-tone="caution"><Icon name="scissors" size={14} />Preview from {job.source || 'this source'}. The full posting is on the employer&apos;s site{postingHref ? <> — <a href={postingHref} target="_blank" rel="noopener noreferrer" className={d.link}>open it</a></> : '.'}</p>
                   )}
-                  {cutOff && !foldToFull && (
+                  {cutOff && !foldToFull && !closed && (
                     <p className={d.fine}>Continues on the employer&apos;s site{postingHref ? <> — <a href={postingHref} target="_blank" rel="noopener noreferrer" className={d.link}>open it</a></> : '.'}</p>
                   )}
                 </>
@@ -565,10 +589,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           }
         </section>
 
-        {/* SeenFit — the free fit check; HumanProof — runs after it (both under rebuild, untouched here). */}
-        {/* not run against a job its source says is closed */}
-        {!closed && <SeenFitPanel job={job} />}
-        {!closed && <HumanProofPanel job={job} optimized={optimized} />}
+        {/* The fit check lives in ONE place: the Optimize sheet (its free step). The old bottom-of-page fit panel and
+            HumanProof panel were a second, different version of the same check (UX audit F6). */}
 
         {/* Report your experience — the strategy's data engine: one tap per outcome. */}
         <section className={d.card} aria-labelledby="jd-report">
@@ -624,7 +646,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         {confirmOpen && (
           <CreditConfirmDialog
             cost={insightPrice}
-            action={`generate AI insights for ${companyName}`}
+            action={`build job insights for ${companyName}`}
             onConfirm={() => { setConfirmOpen(false); generateInsights() }}
             onCancel={() => setConfirmOpen(false)}
           />

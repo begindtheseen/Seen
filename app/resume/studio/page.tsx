@@ -28,9 +28,11 @@ import { ResumeDocStore, type StoredVariant } from '@/lib/stores/ResumeDocStore'
 import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import { parseResumeFile } from '@/lib/resumeUploadClient'
 import { parseResume, scoreResume, serializeToText, rewriteDoc, emptyDoc, normalizeDoc, docStats, newId, countWords } from '@/lib/resume/engine-client'
+import { rewriteKeepsMeaning } from '@/lib/resume/health/meaningGuard.js'
 import type { ResumeDoc, Health } from '@/lib/resume/types'
 import type { SavedJob } from '@/lib/types'
 import { showToast } from '@/lib/toast'
+import ParseNotice from '@/components/resume/ParseNotice'
 
 type Tab = 'edit' | 'health' | 'tailor' | 'export'
 const HANDOFF_KEY = 'seen_studio_job'
@@ -86,7 +88,13 @@ function StudioInner() {
 
   const doc = activeId ? variantDoc : baseDoc
   const health: Health | null = useMemo(() => (doc ? scoreResume(doc) : null), [doc])
-  const fixAll = useMemo(() => (doc ? rewriteDoc(doc) : null), [doc])
+  // "Fix all" passes the same meaning guard as the Health panel: a rewrite that changes what a line says is
+  // never offered (lib/resume/health/meaningGuard.js — parse engineer's hand-off, 2026-11-10)
+  const fixAll = useMemo(() => {
+    if (!doc) return null
+    const r = rewriteDoc(doc)
+    return { ...r, log: r.log.filter((l) => l.to === l.from || rewriteKeepsMeaning(l.from, l.to).ok) }
+  }, [doc])
   // the button counts what the preview pre-selects (not punctuation, not tense-only)
   const fixAllCount = fixAll ? fixAll.log.filter((l) => l.to !== l.from && l.changes.some((c) => c.rule !== 'hygiene' && c.rule !== 'tense')).length : 0
   // "Fix N bullets": a preview with checkboxes first, then Apply, with Undo afterwards — never a
@@ -302,6 +310,7 @@ function StudioInner() {
 
         {mode === 'editor' && doc && (
           <>
+            {!activeId && <div style={{ marginBottom: '1rem' }}><ParseNotice doc={baseDoc} /></div>}
             {variants.length > 0 && (
               <div className={s.variants} style={{ marginBottom: '1rem' }}>
                 <span className={s.label} style={{ margin: 0 }}>Versions</span>

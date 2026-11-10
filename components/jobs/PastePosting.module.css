@@ -1,7 +1,3 @@
-/* "Paste the full posting" — a sentence above it, one outlined button on its own line, then the box. */
+/* Legacy opener for the shared paste box (components/jobs/PostingInput.module.css holds the box). */
 .row { display: flex; margin-top: var(--sp-3); }
 .form { display: flex; flex-direction: column; gap: var(--sp-2); margin-top: var(--sp-3); width: 100%; }
-.label { font-size: var(--fs-sm); color: var(--text-3); line-height: 1.5; }
-.text { width: 100%; box-sizing: border-box; background: var(--surface-1); border: 1px solid var(--border-2); border-radius: var(--r-control); color: var(--text-1); padding: var(--sp-2) var(--sp-3); font-size: var(--fs-sm); line-height: 1.5; font-family: inherit; resize: vertical; }
-.text:focus-visible { outline: none; border-color: var(--accent); box-shadow: var(--sh-focus); }
-.hint { margin: 0; font-size: var(--fs-sm); color: var(--text-3); }

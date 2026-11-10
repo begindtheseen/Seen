@@ -17,7 +17,10 @@ process.env.SUPABASE_JWT_SECRET = 'test-secret';
 delete process.env.SEENFIT_ENGINE_ENABLED;
 
 const FX = JSON.parse(readFileSync(new URL('../lib/optimizer/fixtures/expert-postings.json', import.meta.url), 'utf8'));
-const RESUME = FX.resume;
+// The money tests need a résumé the tailor really changes (a thin, job-hunting summary it rewrites from the verdict):
+// since v6 a package that changes nothing of substance is FREE (no_gain) — pinned separately below.
+const RESUME = FX.resume.replace(/Customer-focused retail[^\n]*(\n[^\n]+)?/, 'Hard working and dependable team player looking for a sales role.');
+const RESUME_STRONG = FX.resume;
 const A = FX.postings.A;
 const WALMART = FX.postings.walmart;
 
@@ -113,6 +116,36 @@ test('E6: a probe never charges; C2: the first run charges once and every reopen
   // another user never sees this user's cached result
   const other = await optimize({ probe: true }, '33333333-3333-4333-8333-333333333333');
   assert.equal(other.body.cached, false);
+});
+
+test('v6 (director G3): a package that changes nothing of substance is free — no_gain, a plain note, cached, never charged', async () => {
+  const uid = '88888888-8888-4888-8888-888888888888';
+  const before = state.charges;
+  const r = await optimize({ resume: RESUME_STRONG }, uid);
+  assert.equal(r.code, 200, JSON.stringify(r.body).slice(0, 300));
+  assert.equal(r.body.charged, false);
+  assert.equal(r.body.no_gain, true);
+  assert.match(r.body.note, /No credit was used/);
+  assert.ok(r.body.tailored && r.body.tailored.kept_as_is, 'the finished résumé says it was kept as is');
+  assert.ok(!r.body.tailored.changes.some((c) => c.default === 'applied' && c.substantive));
+  assert.equal(state.charges, before);
+  // and the charged package carries the finished résumé with every change shown before → after
+  const paid = await optimize({}, '99999999-9999-4999-8999-999999999999');
+  assert.equal(paid.body.charged, true);
+  const t = paid.body.tailored;
+  for (const k of ['doc', 'text', 'pages', 'score_before', 'score_after', 'changes', 'kept_as_is']) assert.ok(k in t, k);
+  assert.ok(t.score_after >= t.score_before);
+  assert.equal(t.score_before, paid.body.fit_score, 'one score in one package');
+  assert.ok(t.changes.some((c) => c.default === 'applied' && c.substantive));
+  for (const c of t.changes) { assert.ok(['reorder', 'summary', 'skills', 'rewrite', 'cut', 'move'].includes(c.type)); assert.ok(['applied', 'needs_ok'].includes(c.default)); assert.ok(c.why && c.why.length > 20, c.why); }
+  assert.equal(t.doc.basics.summary, t.changes.find((c) => c.type === 'summary').after, 'the doc carries the applied summary');
+});
+
+test('v6 (director G2): a signed-out caller gets signin_required, never credits_required', async () => {
+  const r = await call(resumeHandler, { tool: 'optimize', job: A.title, company: A.company, resume: RESUME, jobDescription: A.jd });
+  assert.equal(r.code, 401);
+  assert.equal(r.body.error, 'signin_required');
+  assert.equal(r.body.credits_required, undefined);
 });
 
 test('a corrupted résumé or a signed-out caller is refused before any credit is spent', async () => {

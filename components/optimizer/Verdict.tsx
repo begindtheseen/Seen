@@ -1,16 +1,22 @@
 'use client'
 
-// The ONE verdict and the paid plan, shared by the jobs-page Optimize modal and the /resume panel
-// (2026-10-24 audits, D4/E7/C3). Every surface shows the same thing: a score (or none, with why),
-// a band, ONE sentence, the hard-gate line first; "Why you match" is built from the matched
-// requirements with their résumé evidence — never from which bullets happened to be rewritten.
-// Everything the person might copy into a résumé that they did not write is labelled
-// "add only if true" and stays a proposal.
+// The ONE verdict, the ONE requirement list and the paid changes — shared by the Optimize sheet, /resume
+// and the legacy fit panel (2026-10-24 audits D4/E7/C3; UX audit 2026-11-10 F3/F4/F9/F12).
+//  - VerdictCard: a score (or none, with why), a band word, ONE sentence; the hard gate first.
+//  - RequirementsView: "You show 6 of 14 requirements this posting states", then two groups — shown on
+//    your résumé (rows that share one proof line are one group, quoted once) and not shown — most important
+//    first, five each, "Show all N". This replaces the old capped WhyYouMatch + MissingList pair and the
+//    sheet's second "Write a bullet for …" card list (one list of what is missing per screen).
+//  - PlanChanges: what the credit bought, as ordered changes with before → after and the why.
+// Everything the person might copy that they did not write is labelled "add only if true".
 
 import { useState } from 'react'
+import Icon from '@/components/ui/Icon'
 import { bulletFromAnswer } from '@/lib/resume/engine-client'
 // display spelling of canonical skills — the same table the verdict sentence uses
 import { displaySkill } from '@/lib/optimizer/explainScore.js'
+import { requirementCounts, groupByProof, countHeadline } from '@/lib/requirementList.js'
+import s from './Verdict.module.css'
 
 export interface Verdict {
   score: number | null
@@ -40,82 +46,110 @@ export interface PaidPlan {
   reorder?: ReorderProposal[]
   questions?: NumberQuestion[]
   availability?: { text: string; why: string; conflict: string | null } | null
-  summary?: { text: string; replaces: string; why: string } | null
+  summary?: { text: string; replaces: string; why: string; kept?: boolean } | null
+  application_message?: string
 }
 
-const kicker: React.CSSProperties = { fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)', marginBottom: '.5rem' }
-const card: React.CSSProperties = { background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 10, padding: '.5rem .75rem' }
-const amberCard: React.CSSProperties = { background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.22)', borderRadius: 8, padding: '.5rem .75rem' }
-const show = (s: string): string => displaySkill(s)
+// display spelling (P&L, SQL…), first letter up so a row reads as a label ("Customer service")
+const show = (x: string): string => { const d = displaySkill(x); return /^[a-z]/.test(d) ? d[0].toUpperCase() + d.slice(1) : d }
+const tone = (score: number | null): 'good' | 'caution' | undefined => score == null ? undefined : score >= 65 ? 'good' : score >= 45 ? 'caution' : undefined
 
-function bandColor(score: number | null): string {
-  if (score == null) return 'var(--muted)'
-  return score >= 65 ? 'var(--green)' : score >= 45 ? 'var(--amber)' : 'var(--sub)'
-}
-
-/** Score circle (or a dash) + band + the one sentence; the hard gate is the first line. */
-export function VerdictCard({ verdict, title = 'SeenFit match', note, cached }: { verdict: Verdict; title?: string; note?: string; cached?: boolean }) {
-  const s = verdict.score
-  // the sentence starts with the number; show it once, in the circle
+/** Score ring (or a dash) + band word + the one sentence; the hard gate is the first line. */
+export function VerdictCard({ verdict, title = 'Fit', note, cached }: { verdict: Verdict; title?: string; note?: string; cached?: boolean }) {
+  const sc = verdict.score
+  // the sentence starts with the number; show it once, in the ring
   const why = verdict.sentence.replace(/^\d+ — /, '')
   return (
-    <div data-testid="verdict" style={{ background: 'var(--surface-1)', border: '1px solid var(--border-2)', borderRadius: 12, padding: '1rem 1rem' }}>
+    <div data-testid="verdict" className={s.verdict}>
       {verdict.gate && (
-        <div data-testid="verdict-gate" style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-start', marginBottom: '.75rem', color: 'var(--amber)', fontSize: 'var(--fs-72)', lineHeight: 1.5, fontWeight: 600 }}>
-          <span aria-hidden style={{ flexShrink: 0 }}>⚠</span><span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{verdict.gate}</span>
+        <p data-testid="verdict-gate" className={s.gate}><Icon name="triangle-alert" size={16} /><span>{verdict.gate}</span></p>
+      )}
+      <div className={s.vTop}>
+        <div aria-label={sc == null ? 'No score' : `Score ${sc} of 100`} className={s.ring} data-tone={tone(sc)}>{sc == null ? '–' : sc}</div>
+        <div className={s.vText}>
+          <div className={s.band}>{verdict.band || 'No score'}</div>
+          <div className={s.vMeta}>{title}{note ? ` · ${note}` : ''}{cached ? ' · already built, no credit used' : ''}</div>
+        </div>
+      </div>
+      <p className={s.sentence}>{verdict.withheld ? verdict.sentence : why}</p>
+    </div>
+  )
+}
+
+/** The verdict as one line (the paid result leads with the work, not a second copy of the free card). */
+export function VerdictStrip({ verdict, total, extra }: { verdict: Verdict; total: number; extra?: string }) {
+  const sc = verdict.score
+  return (
+    <p className={s.strip} data-testid="verdict-strip">
+      <span>Fit <b>{sc == null ? 'no score' : sc}</b>{[verdict.band, total > 0 ? `${total} requirement${total === 1 ? '' : 's'} read` : '', extra || ''].filter(Boolean).map((x) => ` · ${x}`).join('')}</span>
+    </p>
+  )
+}
+
+function ShowAll({ n, open, onToggle, what }: { n: number; open: boolean; onToggle: () => void; what: string }) {
+  return <button type="button" className={s.more} aria-expanded={open} onClick={onToggle}>{open ? 'Show fewer' : `Show all ${n} ${what}`}</button>
+}
+
+/**
+ * THE requirement list. Counts say what they count and add up to the rows below them.
+ * @param limit rows (or proof groups) shown per group before "Show all N"
+ */
+export function RequirementsView({ matched, missing, limit = 5, heading = true }: { matched: RequirementRow[]; missing: RequirementRow[]; limit?: number; heading?: boolean }) {
+  const c = requirementCounts({ matched, missing })
+  const groups = groupByProof(c.shown)
+  const [allShown, setAllShown] = useState(false)
+  const [allMissing, setAllMissing] = useState(false)
+  if (!c.total) return null
+  const g = allShown ? groups : groups.slice(0, limit)
+  const m = allMissing ? c.missing : c.missing.slice(0, limit)
+  return (
+    <section className={s.section} data-testid="requirements" aria-label="What the posting asks for">
+      {heading && <h3 className={s.h3}>{countHeadline(c)}</h3>}
+      {c.shown.length > 0 && (
+        <div className={s.group}>
+          <p className={s.eyebrow}>Shown on your résumé ({c.shown.length})</p>
+          <ul className={s.list}>
+            {g.map((grp, i) => (
+              <li key={i} className={s.item}>
+                <Icon name="circle-check" size={16} className={s.good} label="Shown" />
+                <div className={s.itemBody}>
+                  {grp.rows.length === 1
+                    ? <div className={s.req}>{show(grp.rows[0].surface)}{grp.rows[0].inferred ? <span className={s.tag}> · from related work, no line says it</span> : grp.rows[0].via === 'related' ? <span className={s.tag}> · related experience</span> : null}</div>
+                    : <div className={s.reqs}>{grp.rows.map((r) => <span key={r.surface} className={s.reqTag}>{show(r.surface)}</span>)}</div>}
+                  {grp.line && <p className={s.quote}>“{grp.line.length > 180 ? `${grp.line.slice(0, 180).replace(/\s+\S*$/, '')}…` : grp.line}”</p>}
+                </div>
+              </li>
+            ))}
+          </ul>
+          {groups.length > limit && <ShowAll n={c.shown.length} what="shown" open={allShown} onToggle={() => setAllShown((v) => !v)} />}
         </div>
       )}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem' }}>
-        <div aria-label={s == null ? 'No score' : `Score ${s} of 100`} style={{ flexShrink: 0, width: 52, height: 52, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `3px solid ${bandColor(s)}` }}>
-          <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-lead)', color: bandColor(s) }}>{s == null ? '–' : s}</span>
+      {c.missing.length > 0 && (
+        <div className={s.group}>
+          <p className={s.eyebrow}>Not shown on your résumé ({c.missing.length}) — add only if true</p>
+          <ul className={s.list}>
+            {m.map((r) => (
+              <li key={r.surface} className={s.item}>
+                <Icon name="triangle-alert" size={16} className={s.caution} label="Not shown" />
+                <div className={s.itemBody}>
+                  <div className={s.req}>{show(r.surface)}<span className={s.tag}>{r.importance === 'preferred' ? ' · preferred' : r.hard ? ' · required' : ''}</span></div>
+                </div>
+              </li>
+            ))}
+          </ul>
+          {c.missing.length > limit && <ShowAll n={c.missing.length} what="not shown" open={allMissing} onToggle={() => setAllMissing((v) => !v)} />}
         </div>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: 'var(--fs-ui)' }}>{verdict.band || 'No score'}{cached ? <span style={{ marginLeft: '.5rem', fontFamily: 'var(--mono)', fontWeight: 400, fontSize: 'var(--fs-55)', color: 'var(--green)' }}>· cached, no credit used</span> : null}</div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--dim)', lineHeight: 1.5 }}>{title}{note ? ` · ${note}` : ''}</div>
-        </div>
-      </div>
-      <p style={{ margin: '.75rem 0 0', fontSize: 'var(--fs-72)', color: 'var(--sub)', lineHeight: 1.6, overflowWrap: 'anywhere' }}>{verdict.withheld ? verdict.sentence : why}</p>
-    </div>
+      )}
+    </section>
   )
 }
 
-/** "Why you match" — every matched requirement with the sentence of the résumé that proves it. */
+/** Legacy pair kept for the old fit panel — both now render the one list's halves. */
 export function WhyYouMatch({ matched, limit = 6 }: { matched: RequirementRow[]; limit?: number }) {
-  // a soft skill inferred from related work is counted, never shown as proof (round 5, Tasha)
-  const rows = (matched || []).filter((m) => m.matched && !m.inferred).sort((a, b) => Number(a.via === 'related') - Number(b.via === 'related')).slice(0, limit)
-  if (!rows.length) return null
-  return (
-    <div>
-      <div style={{ ...kicker, color: 'var(--text-3)' }}>Why you match</div>
-      <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-        {rows.map((m, i) => (
-          <li key={i} style={{ display: 'flex', gap: '.5rem', fontSize: 'var(--fs-72)', color: 'var(--sub)', lineHeight: 1.5 }}>
-            <span style={{ color: 'var(--green)', flexShrink: 0 }}>✓</span>
-            <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
-              <strong style={{ color: 'var(--white)' }}>{show(m.surface)}</strong>{m.via === 'related' ? ' (related experience)' : ''}
-              {m.evidence ? <span style={{ color: 'var(--muted)' }}> — “{m.evidence.replace(/^[•\-*\s]+/, '').slice(0, 140)}{m.evidence.length > 140 ? '…' : ''}”</span> : null}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
+  return <RequirementsView matched={matched} missing={[]} limit={limit} heading={false} />
 }
-
-/** The posting's requirements the résumé does not show (hard ones first). Amber: a to-do, not a failure. */
 export function MissingList({ missing, limit = 8 }: { missing: RequirementRow[]; limit?: number }) {
-  const rows = (missing || []).filter((m) => !m.matched).sort((a, b) => Number(!!b.hard) - Number(!!a.hard) || Number(a.importance !== 'required') - Number(b.importance !== 'required')).slice(0, limit)
-  if (!rows.length) return null
-  return (
-    <div>
-      <div style={{ ...kicker, color: 'var(--amber)' }}>The posting asks for — add only if true</div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.25rem' }}>
-        {rows.map((m, i) => (
-          <span key={i} style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.28)', color: 'var(--amber)', borderRadius: 5, padding: '.25rem .5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', maxWidth: '100%', overflowWrap: 'anywhere' }}>{show(m.surface)}{m.importance === 'preferred' ? ' · preferred' : ''}</span>
-        ))}
-      </div>
-    </div>
-  )
+  return <RequirementsView matched={[]} missing={missing} limit={limit} heading={false} />
 }
 
 /** Screens the résumé cannot answer (availability, lifting, a licence): yes/no for the person. */
@@ -123,121 +157,101 @@ export function Checklist({ constraints }: { constraints: ConstraintRow[] }) {
   const rows = (constraints || []).filter((c) => c.status === 'ask' || (c.status === 'unmet' && !c.gate))
   if (!rows.length) return null
   return (
-    <div>
-      <div style={kicker}>This job also screens on</div>
-      <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.25rem' }}>
-        {rows.slice(0, 6).map((c, i) => (
-          <li key={i} style={{ display: 'flex', gap: '.5rem', fontSize: 'var(--fs-70)', color: c.conflict ? 'var(--amber)' : 'var(--sub)', lineHeight: 1.5 }}>
-            <span style={{ flexShrink: 0 }}>{c.conflict ? '⚠' : '☐'}</span><span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{c.message}</span>
+    <section className={s.section} aria-label="This job also screens on">
+      <h3 className={s.h3}>This job also screens on</h3>
+      <ul className={s.list}>
+        {rows.slice(0, 8).map((c, i) => (
+          <li key={i} className={s.check} data-conflict={c.conflict ? '1' : undefined}>
+            <Icon name={c.conflict ? 'triangle-alert' : 'circle'} size={16} label={c.conflict ? 'Conflict' : undefined} /><span>{c.message}</span>
           </li>
         ))}
       </ul>
-    </div>
+    </section>
   )
 }
 
-function CopyBtn({ text, label = 'copy' }: { text: string; label?: string }) {
+export function CopyBtn({ text, label = 'Copy' }: { text: string; label?: string }) {
   const [done, setDone] = useState(false)
   return (
-    <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(text); setDone(true); setTimeout(() => setDone(false), 1500) } catch { /* ignore */ } }}
-      style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 6, padding: '.25rem .5rem', minHeight: 32, fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', color: done ? 'var(--green)' : 'var(--muted)', cursor: 'pointer', flexShrink: 0 }}>
-      {done ? '✓' : label}
+    <button type="button" className={s.copy} data-done={done ? '1' : undefined}
+      onClick={async () => { try { await navigator.clipboard.writeText(text); setDone(true); setTimeout(() => setDone(false), 1500) } catch { /* ignore */ } }}>
+      {done ? 'Copied' : label}
     </button>
   )
 }
 
 /** One number question → the person's answer → a bullet written by the SAME composer the Studio uses. */
-function QuestionRow({ q }: { q: NumberQuestion }) {
+function QuestionChange({ q, onAnswer }: { q: NumberQuestion; onAnswer?: (id: string, bullet: string) => void }) {
   const [answer, setAnswer] = useState('')
   const bullet = answer.trim() ? bulletFromAnswer({ unit: q.unit } as Parameters<typeof bulletFromAnswer>[0], answer) : ''
+  const role = q.roles?.[0]
   return (
-    <div style={card}>
-      <label style={{ display: 'block', fontSize: 'var(--fs-72)', color: 'var(--white)', lineHeight: 1.5, marginBottom: '.5rem' }}>
+    <li className={s.change}>
+      <p className={s.kind}>{!/your number/i.test(q.template) ? 'Answer to add a line — only if it’s true' : 'Add a number — only one you can defend'}</p>
+      {role && <p className={s.where}>For {role.title}{role.company ? ` · ${role.company}` : ''}</p>}
+      <label className={s.qLabel}>
         {q.question}
-        <input autoComplete="off" value={answer} onChange={(e) => setAnswer(e.target.value)} inputMode="text" placeholder="e.g. 200" maxLength={60}
-          style={{ display: 'block', width: '100%', marginTop: '.25rem', background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 7, padding: '.5rem .75rem', color: 'var(--white)', fontSize: 'var(--fs-ui)', boxSizing: 'border-box' }} />
+        <input autoComplete="off" className={s.input} value={answer} inputMode="text" placeholder={/your number/i.test(q.template) ? 'e.g. 200' : 'Your answer, in your words'} maxLength={60}
+          onChange={(e) => { setAnswer(e.target.value); const b = e.target.value.trim() ? bulletFromAnswer({ unit: q.unit } as Parameters<typeof bulletFromAnswer>[0], e.target.value) : ''; onAnswer?.(q.id, b) }} />
       </label>
-      {bullet ? (
-        <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
-          <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--fs-72)', color: 'var(--sub)', overflowWrap: 'anywhere' }}>“{bullet}”</span>
-          <CopyBtn text={bullet} />
-        </div>
-      ) : (
-        <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--muted)' }}>Your answer becomes: “{q.template}” — only a number you can defend.</div>
-      )}
-    </div>
+      {bullet
+        ? <div className={s.row}><p className={s.after}>“{bullet}”</p><CopyBtn text={bullet} /></div>
+        : <p className={s.why}>Your answer becomes: “{q.template}”</p>}
+    </li>
   )
 }
 
-/** The paid work: what to move, what to reword (proposals), what to add once you confirm it. */
-export function PaidPlanView({ plan }: { plan: PaidPlan }) {
+/** How many changes the plan holds (what the header counts). */
+export function planChangeCount(plan: PaidPlan): number {
+  return (plan.reorder || []).length + (plan.rewrite_plan || []).length + (plan.questions || []).length
+    + (plan.availability ? 1 : 0) + (plan.summary && !plan.summary.kept ? 1 : 0)
+}
+
+/** The paid work as ordered changes: before → after, where, and why. */
+export function PlanChanges({ plan, onAnswer }: { plan: PaidPlan; onAnswer?: (id: string, bullet: string) => void }) {
   const reorder = plan.reorder || []
   const rewrites = plan.rewrite_plan || []
   const questions = plan.questions || []
   return (
-    <>
+    <ol className={s.list} data-testid="plan-changes">
+      {reorder.map((r, i) => (
+        <li key={`m${i}`} className={s.change}>
+          <p className={s.kind}>Move up — no words change</p>
+          <p className={s.where}>{r.role}{r.company ? ` · ${r.company}` : ''} · line {r.from} → {r.to || 1}</p>
+          <p className={s.after}>{r.text}</p>
+          {r.why && <p className={s.why}>Why: {r.why}</p>}
+        </li>
+      ))}
+      {plan.summary && !plan.summary.kept && (
+        <li className={s.change}>
+          <p className={s.kind}>New summary — from your own facts</p>
+          <div className={s.row}><p className={s.after}>{plan.summary.text}</p><CopyBtn text={plan.summary.text} /></div>
+          {plan.summary.replaces && (
+            <details className={s.details}><summary>Your current summary</summary><p className={s.before}>{plan.summary.replaces}</p></details>
+          )}
+        </li>
+      )}
+      {rewrites.map((r, i) => (
+        <li key={`r${i}`} className={s.change}>
+          <p className={s.kind}>Reword — use it only if it reads right to you</p>
+          <p className={s.before}>{r.from}</p>
+          <div className={s.row}><p className={s.after}>{r.to}</p><CopyBtn text={r.to} /></div>
+        </li>
+      ))}
+      {questions.map((q) => <QuestionChange key={q.id} q={q} onAnswer={onAnswer} />)}
       {plan.availability && (
-        <div>
-          <div style={{ ...kicker, color: 'var(--amber)' }}>Availability line — add only if true</div>
-          <div style={amberCard}>
-            {plan.availability.conflict && <div style={{ fontSize: 'var(--fs-70)', color: 'var(--amber)', lineHeight: 1.5, marginBottom: '.5rem' }}>⚠ {plan.availability.conflict}</div>}
-            <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
-              <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--fs-72)', color: 'var(--white)', overflowWrap: 'anywhere' }}>{plan.availability.text}</span>
-              <CopyBtn text={plan.availability.text} />
-            </div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--muted)', marginTop: '.25rem', lineHeight: 1.5 }}>{plan.availability.why}</div>
-          </div>
-        </div>
+        <li className={s.change}>
+          <p className={s.kind}>Availability line — add only if true</p>
+          {plan.availability.conflict && <p className={s.conflict}><Icon name="triangle-alert" size={14} label="Conflict" />{plan.availability.conflict}</p>}
+          <div className={s.row}><p className={s.after}>{plan.availability.text}</p><CopyBtn text={plan.availability.text} /></div>
+          <p className={s.why}>From this posting&apos;s schedule — edit it to what you can actually work.</p>
+        </li>
       )}
-      {reorder.length > 0 && (
-        <div>
-          <div style={kicker}>Move to the top — no words change</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-            {reorder.map((r, i) => (
-              <div key={i} style={card}>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--dim)', marginBottom: '.25rem' }}>{r.role}{r.company ? ` · ${r.company}` : ''} · line {r.from} → 1</div>
-                <div style={{ fontSize: 'var(--fs-72)', color: 'var(--white)', lineHeight: 1.55, overflowWrap: 'anywhere' }}>{r.text}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      {questions.length > 0 && (
-        <div>
-          <div style={{ ...kicker, color: 'var(--amber)' }}>Add a number — your answer writes the bullet</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-            {questions.map((q) => <QuestionRow key={q.id} q={q} />)}
-          </div>
-        </div>
-      )}
-      {plan.summary && (
-        <div>
-          <div style={kicker}>Summary for this job</div>
-          <div style={card}>
-            <div style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-start' }}>
-              <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--fs-72)', color: 'var(--white)', lineHeight: 1.6, overflowWrap: 'anywhere' }}>{plan.summary.text}</span>
-              <CopyBtn text={plan.summary.text} />
-            </div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--muted)', marginTop: '.25rem' }}>{plan.summary.why}</div>
-          </div>
-        </div>
-      )}
-      {rewrites.length > 0 && (
-        <div>
-          <div style={kicker}>Wording proposals — use only the ones that read right to you</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-            {rewrites.map((r, i) => (
-              <div key={i} style={{ ...card, padding: 0, overflow: 'hidden' }}>
-                <div style={{ padding: '.5rem .75rem', borderBottom: '1px solid var(--line)', fontSize: 'var(--fs-70)', color: 'var(--muted)', overflowWrap: 'anywhere' }}>{r.from}</div>
-                <div style={{ padding: '.5rem .75rem', display: 'flex', gap: '.5rem', alignItems: 'center' }}>
-                  <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--fs-72)', color: 'var(--white)', overflowWrap: 'anywhere' }}>{r.to}</span>
-                  <CopyBtn text={r.to} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </>
+    </ol>
   )
+}
+
+/** Legacy name: the /resume Rewrite tab renders the same changes. */
+export function PaidPlanView({ plan }: { plan: PaidPlan }) {
+  return <PlanChanges plan={plan} />
 }

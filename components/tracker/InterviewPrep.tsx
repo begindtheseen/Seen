@@ -25,6 +25,8 @@ import { useCheckout } from '@/lib/useCheckout'
 import { funnelEvent } from '@/lib/funnel'
 import { splitAnswer, composeAnswer, isFinished, blankCount } from './prepAnswer'
 import { localDay, localTime, isoFrom } from '@/lib/interviewTime'
+// ONE posting text: the cap the server and the fit check use (20,000 characters, lines kept)
+import { PREP_POSTING_MAX } from '@/lib/server/prepPosting.js'
 import s from './InterviewPrep.module.css'
 
 const SKU = PREP
@@ -54,7 +56,7 @@ type Pack = {
   answers: Answer[]
   intro: string | null
   resume_check?: { line: string; note: string }[]
-  job_match?: { label: string; status: 'shown' | 'stated' | 'gap' | 'expired' | 'in progress'; proof?: string; say: string; duty?: boolean; cert?: boolean }[]
+  job_match?: { label: string; status: 'shown' | 'stated' | 'related' | 'gap' | 'expired' | 'in progress'; proof?: string; say: string; duty?: boolean; cert?: boolean; source?: string; basis?: string; story?: string }[]
   ask_them?: { q: string; company?: boolean }[]
   format?: string
   guide?: { company: string; confidence: string; framework: { name: string; note: string } | null; tips: string[]; watch: string } | null
@@ -122,7 +124,7 @@ const postingKey = (appId: string) => `seen_prep_posting_${appId}`
 const openKey = (appId: string) => `seen_prep_open_${appId}`
 const readOpen = (appId: string): boolean => { try { return sessionStorage.getItem(openKey(appId)) === '1' } catch { return false } }
 const writeOpen = (appId: string, open: boolean) => { try { if (open) sessionStorage.setItem(openKey(appId), '1'); else sessionStorage.removeItem(openKey(appId)) } catch { /* private mode */ } }
-const stashPosting = (appId: string, text: string) => { try { if (text.trim()) localStorage.setItem(postingKey(appId), text.slice(0, 6000)); else localStorage.removeItem(postingKey(appId)) } catch { /* private mode */ } }
+const stashPosting = (appId: string, text: string) => { try { if (text.trim()) localStorage.setItem(postingKey(appId), text.slice(0, PREP_POSTING_MAX)); else localStorage.removeItem(postingKey(appId)) } catch { /* private mode */ } }
 const takePosting = (appId: string): string => { try { const v = localStorage.getItem(postingKey(appId)) || ''; return v } catch { return '' } }
 const dropPosting = (appId: string) => { try { localStorage.removeItem(postingKey(appId)) } catch { /* ignore */ } }
 
@@ -250,7 +252,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
     setState('building'); setErr('')
     try {
       const h = await aiHeaders()
-      const jobText = (opts.jobText ?? postingRef.current).trim().slice(0, 6000)
+      const jobText = (opts.jobText ?? postingRef.current).trim().slice(0, PREP_POSTING_MAX)
       const r = await fetch('/api/interview-prep', { method: 'POST', headers: h, body: JSON.stringify({ action: 'build', company, role, application_id: appId, interview_at: interviewAt, job_id: jobId || '', job_text: jobText, stage, ...(opts.refresh ? { refresh: true } : {}) }) })
       const d = await r.json().catch(() => ({}))
       if (r.status === 409 && d.need_resume) { setState('need_resume'); return }
@@ -289,7 +291,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
       try {
         const h = await aiHeaders()
         await Promise.race([
-          fetch('/api/interview-prep', { method: 'POST', headers: h, body: JSON.stringify({ action: 'stash', company, role, application_id: appId, job_text: text.slice(0, 6000) }), keepalive: true }),
+          fetch('/api/interview-prep', { method: 'POST', headers: h, body: JSON.stringify({ action: 'stash', company, role, application_id: appId, job_text: text.slice(0, PREP_POSTING_MAX) }), keepalive: true }),
           new Promise(res => setTimeout(res, 2500)),
         ])
       } catch { /* the device copy still carries it */ }
@@ -479,7 +481,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
   )
 }
 
-const MATCH_WORD = { shown: 'your résumé shows it', stated: 'listed, not shown in a line', gap: 'not on your résumé', expired: 'lapsed', 'in progress': 'in progress' } as const
+const MATCH_WORD: Record<string, string> = { shown: 'your résumé shows it', stated: 'listed, not shown in a line', related: 'related experience', gap: 'not on your résumé', expired: 'lapsed', 'in progress': 'in progress' }
 
 // One answer: the résumé's words as text, each [blank] as a field; the finished answer below once typed.
 // A box grows with what is typed; it starts two lines tall so the prompt inside it can be read (round 4: one-
@@ -637,8 +639,9 @@ function PackView({ pack, company, fu, onFill, onRebuild, building }: { pack: Pa
           <ul className={s.qs}>
             {pack.job_match.map((m, i) => (
               <li key={i}>
-                <b>{m.label}</b> <span className={s.dim}>· {MATCH_WORD[m.status]}</span>
-                {m.proof ? <span className={s.why}>Your line: “{m.proof}”</span> : <span className={s.why}>{m.say}</span>}
+                <b>{m.label}</b> <span className={s.dim}>· {MATCH_WORD[m.status] || m.status}</span>
+                {m.proof && <span className={s.why}>Your line: “{m.proof}”</span>}
+                {m.say && <span className={s.why}>{m.say}</span>}
               </li>
             ))}
           </ul>

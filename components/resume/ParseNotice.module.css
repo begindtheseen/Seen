@@ -1,0 +1,9 @@
+/* The "what Seen could not place" notice: caution with a word and an icon, tokens only. */
+.box { display: flex; gap: var(--sp-2); align-items: flex-start; padding: var(--sp-3); background: var(--caution-tint); border: 1px solid var(--caution-line); border-radius: var(--r-control); min-width: 0; }
+.ico { flex-shrink: 0; margin-top: 4px; color: var(--caution-text); }
+.body { min-width: 0; display: flex; flex-direction: column; gap: var(--sp-1); }
+.p { margin: 0; font-size: var(--fs-sm); color: var(--text-1); line-height: 1.5; overflow-wrap: anywhere; }
+.fine { margin: 0; font-size: var(--fs-sm); color: var(--text-3); }
+.list { margin: 0; padding-left: var(--sp-4); font-size: var(--fs-sm); color: var(--text-2); line-height: 1.5; overflow-wrap: anywhere; }
+.link { min-height: 44px; padding: 0; background: none; border: 0; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
+.link:hover { text-decoration: underline; }

@@ -29,6 +29,7 @@ import { localPack } from '../lib/server/prepLocal.js';
 import { buildPaidOptimize } from '../lib/server/optimizePackage.js';
 import { previewFrom } from '../api/interview-prep.js';
 import { numbersBacked } from '../lib/server/interviewPrep.js';
+import { SOFT_SKILL_RE, SCREENING_RE } from '../lib/resume/optimize/engine.js';
 
 // ── args ────────────────────────────────────────────────────────────────────────────────────────
 const argv = process.argv.slice(2);
@@ -41,9 +42,10 @@ if (arg('cases')) cases = JSON.parse(fs.readFileSync(arg('cases'), 'utf8'));
 else cases = [{ id: arg('id', 'case'), resume: arg('resume'), posting: arg('posting'), title: arg('title'), company: arg('company'), stage: arg('stage', 'Interview') }];
 fs.mkdirSync(outDir, { recursive: true });
 
-// ── production's own posting preparation (api/interview-prep.js) ───────────────────────────────
-const prodClean = (s, n) => String(s || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, n);
-const prodCleanText = (s, n) => String(s || '').replace(/\r\n?/g, '\n').replace(/[\u0000-\u0008\u000b-\u001f]/g, ' ').trim().slice(0, n);
+// ── production's own posting preparation (api/interview-prep.js → lib/server/prepPosting.js) ────
+// Since 2026-11-10 both Prep paths (the card's job_text and the server's job_id read) use ONE cleaning: lines kept,
+// 20,000 characters; the job_id path reads the stored description alone. Prep also reads the same taxonomy.
+import { cleanPostingText } from '../lib/server/prepPosting.js';
 
 // ── helpers ─────────────────────────────────────────────────────────────────────────────────────
 const STOP = /^(?:and|the|for|with|experience|experienced|skills?|strong|proven|knowledge|ability|abilities|working|work|years?|of|in|or|a|an|to|preferred|required|plus|any|e\.g|similar|etc|basic|general|good|excellent)$/;
@@ -78,18 +80,18 @@ function runCase(c) {
   // Job Insights
   const ins = buildJobInsights({ title, company, description: jd, needsSummary: true });
   // Interview Prep — the card's job_text path and the server's job_id path
-  const jobTextCard = prodCleanText(jd, 6000);
-  const jobTextDb = prodClean(`${title || ''} at ${company || ''}\n${jd}`, 6000);
-  const prep = localPack({ company, role: title, resumeText: resumeRaw, jobText: jobTextCard, pay: null, stage });
-  const prepDb = localPack({ company, role: title, resumeText: resumeRaw, jobText: jobTextDb, pay: null, stage });
+  const jobTextCard = cleanPostingText(jd);
+  const jobTextDb = cleanPostingText(jd);
+  const prep = localPack({ company, role: title, resumeText: resumeRaw, jobText: jobTextCard, pay: null, stage, taxonomy });
+  const prepDb = localPack({ company, role: title, resumeText: resumeRaw, jobText: jobTextDb, pay: null, stage, taxonomy });
   const preview = previewFrom({ company, role: title, resumeText: resumeRaw, stage });
   // paid Optimize
   const paid = buildPaidOptimize({ resume, jobDescription: jd, job: title, company, pro: false, jobId: c.id, taxonomy, fit: { companyProcessScore: null, companyProcessConfidence: null, remoteOk, jobLocation: null, desiredLocation: null } });
 
   // ── requirement sets ──
   const fitReqs = [
-    ...fit.matched_requirements.map((r) => ({ label: label(r), key: r.requirement, importance: r.importance, status: r.inferred ? 'inferred' : 'matched', via: r.via, term: !!r.term, evidence: r.evidence })),
-    ...fit.unsupported_requirements.map((r) => ({ label: label(r), key: r.requirement, importance: r.importance, status: 'missing', term: !!r.term })),
+    ...fit.matched_requirements.map((r) => ({ label: label(r), key: r.requirement, importance: r.importance, status: r.inferred ? 'inferred' : 'matched', via: r.via, term: !!r.term, evidence: r.evidence, soft: !!r.soft })),
+    ...fit.unsupported_requirements.map((r) => ({ label: label(r), key: r.requirement, importance: r.importance, status: 'missing', term: !!r.term, soft: !!r.soft })),
   ];
   const paidReqs = [
     ...paid.matched_requirements.map((r) => ({ label: label(r), status: r.inferred ? 'inferred' : 'matched' })),
@@ -108,7 +110,7 @@ function runCase(c) {
     const pd = paidReqs.find((x) => x.label === r.label);
     const iv = findIns(r.label);
     const pa = prepAnswerFor(r.label);
-    return { req: r.label, importance: r.importance, term: r.term, fit: r.status, paid: pd ? pd.status : '—', prep: pr ? `${pr.status}${pr.label !== r.label ? ` (as "${pr.label}")` : ''}` : '—', prepStatus: pr ? pr.status : null, insights: iv ? `shown: "${iv}"` : '—', prepAnswer: pa ? 'story' : '' };
+    return { req: r.label, importance: r.importance, term: r.term, soft: !!r.soft || SOFT_SKILL_RE.test(r.label) || SCREENING_RE.test(r.label), fit: r.status, paid: pd ? pd.status : '—', prep: pr ? `${pr.status}${pr.label !== r.label ? ` (as "${pr.label}")` : ''}` : '—', prepStatus: pr ? pr.status : null, insights: iv ? `shown: "${iv}"` : '—', prepAnswer: pa ? 'story' : '' };
   });
 
   // ── disagreements ──
@@ -118,7 +120,8 @@ function runCase(c) {
     if (fitHas && t.prepStatus === 'gap') dis.push({ kind: 'matched_vs_missing', detail: `"${t.req}": fit check = matched; Interview Prep = "Not on your résumé"` });
     if (t.fit === 'missing' && (t.prepStatus === 'shown' || t.prepStatus === 'stated')) dis.push({ kind: 'missing_vs_shown', detail: `"${t.req}": fit check = missing; Interview Prep = ${t.prepStatus}` });
     if (t.fit !== t.paid && t.paid !== '—') dis.push({ kind: 'fit_vs_paid', detail: `"${t.req}": fit ${t.fit} vs paid ${t.paid}` });
-    if (t.importance === 'required' && t.prep === '—') dis.push({ kind: 'prep_drops_requirement', detail: `"${t.req}" (required${t.term ? ', posting term' : ''}) is in the fit check but has no Interview Prep job-match row` });
+    // a soft skill (a trait) is shown by how you answer, never a job-match row — by design, not a disagreement
+    if (t.importance === 'required' && t.prep === '—' && !t.soft) dis.push({ kind: 'prep_drops_requirement', detail: `"${t.req}" (required${t.term ? ', posting term' : ''}) is in the fit check but has no Interview Prep job-match row` });
   }
   for (const pr of prepRows.filter((r) => !r.duty)) {
     if (/^term:/.test(pr.label)) continue; // counted under leaks

@@ -101,7 +101,7 @@ export function PostingReadRow({ read, onCorrect, onPasteAnother, note }: {
     <div className={s.read} data-testid="posting-read" role="status">
       <p className={s.readLine}>
         <Icon name="circle-check" size={16} className={s.readIco} />
-        <span><span className={s.readKey}>Read:</span> {readLine(read)}</span>
+        <span><span className={s.readKey}>Seen read:</span> {readLine(read)}</span>
       </p>
       {note && <p className={s.readNote}>{note}</p>}
       {!editing && (onCorrect || onPasteAnother) && (

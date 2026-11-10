@@ -7,13 +7,15 @@
 // Every 200 answer carries the ledger facts the UI renders from:
 //   _src   'db' (cached, free) | 'generated' (charged) | 'empty' (no description) | 'uncached' (probe miss)
 //   cost   credits this call charged (0 or JOB_INSIGHTS_COST)
-//   charged  true only when a credit was actually consumed
+//   charged  true only when a credit was actually consumed (false for Pro)
+//   shared   on a generated answer: the shared row was stored, so the next visitor's view is free
 //   price  on a probe miss: what a real call would cost
 import { postingLink, readPostingLink } from '../lib/server/fullPosting.js';
 import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { gateAI } from '../lib/server/credits.js';
 import { JOB_INSIGHTS_COST } from '../lib/server/creditRules.js';
 import { buildJobInsights } from '../lib/server/jobInsights.js';
+import { loadSkillTaxonomy } from '../lib/server/skillTaxonomy.js';
 import { JOB_INSIGHTS_VERSION } from '../lib/jobInsightsVersion.js';
 import { createHash } from 'node:crypto';
 
@@ -69,6 +71,18 @@ export default async function handler(req, res) {
   // "non-negotiable shift" for a salaried role. Bumping the version regenerates them on the next
   // view with no SQL purge; old rows age out by expires_at.
   const cacheKey = jobDescription ? insightsCacheKey(jobId, jobDescription) : '';
+  const readable = !!(job && company && jobDescription && jobDescription.length >= 80);
+  // The insight is deterministic and free to compute, so it is built ONCE, up front, with the same
+  // skill taxonomy the fit check reads (lib/server/skillTaxonomy.js) — the requirement list is the
+  // verdict's. The cached row is the record that someone already paid for THIS text under THIS
+  // version; what is served is always this build, so a cache hit carries every field a fresh answer
+  // does (items with their quotes, conditions, pay) — the row only stores the legacy strings.
+  const parsed = readable
+    ? buildJobInsights({ title: job, company, description: jobDescription, needsSummary: true, taxonomy: await loadSkillTaxonomy().catch(() => null) })
+    : null;
+  const unreadBody = (p) => ({ ...p, what_they_want: [], _src: 'unread', cost: 0, charged: false,
+    message: "This listing doesn't state what it requires, so there is nothing to analyze — no credit used. If the employer's site has the full posting, paste it to analyze that." });
+
   if (cacheKey && SUPABASE_URL && SUPABASE_SERVICE_KEY) {
     try {
       const checkRes = await fetch(
@@ -81,16 +95,14 @@ export default async function handler(req, res) {
         const row = list.find(r => r.job_id === cacheKey) || null;
         // a row that holds no read is never served as one
         if (row && (row.what_they_want || []).length) {
-          // Prod's job_insights has no description_summary column until migration
-          // 20261024140000 is applied; the summary is a deterministic excerpt of the posting the
-          // caller sent, so it is rebuilt here (free) rather than lost.
-          const summary = row.description_summary ?? (needsSummary && job && company && jobDescription
-            ? buildJobInsights({ title: job, company, description: jobDescription, needsSummary: true }).description_summary : '');
+          if (parsed && !parsed.read) return res.status(200).json(unreadBody(parsed));
+          if (parsed) return res.status(200).json({ ...parsed, cached: true, _src: 'db', cost: 0, charged: false });
+          // a caller that sent no title/company: the stored strings, as they were paid for
           return res.status(200).json({
             what_they_want: row.what_they_want || [],
             hidden_requirements: row.hidden_requirements || [],
             insider_tip: row.insider_tip || '',
-            description_summary: summary || '',
+            description_summary: row.description_summary || '',
             cached: true, _src: 'db', cost: 0, charged: false,
           });
         }
@@ -100,25 +112,22 @@ export default async function handler(req, res) {
     }
   }
 
-  if (!job || !company || !jobDescription || jobDescription.length < 80) {
+  if (!readable) {
     return res.status(200).json({ what_they_want: [], hidden_requirements: [], insider_tip: '', description_summary: '', _src: 'empty', cost: 0, charged: false });
   }
 
   // A posting that states nothing to read (a car-wash "join our family" ad, a teaser) is answered
-  // here, free, and NEVER cached: the generator is deterministic and free to run, so it is run
-  // BEFORE any credit gate. Groupon's "Social Media Specialist" used to come back as the filler
-  // "Relevant experience", charged a credit and was cached "free for everyone for 7 days"
-  // (2026-10-25); an empty read cost a credit on the no-requirements eval posting.
-  const parsed = buildJobInsights({ title: job, company, description: jobDescription, needsSummary: true });
-  if (!parsed.read) {
-    return res.status(200).json({ ...parsed, what_they_want: [], _src: 'unread', cost: 0, charged: false,
-      message: "This listing doesn't state what it requires, so there is nothing to analyze — no credit used. If the employer's site has the full posting, paste it to analyze that." });
-  }
+  // here, free, and NEVER cached — BEFORE any credit gate. Groupon's "Social Media Specialist" used
+  // to come back as the filler "Relevant experience", charged a credit and was cached "free for
+  // everyone for 7 days" (2026-10-25).
+  if (!parsed.read) return res.status(200).json(unreadBody(parsed));
 
   // Probe: the caller only wants to know whether this job is cached. Never gate, never
   // generate, never charge — answer with the price a real call would cost.
   if (probe) {
-    return res.status(200).json({ cached: false, price: JOB_INSIGHTS_COST, _src: 'uncached', cost: 0, charged: false });
+    // what a credit would buy, counted (never the items themselves): the screen can say so before the tap
+    return res.status(200).json({ cached: false, price: JOB_INSIGHTS_COST, _src: 'uncached', cost: 0, charged: false,
+      requirements_read: parsed.requirements_read, item_count: parsed.items.length, condition_count: parsed.hidden_items.length, has_pay: !!parsed.pay });
   }
 
   // Cache miss → costs JOB_INSIGHTS_COST (shared cache means most users never pay)
@@ -132,6 +141,7 @@ export default async function handler(req, res) {
   // must exist before the next visitor probes (an un-awaited write may never land). Prod's table
   // has had no description_summary column (verified 2026-10-24: 0 rows ever stored — every write
   // was a 400), so a 400 retries without it. ──────
+  let shared = false; // did the shared row land? Only then is "free for everyone for 7 days" true.
   if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
     const row = {
       job_id: cacheKey,
@@ -152,9 +162,14 @@ export default async function handler(req, res) {
         const { description_summary: _omit, ...withoutSummary } = row;
         const w2 = await write(withoutSummary);
         if (w2 && !w2.ok) console.error('job-insights db write:', w2.status);
+        shared = !!(w2 && w2.ok);
       } else if (w && !w.ok) console.error('job-insights db write:', w.status);
+      else shared = !!(w && w.ok);
     } catch (e) { console.error('job-insights db write:', e.message); }
   }
 
-  return res.status(200).json({ ...parsed, _src: 'generated', cost: JOB_INSIGHTS_COST, charged: true, balance: gate.balance, pro: !!gate.pro });
+  // Pro spends nothing (gateAI logs the use but takes no credit) — the answer says so itself instead
+  // of claiming a charge the client had to correct (`charged && !pro`).
+  const charged = !gate.pro;
+  return res.status(200).json({ ...parsed, _src: 'generated', cost: charged ? JOB_INSIGHTS_COST : 0, charged, balance: gate.balance, pro: !!gate.pro, shared });
 }
