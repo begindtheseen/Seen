@@ -265,6 +265,9 @@ export function approvePlan(rows: HeldRow[], scope: 'positive' | 'selection', se
     const flagged = flagsOf(r).includes('anti_gaming_hold') || isDuplicate(r)
     if (flagsOf(r).includes('anti_gaming_hold') && !own) { heldBack.antiGaming++; continue }
     if (isDuplicate(r) && !own) { heldBack.duplicates++; continue }
+    // "Approve all positive" counts only what it will publish unread: a row the server has not yet checked for
+    // copies of published reports waits (a selection still sends it — the server re-checks it at decision time).
+    if (scope === 'positive' && isUnchecked(r)) { heldBack.unchecked++; continue }
     if (flagged) includeIds.push(r.id)
     ids.push(r.id)
   }

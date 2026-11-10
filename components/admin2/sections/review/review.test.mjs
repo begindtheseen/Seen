@@ -194,9 +194,12 @@ test('the rules check is told both ways', () => {
   assert.equal(rulesReadings(undefined), null)
 })
 
-test('a row the server has not yet checked for copies is still sent: the server re-checks at decision time and names what it skips', () => {
+test('not yet checked for copies: out of Approve all positive, still sent from a selection (the server re-checks)', () => {
   const rows = [row('p1', 'positive'), { ...row('p2', 'positive'), review: { group: 'positive', flags: [], duplicate_check: 'pending' } }]
-  assert.deepEqual(approvePlan(rows, 'positive').ids, ['p1', 'p2'])
+  const pos = approvePlan(rows, 'positive')
+  assert.deepEqual(pos.ids, ['p1'])
+  assert.equal(pos.sentence, '1 clear positive will be published · 1 not yet checked for copies stays for you to read.')
+  assert.deepEqual(approvePlan(rows, 'selection', new Set(['p1', 'p2'])).sendIds, ['p1', 'p2'])
 })
 
 test('outcomes and sources print in the site\'s words, never the raw enum', () => {

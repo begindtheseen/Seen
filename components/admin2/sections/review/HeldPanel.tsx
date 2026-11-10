@@ -69,6 +69,14 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
   const isFiltered = view !== 'all' || !!q.trim()
   const shown = filtered.slice(0, limit)
   const pendingCheck = useMemo(() => rows.filter((r) => r.review?.duplicate_check === 'pending').length, [rows])
+  // While the server still has rows to check for copies, read the list again a few times so the counts settle.
+  const recheck = useRef(0)
+  useEffect(() => {
+    if (!pendingCheck || recheck.current >= 10 || list.fetching) return
+    const t = setTimeout(() => { recheck.current += 1; void list.refresh() }, 4000)
+    return () => clearTimeout(t)
+  }, [pendingCheck, list.fetching]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!pendingCheck) recheck.current = 0 }, [pendingCheck])
   const positivePlan = useMemo(() => approvePlan(rows, 'positive'), [rows])
   const selectionPlan = useMemo(() => approvePlan(rows, 'selection', selected, picked), [rows, selected, picked])
 
@@ -227,7 +235,7 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
 
       {pendingCheck ? (
         <p className={`${styles.leftLine} ${styles.hidePhone}`} role="status" data-testid="held-pending-check">
-          {plural(pendingCheck, 'report has', 'reports have')} not been checked against published reports yet; an approve checks them first and leaves out any copy.
+          {plural(pendingCheck, 'report has', 'reports have')} not been checked against published reports yet: they stay out of Approve all positive until checked (a selection is checked when you approve it).
           <button type="button" className={styles.inlineLink} onClick={() => void list.refresh()}>Check now</button>
         </p>
       ) : null}

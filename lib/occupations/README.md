@@ -54,6 +54,34 @@ modifiers (Dice ≥ 0.8) → the partial readings (one side of a comma/slash, a 
 occupation whose task statements the lines share ≥4 specific words with. A weak title match alone returns **null** (on real postings
 such guesses were wrong 9 times in 14). Title-only answers are cached (5k).
 
+## Round 4: trade talk (`lib/text/tradeTalk.js`)
+
+742 reviewed groups in 16 fields (≥ 40 each): food, retail, warehouse, healthcare, nursing, trades, office, support,
+sales, k12, itsupport, software, accounting, construction, security, military. Source `scripts/text/trade-talk.txt`
+(human-readable) → `scripts/text/build-trade-talk.mjs` → `lib/text/data/tradeTalk.json` (52 KB).
+
+```js
+import { sameThing, expand, fieldsOf } from '../text/tradeTalk.js';
+sameThing('vitals', 'vital signs', { field: 'healthcare' })
+// → { same: true, via: 'vital signs', kind: 'abbreviation or trade term', confidence: 'exact' }
+sameThing('ServSafe', 'food safety certification', { field: 'food' })           // → same: true (instance ⇒ class)
+sameThing('food safety certification', 'ServSafe Manager', { field: 'food' })   // → same: false (a class does not show an instance)
+sameThing('IM injections', 'intramuscular medications', { field: 'office' })    // → same: null (not this field's IM)
+fieldsOf('29-1141.00')   // → ['healthcare', 'nursing']
+```
+
+**Contract.**
+- `true` + `exact`: use as fact.
+- `true` + `close`: the term contains a listed term; use it, but a contradicting reading wins.
+- `false`: both terms are known in this field and name different things, or the class is asked to show the instance.
+- `null`: unknown, or not this field. It says nothing.
+- The longest listed term wins: "EPA 608 Universal" is the instance, not the "EPA 608" inside it.
+- A single ordinary English word ("pick", "stow", "rest") counts only as the whole term.
+
+**Measured.**
+- Own 330 pairs, written before the table: precision 100%, recall 97.9%. I wrote both the table and these pairs, so this number is optimistic.
+- Fresh 101-pair holdout, written after the table from the corpora's phrasing: precision 95.7%, recall 89.3%.
+
 ## Round 3: the activity index (`lib/occupations/activities.js`)
 
 O*NET maps every task statement (24k mappings) to one of 2,087 Detailed Work Activities (DWA), each under an Intermediate
