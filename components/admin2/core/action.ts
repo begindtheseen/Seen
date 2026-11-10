@@ -218,7 +218,8 @@ export function createActionRunner(deps: {
       const r = res as AdminOk & { restored?: number; total?: number }
       const done = typeof r.restored === 'number' ? r.restored : total
       const jobId = deps.jobs.start({
-        action: u.action, args: u.args, label: 'Undoing', past: 'Put back', noun: 'rows',
+        // The SAME request_id for every round of this Undo press (the job sends `round`); job_status { kind:'undo', audit_id } after a reload.
+        action: u.action, args: { ...u.args, request_id: undoRid }, label: 'Undoing', past: 'Put back', noun: 'rows',
         initial: { changed: done, remaining: typeof r.remaining === 'number' ? r.remaining : null, cursor: r.cursor },
       })
       const of = typeof r.total === 'number' ? ` of ${r.total.toLocaleString('en-US')}` : ''

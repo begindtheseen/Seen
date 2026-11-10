@@ -48,7 +48,8 @@ export function getRuntime(): AdminRuntime {
       // (SHAPES.md). A job action with no kind keeps the honest "not known" (null).
       const kind = job.status_kind || JOB_STATUS_KIND[job.action]
       if (!kind) return null
-      const r = await api<{ remaining?: number | null; complete?: boolean }>('job_status', { kind })
+      const extra = kind === 'undo' && job.args.audit_id != null ? { audit_id: job.args.audit_id } : {}
+      const r = await api<{ remaining?: number | null; complete?: boolean }>('job_status', { kind, ...extra })
       if (!r.ok) return null
       return { remaining: typeof r.remaining === 'number' ? r.remaining : null, done: null, complete: r.complete === true }
     },

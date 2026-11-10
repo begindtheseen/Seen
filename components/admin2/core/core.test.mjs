@@ -655,3 +655,32 @@ test('round 8: a large Undo waits long, checks an unknown answer with the same i
   await r2.run({}); await r2.undo()
   assert.equal(r2.state().error.code, 'unknown_outcome'); assert.ok(r2.state().result.undo, 'the Undo stays available to check again'); assert.ok(r2.state().undoRid)
 })
+
+test('round 10: a bulk Undo is one press — one request_id on every round, rounds 1,2,3, replay counted once, already_undone is done', async () => {
+  const sent = []
+  let restored = 0, lost = false
+  const recorded = new Map()
+  const api = async (action, body) => {
+    sent.push({ action, body: { ...body } })
+    if (action === 'review_held') return toResult(200, JSON.stringify({ ok: true, changed: 1040, message: 'Approved 1,040.', undo: { action: 'undo', args: { audit_id: '77' }, label: 'Undo' } }))
+    const key = `${body.request_id}:${body.round}`
+    if (recorded.has(key)) return toResult(200, JSON.stringify({ ...recorded.get(key), changed: 0, replayed: true, recorded_changed: recorded.get(key).changed }))
+    if (restored >= 1040) return toResult(200, JSON.stringify({ ok: true, changed: 0, complete: true, remaining: 0, already_undone: true, message: '1,040 reports are back in the review queue.' }))
+    restored += 420; const c = Math.min(restored, 1040); restored = c
+    const ans = { ok: true, changed: body.round === 3 ? 200 : 420, remaining: 1040 - c, complete: c >= 1040, message: `${c} reports are back.`, touched: ['held'] }
+    recorded.set(key, ans)
+    if (body.round === 2 && !lost) { lost = true; return toResult(504, '') }
+    return toResult(200, JSON.stringify(ans))
+  }
+  const jobs = createJobManager({ api, sleep: async () => {} })
+  const r = createActionRunner({ api, cache: new QueryCache(), action: 'review_held', jobs, sleep: async () => {} })
+  await r.run({ ids: ['*'] }); await r.undo()
+  const jid = r.state().jobId
+  assert.ok(jid)
+  await until(() => jobs.get(jid).status === 'done')
+  const undos = sent.filter((c) => c.action === 'undo')
+  assert.equal(new Set(undos.map((c) => c.body.request_id)).size, 1, 'one request_id per Undo press, every round')
+  assert.deepEqual(undos.map((c) => c.body.round), [1, 2, 2, 3])
+  assert.equal(jobs.get(jid).changed, 1040, 'replayed round counted once')
+  assert.equal(JOB_STATUS_KIND.undo, 'undo')
+})

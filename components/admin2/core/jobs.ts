@@ -42,6 +42,7 @@ export type JobSpec = {
 export const JOB_STATUS_KIND: Record<string, string> = {
   purge_stale_jobs: 'clear_stale', auto_merge: 'auto_merge', recompute_queue_drain: 'recompute',
   dedupe_reports: 'report_dupes', job_dupes_remove: 'job_dupes', job_dupes_scan: 'job_dupes', dedupe_jobs: 'job_dupes',
+  undo: 'undo', // + audit_id (SHAPES round 10)
 }
 /** A second unit some job actions count per round (summed across rounds and said in both units). */
 export const JOB_DETAIL: Record<string, { field: string; noun: string }> = { auto_merge: { field: 'merged', noun: 'companies' } }
