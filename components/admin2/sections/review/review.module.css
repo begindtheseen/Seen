@@ -64,3 +64,27 @@
 .groups li { display: flex; justify-content: space-between; gap: var(--sp-3); padding: var(--sp-2) var(--sp-3); border: 1px solid var(--border-1); border-radius: var(--r-control); background: var(--surface-1); font-size: var(--fs-sm); color: var(--text-1); }
 .groups li span:last-child { color: var(--text-2); font-weight: 600; }
 .scanning { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); color: var(--text-2); }
+
+/* Phone: each chip group is ONE row that scrolls sideways (no wrap), so the title, both rows, the search
+   and the first reports fit on the first screen. The chip cut at the edge says there is more. */
+@media (max-width: 767px) {
+  .kinds, .choice { flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; scroll-padding-inline: var(--sp-4); padding-bottom: 2px; }
+  .kinds::-webkit-scrollbar, .choice::-webkit-scrollbar { display: none; }
+  .kinds > *, .choice > * { flex: none; white-space: nowrap; }
+  .kinds { margin-bottom: var(--sp-3); }
+}
+
+/* The row checkbox is itself the 44px target; the drawn box (20px) sits in its middle. */
+.rowWrap :global(input[type='checkbox']) {
+  appearance: none; -webkit-appearance: none; display: grid; place-items: center; width: 44px; height: 44px; margin: 0;
+  border: 0; border-radius: var(--r-control); background: transparent; cursor: pointer;
+}
+.rowWrap :global(input[type='checkbox'])::before {
+  content: ''; grid-area: 1 / 1; width: 20px; height: 20px; box-sizing: border-box;
+  border: 2px solid var(--border-3); border-radius: var(--r-chip); background: var(--surface-1);
+}
+.rowWrap :global(input[type='checkbox']:checked)::before { background: var(--accent-strong); border-color: var(--accent-strong); }
+.rowWrap :global(input[type='checkbox']:checked)::after {
+  content: ''; grid-area: 1 / 1; width: 6px; height: 11px; margin-top: -2px; border: solid var(--text-1); border-width: 0 2px 2px 0; transform: rotate(45deg);
+}
+.rowWrap :global(input[type='checkbox']:focus-visible) { outline: none; box-shadow: var(--sh-focus); }

@@ -3,18 +3,32 @@
 // Small pieces every Review panel uses: the kind chips (with live counts, quiet when nothing waits,
 // "couldn't count" when the count failed), a status filter, a meta line, the key hint row, and the
 // row wrapper that carries the keyboard cursor.
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import Icon from '@/components/ui/Icon'
 import { KeyHint, StatusChip } from '../../ui/bits.tsx'
 import { fmt, type KindKey, type Tone } from './adapter.ts'
 import styles from './review.module.css'
 
+/** Keep the chosen chip in view inside a sideways-scrolling row — horizontally only, never the page. */
+function useActiveInView(value: string) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const row = ref.current
+    const on = row?.querySelector<HTMLElement>('[aria-pressed="true"]')
+    if (!row || !on || row.scrollWidth <= row.clientWidth) return
+    const left = on.offsetLeft - row.offsetLeft
+    if (left < row.scrollLeft || left + on.offsetWidth > row.scrollLeft + row.clientWidth) row.scrollLeft = Math.max(0, left - 16)
+  }, [value])
+  return ref
+}
+
 export type KindChip = { key: KindKey; label: string; count: number | null | undefined }
 
 /** One chip per kind. A kind with nothing waiting is still a chip, just quiet. */
 export function KindChips({ chips, value, onChange }: { chips: KindChip[]; value: KindKey; onChange: (k: KindKey) => void }) {
+  const ref = useActiveInView(value)
   return (
-    <div className={styles.kinds} role="group" aria-label="What to review" data-testid="review-kinds">
+    <div ref={ref} className={styles.kinds} role="group" aria-label="What to review" data-testid="review-kinds">
       {chips.map((c) => {
         const quiet = c.count === 0 || c.count === undefined
         return (
@@ -45,8 +59,9 @@ export function KindChips({ chips, value, onChange }: { chips: KindChip[]; value
 export function Choice({ options, value, onChange, label, testId }: {
   options: Array<{ value: string; label: string; count?: number | null }>; value: string; onChange: (v: string) => void; label: string; testId?: string
 }) {
+  const ref = useActiveInView(value)
   return (
-    <div className={styles.choice} role="group" aria-label={label} data-testid={testId}>
+    <div ref={ref} className={styles.choice} role="group" aria-label={label} data-testid={testId}>
       {options.map((o) => (
         <button key={o.value} type="button" className={`ui-chip ${styles.choiceChip}`} aria-pressed={o.value === value} onClick={() => onChange(o.value)} data-testid={testId ? `${testId}-${o.value}` : undefined}>
           {o.label}{typeof o.count === 'number' ? <span className={styles.kindCount}>{fmt(o.count)}</span> : null}
@@ -84,7 +99,7 @@ export function KeysHint({ keys }: { keys: Array<[string, string]> }) {
 
 /** Wraps a Row so the keyboard cursor can find it and ring it. */
 export function CursorRow({ id, cursor, children }: { id: string; cursor: boolean; children: ReactNode }) {
-  return <div data-rowid={id} className={cursor ? styles.cursor : undefined} data-cursor={cursor ? 'true' : undefined}>{children}</div>
+  return <div data-rowid={id} className={cursor ? `${styles.rowWrap} ${styles.cursor}` : styles.rowWrap} data-cursor={cursor ? 'true' : undefined}>{children}</div>
 }
 
 /** A labelled block inside a sheet. */
