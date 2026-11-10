@@ -104,7 +104,7 @@ function DuplicatesBlock() {
             {confirming ? (
               <ConfirmStep title={`Merge ${fmt(auto.length)} ${auto.length === 1 ? 'group' : 'groups'} automatically?`}
                 body="In each group the company with the most reports keeps the name; the others’ reports move to it. It runs in rounds and keeps going if you leave this section. Each merge can be undone in the history below."
-                confirmLabel="Auto-merge" busy={confirming && job.running} onCancel={() => setConfirming(false)} onConfirm={() => { job.start() }} />
+                confirmLabel="Auto-merge" busy={job.running} onCancel={() => setConfirming(false)} onConfirm={() => { job.start() }} />
             ) : auto.length || job.running ? (
               <div className={styles.actions}>
                 <Button variant="secondary" icon="layers" onClick={() => (job.running ? job.start() : setConfirming(true))} data-testid="co-automerge">

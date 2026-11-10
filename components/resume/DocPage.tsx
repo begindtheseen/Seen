@@ -6,7 +6,7 @@
 // quiet margin mark and tapping it opens its change (`marks` + `onMark`). Nothing is added or reworded.
 
 import type { ResumeDoc } from '@/lib/resume/types'
-import { formatRange, sectionTitle, experienceGroups, companyLabel, certDateLabel, gpaLabel, withExpected } from '@/lib/resume/engine-client'
+import { formatRange, sectionTitle, experienceGroups, companyLabel, earnedDateLabel, gpaLabel, withExpected } from '@/lib/resume/engine-client'
 import s from './DocPage.module.css'
 
 export interface DocMarks { summary?: string | null; bullets?: Record<string, string>; skills?: Record<string, string>; certs?: Record<string, string> }
@@ -77,7 +77,7 @@ export default function DocPage({ doc, marks = {}, onMark, testId }: { doc: Resu
         if (key === 'certifications' && doc.certifications.length) return (
           <section key={key} className={s.sec}>
             <p className={s.h}>{sectionTitle(doc, 'certifications')}</p>
-            <ul className={s.ul}>{doc.certifications.map((c) => <Line key={c.id} mark={(marks.certs || {})[c.id]} onMark={onMark}>{join([join([c.name, c.issuer], ' · ') || c.text, certDateLabel(c)], ' · ')}</Line>)}</ul>
+            <ul className={s.ul}>{doc.certifications.map((c) => <Line key={c.id} mark={(marks.certs || {})[c.id]} onMark={onMark}>{join([join([c.name, c.issuer], ' · ') || c.text, earnedDateLabel(c)], ' · ')}</Line>)}</ul>
           </section>
         )
         if (key === 'projects' && doc.projects.length) return (

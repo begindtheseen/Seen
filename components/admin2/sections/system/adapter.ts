@@ -45,8 +45,11 @@ export function cronOneInWords(expr: string, ref = new Date()): string {
 
 /** The server joins several schedules for one path with ";" (or puts several hours in one field). */
 export function cronInWords(schedule: string, ref = new Date()): string {
-  const parts = schedule.split(';').map((s) => s.trim()).filter(Boolean)
+  let parts = schedule.split(';').map((s) => s.trim()).filter(Boolean)
   if (!parts.length) return 'No schedule'
+  // Several daily schedules at the same minute ("0 2 * * *; 0 6 * * *") read as one line of times.
+  const daily = parts.map((p) => /^(\d+) (\d+) \* \* \*$/.exec(p))
+  if (parts.length > 1 && daily.every(Boolean) && daily.every((m) => m![1] === daily[0]![1])) parts = [`${daily[0]![1]} ${daily.map((m) => m![2]).join(',')} * * *`]
   return parts.map((p) => cronOneInWords(p, ref)).join('; ')
 }
 

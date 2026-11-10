@@ -68,6 +68,7 @@ test('cron schedules read as words in California time', () => {
   assert.equal(cronOneInWords('0 3 1 * *', ref), 'On day 1 of each month at 7:00 PM')
   assert.equal(cronInWords('0 15 * * *; 35 * * * *', ref), 'Every day at 7:00 AM; Every hour at :35')
   assert.equal(cronOneInWords('weird', ref), 'weird')
+  assert.equal(cronInWords('0 2 * * *; 0 14 * * *', ref), 'Every day at 6:00 AM and 6:00 PM')
 })
 
 test('cron rows: unknown stays "No run recorded yet", overdue is bad, the summary never says on time without a record', () => {

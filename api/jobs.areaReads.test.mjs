@@ -42,7 +42,7 @@ const add = (location, extra = {}) => ROWS.push({
   created_at: new Date(Date.now() - (n % 40) * 864e5).toISOString(), expires_at: FUT, salary: null, source: 'Greenhouse',
   apply_url: `https://boards.example.com/${n}`, description: 'Work.', score: 60, waste_score: 20, is_employer_posted: false, ...extra,
 });
-for (const c of CENTRES) {
+for (const c of [...CENTRES, 'Portland, OR', 'New Orleans, LA', 'Lexington Park, MD']) {
   const g = geocodePlace(c);
   const near = placesWithin(g, 120, { limit: 100000, minPop: 0 }).filter((p, i) => p.pop > 1500 || (p.pop === 0 && i % 3 === 0));
   for (let i = 0; i < 170; i++) {
@@ -58,6 +58,11 @@ for (const l of COUNTY_LINES) for (let k = 0; k < 4; k++) add(l);
 for (const l of ['Saint John, IN', 'St. Charles, IL', 'Mt. Prospect, IL', 'Mount Prospect, Illinois', 'Woodside, NY', 'Astoria, NY',
   'San Buenaventura (Ventura), California, United States', 'Ventura, CA', 'US > Texas > Bunker Hill Village', 'US-CA-Downey', 'Renton, WA',
   'Liberty, Texas', 'Austell, Georgia, United States', 'US > Pennsylvania > Bangor']) for (let k = 0; k < 2; k++) add(l);
+// Towns in the county-mode counties (and one just outside each), every form.
+for (const l of ['Newton, NJ', 'Hopatcong, NJ', 'Vernon, NJ', 'Sparta, New Jersey', 'Somewhere, Sussex County, NJ', 'Morristown, NJ',
+  'Belgrade, MT', 'Bozeman, Montana', 'Hillsboro, OR', 'Beaverton, Oregon', 'US > Oregon > Tigard', 'Portland, OR', 'New Orleans, LA',
+  'Metairie, LA', 'Brooklyn, NY', 'Lexington Park, MD', 'California, MD', 'Leonardtown, Maryland', 'Sun City, AZ', 'Evanston, IL',
+  'Naperville, IL', 'Pasadena, TX', 'Long Beach, CA']) for (let k = 0; k < 2; k++) add(l);
 for (const l of ['85004', 'Phoenix, AZ 85004', '90012', 'Chicago 60601', 'Remote', 'United States', 'Arizona', 'Toronto, ON', 'Remote - European Region']) add(l);
 if (process.env.AREA_CORPUS) for (const r of JSON.parse(readFileSync(process.env.AREA_CORPUS, 'utf8'))) add(r.location || '', { title: r.title, company: r.company });
 
@@ -99,4 +104,58 @@ test(`rule-accepts ⇒ read-finds: ${CENTRES.length} places × ${RADII.length} r
     }
   }
   assert.deepEqual(misses, []);
+});
+
+// County mode: a county is an area — every listing whose town lies in it, or whose text names it.
+const COUNTIES = ['Los Angeles County, CA', 'Sussex County, NJ', 'Maricopa County, AZ', 'Cook County, IL', 'Gallatin County, MT',
+  'Washington County, OR', 'Harris County, TX', "St. Mary's County, MD", 'Orleans Parish, LA', 'Kings County, NY'];
+test(`county mode, rule-accepts ⇒ read-finds: ${COUNTIES.length} counties`, async () => {
+  const misses = [];
+  for (const county of COUNTIES) {
+    const area = placeSearch(county);
+    assert.equal(area.kind, 'county', county);
+    _clearAreaCache();
+    const want = rankArea(ROWS, area, 0, { includeRemote: false, exclude: isSeedListing }).list.map((x) => x.row.id);
+    const got = [];
+    let cursor = null, first = null;
+    for (let i = 0; i < 200; i++) {
+      const res = await call({ query: '', location: county, radius: '10', cursor });
+      assert.equal(res.code, 200, JSON.stringify(res.body));
+      first = first || res.body;
+      assert.equal(res.body.complete, true, `${county}: the read finished`);
+      got.push(...res.body.jobs.map((j) => j.id));
+      if (!res.body.has_more) break;
+      cursor = res.body.next_cursor;
+    }
+    assert.equal(first.mode, 'county');
+    assert.equal(first.radius, null, 'no radius for a county');
+    assert.equal(first.area.label, county);
+    assert.ok(want.length > 0, `${county}: the fixture has rows in it`);
+    const g = new Set(got);
+    const missing = want.filter((id) => !g.has(id));
+    if (missing.length || first.total !== want.length || got.length !== want.length) {
+      misses.push(`${county}: rule ${want.length}, handler ${first.total}, paged ${got.length}; not read: ${missing.slice(0, 5).map((id) => ROWS.find((x) => x.id === id).location).join(' | ')}`);
+    }
+  }
+  assert.deepEqual(misses, []);
+});
+
+test('county searches: a shared name asks which; the town decides membership, not a circle', async () => {
+  const shared = await call({ query: '', location: 'Washington County', radius: '25' });
+  assert.equal(shared.body.jobs.length, 0);
+  assert.equal(shared.body.unplaced.reason, 'ambiguous');
+  assert.ok(shared.body.unplaced.suggestions.includes('Washington County, OR'));
+  const sussex = await call({ query: '', location: 'Sussex County, NJ', radius: '25' });
+  assert.equal(sussex.body.area.label, 'Sussex County, NJ');
+  assert.ok(sussex.body.jobs.every((j) => j.distance_miles == null), 'no miles from an invisible centre');
+  const { inCounty } = await import('../lib/geo/radius.js');
+  const sx = placeSearch('Sussex County, NJ');
+  assert.equal(inCounty({ location: 'Newton, NJ' }, sx), 'Newton, NJ');
+  assert.equal(inCounty({ location: 'Hopatcong, NJ' }, sx), 'Hopatcong, NJ');
+  assert.equal(inCounty({ location: 'Morristown, NJ' }, sx), null, 'Morris County');
+  assert.equal(inCounty({ location: 'Somewhere, Sussex County, NJ' }, sx), 'Sussex County, NJ');
+  assert.equal(inCounty({ location: 'Somewhere, Sussex County' }, sx), null, 'Sussex County without a state could be Delaware or Virginia');
+  const cook = placeSearch('Cook County, IL');
+  assert.ok(inCounty({ location: 'Chicago, IL' }, cook));
+  assert.equal(inCounty({ location: 'Naperville, IL' }, cook), null, 'DuPage / Will');
 });

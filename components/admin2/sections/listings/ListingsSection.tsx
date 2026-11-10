@@ -294,7 +294,7 @@ function DupesBlock() {
           title={`Remove ${plan.suspected === null ? 'the' : fmt(plan.suspected)} duplicate ${plan.suspected === 1 ? 'listing' : 'listings'}?`}
           body="The server checks the table again as it removes, so the number removed can differ a little from the plan. It runs in rounds and keeps going if you open another section."
           irreversible="Removed listings are deleted. The activity log keeps their titles and links."
-          confirmLabel="Remove duplicates" busy={confirming && remove.running}
+          confirmLabel="Remove duplicates" busy={remove.running}
           onCancel={() => setConfirming(false)} onConfirm={() => { remove.start() }}
         />
       ) : (

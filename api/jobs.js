@@ -1169,7 +1169,7 @@ async function handleAreaSearch(req, res, body) {
   }
   if (!U || !K) return res.status(503).json({ error: 'DB unavailable', jobs: [] });
   const r = parseInt(body.radius, 10);
-  const miles = place.kind === 'state' ? null : (Number.isFinite(r) && r >= 5 && r <= 500 ? r : 25);
+  const miles = place.kind === 'state' || place.kind === 'county' ? null : (Number.isFinite(r) && r >= 5 && r <= 500 ? r : 25);
   const sort = AREA_SORTS.has(body.sort) ? body.sort : 'nearest';
   const includeRemote = body.include_remote === true;
   const filters = {
@@ -1229,7 +1229,7 @@ async function handleAreaSearch(req, res, body) {
     else res.setHeader('Cache-Control', 'no-store');
     return res.status(200).json({
       ...base,
-      mode: place.kind === 'state' ? 'state' : 'area',
+      mode: place.kind === 'state' || place.kind === 'county' ? place.kind : 'area',
       pending: pending === true,
       jobs, in_radius: jobs.length,
       // The page shows one card per employer + job title (lib/jobs/groupListings.js — "+N more locations"), so the

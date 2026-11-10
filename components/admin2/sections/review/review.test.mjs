@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 import {
   KINDS, parseKind, kindCount, waitingLine, matchesHeldView, heldViewCounts, positiveIds, approvableIds, filterNote,
   pruneSelection, moderationFor, patchRows, sourceHref, when, newRequestId, ticketSummary, signalText, heldHasRules,
-  parseHeldView, label, snippet, outcomeTone, approvePlan,
+  parseHeldView, label, snippet, outcomeTone, approvePlan, reviewQueues,
 } from './adapter.ts'
 
 const row = (id, group, flags = [], extra = {}) => ({ id, company_name: 'Acme', outcome: group === 'positive' ? 'interview' : 'ghosted', review: { group, flags }, ...extra })
@@ -157,4 +157,15 @@ test('bulk approve never publishes anti-gaming holds or possible duplicates unle
   assert.deepEqual(mine.ids.sort(), ['ag', 'e1', 'n1', 'p1', 'p2', 'pd'])
   assert.equal(mine.includeDuplicates, true)
   assert.equal(approvePlan(rows, 'selection', new Set(['ag'])).sentence, 'Nothing here can be published in bulk · 1 anti-gaming hold stays for you to read (tick one yourself to include it).')
+})
+
+test('the header sentence adds up exactly what the shell badge adds up (queues whose section is review)', () => {
+  const ov = { queues: [
+    { key: 'held_reports', label: 'Held reports', count: 343, section: 'review' },
+    { key: 'listing_tickets', label: 'Listing tickets', count: 24, section: 'review' },
+    { key: 'data_issues', label: 'Data issues', count: 22, section: 'review' },
+    { key: 'account_clusters', label: 'Account clusters', count: 4, section: 'people' },
+  ] }
+  assert.equal(waitingLine(reviewQueues(ov)), '389 decisions are waiting.')
+  assert.deepEqual(reviewQueues(undefined), [])
 })

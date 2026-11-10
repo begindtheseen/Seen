@@ -15,7 +15,7 @@ import type { SectionProps } from '../../core/sections.tsx'
 import { useShell } from '../../core/shellContext.ts'
 import { SectionHeader } from '../../ui/bits.tsx'
 import { RefreshFailed } from '../../ui/states.tsx'
-import { KINDS, kindCount, kindDef, parseKind, waitingLine, type HeldRow, type KindKey } from './adapter.ts'
+import { KINDS, kindCount, parseKind, reviewQueues, waitingLine, type HeldRow, type KindKey } from './adapter.ts'
 import DupesPanel from './DupesPanel.tsx'
 import HeldPanel, { HELD_SORTS } from './HeldPanel.tsx'
 import KindPanel from './KindPanel.tsx'
@@ -41,9 +41,11 @@ export default function ReviewSection({ active }: SectionProps) {
   const held = useAdminList<HeldRow>(`held?sort=${sort}`, () => api<AdminList<HeldRow>>('list_held_reports', { sort }, { timeoutMs: 45_000 }), { staleMs: 20_000 })
   const heldTotal = held.data ? (typeof held.total === 'number' ? held.total : held.rows.length) : undefined
 
-  const chips = KINDS.map((k) => ({ key: k.key, label: k.label, count: kindCount(k.key, overview.data, heldTotal) }))
-  const queues = chips.filter((c) => kindDef(c.key).queue && c.count !== undefined)
-  const sub = overview.data || held.data ? waitingLine(queues) : overview.loading ? 'Counting what is waiting…' : overview.error ? 'The waiting counts couldn’t be read.' : undefined
+  // ONE number per thing, from ONE read: every count here comes from the same `overview` the shell's Review
+  // badge reads (the held list's own total only stands in until that read lands).
+  const chips = KINDS.map((k) => ({ key: k.key, label: k.label, count: kindCount(k.key, overview.data, overview.data ? undefined : heldTotal) }))
+  const queues = reviewQueues(overview.data)
+  const sub = overview.data ? waitingLine(queues) : overview.loading ? 'Counting what is waiting…' : overview.error ? 'The waiting counts couldn’t be read.' : undefined
 
   const setKind = (k: KindKey) => {
     if (k === kind) return

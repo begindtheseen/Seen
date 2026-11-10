@@ -72,7 +72,11 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
   const selectionPlan = useMemo(() => approvePlan(rows, 'selection', selected, picked), [rows, selected, picked])
 
   // Rows decided elsewhere (the sheet, another tab) leave the selection too.
-  useEffect(() => { setSelected((s) => pruneSelection(s, rows)) }, [rows])
+  // Not while a bulk decision is in flight: its rows leave optimistically, and the bar (with its busy confirm)
+  // must stay put until the answer lands — a second tap then lands on a disabled button, not the list.
+  const bulkBusyRef = useRef(false)
+  const bulkArgsRef = useRef<Record<string, unknown> | null>(null)
+  useEffect(() => { if (!bulkBusyRef.current) { setSelected((s) => pruneSelection(s, rows)); setPicked((s) => pruneSelection(s, rows)) } }, [rows])
 
   const recomputeJob = [...allJobs].reverse().find((j) => j.action === 'recompute_queue_drain')
   const recomputeRunning = !!recomputeJob && (recomputeJob.status === 'running' || recomputeJob.status === 'cancelling')
@@ -98,9 +102,12 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
     },
     onSettled: (res, args) => {
       const ids = args.ids as string[]
+      if (args === bulkArgsRef.current) { bulkBusyRef.current = false; bulkArgsRef.current = null }
+      // Only the ids this press sent leave the selection — never a newer selection made meanwhile.
+      const sent = new Set(ids)
+      const drop = (cur: Set<string>) => { if (![...cur].some((id) => sent.has(id))) return cur; const n = new Set(cur); for (const id of sent) n.delete(id); return n }
       if (res.ok) {
-        if (ids.length > 1) { setSelected(new Set()); setPicked(new Set()) }
-        else setSelected((s) => { if (!s.has(ids[0])) return s; const n = new Set(s); n.delete(ids[0]); return n })
+        setSelected(drop); setPicked(drop)
         const rc = (res as AdminOk & { recompute?: Recompute }).recompute
         if (rc && (rc.remaining || 0) > 0) {
           if (recomputeRunning) { if (rc.cursor) pendingCursors.current.push(rc.cursor) } else startRecompute(rc.cursor)
@@ -115,7 +122,9 @@ export default function HeldPanel({ on, visible, list, sort, setSort }: { on: bo
     if (!ids.length) return
     setLastTarget(target)
     if (target !== 'bulk') setLastRow(target)
-    void decide.run({ decision, request_id: newRequestId(), ...extra, ids: ids.slice(0, MAX_BULK) }, target)
+    const args = { decision, request_id: newRequestId(), ...extra, ids: ids.slice(0, MAX_BULK) }
+    if (target === 'bulk' && !decide.busy('bulk')) { bulkBusyRef.current = true; bulkArgsRef.current = args }
+    void decide.run(args, target)
   }
   const one = (decision: 'approve' | 'reject', r: HeldRow) => run(decision, [r.id], r.id, decision === 'approve' && isDuplicate(r) ? { include_duplicates: true } : {})
   const byId = (id: string) => rows.find((r) => r.id === id)

@@ -28,7 +28,7 @@ export interface AreaInfo {
   jobsTotal: number
   remoteTotal: number
   label: string
-  kind: 'point' | 'state'
+  kind: 'point' | 'state' | 'county'
   radius: number | null
   includeRemote: boolean
   wider: { radius: number; total: number } | null
@@ -48,11 +48,11 @@ export function areaStatus(a: AreaInfo): string {
   const fmt = (x: number) => x.toLocaleString('en-US')
   // One number per thing: cards are jobs; a job open in several places counts each place as a location.
   const jobs = j < n ? `${fmt(j)} job${j === 1 ? '' : 's'} (${fmt(n)} locations)` : `${fmt(n)} job${n === 1 ? '' : 's'}`
-  const where = a.kind === 'state' ? `in ${a.label}` : `within ${a.radius} mile${a.radius === 1 ? '' : 's'} of ${a.label}`
+  const where = a.kind !== 'point' ? `in ${a.label}` : `within ${a.radius} mile${a.radius === 1 ? '' : 's'} of ${a.label}`
   if (!n) return `No jobs ${where}`
   const remote = a.includeRemote && a.remoteTotal ? ` · including ${fmt(a.remoteTotal)} remote listing${a.remoteTotal === 1 ? '' : 's'}` : ''
   const partial = a.complete ? '' : ' found so far — still counting'
-  return `${jobs} ${where}${remote}${partial} · ${a.kind === 'state' || a.sort === 'recent' ? 'newest first' : 'nearest first'}`
+  return `${jobs} ${where}${remote}${partial} · ${a.kind !== 'point' || a.sort === 'recent' ? 'newest first' : 'nearest first'}`
 }
 const searchCache = new Map<string, CachedSearch>()
 // The last few searches also live in this tab's sessionStorage, so Back from a listing, a company
@@ -799,7 +799,7 @@ export function useJobSearch() {
   }
   type AreaResponse = {
     jobs?: unknown[]; total?: number; jobs_total?: number; remote_total?: number; include_remote?: boolean; has_more?: boolean; next_cursor?: string | null
-    area?: { kind: 'point' | 'state'; label: string; radius: number | null } | null; wider?: { radius: number; total: number } | null
+    area?: { kind: 'point' | 'state' | 'county'; label: string; radius: number | null } | null; wider?: { radius: number; total: number } | null
     complete?: boolean; pending?: boolean; unplaced?: { reason: string | null; suggestions: string[] }; message?: string; need_title?: boolean
   }
   function showArea(c: CachedSearch) {

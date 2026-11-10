@@ -132,7 +132,7 @@ function RefreshJobsRun() {
     <span className={styles.blockFlat} data-testid="run-refresh-jobs-wrap">
       <ResultLine state={st} onRetry={start} onDismiss={() => setRefreshJobs({ status: 'idle', target: 'refresh-jobs' })}
         runningText="Refreshing listings… This can take up to 5 minutes. You can leave this screen." />
-      {st.status !== 'running' ? <span className={styles.actions}><Button variant="secondary" icon="refresh-cw" onClick={start} data-testid="run-refresh-jobs">Run now</Button></span> : null}
+      {st.status === 'idle' || st.status === 'done' ? <span className={styles.actions}><Button variant="secondary" icon="refresh-cw" onClick={start} data-testid="run-refresh-jobs">Run now</Button></span> : null}
     </span>
   )
 }

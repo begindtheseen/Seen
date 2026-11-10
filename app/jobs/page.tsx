@@ -136,8 +136,9 @@ export default function JobsPage() {
     setTimeout(() => locRef.current?.focus(), 0)
   }
   // A state typed alone is the whole state: the radius means nothing there (the select says "Whole state").
-  const wholeState = area?.kind === 'state' && location.trim() === area.typed
-  const radiusLabel = wholeState ? 'whole state' : radius === '0' ? 'Remote' : hasCity ? `${radius} mi` : 'Anywhere'
+  // A state or a county typed alone is that whole area: the radius means nothing there (the select says so).
+  const wholeState = (area?.kind === 'state' || area?.kind === 'county') && location.trim() === area.typed
+  const radiusLabel = wholeState ? (area?.kind === 'county' ? 'whole county' : 'whole state') : radius === '0' ? 'Remote' : hasCity ? `${radius} mi` : 'Anywhere'
   // Follow the URL: Back/Forward open or close the listing; a page loaded on ?job= (Back from another
   // page) reopens it once its row is known — from the results, the rail, or this tab's listing cache.
   useEffect(() => {
@@ -236,12 +237,13 @@ export default function JobsPage() {
               <select
                 className={bar.radius}
                 aria-label={wholeState ? `Distance — not used: this search covers all of ${area?.label}` : 'Distance'}
+                title={wholeState ? `Not used: this search covers all of ${area?.label}` : undefined}
                 value={wholeState ? 'state' : hasCity || radius === '0' ? radius : 'any'}
                 disabled={wholeState}
                 onChange={e => setRadius(e.target.value === 'any' ? '25' : e.target.value)}
               >
                 {wholeState ? (
-                  <option value="state">Whole state</option>
+                  <option value="state">{area?.kind === 'county' ? 'Whole county' : 'Whole state'}</option>
                 ) : hasCity ? (
                   <>
                     <option value="10">10 mi</option>
@@ -438,7 +440,7 @@ export default function JobsPage() {
         ) : view === 'empty' && area ? (
           <div className={j.idle} data-testid="area-empty">
             <Icon name="map-pin" size={28} className={j.emptyIcon} />
-            <h2 className={j.idleTitle}>{hasFilters ? `No jobs match these filters ${area.kind === 'state' ? `in ${area.label}` : `within ${area.radius} miles of ${area.label}`}` : `No jobs on Seen ${area.kind === 'state' ? `in ${area.label}` : `within ${area.radius} miles of ${area.label}`} yet`}</h2>
+            <h2 className={j.idleTitle}>{hasFilters ? `No jobs match these filters ${area.kind !== 'point' ? `in ${area.label}` : `within ${area.radius} miles of ${area.label}`}` : `No jobs on Seen ${area.kind !== 'point' ? `in ${area.label}` : `within ${area.radius} miles of ${area.label}`} yet`}</h2>
             {area.wider && area.wider.total > 0 && (
               <Button size="sm" variant="secondary" onClick={() => setRadius(String(area.wider!.radius))} iconRight="arrow-right">
                 {`${area.wider.total.toLocaleString('en-US')} within ${area.wider.radius} miles`}

@@ -59,6 +59,16 @@ export function kindCount(kind: KindKey, overview: Partial<AdminOverview> | unde
   return typeof q.count === 'number' && Number.isFinite(q.count) ? q.count : null
 }
 
+/**
+ * The queues the header sentence adds up — exactly the ones the shell's Review badge adds up (core/AdminApp:
+ * every overview queue whose `section` is 'review'), so the badge and the sentence are always the same number.
+ * Account clusters belong to People there; their chip stays here, outside the total.
+ */
+export function reviewQueues(overview: Partial<AdminOverview> | undefined): Array<{ label: string; count: number | null }> {
+  if (!overview || !Array.isArray(overview.queues)) return []
+  return overview.queues.filter((q) => q && q.section === 'review').map((q) => ({ label: q.label, count: typeof q.count === 'number' && Number.isFinite(q.count) ? q.count : null }))
+}
+
 /** The header line: how much is waiting across every queue, and which counts could not be read. */
 export function waitingLine(counts: Array<{ label: string; count: number | null | undefined }>): string {
   const known = counts.filter((c) => typeof c.count === 'number') as Array<{ label: string; count: number }>
