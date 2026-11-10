@@ -66,7 +66,8 @@ for (const c of rows) {
   const valid = cleanName(c[8]);
   if (!valid || !/^\d{1,8}$/.test(c[15])) fail(`malformed place part: ${c.join(',').slice(0, 80)}`);
   let name = valid.replace(/\s*\((?:pt\.|balance)\)/gi, '').trim();
-  for (let k = 0; k < 3; k++) name = name.replace(/\s+(?:city and borough|metropolitan government|consolidated government|unified government|urban county|charter township|township|city|town|village|borough|municipality|plantation|CDP)$/i, '').trim();
+  // The legal kind is ONE trailing word group ("Kansas City city" → "Kansas City", never "Kansas").
+  name = name.replace(/\s+(?:city and borough|metropolitan government|consolidated government|unified government|urban county|charter township|township|city|town|village|borough|municipality|plantation|CDP)$/i, '').trim();
   if (!name) continue;
   (members[`${st}|${county}`] ||= []).push([name, Number(c[15])]);
   parts++;

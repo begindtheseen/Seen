@@ -1238,7 +1238,7 @@ async function handleAreaSearch(req, res, body) {
       onsite_total: onsiteTotal, remote_total: remoteTotal, include_remote: includeRemote,
       has_more: hasMore, next_cursor: nextCursor, offset: before, page_size: AREA_PAGE, sort,
       radius: miles,
-      area: { kind: place.kind, label: place.label, name: place.name, state: place.state, state_name: place.state ? stateName(place.state) : null, zip: place.zip, lat: place.lat, lng: place.lng, radius: miles },
+      area: { kind: place.kind, label: place.label, name: place.name, state: place.state, state_name: place.state ? stateName(place.state) : null, zip: place.zip, approx: place.approx === true, lat: place.lat, lng: place.lng, radius: miles },
       complete, wider, _src: cached ? 'area-cached' : 'area', ms: Date.now() - t0,
     });
   } catch (e) {
