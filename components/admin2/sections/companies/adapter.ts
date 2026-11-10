@@ -15,11 +15,11 @@ export function readCompanyRow(r: unknown): CompanyRow {
 
 const pct = (v: number | null) => (v === null ? null : `${Math.round((v <= 1 ? v * 100 : v))}%`)
 
-/** "Score 63 · 412 reports counted · 31% ghosted · 54% heard back". */
+/** "Score 63 · 412 applicant accounts counted · 31% ghosted · 54% heard back". */
 export function companyLine(c: CompanyRow): string {
   const parts = [
     c.overall_score === null ? 'No score yet' : `Score ${Math.round(c.overall_score)}`,
-    c.report_count === null ? '' : `${fmt(c.report_count)} ${c.report_count === 1 ? 'report' : 'reports'} counted`,
+    c.report_count === null ? '' : `${fmt(c.report_count)} applicant ${c.report_count === 1 ? 'account' : 'accounts'} counted`,
     pct(c.ghost_rate) ? `${pct(c.ghost_rate)} ghosted` : '',
     pct(c.response_rate) ? `${pct(c.response_rate)} heard back` : '',
   ]
@@ -71,8 +71,8 @@ export function evidence(d: CompanyDetail): Evidence[] {
   const s = d.score || {}
   const out: Evidence[] = []
   const add = (key: string, label: string, what: string) => { if (key in s) out.push({ label, value: num(s[key]), what }) }
-  add('first_party_report_count', 'Applicant reports to Seen', 'told to Seen by people who applied; these weigh the most')
-  add('report_count', 'Reports counted in the grade', 'every report the grade uses, weighted by where it came from')
+  add('first_party_report_count', 'Reports from Seen users', 'sent to Seen by people who applied; these weigh the most')
+  add('report_count', 'Applicant accounts in the grade', 'reports from Seen users plus applicant accounts (public posts), each weighted by where it came from')
   add('employee_review_count', 'Employee reviews', 'move the grade a little by their letter grade; never counted as hiring outcomes')
   add('mention_count', 'Online mentions', 'public posts about applying here; each counts half')
   out.push({ label: 'Reports stored under this name', value: d.reportsTotal, what: 'every report row with this name, including held and rejected ones' })

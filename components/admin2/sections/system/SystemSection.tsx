@@ -69,7 +69,7 @@ function CronsBlock() {
                   <span className={styles.trName}>{c.name}<span className={styles.quiet}><br />{cronInWords(c.schedule)}</span></span>
                   <span className={styles.trBody}>
                     {cronLines(c).map((l) => <span key={l}>{l}</span>)}
-                    {c.detail ? <span className={styles.quiet}>{c.detail}</span> : null}
+                    {c.detail ? <span className={styles.quiet}>{c.detail.replace(/^Next:[^·]*·\s*/, '')}</span> : null}
                   </span>
                   <span className={styles.trSide}><StatusChip tone={st.tone} label={st.word} icon={st.tone === 'neutral' ? 'circle-help' : undefined} /></span>
                 </li>

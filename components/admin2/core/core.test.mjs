@@ -3,7 +3,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { parseItem, parseSection, formatItem, sectionFilters, searchForSection, filterParam } from './url.ts'
-import { toResult, createAdminApi, createReauthGate } from './api.ts'
+import { toResult, createAdminApi, createReauthGate, createAdminDownload, filenameFrom } from './api.ts'
 import { QueryCache, keyMatches, mergeListRefresh } from './cache.ts'
 import { createActionRunner } from './action.ts'
 import { createJobManager, jobKey, jobProgressText, jobSummary } from './jobs.ts'
@@ -302,15 +302,16 @@ test('action: a 401 mid-action replays after sign-in; the state ends done, nothi
 // ── Jobs (defects 4, 8; class f) ──────────────────────────────────────────────────────────────────
 
 function memStorage() { let v = null; return { get: () => v, set: (x) => { v = x }, raw: () => v } }
-function jobServer({ backlog, per = 4000, failAt = [], zeroAt = -1, fatalAt = -1 }) {
-  let left = backlog; let n = 0
+function jobServer({ backlog, per = 4000, failAt = [], zeroAt = -1, fatalAt = -1, scanAt = -1 }) {
+  let left = backlog; let n = 0; let cursor
   const calls = []
   const api = async (action, body) => {
     n++; calls.push(body)
     if (failAt.includes(n)) return toResult(504, '')
     if (n === fatalAt) return toResult(500, JSON.stringify({ error: 'sweep_stale_jobs failed (HTTP 500)' }))
-    const d = n === zeroAt ? 0 : Math.min(left, per); left -= d
-    return toResult(200, JSON.stringify({ ok: true, changed: d, remaining: left, complete: left === 0, cursor: `c${n}`, message: `Cleared ${d}.`, touched: ['listing_counts'] }))
+    const d = n === zeroAt || n === scanAt ? 0 : Math.min(left, per); left -= d
+    if (n !== zeroAt) cursor = `c${n}` // a stuck round does not move its cursor; a scan round does
+    return toResult(200, JSON.stringify({ ok: true, changed: d, remaining: left, complete: left === 0, cursor, message: n === scanAt ? 'Scanned 61,000 listings so far — keep going.' : `Cleared ${d}.`, touched: ['listing_counts'] }))
   }
   return { api, calls, left: () => left }
 }
@@ -424,4 +425,53 @@ test('action: an Undo that answers in rounds continues as a visible, resumable j
   assert.equal(j.changed, 1200); assert.equal(j.remaining, 0)
   assert.deepEqual(sent.slice(2).map((c) => c.body), [{ audit_id: '7', cursor: 'c400' }, { audit_id: '7', cursor: 'c800' }], 'same audit_id, cursor passed back')
   assert.match(j.message, /^Restored 1,200 rows in 3 rounds\./)
+})
+
+test('jobs: a round that moves its cursor with nothing changed is progress; the server sentence is kept', async () => {
+  const s = jobServer({ backlog: 8000, scanAt: 2 })
+  const m = createJobManager({ api: s.api, sleep: async () => {} })
+  const id = m.start(SPEC)
+  let sawScan = false
+  m.subscribe(() => { if (m.get(id)?.last_message?.startsWith('Scanned')) sawScan = true })
+  await until(() => m.get(id).status !== 'running')
+  assert.equal(m.get(id).status, 'done'); assert.equal(m.get(id).changed, 8000); assert.ok(sawScan, 'last_message carried the scan sentence')
+  assert.equal(m.get(id).last_message, 'Cleared 4000.')
+})
+
+test('download: filename from Content-Disposition, errors as sentences, empty file refused, 401 replays', async () => {
+  assert.equal(filenameFrom('attachment; filename="walmart-audit.pdf"'), 'walmart-audit.pdf')
+  assert.equal(filenameFrom("attachment; filename*=UTF-8''Fry%27s%20audit.zip"), "Fry's audit.zip")
+  assert.equal(filenameFrom('attachment; filename=a/b.csv'), 'a_b.csv')
+  assert.equal(filenameFrom(null), null)
+  const saved = []
+  let token = 'old'
+  const queue = [
+    { status: 401, body: '{"error":"Session expired"}', type: 'application/json' },
+    { status: 200, body: '%PDF-1.7 fake', type: 'application/pdf', cd: 'attachment; filename="acme.pdf"' },
+    { status: 500, body: '<html>boom</html>', type: 'text/html' },
+    { status: 200, body: '', type: 'application/pdf' },
+    { status: 503, body: JSON.stringify({ ok: false, code: 'upstream', retryable: true, error: "Couldn't reach the database. Try again." }), type: 'application/json' },
+  ]
+  const fetchImpl = async (url, init) => {
+    const a = queue.shift()
+    return { status: a.status, headers: new Map([['content-type', a.type], ['content-disposition', a.cd || '']]), text: async () => a.body, blob: async () => new Blob([a.body]), sent: init.headers['X-Admin-Token'] }
+  }
+  const gate = createReauthGate()
+  const dl = createAdminDownload({ fetchImpl, getToken: () => token, reauth: () => gate.wait(), save: (b, n) => saved.push(n) })
+  const p = dl('/api/admin-company-audit-pdf', { company: 'Acme' })
+  await flush(); token = 'new'; gate.settle(true)
+  const r1 = await p
+  assert.equal(r1.ok, true); assert.deepEqual(saved, ['acme.pdf']); assert.match(r1.message, /^Downloaded acme\.pdf \(1 KB\)\.$/)
+  const r2 = await dl('/x'); assert.equal(r2.code, 'upstream'); assert.match(r2.error, /HTTP 500/)
+  const r3 = await dl('/x'); assert.match(r3.error, /empty file/)
+  const r4 = await dl('/x'); assert.equal(r4.retryable, true); assert.match(r4.error, /Couldn't reach the database/)
+  assert.equal(saved.length, 1, 'nothing saved on a failure')
+})
+
+test('a 503 session check (upstream, retryable) is an error to retry — never the sign-in step', async () => {
+  const { impl } = fakeFetch([[503, { ok: false, code: 'upstream', retryable: true, error: "Couldn't check the session — the database did not answer. Try again." }]])
+  let asked = 0
+  const api = createAdminApi({ fetchImpl: impl, getToken: () => 't', reauth: async () => { asked++; return true } })
+  const r = await api('overview')
+  assert.equal(r.code, 'upstream'); assert.equal(r.retryable, true); assert.equal(asked, 0)
 })

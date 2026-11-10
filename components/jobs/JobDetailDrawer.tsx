@@ -355,7 +355,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
       <div ref={panelRef} role="dialog" aria-modal="true" aria-label={`${job.title} at ${job.company}`} className={`${w.panel}${visible ? ' ' + w.panelOn : ''}`}>
         {/* Sticky header */}
         <div className={w.bar}>
-          <Button variant="ghost" size="sm" onClick={onClose} icon="arrow-left">Back</Button>
+          <Button variant="ghost" size="sm" onClick={onClose} icon="arrow-left" className={w.tap}>Back</Button>
           <div className={w.barText}>
             <div className={w.barTitle}>{job.title}</div>
             <div className={w.barCo}>{companyName}</div>
@@ -394,7 +394,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
             {/* Factual freshness — literally-true observations of OUR data (never an employer verdict). */}
             {job.freshness?.label && <p className={d.fine}>{job.freshness.label}</p>}
             {closed ? null : !reportedInactive ? (
-              <button type="button" onClick={reportInactive} disabled={reportingInactive} className={d.textBtn}>
+              <button type="button" onClick={reportInactive} disabled={reportingInactive} className={`${d.textBtn} ${w.tap}`}>
                 <Icon name="flag" size={14} />{reportingInactive ? 'Reporting…' : 'Not active? Report it'}
               </button>
             ) : (
@@ -481,7 +481,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
                 { label: 'Interview', outcome: 'interviewing', icon: 'calendar' },
                 { label: 'Offer', outcome: 'hired', icon: 'award' },
               ] as const).map(({ label, outcome, icon }) => (
-                <Button key={outcome} size="sm" variant="secondary" icon={icon} href={`/report?from=company&company=${encodeURIComponent(job.company)}&role=${encodeURIComponent(job.title)}&outcome=${outcome}`}>{label}</Button>
+                <Button key={outcome} size="sm" variant="secondary" icon={icon} className={w.tap} href={`/report?from=company&company=${encodeURIComponent(job.company)}&role=${encodeURIComponent(job.title)}&outcome=${outcome}`}>{label}</Button>
               ))}
             </div>
           </section>

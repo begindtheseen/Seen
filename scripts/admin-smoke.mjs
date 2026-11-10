@@ -74,6 +74,7 @@ async function answer(req) {
     const f = S.faults.splice(fi, 1)[0]
     if (f.kind === '500') return json(500, { error: 'The database refused the write (HTTP 500). Nothing was changed.' })
     if (f.kind === '401') { S.token = null; return json(401, { error: 'Session expired — log in again' }) }
+    if (f.kind === '503') return json(503, { ok: false, code: 'upstream', retryable: true, error: "Couldn't reach the server — the session check timed out. Try again." })
     if (f.kind === 'empty') return { status: 200, contentType: 'application/json', body: '' }
     if (f.kind === 'html') return { status: 502, contentType: 'text/html', body: '<html><body>Bad gateway</body></html>' }
     if (f.kind === 'timeout') { await sleep(32_000); return json(200, { ok: true }) }
@@ -233,7 +234,17 @@ async function run(vp) {
   const browser = await chromium.launch(exe ? { executablePath: exe } : {})
   const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, deviceScaleFactor: 2, hasTouch: phone, isMobile: phone })
   await ctx.route('**/api/admin-stats**', async (route) => { route.fulfill(await answer(route.request())) })
-  await ctx.route((u) => u.pathname.startsWith('/api/') && !u.pathname.startsWith('/api/admin-stats'), (route) => route.fulfill(json(404, { error: 'not in the fixture' })))
+  await ctx.route((u) => u.pathname.startsWith('/api/') && !u.pathname.startsWith('/api/admin-stats'), (route) => {
+    const req = route.request()
+    if (new URL(req.url()).pathname === '/api/admin-company-audit-pdf') {
+      S.downloads = (S.downloads || 0) + 1
+      if (req.headers()['x-admin-token'] !== S.token) return route.fulfill(json(401, { error: 'Session expired — log in again' }))
+      const f = S.faults.findIndex((x) => x.action === 'audit_pdf')
+      if (f >= 0) { S.faults.splice(f, 1); return route.fulfill(json(500, { ok: false, code: 'upstream', retryable: true, error: 'The PDF could not be built (HTTP 500). Nothing was downloaded.' })) }
+      return route.fulfill({ status: 200, headers: { 'content-type': 'application/pdf', 'content-disposition': 'attachment; filename="acme-logistics-audit.pdf"' }, body: '%PDF-1.7\n% fixture audit\n' + 'x'.repeat(2000) })
+    }
+    return route.fulfill(json(404, { error: 'not in the fixture' }))
+  })
   const page = await ctx.newPage()
   currentPage = page
   const docNavs = []
@@ -285,6 +296,17 @@ async function run(vp) {
   check(tag('a number that could not be read says "couldn\'t read", never 0'), /couldn.t read/.test(await page.getByTestId('stat-signups').innerText()))
   await shot(page, `${vp.name}-04-today-degraded`)
   S.degraded = false
+  // A session check that timed out answers 503 upstream: a Retry line, the page kept — never the sign-in step
+  S.faults.push({ kind: '503', action: 'overview' })
+  await page.getByTestId('today-refresh').click()
+  await page.getByTestId('refresh-failed').waitFor()
+  check(tag('a 503 (session check timed out) keeps the page and offers Retry, no sign-in step'),
+    /Couldn.t reach the server/.test(await page.getByTestId('refresh-failed').innerText()) && await page.getByTestId('sheet-session').count() === 0 && await page.getByTestId('stat-listings').count() === 1 && await sentinelAlive(page),
+    (await page.getByTestId('refresh-failed').innerText()).replace(/\s+/g, ' '))
+  await shot(page, `${vp.name}-04b-today-503`)
+  await page.getByTestId('refresh-failed').getByRole('button', { name: 'Retry' }).click()
+  await page.getByTestId('refresh-failed').waitFor({ state: 'detached' })
+  check(tag('Retry after the 503 reads again and clears the line'), true)
   await page.getByTestId('queue-held_reports').click()
   check(tag('a queue row opens its section with its filter in the URL'), url(page).searchParams.get('s') === 'review' && url(page).searchParams.get('review.kind') === 'held', page.url())
   await page.getByText('Review is still on the legacy admin.').waitFor()
@@ -323,6 +345,25 @@ async function run(vp) {
   const navsAfterReload = docNavs.length
   await page.getByRole('button', { name: 'All', exact: true }).click()
   await page.getByTestId('lab-row-r001').waitFor()
+
+  // Downloads: the file arrives with its server name; a failure is a sentence; a 401 signs in and replays
+  {
+    const [d1] = await Promise.all([page.waitForEvent('download'), page.getByTestId('lab-download').click()])
+    check(tag('a binary download saves the file under the server\'s name'), d1.suggestedFilename() === 'acme-logistics-audit.pdf', d1.suggestedFilename())
+    await page.waitForFunction(() => /Downloaded acme-logistics-audit\.pdf/.test(document.body.textContent || ''))
+    S.faults.push({ kind: 'x', action: 'audit_pdf' })
+    await page.getByTestId('lab-download').click()
+    await page.waitForFunction(() => /could not be built/.test(document.body.textContent || ''))
+    check(tag('a failed download says so and offers Retry'), await page.getByRole('button', { name: 'Retry' }).count() >= 1)
+    S.token = 'expired-by-test'
+    const dlP = page.waitForEvent('download')
+    await page.getByTestId('lab-download').click()
+    await page.getByTestId('sheet-session').waitFor()
+    await page.getByTestId('login-pass').fill('right'); await page.getByTestId('login-submit').click()
+    const d2 = await dlP
+    check(tag('a 401 during a download → sign in → the file still arrives'), d2.suggestedFilename() === 'acme-logistics-audit.pdf' && await sentinelAlive(page))
+    await page.locator('[data-testid=result-dismiss]').first().click().catch(() => {})
+  }
 
   // 4 · Approve all → result line, rows leave in place, Undo restores, a second press cannot double-run
   await page.getByTestId('lab-approve-all').click()
@@ -494,11 +535,39 @@ async function run(vp) {
   await page.waitForFunction(() => document.querySelector('[data-testid=sheet-panel] [data-testid=job-progress]')?.getAttribute('data-status') === 'done', null, { timeout: 20_000 })
   const doneTxt = await page.locator('[data-testid=sheet-panel] [data-testid=job-progress]').innerText()
   check(tag('the resumed job finishes; the server has nothing left'), S.stale === 0 && /Cleared [\d,]+ stale listings/.test(doneTxt), doneTxt.split('\n').slice(-2).join(' '))
+  await page.getByTestId('sheet-close').click()
+  if (phone) {
+    for (const w of [360, 390, 430]) {
+      await page.setViewportSize({ width: w, height: 844 }); await page.waitForTimeout(250)
+      const o = await page.evaluate(() => {
+        const vis = (el) => { const r = el.getBoundingClientRect(); const cs = getComputedStyle(el); return r.width > 0 && r.height > 0 && cs.display !== 'none' && cs.visibility !== 'hidden' }
+        const header = document.querySelector('[data-testid=admin-shell] header')
+        const items = [...header.querySelectorAll('button, a, span, input')].filter(vis).filter((el) => ![...el.children].some((c) => vis(c) && c.tagName !== 'svg') || el.matches('button, a, input'))
+          .filter((el, _, arr) => !arr.some((p) => p !== el && p.contains(el)))
+        const hits = []
+        for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++) {
+          const a = items[i].getBoundingClientRect(), b = items[j].getBoundingClientRect()
+          if (a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5) hits.push(`${items[i].textContent.trim().slice(0, 12)} × ${items[j].textContent.trim().slice(0, 12)}`)
+        }
+        const bar = document.querySelector('[data-testid=job-bar]')?.getBoundingClientRect()
+        const top = header.getBoundingClientRect()
+        const bottom = document.querySelector('[data-testid=tab-today]')?.parentElement?.getBoundingClientRect()
+        const chip = document.querySelector('[data-testid=job-bar] [data-testid=job-chip]')
+        return { hits, bar: bar && { top: bar.top, bottom: bar.bottom, h: bar.height }, headerBottom: top.bottom, bottomTop: bottom?.top, chipH: chip?.getBoundingClientRect().height, chipInHeader: !!header.querySelector('[data-testid=job-chip]') }
+      })
+      check(tag(`header at ${w}px: no two elements intersect, the job chip is not in it`), o.hits.length === 0 && !o.chipInHeader, o.hits.join(', '))
+      check(tag(`job bar at ${w}px: one line, between the header and the bottom bar, touching neither`), !!o.bar && o.bar.top >= o.headerBottom && Math.abs(o.bar.bottom - o.bottomTop) < 1.5 && o.chipH <= 48, JSON.stringify(o))
+    }
+    await page.setViewportSize({ width: vp.w, height: vp.h })
+    await shot(page, `${vp.name}-15b-job-bar`)
+  }
+  await page.locator('[data-testid=job-chip]:visible').click()
   await page.getByTestId('sheet-panel').getByTestId('job-dismiss').click()
   await page.getByTestId('sheet-close').click()
 
   // 9 · No document navigation happened except the reloads/gotos the test made itself
   const extra = docNavs.length - navsAtStart - 4 // 4 = the reloads/gotos above (lab reload, item reload, two gotos)
+  // (a download is not a document navigation; Playwright reports it as a download)
   check(tag('no action or section change caused a page load'), extra <= 1 && errors.length === 0, `${docNavs.length - navsAtStart} document loads (expected 4–5 from the test's own reloads); page errors: ${errors.slice(0, 3).join(' | ')}`)
   void navsAfterReload; void navsAfterReload2; void navsAfterGoto
 

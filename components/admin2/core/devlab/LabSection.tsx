@@ -10,7 +10,7 @@
 import { useState } from 'react'
 import Button from '@/components/ui/Button'
 import type { AdminList } from '../../contract.ts'
-import { useAdminAction, useAdminJob, useAdminList, useApi } from '../hooks.tsx'
+import { useAdminAction, useAdminDownload, useAdminJob, useAdminList, useApi } from '../hooks.tsx'
 import { useUrlFilter } from '../place.ts'
 import type { SectionProps } from '../sections.tsx'
 import { useShell } from '../shellContext.ts'
@@ -47,6 +47,7 @@ export default function LabSection(_props: SectionProps) {
       if (which[0] === '*all*') setConfirmAll(false)
     },
   })
+  const dl = useAdminDownload()
   const job = useAdminJob({ action: 'lab_clear', label: 'Clearing stale listings', past: 'Cleared', noun: 'stale listings' })
 
   const toggle = (id: string) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
@@ -81,11 +82,13 @@ export default function LabSection(_props: SectionProps) {
             Approve all{typeof list.total === 'number' ? ` (${list.total})` : ''}
           </Button>
         )}
+        <Button variant="secondary" icon="download" onClick={() => void dl.run('/api/admin-company-audit-pdf', { company: 'Acme Logistics' }, { fallbackName: 'audit.pdf' })} loading={dl.busy} data-testid="lab-download">Legal audit PDF</Button>
         <Button variant="secondary" onClick={() => job.start()} data-testid="lab-job">{job.running ? 'Clearing… (tap to see it)' : 'Clear stale listings'}</Button>
       </div>
 
       <ResultLine state={decide.state('bulk')} onUndo={() => decide.undo('bulk')} onRetry={() => decide.retry('bulk')} onDismiss={() => decide.dismiss('bulk')}
         runningText="Approving…" skipLinks={{ possible_duplicate: { label: 'Review them', onSelect: () => setKind('dupes') } }} />
+      {dl.state.status !== 'idle' ? <div className={styles.job}><ResultLine state={dl.state} runningText="Building the PDF…" onRetry={dl.retry} onDismiss={dl.dismiss} /></div> : null}
       {lastRow && decide.state(lastRow).status === 'done' ? (
         <div className={styles.job}>
           <ResultLine state={decide.state(lastRow)} onUndo={() => decide.undo(lastRow)} onDismiss={() => { decide.dismiss(lastRow); setLastRow(null) }} />

@@ -183,6 +183,7 @@ function Shell({ username: initialUser, onSignedOut }: { username: string; onSig
         onSelect={(k) => goSection(k)}
         badges={badges}
         jobChip={jobList.length ? <JobChip jobs={jobList} onOpen={() => setPanel({ kind: 'jobs' })} /> : null}
+        jobBar={jobList.length ? <JobChip bar jobs={jobList} onOpen={() => setPanel({ kind: 'jobs' })} /> : null}
         onSearch={() => setPanel({ kind: 'search' })}
         onMore={() => setPanel({ kind: 'more' })}
         onSignOut={() => { void signOut() }}

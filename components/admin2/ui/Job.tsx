@@ -51,7 +51,8 @@ export function JobProgress({ job, onCancel, onResume, onDismiss }: { job: Job; 
           <span className={pct == null ? `${styles.barFill} ${styles.barIndet}` : styles.barFill} style={pct == null ? undefined : { transform: `scaleX(${pct / 100})` }} />
         </div>
       ) : null}
-      <div className={styles.jobMsg}>{job.message}</div>
+      {/* While it runs, the server's own sentence for the last round says the most ("Scanned 61,000 listings so far"). */}
+      <div className={styles.jobMsg}>{live && job.last_message ? job.last_message : job.message}</div>
       <div className={styles.jobActions}>
         {live && onCancel ? <Button variant="ghost" onClick={onCancel} disabled={job.status === 'cancelling'} data-testid="job-cancel">{job.status === 'cancelling' ? 'Stopping after this round…' : 'Cancel'}</Button> : null}
         {!live && job.resumable && onResume ? <Button variant="secondary" icon="refresh-cw" onClick={onResume} data-testid="job-resume">{resumeLabel(job)}</Button> : null}
@@ -62,7 +63,7 @@ export function JobProgress({ job, onCancel, onResume, onDismiss }: { job: Job; 
 }
 
 /** The shell's chip: the running job with its count, or the newest result that has not been read. */
-export function JobChip({ jobs, onOpen }: { jobs: Job[]; onOpen: () => void }) {
+export function JobChip({ jobs, onOpen, bar }: { jobs: Job[]; onOpen: () => void; /** One line (the phone bar). */ bar?: boolean }) {
   if (!jobs.length) return null
   const live = jobs.filter((j) => j.status === 'running' || j.status === 'cancelling')
   const show = live[0] || jobs[jobs.length - 1]
@@ -71,7 +72,7 @@ export function JobChip({ jobs, onOpen }: { jobs: Job[]; onOpen: () => void }) {
   const pct = total ? Math.min(100, Math.round((show.changed / Math.max(1, total)) * 100)) : null
   const isLive = show.status === 'running' || show.status === 'cancelling'
   return (
-    <button type="button" className={styles.jobChip} onClick={onOpen} data-testid="job-chip" aria-label={`${show.label}: ${isLive ? jobProgressText(show) : jobWord(show)}. Open jobs.`}>
+    <button type="button" className={bar ? `${styles.jobChip} ${styles.jobChipBarMode}` : styles.jobChip} onClick={onOpen} data-testid="job-chip" aria-label={`${show.label}: ${isLive ? jobProgressText(show) : jobWord(show)}. Open jobs.`}>
       {isLive ? <span className={styles.spin} aria-hidden="true" /> : <Icon name={show.status === 'done' ? 'circle-check' : 'circle-slash'} size={16} />}
       <span className={styles.jobChipText}>
         <span className={styles.jobChipLabel}>{isLive ? show.label : `${jobWord(show)}: ${show.label}`}</span>

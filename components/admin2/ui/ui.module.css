@@ -184,6 +184,11 @@
 .jobChipText { display: flex; flex-direction: column; min-width: 0; line-height: var(--lh-snug); }
 .jobChipLabel { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .jobChipCount { font-size: var(--fs-meta); color: var(--text-3); white-space: nowrap; }
+/* The phone bar: one line — label, then the count, then "Open" — never wraps. */
+.jobChipBarMode { width: 100%; }
+.jobChipBarMode .jobChipText { flex-direction: row; align-items: baseline; gap: var(--sp-2); flex: 1 1 auto; }
+.jobChipBarMode .jobChipLabel { flex: 0 1 auto; }
+.jobChipBarMode .jobChipCount { flex: none; margin-left: auto; font-size: var(--fs-sm); }
 .jobChipBar { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--surface-3); overflow: hidden; }
 
 @media (prefers-reduced-motion: reduce) {

@@ -89,3 +89,20 @@ test('invariant over the persona × sample postings: no row both shown and asked
     }
   }
 })
+
+test('a statement the reader marks display:false never reaches the screen', async () => {
+  const { fitGroups } = await import('./fitRead.js')
+  const m = fitGroups({ statements: [
+    { id: 'a', text: 'Forklift certification', kind: 'requirement', importance: 'required', status: 'shown', evidence: [{ line: 'Forklift certified' }] },
+    { id: 'b', text: 'Additional tasks may be assigned', kind: 'requirement', importance: 'required', status: 'not_shown', display: false },
+  ] })
+  assert.deepEqual(m.groups.flatMap((g) => g.rows.map((r) => r.id)), ['a'])
+})
+
+test('the first five: required before duties; not shown and partly before shown; a gate\'s own statement is not repeated', async () => {
+  const { fitGroups, topRows } = await import('./fitRead.js')
+  const st = (id, importance, status) => ({ id, text: `line ${id}`, kind: importance === 'duty' ? 'duty' : 'requirement', importance, status, evidence: status === 'not_shown' ? [] : [{ line: `proof ${id}` }] })
+  const m = fitGroups({ statements: [st('r1', 'required', 'shown'), st('r2', 'required', 'not_shown'), st('r3', 'required', 'partly'), st('d1', 'duty', 'shown'), st('d2', 'duty', 'not_shown'), st('d3', 'duty', 'shown')] })
+  assert.deepEqual(topRows(m, 5).map((r) => r.id), ['r2', 'r3', 'r1', 'd2', 'd1'])
+  assert.deepEqual(topRows(m, 5, ['r2']).map((r) => r.id), ['r3', 'r1', 'd2', 'd1', 'd3'])
+})

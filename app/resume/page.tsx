@@ -1108,7 +1108,7 @@ function ResumePageInner() {
                     {/* what Seen read, before any score (UX audit F8) — the title and employer it scored under are the fields above */}
                     <PostingReadRow read={savedId || !jobJD.trim()
                       ? { title: jobTitle, company: jobCompany, source: savedId ? 'from your saved listing' : 'the job title only — no posting text', requirements: requirementCounts({ matched: fitOut.matched_requirements, missing: fitOut.unsupported_requirements }).total }
-                      : readFacts({ pasted: jobJD, server: isPostingLink(jobJD) ? { title: jobTitle, company: jobCompany } : null, job: { title: jobTitle, company: jobCompany }, requirements: requirementCounts({ matched: fitOut.matched_requirements, missing: fitOut.unsupported_requirements }).total })} />
+                      : readFacts({ pasted: jobJD, server: isPostingLink(jobJD) ? { title: jobTitle, company: jobCompany } : null, job: { title: jobTitle, company: jobCompany }, requirements: (() => { const rc = (fitOut as { requirement_count?: number }).requirement_count ?? fitOut.verdict?.requirement_count; return typeof rc === 'number' ? rc : null })() })} />
                   </div>
                 )}
                 <div className={`ai-tabs ${rs.tabs}`} role="tablist">

@@ -20,6 +20,8 @@ export type AdminShellProps = {
   /** Live counts on nav items (Review). null = could not be read. */
   badges: Partial<Record<string, number | null>>
   jobChip?: ReactNode
+  /** Phone: the same job, as a one-line bar above the bottom bar. */
+  jobBar?: ReactNode
   onSearch: () => void
   onMore: () => void
   onSignOut: () => void
@@ -34,7 +36,7 @@ function Badge({ n }: { n: number | null | undefined }) {
   return <span className={styles.badge} aria-label={`${fmt(n)} waiting`}>{n > 999 ? '999+' : fmt(n)}</span>
 }
 
-export default function AdminShell({ sections, active, onSelect, badges, jobChip, onSearch, onMore, onSignOut, username, children }: AdminShellProps) {
+export default function AdminShell({ sections, active, onSelect, badges, jobChip, jobBar, onSearch, onMore, onSignOut, username, children }: AdminShellProps) {
   const root = useRef<HTMLDivElement>(null)
   // The phone bar ducks while a field has focus (the keyboard is up).
   useEffect(() => {
@@ -53,7 +55,7 @@ export default function AdminShell({ sections, active, onSelect, badges, jobChip
   const moreActive = more.some((s) => s.key === active)
 
   return (
-    <div ref={root} className={styles.root} data-testid="admin-shell">
+    <div ref={root} className={jobBar ? `${styles.root} ${styles.hasJob}` : styles.root} data-testid="admin-shell">
       <a href="#admin-main" className={styles.skip}>Skip to content</a>
       {/* Desktop rail */}
       <aside className={styles.rail} aria-label="Admin">
@@ -86,7 +88,6 @@ export default function AdminShell({ sections, active, onSelect, badges, jobChip
       {/* Phone top bar */}
       <header className={styles.top}>
         <div className={styles.brand}><span className={styles.brandWord}>Seen</span><span className={styles.brandTag}>Admin</span></div>
-        <div className={styles.topJob}>{jobChip}</div>
         <button type="button" className={styles.iconBtn} onClick={onSearch} aria-label="Search" data-testid="top-search">
           <Icon name="search" size={20} />
         </button>
@@ -95,6 +96,10 @@ export default function AdminShell({ sections, active, onSelect, badges, jobChip
       <div id="admin-main" className={styles.main} tabIndex={-1}><div className={styles.inner}>{children}</div></div>
 
       {/* Phone bottom bar */}
+      {/* Phone: the job chip has its own slim bar just above the bottom bar — never in the header, where it
+          covered the wordmark (director, 2026-11-10). Solid and fixed: it overlays nothing the owner needs
+          (the page reserves its height at the bottom while a job is shown) and never shifts the page. */}
+      {jobBar ? <div className={styles.jobBar} data-testid="job-bar">{jobBar}</div> : null}
       {/* Not a <nav>: globals.css styles every nav element as the site bar. */}
       <div role="navigation" className={styles.bottom} aria-label="Sections">
         {bar.map((s) => (

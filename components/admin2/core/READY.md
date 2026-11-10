@@ -15,7 +15,10 @@ useAdminAction(action, { optimistic?(tx, args), onRows?(rows, cache, args), onSe
   tx: { patch(keyPrefix | (key)=>bool, fn), removeRows(keyPrefix, ids), rollback() }
 // long jobs
 useAdminJob({ action, args?, label, past, noun }) → { job, running, start, cancel, resume, dismiss }
-useAdminJobs() → Job[]
+useAdminJobs() → Job[]            // Job.last_message = the server's sentence for the last round
+// files
+useAdminDownload() → { run(endpoint, body?, { fallbackName?, timeoutMs? }), state, busy, retry, dismiss }
+saveText(text, filename, type?)   // core/api.ts, for CSV/JSON returned inside an action's answer
 // places
 useShell() → { section, goSection(s, filter?), openItem(kind, id), closeItem, openPanel, closePanel, sheetOpen, username, signOut }
 useUrlFilter(section, name, fallback) → [value, set]

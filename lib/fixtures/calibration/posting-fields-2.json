@@ -721,7 +721,8 @@
   "posting": 456,
   "title": "Behavior Technician",
   "accept": [
-   "patient_care"
+   "patient_care",
+   "behavior"
   ]
  },
  {

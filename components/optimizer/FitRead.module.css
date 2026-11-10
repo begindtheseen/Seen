@@ -1,6 +1,6 @@
 /* THE fit read (DESIGN.md: tokens only, ink labels, body text at --fs-body, semantic colour with a word + an
    icon, 44px targets, 8px grid). */
-.fit { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
+.fit { display: flex; flex-direction: column; gap: var(--sp-3); min-width: 0; }
 .head { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
 .gate { display: flex; gap: var(--sp-2); align-items: flex-start; margin: 0; color: var(--caution-text); font-size: var(--fs-body); font-weight: 600; line-height: var(--lh-body); overflow-wrap: anywhere; }
 .gate svg { flex-shrink: 0; margin-top: 4px; }
@@ -47,3 +47,13 @@
 .said > span { min-width: 0; flex: 1 1 200px; }
 .change { min-height: 44px; padding: 0 var(--sp-2); background: none; border: 0; color: var(--accent); font: inherit; font-size: var(--fs-sm); font-weight: 600; cursor: pointer; }
 .ans:focus-visible, .change:focus-visible { outline: none; box-shadow: var(--sh-focus); }
+
+/* the free step's first screen: rows without a card, a hairline between, the quote kept to two lines */
+.denseList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border-top: 1px solid var(--border-1); }
+.dense { display: flex; flex-direction: column; gap: var(--sp-1); min-width: 0; padding: var(--sp-2) 0; border-bottom: 1px solid var(--border-1); }
+.dense .text { font-size: var(--fs-body); }
+.clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.dense .mark { font-size: var(--fs-meta); }
+
+.dense .mark { margin-right: var(--sp-1); vertical-align: baseline; }
+.gateText { margin: 0; font-size: var(--fs-sm); color: var(--text-2); line-height: var(--lh-body); overflow-wrap: anywhere; }

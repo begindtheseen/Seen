@@ -125,11 +125,13 @@ const STATE_RANK = { not_shown: 0, partly: 1, shown: 2 };
  * what is — so the top of the screen is what matters. Questions only the person can answer are not in it.
  * @param {{ groups: Array<{ key: string, rows: Array<Record<string, any>> }> } | null} model
  */
-export function topRows(model, n = 5) {
+export function topRows(model, n = 5, skip = []) {
   if (!model) return [];
+  // a statement a graded gate already says ("You show about 6 years…; they ask for 1+") is not said twice
+  const skipped = new Set(skip.filter(Boolean));
   const pick = (k) => ((model.groups.find((g) => g.key === k) || { rows: [] }).rows).map((r, i) => ({ r, i }))
     .sort((a, b) => (STATE_RANK[a.r.state] ?? 3) - (STATE_RANK[b.r.state] ?? 3) || a.i - b.i).map((x) => x.r);
-  return [...pick('required'), ...pick('duty')].slice(0, n);
+  return [...pick('required'), ...pick('duty')].filter((r) => !skipped.has(r.id)).slice(0, n);
 }
 
 /** Group heading: plain label + the count of THIS group's rows that are shown (states from the server). */
@@ -160,10 +162,13 @@ export function gateRows(constraints) {
   for (const c of constraints || []) {
     if (!c || !GATE_KINDS.has(String(c.kind))) continue;
     const text = clean(c.sentence || c.message);
-    if (!text || seen.has(text)) continue;
-    seen.add(text);
+    // two graded rows that say the same thing ("…lead duties (…) but no role where you managed people; they ask for 7+ years" and the
+    // same without the years) are one row: the first 60 characters decide
+    const head = text.slice(0, 60).toLowerCase();
+    if (!text || seen.has(head)) continue;
+    seen.add(head);
     const state = GRADE_STATE[c.grade] || (c.status === 'met' ? 'shown' : c.status === 'ask' ? 'ask' : c.status === 'partial' ? 'partly' : 'not_shown');
-    out.push({ kind: String(c.kind), text, state, caps: !!c.caps, quote: clean(c.posting_quote), preferred: c.importance === 'preferred' });
+    out.push({ kind: String(c.kind), text, state, caps: !!c.caps, quote: clean(c.posting_quote), preferred: c.importance === 'preferred', statementId: c.statementId || null });
   }
   // a gate that stops the application first, then what is short, then what is met
   const rank = (r) => (r.caps ? 0 : r.state === 'not_shown' ? 1 : r.state === 'partly' ? 2 : r.state === 'ask' ? 3 : 4);

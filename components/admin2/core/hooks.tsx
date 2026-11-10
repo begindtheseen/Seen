@@ -213,3 +213,38 @@ export function useAdminJob(spec: JobSpec): JobView {
     dismiss: () => { if (job) jobs.dismiss(job.id) },
   }
 }
+
+// ── Downloads ────────────────────────────────────────────────────────────────────────────────────
+
+export type DownloadView = {
+  /** POST to a binary endpoint (legal-audit PDF / package…) and save the file. A second tap while busy is ignored. */
+  run: (endpoint: string, body?: Record<string, unknown>, opts?: { fallbackName?: string; timeoutMs?: number }) => Promise<void>
+  /** ActionState-shaped, so <ResultLine state={dl.state} /> shows "Downloaded walmart-audit.pdf (212 KB)." or the error + Retry. */
+  state: ActionState
+  busy: boolean
+  retry: () => void
+  dismiss: () => void
+}
+
+/** The admin's file downloads: same token, same 401 → sign-in → replay, same error sentences as actions. */
+export function useAdminDownload(): DownloadView {
+  const rt = useRuntime()
+  const [state, setState] = useState<ActionState>(IDLE('download'))
+  const last = useRef<{ endpoint: string; body?: Record<string, unknown>; opts?: { fallbackName?: string; timeoutMs?: number } } | null>(null)
+  const inflight = useRef(false)
+  const run = useCallback(async (endpoint: string, body?: Record<string, unknown>, opts?: { fallbackName?: string; timeoutMs?: number }) => {
+    if (inflight.current || !rt.download) return
+    inflight.current = true
+    last.current = { endpoint, body, opts }
+    setState({ status: 'running', target: 'download' })
+    const res = await rt.download(endpoint, body, opts)
+    inflight.current = false
+    if (res.ok) setState({ status: 'done', target: 'download', result: { ok: true, changed: 0, skipped: [], touched: [], message: res.message } })
+    else setState({ status: 'error', target: 'download', error: res })
+  }, [rt])
+  return {
+    run, state, busy: state.status === 'running',
+    retry: () => { if (last.current) void run(last.current.endpoint, last.current.body, last.current.opts) },
+    dismiss: () => setState(IDLE('download')),
+  }
+}

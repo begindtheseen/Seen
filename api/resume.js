@@ -6,7 +6,7 @@ import { gateAI, resolveProAccess, resolveAuthedUser } from '../lib/server/credi
 import { RESUME_OPTIMIZE_COST } from '../lib/server/creditRules.js';
 import { postingTextForReader } from '../lib/server/jobInsights.js';
 import { readPosting } from '../lib/server/postingRead.js';
-import { paidExportToken, verifyPaidExport } from '../lib/server/paidExport.js';
+import { paidExportToken, paidExportAllowed } from '../lib/server/paidExport.js';
 import { optimizeCacheKey, readCachedOptimize, writeCachedOptimize } from '../lib/server/optimizeCache.js';
 import { buildPaidOptimize, unoptimizableListing } from '../lib/server/optimizePackage.js';
 import { runAdvantage, requirementsStated, extractEmployment, extractCareerSignal, buildResumeDocument, resumeFileName } from '../lib/server/resumeAnalysis.js';
@@ -615,7 +615,7 @@ async function handleOptimizeTool(req, res, body) {
     const hit = body.fresh ? null : await readCachedOptimize(authed.uid, key);
     if (hit) {
       const paidBefore = !hit.output.no_gain;
-      const tail = hit.output.tailored ? { ...hit.output.tailored, export_token: paidBefore ? paidExportToken(authed.uid, key) : null } : hit.output.tailored;
+      const tail = hit.output.tailored ? { ...hit.output.tailored, export_token: paidBefore ? paidExportToken(authed.uid, key) : null, export_key: paidBefore ? key : null } : hit.output.tailored;
       return res.status(200).json({ ...hit.output, tailored: tail, cached: true, cached_at: hit.created_at, charged: false });
     }
     // A posting with no measurable requirements has nothing to optimize against: refused free,
@@ -636,7 +636,7 @@ async function handleOptimizeTool(req, res, body) {
     const gate = await gateAI(req, 'resume_optimize');
     if (!gate.ok) return res.status(gate.status).json(gateFailure(gate));
     const stored = await writeCachedOptimize(authed.uid, key, result);
-    if (result.tailored) result.tailored.export_token = paidExportToken(authed.uid, key);
+    if (result.tailored) { result.tailored.export_token = paidExportToken(authed.uid, key); result.tailored.export_key = key; }
     // charged is what the gate did: a Pro user is never charged (consume_credit answers pro:true)
     return res.status(200).json({ ...result, cached: false, cache_saved: stored, charged: !gate.pro, pro: !!gate.pro, balance: gate.balance });
   } catch (err) {
@@ -666,19 +666,20 @@ async function handleStudio(req, res, body) {
         // Effective Pro status (no credit consumed) decides branding — same rule as download_resume.
         // a paid tailored version (its export token, this user's, unexpired) exports without the footer, like Pro
         const { pro } = await resolveProAccess(req);
-        let paidVersion = false;
-        if (body.exportToken) { const who = await resolveAuthedUser(req); paidVersion = verifyPaidExport(who && who.uid, body.exportToken); }
-        const out = await exportAction(body, { pro: pro || paidVersion });
+        const unbranded = pro || await paidExportAllowed(req, body, resolveAuthedUser);
+        const out = await exportAction(body, { pro: unbranded });
         const asciiName = out.fileName.replace(/[^\x20-\x7E]/g, '-').replace(/"/g, '');
         res.setHeader('Content-Type', out.contentType);
         res.setHeader('Content-Disposition', `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(out.fileName)}`);
         res.setHeader('Cache-Control', 'no-store');
         res.setHeader('X-Seen-Template', out.template || '');
         res.setHeader('X-Seen-Pages', String(out.pages || ''));
-        res.setHeader('X-Seen-Branded', pro || paidVersion ? '0' : '1');
+        res.setHeader('X-Seen-Branded', unbranded ? '0' : '1');
         return res.status(200).send(out.buffer);
       }
       case 'tailor': {
+        // identity first: a missing or expired session answers 401 signin_required before anything is read, run or charged
+        if (!(await resolveAuthedUser(req))) return res.status(401).json(SIGNIN_REQUIRED);
         // a posting that is only a preview is never charged (a title-only tailor stays allowed)
         if (String(body.jobDescription || '').trim()) {
           const read = await readPosting(body);
@@ -695,7 +696,6 @@ async function handleStudio(req, res, body) {
         }
         // The plan is computed BEFORE the credit is taken: a tailor that cannot move the fit score (an
         // engineer's résumé went 70 → 70 and paid 1 credit, round 1) is returned free, with a plain reason.
-        if (!(await resolveAuthedUser(req))) return res.status(401).json(SIGNIN_REQUIRED);
         const out = await tailorAction(body, { taxonomy, fit });
         if (body._posting) out.posting = { ...body._posting, title: body._posting.title || body.jobTitle || null };
         const rule = tailorCharge(out.tailored);

@@ -168,6 +168,81 @@ test('system', async () => {
   await run('list_subscriptions', { action: 'list_subscriptions' }, lst());
 });
 
+test('round 4: db size, source health, grant reason, sign-up source, one cluster, flag undo, groups, runs', async () => {
+  // (1) db_size: neither size function is deployed in this fake → null, never a guess.
+  const d0 = await run('db_size (unreadable)', { action: 'db_size' }, ok);
+  assert.equal(d0.rows[0].db_size, null);
+  // (2) per-source health (fallback: distinct sources by index steps, exact counts).
+  const sh = await run('source_health', { action: 'source_health' }, lst());
+  const gh = sh.rows.find((x) => x.source === 'greenhouse');
+  assert.equal(gh.live, fake.tables.jobs.filter((j) => j.source === 'greenhouse' && j.availability_status === 'active' && new Date(j.expires_at) > new Date()).length);
+  assert.equal(typeof gh.failing, 'boolean');
+  // (3) a credit grant's reason reaches the ledger and the audit row.
+  const g = await run('grant with reason', { action: 'grant_credits', user_id: uid(3, '6'), amount: 3, reason: 'Refund for a failed tailor' }, ok);
+  assert.match(g.message, /Refund for a failed tailor/);
+  const det = await run('user_detail ledger', { action: 'user_detail', user_id: uid(3, '6') }, ok);
+  assert.equal(det.rows[0].ledger[0].note, 'Refund for a failed tailor');
+  assert.equal(fake.tables.admin_audit_log.filter((a) => a.action === 'grant_credits').pop().metadata.reason, 'Refund for a failed tailor');
+  // (4) sign-up source: null without a row; the row (and its groups) when there is one.
+  assert.equal(det.rows[0].signup_source, null);
+  fake.tables.signup_attribution = [{ user_id: uid(3, '6'), landing_path: '/company/walmart', referrer_host: 'www.google.com', utm_source: null, utm_medium: null, utm_campaign: null, ref_code: null, first_seen_at: new Date().toISOString() }];
+  const det2 = await run('user_detail signup', { action: 'user_detail', user_id: uid(3, '6') }, ok);
+  assert.equal(det2.rows[0].signup_source.landing_path, '/company/walmart');
+  assert.ok(det2.rows[0].signup_source.referrer_group);
+  // (5) one cluster, by a numeric id (production) and by a uuid (the rig).
+  const cl = await run('cluster_detail', { action: 'cluster_detail', cluster_id: 1 }, ok);
+  assert.deepEqual(cl.rows[0].users.map((u) => u.email), ['person1@example.com', 'person2@example.com']);
+  fake.tables.duplicate_clusters.push({ id: uid(7, 'c'), user_ids: [uid(1, '6')], signals: ['ip:5.5.5.5'], risk_score: 30, status: 'suspected', admin_note: null, created_at: new Date().toISOString() });
+  await run('cluster_detail uuid', { action: 'cluster_detail', cluster_id: uid(7, 'c') }, ok);
+  const uc = await run('update_cluster uuid', { action: 'update_cluster', cluster_id: uid(7, 'c'), status: 'watching' }, ok);
+  await run('undo cluster uuid', { action: 'undo', ...uc.undo.args }, ok);
+  // (6) a flag that had no row: Undo deletes the row it created.
+  fake.tables.feature_flags = fake.tables.feature_flags.filter((f) => f.flag_name !== 'humanproof_enabled');
+  const sf = await run('set_flag new row', { action: 'set_flag', flag_name: 'humanproof_enabled', status: 'off' }, ok);
+  const uf = await run('undo created flag', { action: 'undo', ...sf.undo.args }, ok);
+  assert.equal(uf.changed, 1);
+  assert.ok(!fake.tables.feature_flags.some((f) => f.flag_name === 'humanproof_enabled'));
+  // (7) auto-merge counts groups, one unit for changed / remaining / message.
+  fake.tables.company_scores.push({ id: uid(50, '3'), company_name: 'acme', overall_score: 50, report_count: 2 }, { id: uid(51, '3'), company_name: 'acme, inc.', overall_score: 40, report_count: 1 }, { id: uid(52, '3'), company_name: 'acme llc', overall_score: 40, report_count: 1 });
+  const am = await run('auto_merge groups', { action: 'auto_merge' }, ok);
+  assert.equal(am.changed, am.groups.length, 'changed counts groups');
+  assert.equal(am.changed + am.remaining <= am.groups_total, true);
+  assert.match(am.message, /group/);
+  // (8) the two runs: listings cannot run in this function (clear reason + where to run it); demand answers the contract.
+  await run('refresh_jobs', { action: 'refresh_jobs' }, (r) => { const p = C.checkErr(r.jsonBody); if (r.jsonBody.code !== 'not_available' || r.jsonBody.run?.path !== '/api/refresh-jobs') p.push('not_available + run'); return p; }, 501);
+  await run('refresh_demand', { action: 'refresh_demand' }, either, null);
+});
+
+test('db_size reads admin_db_size, else jobs_storage_status (what the legacy page reads)', async () => {
+  const MB = 1024 * 1024;
+  const legacy = createFakeRest({ tables: world(), rpcs: { ...RPCS, jobs_storage_status: () => ({ db_bytes: 946 * MB, enabled: true, max_mb: 6000, blocking: false }) } });
+  const a = (await (await caller(handler, legacy))({ action: 'db_size' })).jsonBody.db_size;
+  assert.deepEqual([a.total_mb, a.jobs_mb, a.guard_max_mb, a.used_pct, a.source], [946, null, 6000, 16, 'jobs_storage_status']);
+  const full = createFakeRest({ tables: world(), rpcs: { ...RPCS, admin_db_size: () => ({ db_bytes: 946 * MB, jobs_bytes: 625 * MB, max_mb: 6000, enabled: true }) } });
+  const b = (await (await caller(handler, full))({ action: 'db_size' })).jsonBody.db_size;
+  assert.deepEqual([b.total_mb, b.jobs_mb, b.jobs_pct, b.source], [946, 625, 66, 'admin_db_size']);
+});
+
+test('source_health: exact counts past 1,000 rows, the RPC and the fallback agree', async () => {
+  const T = world({ jobs: 0 });
+  const ago = (ms) => new Date(Date.now() - ms).toISOString();
+  T.jobs = Array.from({ length: 2500 }, (_, i) => ({ id: uid(i + 1, '55'), title: 't', company: 'c', location: 'l', source: i % 5 ? 'adzuna' : 'lever', availability_status: 'active', expires_at: new Date(Date.now() + 864e5).toISOString(), last_seen_at: ago(3600e3), created_at: ago(i % 2 ? 3600e3 : 3 * 864e5), is_employer_posted: false }));
+  T.jobs.push({ id: uid(9999, '55'), title: 't', company: 'c', location: 'l', source: 'workday', availability_status: 'stale', expires_at: ago(864e5), last_seen_at: ago(5 * 864e5), created_at: ago(9 * 864e5), is_employer_posted: false });
+  const SQL = { admin_source_health: ({ p_today }, X) => {
+    const by = new Map();
+    for (const j of X.jobs) { const k = j.source || '(none)'; const g = by.get(k) || { source: k, live: 0, added_24h: 0, added_today: 0, last_seen: null }; if (j.availability_status === 'active' && new Date(j.expires_at) > new Date()) g.live++; if (Date.parse(j.created_at) >= Date.now() - 864e5) g.added_24h++; if (Date.parse(j.created_at) >= Date.parse(p_today)) g.added_today++; if (!g.last_seen || j.last_seen_at > g.last_seen) g.last_seen = j.last_seen_at; by.set(k, g); }
+    return [...by.values()];
+  } };
+  const pick = (r) => r.rows.map((x) => [x.source, x.live, x.added_24h, x.failing]);
+  const without = (await (await caller(handler, createFakeRest({ tables: structuredClone(T), rpcs: RPCS })))({ action: 'source_health' })).jsonBody;
+  const withSql = (await (await caller(handler, createFakeRest({ tables: structuredClone(T), rpcs: { ...RPCS, ...SQL } })))({ action: 'source_health' })).jsonBody;
+  assert.equal(without.source, 'exact');
+  assert.equal(withSql.source, 'admin_source_health');
+  assert.deepEqual(pick(without), pick(withSql));
+  assert.deepEqual(pick(without), [['adzuna', 2000, 1000, false], ['lever', 500, 250, false], ['workday', 0, 0, true]]);
+  assert.match(without.rows[2].why, /No live listings/);
+});
+
 test('errors are AdminErr: unknown action, signed out, bad input', async () => {
   const r = await call({ action: 'nope' });
   assert.equal(r.statusCode, 400);

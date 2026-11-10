@@ -48,7 +48,7 @@ test('clusters: emails when the server sends them, signals in words', () => {
 
 test('companies: names, lines and evidence that say what they count', () => {
   assert.equal(displayName('home depot'), 'Home Depot'); assert.equal(displayName('SpaceX'), 'SpaceX')
-  assert.equal(companyLine({ id: '1', name: 'x', overall_score: 63.2, report_count: 412, ghost_rate: 0.31, response_rate: 0.54 }), 'Score 63 · 412 reports counted · 31% ghosted · 54% heard back')
+  assert.equal(companyLine({ id: '1', name: 'x', overall_score: 63.2, report_count: 412, ghost_rate: 0.31, response_rate: 0.54 }), 'Score 63 · 412 applicant accounts counted · 31% ghosted · 54% heard back')
   const d = readCompanyDetail({ rows: [{ name: 'acme', score: { overall_score: 70, first_party_report_count: 4, report_count: 9, mention_count: null }, reports_total: 12, held: null, merges: [], perks: null }] })
   const ev = evidence(d)
   assert.equal(ev.find((e) => e.label === 'Online mentions').value, null)

@@ -42,7 +42,7 @@ function AnswerControls({ r, answer, onAnswer }: { r: Row; answer?: Answer; onAn
   if (!onAnswer) return null
   if (answer) return (
     <p className={s.said} data-testid="fit-said">
-      <span>{answer === 'skip' ? 'You skipped this one' : `You said: ${answer} — ${r.text.charAt(0).toLowerCase()}${r.text.slice(1)}`}</span>
+      <span>{answer === 'skip' ? 'You skipped this one' : `You said ${answer} to: “${r.text}”`}</span>
       <button type="button" className={s.change} onClick={() => onAnswer(r.id, null)}>Change</button>
     </p>
   )
@@ -53,15 +53,15 @@ function AnswerControls({ r, answer, onAnswer }: { r: Row; answer?: Answer; onAn
   )
 }
 
-function StatementRow({ r, answer, onAnswer, quoted }: { r: Row; answer?: Answer; onAnswer?: (id: string, a: Answer | null) => void; quoted?: Set<string> }) {
+function StatementRow({ r, answer, onAnswer, quoted, dense = false }: { r: Row; answer?: Answer; onAnswer?: (id: string, a: Answer | null) => void; quoted?: Set<string>; dense?: boolean }) {
   // in a partial list a "same line as … above" reference can point at a row that is not on screen: quote it instead
   const ref = r.sameAs && (!quoted || quoted.has(r.line.toLowerCase())) ? r.sameAs : ''
   if (quoted && r.line) quoted.add(r.line.toLowerCase())
   return (
-    <li className={s.row} data-state={r.state} data-testid="fit-row">
-      <StateMark state={r.state} />
-      <p className={s.text}>{r.state === 'ask' ? r.question : r.text}{r.preferred && r.state !== 'ask' ? <span className={s.tag}> · preferred</span> : null}</p>
-      {r.line && !ref && <p className={s.quote}>{r.lineIsJob ? 'Your job' : 'Your line'}: “{clip(r.line, 200)}”</p>}
+    <li className={dense ? s.dense : s.row} data-state={r.state} data-testid="fit-row">
+      {!dense && <StateMark state={r.state} />}
+      <p className={s.text}>{dense && <><StateMark state={r.state} />{' '}</>}{r.state === 'ask' ? r.question : r.text}{r.preferred && r.state !== 'ask' ? <span className={s.tag}> · preferred</span> : null}</p>
+      {r.line && !ref && <p className={dense ? `${s.quote} ${s.clamp}` : s.quote}>{r.lineIsJob ? 'On your résumé' : 'Your line'}: “{clip(r.line, 200)}”</p>}
       {r.line && ref && <p className={s.quote}>Shown by the same {r.lineIsJob ? 'job' : 'line'} as “{clip(ref, 60)}” above.</p>}
       {r.state === 'partly' && <p className={s.note}>{partlySentence(r)}</p>}
       {r.state === 'ask' && <AnswerControls r={r} answer={answer} onAnswer={onAnswer} />}
@@ -100,19 +100,19 @@ export default function FitRead({ data, note, compact = false, brief = false, an
   const sentence = diff ? diff.sentence : verdictSentence(v)
   const asks = model ? ((model.groups.find((g) => g.key === 'ask') || { rows: [] }).rows as Row[]) : []
   const answered = asks.filter((r) => answers?.[r.id]).length
-  const gatesBlock = gates.length > 0 && (
+  const gateList = (list: typeof gates) => list.length > 0 && (
     <div className={s.group} data-group="gates">
       <p className={s.gHead}><span className={s.gLabel}>What they count</span></p>
-      <ul className={s.list}>
-        {gates.map((g, i) => (
-          <li key={i} className={s.row} data-state={g.state} data-testid="fit-gate">
-            <StateMark state={g.state as State} />
-            <p className={s.text}>{g.text}{g.caps ? <span className={s.tag}> · this decides the application</span> : null}</p>
+      <ul className={s.denseList}>
+        {list.map((g, i) => (
+          <li key={i} className={s.dense} data-state={g.state} data-testid="fit-gate">
+            <p className={s.gateText}><StateMark state={g.state as State} />{' '}{g.text}{g.caps ? <span className={s.tag}> · this decides the application</span> : null}</p>
           </li>
         ))}
       </ul>
     </div>
   )
+  const gatesBlock = gateList(gates)
   const everything = (
     <>
       {model
@@ -127,15 +127,18 @@ export default function FitRead({ data, note, compact = false, brief = false, an
     </>
   )
   // the free step: the five rows that matter most, then one tap for the rest (and one for the questions)
-  const top = model ? (topRows(model, 5) as Row[]) : []
+  // the first screen says what stands between the person and the job: the gates not met (met ones are under
+  // "Show all"), then the rows that matter most — fewer of them when gates already take the room
+  const leadGates = gates.filter((g) => g.state !== 'shown')
+  const top = model ? (topRows(model, Math.max(3, 5 - leadGates.length), gates.map((g) => g.statementId)) as Row[]) : []
   const quoted = new Set<string>()
   const lead = (
     <>
-      {gatesBlock}
+      {open ? gatesBlock : gateList(leadGates)}
       {model && top.length > 0 && !open && (
         <div className={s.group} data-group="top">
           <p className={s.gHead}><span className={s.gLabel}>What matters most</span></p>
-          <ul className={s.list}>{top.map((r) => <StatementRow key={r.id} r={r} quoted={quoted} />)}</ul>
+          <ul className={s.denseList}>{top.map((r) => <StatementRow key={r.id} r={r} quoted={quoted} dense />)}</ul>
         </div>
       )}
       {model && asks.length > 0 && !open && onAnswer && (

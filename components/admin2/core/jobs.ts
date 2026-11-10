@@ -43,6 +43,8 @@ export type Job = AdminJobState & {
   resumable?: boolean
   /** A reload interrupted it once: a round in flight then may have been done but not counted. */
   reloaded?: boolean
+  /** The server's own sentence from the last round ("Scanned 61,000 listings so far — keep going."). */
+  last_message?: string
   lost_rounds: number
   ended_at?: string
 }
@@ -89,7 +91,7 @@ export function jobSummary(j: Job, lastMessage = ''): string {
       if (j.stopped === 'reload') return `Stopped when the page reloaded: ${did.toLowerCase()}${left ? `, ${left}` : ''}.`
       return `Cancelled: ${did.toLowerCase()}${left ? `, ${left}` : ''}.`
     case 'error':
-      if (j.stopped === 'no_progress') return `Stopped: the last round changed nothing although the server reports ${left || 'more work'}. ${did} before that.`
+      if (j.stopped === 'no_progress') return `Stopped: the last round changed nothing and did not move on, although the server reports ${left || 'more work'}. ${did} before that.`
       return `${lastMessage || 'The job failed.'}${j.changed ? ` ${did} before it stopped.` : ' Nothing was changed.'}`
     default:
       return `${j.label}… ${jobProgressText(j)}`
@@ -198,6 +200,7 @@ export function createJobManager(deps: {
         remaining: typeof res.remaining === 'number' ? res.remaining : (res.complete === false ? cur.remaining : 0),
         cursor: res.cursor || undefined,
         skipped,
+        last_message: res.message || cur.last_message,
       }
       if (res.complete !== false) {
         const done: Job = { ...next, status: 'done', resumable: false, ended_at: new Date(now()).toISOString() }
@@ -205,7 +208,10 @@ export function createJobManager(deps: {
         jobs.set(id, done); persist(); emit()
         return
       }
-      if (!res.changed) {
+      // A round that moved its cursor forward is progress even with nothing changed (a scan that reads
+      // before it writes). Only a round that neither changed rows nor moved the cursor is stuck.
+      const moved = !!res.cursor && res.cursor !== cur.cursor
+      if (!res.changed && !moved) {
         // The server says there is more but this round did nothing: stop instead of spinning.
         const stuck: Job = { ...next, status: 'error', stopped: 'no_progress', resumable: true, ended_at: new Date(now()).toISOString() }
         stuck.message = jobSummary(stuck, lastMessage)

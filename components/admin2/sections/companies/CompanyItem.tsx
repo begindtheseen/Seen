@@ -69,7 +69,6 @@ export default function CompanyItem({ kind, id, setTitle, open }: ItemViewProps)
     <div className={styles.item} data-testid="company-item">
       <RefreshFailed error={q.error} onRetry={() => void q.refresh()} />
       <div className={styles.itemPart}>
-        <p className={styles.text}><span className={styles.strong}>{scoreLine(d)}</span></p>
         <StatStrip label="What the grade is built from">
           {ev.map((e) => <StatTile key={e.label} label={e.label} value={e.value} sub={e.what} />)}
         </StatStrip>

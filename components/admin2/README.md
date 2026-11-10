@@ -11,7 +11,7 @@ core/                  the foundation: api, cache, actions, jobs, URL places, sh
   cache.ts             QueryCache: stale-while-revalidate, keyset lists, touched-only invalidation
   action.ts            the action pipeline (double-tap block, optimistic + rollback, Undo, Retry)
   jobs.ts              the job manager ("until done" loops, cancel, resume after reload)
-  hooks.tsx            useAdminQuery · useAdminList · useAdminAction · useAdminJob · useAdminJobs · useApi
+  hooks.tsx            useAdminQuery · useAdminList · useAdminAction · useAdminJob · useAdminJobs · useAdminDownload · useApi
   place.ts             useSection · useItemPlace · useUrlFilter
   sections.tsx         THE section registry        items.tsx   THE item-sheet registry
   shellContext.ts      useShell(): goSection, openItem, openPanel, sheetOpen, signOut
@@ -122,6 +122,29 @@ on the next round). The job manager lives at the shell root: it survives section
 global chip, retries ≤2 lost rounds in a row, stops on no progress, pauses at 120 rounds / 15 minutes
 (resumable), and after a reload offers "Resume clearing stale listings — 12,582 left". A second press
 focuses the running job. `args` are part of the job's identity (`jobKey`).
+
+**Progress rules (core behaviour since 2026-11-10 — sections may delete their workarounds):** a round that
+moves its `cursor` forward counts as progress even when `changed` is 0 (a scan that reads before it writes),
+so only a round that neither changes rows nor moves the cursor stops as "no progress"; and the server's own
+sentence for the last round is kept on the job as `job.last_message` and shown by `JobProgress` while it runs
+("Scanned 61,000 listings so far — keep going."). The Listings workaround that restarted a job when the
+cursor moved (`ListingsSection.tsx`, "The job manager stops on 'no change'…") can go.
+
+On a phone the shell shows the job as a one-line bar directly above the bottom bar (never in the header);
+on desktop it stays in the rail.
+
+## Downloads (binary endpoints)
+
+```tsx
+const dl = useAdminDownload()
+<Button icon="download" loading={dl.busy} onClick={() => dl.run('/api/admin-company-audit-pdf', { company }, { fallbackName: 'audit.pdf' })}>Legal audit PDF</Button>
+<ResultLine state={dl.state} runningText="Building the PDF…" onRetry={dl.retry} onDismiss={dl.dismiss} />
+```
+
+Same token, same error sentences, same 401 → sign-in → replay as actions; the file name comes from the
+server's Content-Disposition; an empty file or a JSON answer is an error, never a silent 0-byte download.
+For text the server returns inside JSON (`export_csv` → `{ csv, filename }`, `export_company` → `bundle`)
+use `saveText(text, filename, type)` from `core/api.ts` after an ordinary `useAdminAction`/`api` call.
 
 ## Item sheets
 

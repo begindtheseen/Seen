@@ -76,6 +76,9 @@ test('tailor: credit-gated (401 without a token)', async () => {
   // an expired or missing session is said as such — never "out of credits" (director's decision G)
   assert.equal(res.body.error, 'signin_required');
   assert.equal(res.body.credits_required, undefined);
+  // no paywall fields at all, and nothing ran (no plan, no charge)
+  for (const k of ['credits_required', 'pro_required', 'balance', 'price', 'cost', 'charged', 'plan', 'tailored']) assert.equal(res.body[k], undefined, k);
+  assert.equal(res.body.signin_required, true);
 });
 
 test('download_resume (legacy action) renders through the structured renderer with whole-word headings', async () => {

@@ -1,12 +1,12 @@
 // The admin's runtime: ONE api, ONE session gate, ONE cache, ONE job manager per browser tab, created
 // on first use (never on the server). Everything else (hooks, shell, sections) reads them from here
 // through the provider, so a test or a second tab never shares state by accident.
-import { createAdminApi, createReauthGate, type AdminApi, type ReauthGate } from './api.ts'
+import { createAdminApi, createAdminDownload, createReauthGate, saveBlob, type AdminApi, type AdminDownload, type ReauthGate } from './api.ts'
 import { QueryCache } from './cache.ts'
 import { createJobManager, JOBS_STORAGE_KEY, type JobManager } from './jobs.ts'
 import { TOKEN_KEY, USER_KEY } from './login.ts'
 
-export type AdminRuntime = { api: AdminApi; gate: ReauthGate; cache: QueryCache; jobs: JobManager }
+export type AdminRuntime = { api: AdminApi; gate: ReauthGate; cache: QueryCache; jobs: JobManager; download?: AdminDownload }
 
 function sget(key: string): string | null {
   try { return window.sessionStorage.getItem(key) } catch { return null }
@@ -42,6 +42,7 @@ export function getRuntime(): AdminRuntime {
     storage: { get: () => sget(JOBS_STORAGE_KEY), set: (v) => sset(JOBS_STORAGE_KEY, v) },
     invalidate: (touched) => cache.invalidate(touched),
   })
-  runtime = { api, gate, cache, jobs }
+  const download = createAdminDownload({ getToken: tokenStore.get, reauth: () => (tokenStore.get() ? gate.wait() : Promise.resolve(false)), save: saveBlob })
+  runtime = { api, gate, cache, jobs, download }
   return runtime
 }

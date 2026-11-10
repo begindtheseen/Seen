@@ -51,6 +51,7 @@ function statusSentence(status: number): string {
   if (status === 403) return 'This admin account is not allowed to do that.'
   if (status === 404) return 'The server does not know this request (HTTP 404).'
   if (status === 429) return 'Too many requests in a short time. Wait a minute, then try again.'
+  if (status === 503) return "Couldn't reach the server just now (HTTP 503). Try again in a moment."
   if (status === 504) return 'The server ran out of time (HTTP 504). Part of it may have finished — refresh to see what changed.'
   if (status >= 500) return `The server failed (HTTP ${status}). It is not known whether anything was changed — refresh to check.`
   return `The server refused the request (HTTP ${status}).`
@@ -188,4 +189,86 @@ export function createReauthGate(): ReauthGate {
     isWaiting: () => !!pending,
     subscribe(fn) { subs.add(fn); return () => { subs.delete(fn) } },
   }
+}
+
+// ── Downloads (binary endpoints: legal-audit PDF / package, exports) ─────────────────────────────
+
+/** The file name from a Content-Disposition header (RFC 5987 `filename*` first), or null. Pure for the test. */
+export function filenameFrom(header: string | null | undefined): string | null {
+  if (!header) return null
+  const star = header.match(/filename\*\s*=\s*(?:UTF-8|utf-8)?''([^;]+)/)
+  if (star) { try { return decodeURIComponent(star[1].trim().replace(/^"|"$/g, '')) } catch { /* fall through */ } }
+  const plain = header.match(/filename\s*=\s*"([^"]+)"|filename\s*=\s*([^;]+)/)
+  const name = plain ? (plain[1] || plain[2] || '').trim() : ''
+  return name ? name.replace(/[\\/]/g, '_') : null
+}
+
+export type DownloadOk = { ok: true; filename: string; bytes: number; message: string }
+export type AdminDownload = (endpoint: string, body?: Record<string, unknown>, opts?: ApiCallOpts & { fallbackName?: string }) => Promise<DownloadOk | AdminErr>
+
+/**
+ * POST `body` to a binary endpoint with the admin token and hand the answer to `save(blob, filename)`.
+ * Same failure sentences as adminApi (a JSON or HTML error body becomes an AdminErr; an empty file is an
+ * error, never a 0-byte download), and a 401 asks for a sign-in and replays the request.
+ */
+export function createAdminDownload(deps: AdminApiDeps & { save: (blob: Blob, filename: string) => void }): AdminDownload {
+  const fetchImpl = deps.fetchImpl || ((...a: Parameters<typeof fetch>) => fetch(...a))
+  async function once(endpoint: string, body: Record<string, unknown>, opts: ApiCallOpts & { fallbackName?: string }): Promise<DownloadOk | AdminErr> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    const token = deps.getToken()
+    if (token) headers['X-Admin-Token'] = token
+    const ctl = new AbortController()
+    const timeoutMs = opts.timeoutMs ?? 120_000
+    let timedOut = false
+    const timer = setTimeout(() => { timedOut = true; ctl.abort() }, timeoutMs)
+    try {
+      const res = await fetchImpl(endpoint, { method: 'POST', headers, body: JSON.stringify(body), cache: 'no-store', signal: ctl.signal })
+      if (res.status < 200 || res.status >= 300) {
+        let text = ''
+        try { text = await res.text() } catch { /* ignore */ }
+        const r = toResult(res.status, text)
+        return r.ok ? err('upstream', `The download failed (HTTP ${res.status}).`, true) : r
+      }
+      const type = res.headers.get('content-type') || ''
+      // A JSON success here means the endpoint answered data, not a file: never save it as one silently.
+      if (/application\/json/.test(type) && !/attachment/.test(res.headers.get('content-disposition') || '')) {
+        const r = toResult(res.status, await res.text())
+        return r.ok ? err('upstream', 'The server answered with data instead of a file. Nothing was downloaded.', false) : r
+      }
+      const blob = await res.blob()
+      if (!blob.size) return err('upstream', 'The server sent an empty file. Nothing was downloaded — try again.', true)
+      const filename = filenameFrom(res.headers.get('content-disposition')) || opts.fallbackName || 'download'
+      deps.save(blob, filename)
+      const kb = Math.max(1, Math.round(blob.size / 1024))
+      return { ok: true, filename, bytes: blob.size, message: `Downloaded ${filename} (${kb.toLocaleString('en-US')} KB).` }
+    } catch {
+      if (timedOut) return err('timeout', `No file from the server after ${Math.round(timeoutMs / 1000)} seconds. Try again; a large package can take a minute.`, true)
+      return err('network', "Couldn't reach the server. Check the connection, then try again.", true)
+    } finally { clearTimeout(timer) }
+  }
+  return async (endpoint, body = {}, opts = {}) => {
+    const first = await once(endpoint, body, opts)
+    if (first.ok || first.code !== 'unauthorized' || opts.noReauth || !deps.reauth) return first
+    const signedIn = await deps.reauth().catch(() => false)
+    if (!signedIn) return err('unauthorized', 'Not downloaded — you are signed out. Sign in and try again.', false)
+    return once(endpoint, body, opts)
+  }
+}
+
+/** Hand a file to the browser (one save per call; the object URL is released afterwards). */
+export function saveBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.rel = 'noopener'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 30_000)
+}
+
+/** Save text the server returned inside JSON (`export_csv` → { csv, filename }). */
+export function saveText(text: string, filename: string, type = 'text/plain;charset=utf-8') {
+  saveBlob(new Blob([text], { type }), filename)
 }
