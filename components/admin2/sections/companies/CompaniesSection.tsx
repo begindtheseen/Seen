@@ -218,7 +218,7 @@ function TopSearchedBlock() {
           : (
             <>
               <RefreshFailed error={q.error} onRetry={() => void q.refresh()} />
-              <p className={styles.text} data-testid="co-top-label">{typeof d.label === 'string' && d.label ? `Counted from ${d.label}.` : 'The server did not say how many searches it read.'}</p>
+              <p className={styles.text} data-testid="co-top-label">{typeof d.label === 'string' && d.label ? `Counted ${/^from\b/i.test(d.label) ? '' : 'from '}${d.label}.` : 'The server did not say how many searches it read.'}</p>
               {rows.length ? (
                 <ul className={styles.lines} aria-label="Most searched queries">
                   {rows.map((r, i) => (
