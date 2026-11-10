@@ -315,7 +315,7 @@ async function run(req, res, { loadGeo, fetchFull = fetchFullPosting }) {
         const c = await confirmFullPostings(open, keys, { db: readDb, deadline, fetchFull, want: 8 });
         // The final yes is the fit check's: its gates on the full posting, and a reason naming what in each
         // listing the résumé shows (no two the same). Nothing it marks "gate not met" is ever emailed.
-        const f = finalizeMatches(c.rows, residentText, { limit: 6, keys });
+        const f = finalizeMatches(c.rows, residentText, { limit: 6, keys, strict: true });
         confirmed = f.rows;
         for (const d of f.dropped) { c.dropped.push(d); }
         summary.full_posting_reads = (summary.full_posting_reads || 0) + c.fetched;
