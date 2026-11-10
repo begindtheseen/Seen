@@ -125,8 +125,13 @@ test('E6: a probe never charges; C2: the first run charges once and every reopen
 
 test('v6 (director G3): a package that changes nothing of substance is free — no_gain, a plain note, cached, never charged', async () => {
   const uid = '88888888-8888-4888-8888-888888888888';
+  // round 5: the first-read planner may find a real gain on the strong résumé (then it is charged, with after > before);
+  // the version it finishes has nothing left to move — re-running on THAT version changes nothing and is free
+  const first = await optimize({ resume: RESUME_STRONG, jobId: 'job-strong-0' }, '77777777-7777-4777-8777-777777777777');
+  assert.equal(first.code, 200);
+  if (first.body.charged) assert.ok(first.body.tailored.visibility.after > first.body.tailored.visibility.before, JSON.stringify(first.body.tailored.visibility));
   const before = state.charges;
-  const r = await optimize({ resume: RESUME_STRONG }, uid);
+  const r = await optimize({ resume: first.body.tailored.text }, uid);
   assert.equal(r.code, 200, JSON.stringify(r.body).slice(0, 300));
   assert.equal(r.body.charged, false);
   assert.equal(r.body.no_gain, true);
