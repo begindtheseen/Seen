@@ -44,7 +44,7 @@ import { chooseResumeId } from '@/lib/resumeChoice.js'
 import { needsSignIn, outOfCredits, signInHereHref, SIGNIN_EXPIRED_TITLE, SIGNIN_EXPIRED_TEXT } from '@/lib/toolAuth.js'
 import { readFacts, linkHost, sameHost } from '@/lib/postingRead.js'
 import { requirementCounts, offerSentence } from '@/lib/requirementList.js'
-import { displaySkill } from '@/lib/optimizer/explainScore.js'
+import { displaySkill } from '@/lib/optimizer/displaySkill.js'
 import { similarJobsHref } from './jobs/JobDetailDrawer'
 import s from './ApplyOptimizeModal.module.css'
 
@@ -633,7 +633,7 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
                 : <>
                     {diag
                       ? <>
-                          <FitRead data={diag} note="free" answers={answers} onAnswer={onAnswer} />
+                          <FitRead data={diag} note="free" answers={answers} answerLines={stored.lines} onAnswer={onAnswer} />
                           {!diag.statements?.length && <Checklist constraints={diag.constraints} />}
                         </>
                       : <p className={s.fine}>The free check didn&apos;t load. You can still optimize, or close and try again.</p>}
@@ -681,7 +681,7 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
                   </div>
                 </details>
               )}
-              <FitRead data={diag && diag.statements ? diag : result} compact answers={answers} onAnswer={onAnswer} />
+              <FitRead data={diag && diag.statements ? diag : result} compact answers={answers} answerLines={stored.lines} onAnswer={onAnswer} />
               {result.cached && (
                 <p className={s.ledger}>
                   You built this version with this résumé in the last 7 days. {pro === true ? 'Rebuilding is unlimited with Pro.' : `A rebuild costs ${cost}.`}{' '}
@@ -711,7 +711,7 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
                   <div className={s.section}><p className={s.msg}>{result.application_message}</p><CopyBtn text={result.application_message} label="Copy message" /></div>
                 </details>
               )}
-              <FitRead data={result} compact answers={answers} onAnswer={onAnswer} />
+              <FitRead data={result} compact answers={answers} answerLines={stored.lines} onAnswer={onAnswer} />
             </>
           )}
         </div>

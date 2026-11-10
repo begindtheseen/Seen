@@ -49,7 +49,7 @@ function YesNo({ onYes, onNo, onSkip }: { onYes: () => void; onNo: () => void; o
   )
 }
 
-function StatementRow({ r, answer, onAnswer, quoted, dense = false }: { r: Row; answer?: Answer; onAnswer?: OnAnswer; quoted?: Set<string>; dense?: boolean }) {
+function StatementRow({ r, answer, answerLine, onAnswer, quoted, dense = false }: { r: Row; answer?: Answer; answerLine?: string; onAnswer?: OnAnswer; quoted?: Set<string>; dense?: boolean }) {
   // in a partial list a "same line as … above" reference can point at a row that is not on screen: quote it instead
   const ref = r.sameAs && (!quoted || quoted.has(r.line.toLowerCase())) ? r.sameAs : ''
   if (quoted && r.line) quoted.add(r.line.toLowerCase())
@@ -63,23 +63,23 @@ function StatementRow({ r, answer, onAnswer, quoted, dense = false }: { r: Row; 
       <p className={s.text}>{dense && <><StateMark state={r.state} />{' '}</>}{r.state === 'ask' ? r.question : r.text}{r.preferred && r.state !== 'ask' ? <span className={s.tag}> · preferred</span> : null}</p>
       {r.byYou && (
         <p className={s.said} data-testid="fit-said">
-          <span>{r.candidate ? `You said this line shows it: “${clip(r.candidate.line, 160)}”` : r.state === 'ask' || !r.line ? `You said yes to: “${r.text}”` : 'You said this shows it.'}</span>
+          <span>{r.state === 'not_shown' ? `You said no to: “${r.text}”` : (r.candidate?.line || r.line) ? `You said this line shows it: “${clip(r.candidate?.line || r.line, 160)}”` : `You said yes to: “${r.text}”`}</span>
           {onAnswer && <button type="button" className={s.change} onClick={() => onAnswer(r.id, null)}>Change</button>}
         </p>
       )}
-      {r.line && !ref && <p className={dense ? `${s.quote} ${s.clamp}` : s.quote}>{r.lineIsJob ? 'On your résumé' : 'Your line'}: “{clip(r.line, 200)}”</p>}
-      {r.line && ref && <p className={s.quote}>Shown by the same {r.lineIsJob ? 'job' : 'line'} as “{clip(ref, 60)}” above.</p>}
+      {r.line && !ref && !r.byYou && <p className={dense ? `${s.quote} ${s.clamp}` : s.quote}>{r.lineIsJob ? 'On your résumé' : 'Your line'}: “{clip(r.line, 200)}”</p>}
+      {r.line && ref && !r.byYou && <p className={s.quote}>Shown by the same {r.lineIsJob ? 'job' : 'line'} as “{clip(ref, 60)}” above.</p>}
       {r.state === 'partly' && r.missing.map((m, i) => <p key={i} className={s.note}>{m}</p>)}
       {r.state === 'partly' && !r.missing.length && <p className={s.note}>{partlySentence(r)}</p>}
       {askCandidate && (
         <div className={s.candidate} data-testid="fit-candidate">
-          <p className={s.quote}>Closest line we found: “{clip(r.candidate!.line, 200)}”{onAnswer ? '. Does this show it?' : '.'}</p>
-          {r.candidate!.why && <p className={s.note}>{r.candidate!.why}</p>}
+          <p className={dense ? `${s.quote} ${s.clamp}` : s.quote}>Closest line we found: “{clip(r.candidate!.line, 200)}”{onAnswer ? '. Does this show it?' : '.'}</p>
+          {r.candidate!.why && !dense && <p className={s.note}>{r.candidate!.why}</p>}
           {onAnswer && <YesNo onYes={() => onAnswer(r.id, 'yes', r.candidate!.line)} onNo={() => onAnswer(r.id, 'no', r.candidate!.line)} />}
         </div>
       )}
-      {r.candidate && !r.byYou && answer === 'no' && (
-        <p className={s.note} data-testid="fit-candidate-no">Not on your résumé — you said “{clip(r.candidate.line, 80)}” does not show it.{onAnswer && <> <button type="button" className={s.change} onClick={() => onAnswer(r.id, null)}>Change</button></>}</p>
+      {!r.byYou && answer === 'no' && (r.candidate || answerLine) && (
+        <p className={s.note} data-testid="fit-candidate-no">Not on your résumé — you said “{clip((r.candidate?.line || answerLine || ''), 80)}” does not show it.{onAnswer && <> <button type="button" className={s.change} onClick={() => onAnswer(r.id, null)}>Change</button></>}</p>
       )}
       {r.state === 'ask' && !r.byYou && onAnswer && (answer === 'skip'
         ? <p className={s.said}><span>You skipped this one</span><button type="button" className={s.change} onClick={() => onAnswer(r.id, null)}>Change</button></p>
@@ -88,7 +88,7 @@ function StatementRow({ r, answer, onAnswer, quoted, dense = false }: { r: Row; 
   )
 }
 
-function Group({ g, answers, onAnswer }: { g: { key: string; rows: Row[] }; answers?: Answers; onAnswer?: OnAnswer }) {
+function Group({ g, answers, answerLines, onAnswer }: { g: { key: string; rows: Row[] }; answers?: Answers; answerLines?: Record<string, string>; onAnswer?: OnAnswer }) {
   const [all, setAll] = useState(false)
   const lim = LIMIT[g.key] || 6
   const rows = all ? g.rows : g.rows.slice(0, lim)
@@ -96,7 +96,7 @@ function Group({ g, answers, onAnswer }: { g: { key: string; rows: Row[] }; answ
   return (
     <div className={s.group} data-group={g.key}>
       <p className={s.gHead}><span className={s.gLabel}>{h.label}</span><span className={s.gTally}>{h.tally}</span></p>
-      <ul className={s.list}>{rows.map((r) => <StatementRow key={r.id} r={r} answer={answers?.[r.id]} onAnswer={onAnswer} />)}</ul>
+      <ul className={s.list}>{rows.map((r) => <StatementRow key={r.id} r={r} answer={answers?.[r.id]} answerLine={answerLines?.[r.id]} onAnswer={onAnswer} />)}</ul>
       {g.rows.length > lim && <button type="button" className={s.more} aria-expanded={all} onClick={() => setAll((v) => !v)}>{all ? 'Show fewer' : `Show all ${g.rows.length}`}</button>}
     </div>
   )
@@ -108,7 +108,7 @@ function Group({ g, answers, onAnswer }: { g: { key: string; rows: Row[] }; answ
  * @param brief   blocked: band only (the blocked card says why)
  * @param answers / onAnswer  the person's Yes / No / Skip on what only they can say (kept by the caller)
  */
-export default function FitRead({ data, note, compact = false, brief = false, answers, onAnswer }: { data: FitData; note?: string; compact?: boolean; brief?: boolean; answers?: Answers; onAnswer?: OnAnswer }) {
+export default function FitRead({ data, note, compact = false, brief = false, answers, answerLines, onAnswer }: { data: FitData; note?: string; compact?: boolean; brief?: boolean; answers?: Answers; answerLines?: Record<string, string>; onAnswer?: OnAnswer }) {
   const [open, setOpen] = useState(false)
   const [asking, setAsking] = useState(false)
   const v = data.verdict || null
@@ -135,7 +135,7 @@ export default function FitRead({ data, note, compact = false, brief = false, an
   const everything = (
     <>
       {model
-        ? model.groups.map((g) => <Group key={g.key} g={g as { key: string; rows: Row[] }} answers={answers} onAnswer={onAnswer} />)
+        ? model.groups.map((g) => <Group key={g.key} g={g as { key: string; rows: Row[] }} answers={answers} answerLines={answerLines} onAnswer={onAnswer} />)
         : <RequirementsView matched={data.matched_requirements || []} missing={data.unsupported_requirements || []} />}
       {model && model.promises.length > 0 && (
         <div className={s.promises} data-testid="fit-promises">
@@ -149,7 +149,10 @@ export default function FitRead({ data, note, compact = false, brief = false, an
   // the first screen says what stands between the person and the job: the gates not met (met ones are under
   // "Show all"), then the rows that matter most — fewer of them when gates already take the room
   const leadGates = gates.filter((g) => g.state !== 'shown')
-  const top = model ? (topRows(model, Math.max(3, 5 - leadGates.length), gates.map((g) => g.statementId)) as Row[]) : []
+  // a close-line question takes two rows' room: the first screen holds fewer rows when it carries them
+  const firstPass = model ? (topRows(model, Math.max(3, 5 - leadGates.length), gates.map((g) => g.statementId)) as Row[]) : []
+  const asking3 = firstPass.filter((r) => r.candidate && !r.byYou).length
+  const top = model && asking3 ? (topRows(model, Math.max(3, 5 - leadGates.length - Math.ceil(asking3 / 2)), gates.map((g) => g.statementId)) as Row[]) : firstPass
   const quoted = new Set<string>()
   const lead = (
     <>
@@ -157,12 +160,12 @@ export default function FitRead({ data, note, compact = false, brief = false, an
       {model && top.length > 0 && !open && (
         <div className={s.group} data-group="top">
           <p className={s.gHead}><span className={s.gLabel}>What matters most</span></p>
-          <ul className={s.denseList}>{top.map((r) => <StatementRow key={r.id} r={r} quoted={quoted} dense />)}</ul>
+          <ul className={s.denseList}>{top.map((r) => <StatementRow key={r.id} r={r} quoted={quoted} dense answer={answers?.[r.id]} answerLine={answerLines?.[r.id]} onAnswer={onAnswer} />)}</ul>
         </div>
       )}
       {model && asks.length > 0 && !open && onAnswer && (
         asking
-          ? <Group g={{ key: 'ask', rows: asks }} answers={answers} onAnswer={onAnswer} />
+          ? <Group g={{ key: 'ask', rows: asks }} answers={answers} answerLines={answerLines} onAnswer={onAnswer} />
           : <button type="button" className={s.more} onClick={() => setAsking(true)} data-testid="fit-ask-open">
               {answered ? `You answered ${answered} of ${asks.length} questions only you can answer — review` : `Answer ${asks.length} question${asks.length === 1 ? '' : 's'} only you can answer (lifting, hours, eligibility)`}
             </button>

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import { runOptimizer } from '../../lib/optimizer/index.js'
 import { canonicalResumeText } from '../../lib/resume/canonical.js'
-import { fitGroups, gateRows, askQuestion, missingWords, differentField, verdictSentence, groupHeading } from './fitRead.js'
+import { fitGroups, gateRows, askQuestion, differentField, verdictSentence, groupHeading } from './fitRead.js'
 
 const P = (f) => fs.readFileSync(new URL(`../../lib/fixtures/personas/${f}`, import.meta.url), 'utf8')
 const run = (who, jd, title, company) => runOptimizer({ resumeText: canonicalResumeText(P(who)), jobDescription: jd, jobTitle: title, company })
@@ -44,14 +44,6 @@ test('a statement only the person can answer is a question, never a failure', ()
   assert.equal(askQuestion('Stand, walk, and smile for extended periods of time'), 'Can you stand, walk, and smile for extended periods of time?')
   assert.equal(askQuestion('Travel up to 80% of the time'), 'Can you travel up to 80% of the time?')
   assert.match(askQuestion('Valid driver\'s license'), /is that true for you\?$/)
-})
-
-test('"what is missing" leaves out fragments the reader carries ("find", "give") and says at most three', () => {
-  // the reader's real `missing` for Saxbys s4 (quality assurance checks)
-  const w = missingWords({ missing: ['hospitality,quality assurance checks at each cafe,audit,find,correct inconsistencies'] })
-  assert.ok(!w.includes('find'))
-  assert.ok(w.length <= 3)
-  assert.equal(w[0], 'hospitality')
 })
 
 test('gates come from graded constraints, worded by the server, the one that decides first', () => {
@@ -105,4 +97,18 @@ test('the first five: required before duties; not shown and partly before shown;
   const m = fitGroups({ statements: [st('r1', 'required', 'shown'), st('r2', 'required', 'not_shown'), st('r3', 'required', 'partly'), st('d1', 'duty', 'shown'), st('d2', 'duty', 'not_shown'), st('d3', 'duty', 'shown')] })
   assert.deepEqual(topRows(m, 5).map((r) => r.id), ['r2', 'r3', 'r1', 'd2', 'd1'])
   assert.deepEqual(topRows(m, 5, ['r2']).map((r) => r.id), ['r3', 'r1', 'd2', 'd1', 'd3'])
+})
+
+test('a close line the judge could not prove is carried as a candidate; an answer the server accepted comes back by: you', async () => {
+  const { fitGroups } = await import('./fitRead.js')
+  const m = fitGroups({ statements: [
+    { id: 'p', text: 'Educate patients on medications', kind: 'duty', importance: 'duty', status: 'not_shown', candidate: { line: '• Taught families how to give insulin at home', why: 'shows educating patients or families on medications' } },
+    { id: 'q', text: 'Put away inventory', kind: 'duty', importance: 'duty', status: 'partly', evidence: [{ line: 'Received freight' }], missing: ['not shown: putting away inventory'] },
+    { id: 'r', text: 'Lift 50 lbs', kind: 'physical', importance: 'required', status: 'shown', by: 'you' },
+  ] })
+  const rows = Object.fromEntries(m.groups.flatMap((g) => g.rows).map((r) => [r.id, r]))
+  assert.deepEqual(rows.p.candidate, { line: 'Taught families how to give insulin at home', why: 'shows educating patients or families on medications' })
+  assert.equal(rows.p.line, '', 'a candidate is never quoted as proof')
+  assert.deepEqual(rows.q.missing, ['not shown: putting away inventory'], 'missing is printed as written')
+  assert.equal(rows.r.byYou, true)
 })

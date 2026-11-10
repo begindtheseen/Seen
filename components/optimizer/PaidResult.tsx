@@ -228,7 +228,8 @@ export function ResultTopLine({ charge, charged, cached, pro, balance, cost, vis
   return (
     <div className={s.top} data-testid="result-top">
       {fig && <p className={s.figure} data-testid="result-figure"><span className={s.figNum}>{fig.after} of {fig.of}</span><span className={s.figCap}>in your first lines · before, {fig.before}</span></p>}
-      {fig && (charge?.headline || charge?.sentence) ? <p className={s.why}>{charge?.headline || charge?.sentence}{charge?.detail ? ` ${charge.detail}` : ''}</p>
+      {/* the figure IS the headline's numbers: under it only the detail (what moved), never the same numbers again */}
+      {fig ? (charge?.detail ? <p className={s.why}>{charge.detail}</p> : null)
         : charge?.headline
         ? <><p className={`${s.bought} ${s.headline}`} data-testid="result-headline">{charge.headline}</p>{charge.detail && <p className={s.why}>{charge.detail}</p>}</>
         : charge?.sentence && <p className={s.bought}>{charge.sentence}</p>}

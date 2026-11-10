@@ -185,8 +185,11 @@ Every pending row is read (keyset pages internally, no 1,000 cap; `truncated` tr
 - The duplicate-of-live check does not hold the list up: it runs ≤4 reads in parallel for ~2.5 s. Each row carries
   `review.duplicate_check: 'done'|'pending'`; the list carries `duplicate_check: 'done'|'pending'` and
   `duplicate_check_pending` (how many rows). **`pending` means "not checked yet", never "not a duplicate"** — show it as
-  unchecked and re-read later. Names are compared trimmed and case-folded ("walmart " = "Walmart"); a row is `done` only
-  after that case-insensitive pass. The bulk guard re-checks the rows it would approve, exactly, at decision time, and skips
+  unchecked and re-read later. The list's check is the exact, indexed company-name match; `done` means that check covered
+  the row. A copy whose company name differs only in letter case or spacing ("walmart " vs "Walmart") can look clean in
+  the list: the bulk guard compares names trimmed and case-folded and skips it at approve time as `possible_duplicate`,
+  and its sentence says so ("… under a company name that differs only in letter case or spacing — the list showed it
+  as clean"); `review.duplicate_case_variant: true` marks such a row. The bulk guard re-checks the rows it would approve, exactly, at decision time, and skips
   anything it cannot verify as `not_checked_for_duplicates` ("N not checked for duplicates — try again").
 - Every row carries `rules: "passes"|"fails"|null` and `rules_detail: { verdict, comment: boolean|null, post: boolean|null }`
   — Seen's strict first-hand rules read as a comment and as the post itself (null = the rules do not apply: not an

@@ -84,7 +84,7 @@
     },
     "api/apply.js": {
       "maxDuration": 30,
-      "includeFiles": "{node_modules/pdfjs-dist/**,lib/resume/extract/pdfWorker.js}"
+      "includeFiles": "{node_modules/pdfjs-dist/**,lib/resume/extract/pdfWorker.js,lib/occupations/data/**,lib/text/data/**}"
     },
     "api/jobs.js": {
       "maxDuration": 60,

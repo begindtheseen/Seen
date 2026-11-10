@@ -37,10 +37,9 @@ export function insightsOfferSentence(p: InsightsProbe | null | undefined): stri
   const n = p.item_count ?? p.requirements_read
   // one count: N is the fit check's requirement count, and the conditions among them are part of N, never added to it
   const k = p.condition_count || 0
-  const parts = [`${n} thing${n === 1 ? '' : 's'} this posting asks for${k ? `, ${k} of them conditions (hours, lifting, screening and the like)` : ''}, dealbreakers first, each with the sentence it comes from`]
-  if (p.other_condition_count) parts.push(`${p.other_condition_count} more condition${p.other_condition_count === 1 ? '' : 's'} from the rest of its text`)
-  if (p.has_pay) parts.push('the pay it lists')
-  return `${parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`}.`
+  const first = `${n} thing${n === 1 ? '' : 's'} this posting asks for${k ? `, ${k} of them condition${k === 1 ? '' : 's'} (hours, lifting, screening and the like)` : ''} — dealbreakers first, each with the sentence it comes from.`
+  const more = [p.other_condition_count ? `${p.other_condition_count} more condition${p.other_condition_count === 1 ? '' : 's'} from the rest of its text` : '', p.has_pay ? 'the pay it lists' : ''].filter(Boolean)
+  return more.length ? `${first} Also ${more.join(' and ')}.` : first
 }
 
 function Quote({ text }: { text?: string | null }) {

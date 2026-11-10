@@ -56,7 +56,7 @@ type Pack = {
   answers: Answer[]
   intro: string | null
   resume_check?: { line: string; note: string }[]
-  job_match?: { label: string; status: 'shown' | 'stated' | 'related' | 'gap' | 'expired' | 'in progress'; proof?: string; say: string; duty?: boolean; cert?: boolean; source?: string; basis?: string; story?: string }[]
+  job_match?: { label: string; status: 'shown' | 'stated' | 'related' | 'gap' | 'expired' | 'in progress'; proof?: string; say: string; duty?: boolean; cert?: boolean; source?: string; basis?: string; story?: string; candidate?: { line: string; why?: string } | null }[]
   ask_them?: { q: string; company?: boolean }[]
   format?: string
   guide?: { company: string; confidence: string; framework: { name: string; note: string } | null; tips: string[]; watch: string } | null
@@ -651,6 +651,7 @@ function PackView({ pack, company, fu, onFill, onRebuild, building }: { pack: Pa
               <li key={i}>
                 <b>{m.label}</b> <span className={s.dim}>· {MATCH_WORD[m.status] || m.status}</span>
                 {m.proof && <span className={s.why}>Your line: “{m.proof}”</span>}
+                {!m.proof && m.candidate?.line && <span className={s.why}>Closest line we found: “{m.candidate.line}”{m.candidate.why ? ` — ${m.candidate.why}` : ''}</span>}
                 {m.say && <span className={s.why}>{m.say}</span>}
               </li>
             ))}

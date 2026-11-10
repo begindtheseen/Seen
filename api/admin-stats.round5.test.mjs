@@ -183,13 +183,16 @@ test('a held copy under a different letter case / spacing ("walmart " vs "Walmar
   ];
   const fake = createFakeRest({ tables: T, rpcs: RPCS });
   const call = await caller(handler, fake);
+  // The list's check is exact and indexed: the case-variant copy looks clean there (accepted)…
+  const list = (await call({ action: 'list_held_reports' })).jsonBody;
+  assert.equal(list.duplicate_check, 'done');
+  const copyRow = list.rows.find((r) => r.id === uid(2, '41'));
+  assert.ok(!copyRow.review.flags.includes('possible_duplicate'));
+  // …and the bulk guard (case-insensitive, trimmed) skips it at approve time and says why.
   const bulk = (await call({ action: 'review_held', decision: 'approve', ids: [uid(2, '41'), uid(3, '41')] })).jsonBody;
   assert.equal(bulk.changed, 1, 'only the clean one (a name with commas and parentheses still works)');
   assert.deepEqual(bulk.skipped.map((s) => [s.reason, s.ids]), [['possible_duplicate', [uid(2, '41')]]]);
-  const list = (await call({ action: 'list_held_reports' })).jsonBody;
-  assert.equal(list.duplicate_check, 'done');
-  assert.ok(list.rows[0].review.flags.includes('possible_duplicate'));
-  assert.equal(list.rows[0].review.duplicate_of, uid(1, '41'));
+  assert.match(bulk.message, /1 skipped as possible duplicates \(1 under a company name that differs only in letter case or spacing — the list showed it as clean\)/);
 });
 
 test('a read that answers after the time box is ignored (no late flag, the row stays pending)', async () => {

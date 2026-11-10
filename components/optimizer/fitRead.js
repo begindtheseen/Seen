@@ -34,29 +34,6 @@ export function proofOf(st) {
   return ev.find((l) => !looksLikeHeader(l)) || ev[0];
 }
 
-// "what is missing, in words": the reader's `missing` names words of the statement no line shows. Single
-// short function words ("find", "give", "date") and fragments are noise on a screen — they are left out, and
-// at most three are said.
-export function missingWords(st) {
-  const raw = (st && Array.isArray(st.missing) ? st.missing : []).flatMap((m) => String(m || '').split(/\s*,\s*/));
-  const seen = new Set();
-  const out = [];
-  for (const w of raw.map(clean)) {
-    if (!w) continue;
-    const words = w.split(/\s+/);
-    if (words.length === 1 && w.length < 5 && !/^[A-Z0-9&+#.]{2,}$/.test(w)) continue;
-    if (words.length > 6) continue;
-    const k = w.toLowerCase();
-    if (seen.has(k)) continue;
-    seen.add(k);
-    out.push(w);
-    if (out.length >= 3) break;
-  }
-  return out;
-}
-
-const join = (xs) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
-
 // verbs a physical / schedule / eligibility line starts with — "Stand, walk, and smile…" becomes
 // "Can you stand, walk, and smile…?"
 const ASK_VERB = /^(?:stand|walk|lift|push|pull|carry|climb|stoop|kneel|bend|sit|work|travel|be|have|speak|read|write|drive|commute|reach|handle|operate|pass|maintain|obtain|relocate|wear|use|tolerate|perform|follow|communicate|learn|adapt|attend|respond|remain|move|stay|start|hold|provide|submit|complete|reside|live|report)\b/i;
@@ -135,8 +112,12 @@ export function topRows(model, n = 5, skip = []) {
   // a statement a graded gate already says ("You show about 6 years…; they ask for 1+") is not said twice
   const skipped = new Set(skip.filter(Boolean));
   const pick = (k) => ((model.groups.find((g) => g.key === k) || { rows: [] }).rows).map((r, i) => ({ r, i }))
-    .sort((a, b) => (STATE_RANK[a.r.state] ?? 3) - (STATE_RANK[b.r.state] ?? 3) || a.i - b.i).map((x) => x.r);
-  return [...pick('required'), ...pick('duty')].filter((r) => !skipped.has(r.id)).slice(0, n);
+    // a row the person just answered keeps its place near the top (it was there when they tapped it)
+    .sort((a, b) => (a.r.byYou ? 1 : STATE_RANK[a.r.state] ?? 3) - (b.r.byYou ? 1 : STATE_RANK[b.r.state] ?? 3) || a.i - b.i).map((x) => x.r);
+  const all = [...pick('required'), ...pick('duty')].filter((r) => !skipped.has(r.id));
+  const top = all.slice(0, n);
+  // an answer the server accepted stays on the first screen, wherever it now ranks — the person sees what their tap did
+  return [...top, ...all.slice(n).filter((r) => r.byYou)];
 }
 
 /** Group heading: plain label + the count of THIS group's rows that are shown (states from the server). */

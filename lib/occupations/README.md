@@ -68,7 +68,8 @@ evidence, `false` is not a gap.
 
 **Stable exports** (names, arguments and return fields will not change; new fields may be added): `occupationOf`, `relation`,
 `levelOf`, `tasksOf`, `toolsOf`, `impliedDuties`, `militaryOccupation`, `occupation`, `groupOf`, `looksMilitary` from
-`lib/occupations/index.js`; `sameWord`, `relateWords`, `synonymsOf`, `lemmaOf` from `lib/text/synonyms.js`; `stem`,
+`lib/occupations/index.js`; `sameWord`, `relateWords`, `synonymsOf`, `lemmaOf`, `relatePhrases` from `lib/text/synonyms.js`;
+`relatePhrases`, `sameWorkWord`, `unitsOf`, `familiesOf` from `lib/text/workFamilies.js`; `stem`,
 `inflectionCandidates`, `derivationCandidates`, `lemmaCandidates`, `words`, `isStopWord` from `lib/text/morph.js`. Not stable:
 `_internal`, `normalize.js` helpers, `parseGroupIds`, the data file formats (read them only through the API).
 
@@ -97,15 +98,40 @@ evidence, `false` is not a gap.
 
 | measure | result | target |
 |---|---|---|
-| Titles, 148 of K's résumé-style titles (labelled before any code) | 93.9% classified, 91.4% of classified correct | ≥90% / ≥95% |
-| Titles, 143 real posting titles from the corpus | 63.6% classified, 82.4% of classified correct | ≥90% / ≥95% |
-| Same corpus titles with the posting text as `lines` | 72.7% classified, 75.0% correct | — |
+| `exact` precision over all 351 labelled titles | **74 / 74 (100%)** | ≥99% |
+| Titles, 148 of K's résumé-style titles (labelled before any code) | 95.3% classified, 90.8% of classified correct | ≥90% / ≥95% |
+| Titles, 143 real posting titles from the corpus | 67.8% classified, 86.6% of classified correct | ≥90% / ≥95% |
+| Titles, 60 "<function> + lead/supervisor/manager/coordinator/specialist/associate" | 100% classified, 76.7% correct | — |
+| Same corpus titles with the posting text as `lines` | 75.5% classified, 74.1% correct | — |
 | The brief's titles (Supply Sergeant, 88M, Assistant Branch Manager, Medical Billing Specialist, Software Engineering Intern, Process Assistant, Licensed Insurance Producer, Principal Elementary School, Phlebotomist, Chef, Lab Technician) | all classified acceptably | all |
-| relation, 120 labelled pairs | 71.7% agreement; 2 labelled ladders called "different" (both: a side could not be placed) | ≥90%, 0 |
-| sameWord, 150-pair dev set (used to tune) | precision 96.3%, recall 32.5% | ≥95% |
-| sameWord, 60-pair holdout (written after tuning) | precision 81.8% (2 false matches, both arguable: shipment~cargo, procedure~process), recall 33.3% | — |
-| cold load | occupations 20 ms / 8 MB heap; titles 200 ms / 10 MB; military 206 ms / 21 MB; synonyms 7 ms / 2 MB | — |
+| relation, 120 labelled pairs | 71.7% agreement; 2 labelled ladders called "different" (a side could not be placed) | ≥90%, 0 |
+| work thesaurus `relatePhrases`, 400 pairs written after the TABLE was frozen (then used to fix the matching code) | precision 95.7%, recall 90.0% | P ≥93%, R ≥70% |
+| work thesaurus `relatePhrases`, 100-pair holdout written after the CODE was frozen | **precision 91.3%, recall 84.0%** | P ≥93%, R ≥70% |
+| `sameWord` (work families first, WordNet for unknown words), 150-pair dev / 60-pair WordNet holdout | 95.3% / 76.2%; 65.0% / 48.1% (most holdout "false" matches are label calls: vehicle~car, cash~money, procedure~process) | — |
+| cold load | occupations 20 ms / 8 MB heap; titles 200 ms / 10 MB; military 206 ms / 21 MB; synonyms 7 ms / 2 MB; workFamilies < 10 ms | — |
 | throughput (warm) | occupationOf ≈700 new titles/s (cached repeats free); relation ≈14k/s cached; sameWord ≈170k/s; levelOf ≈90k/s | — |
+
+## The work thesaurus (`lib/text/workFamilies.js`, `lib/text/data/workFamilies.json`)
+
+169 action families and 188 object families, written and reviewed by hand in `scripts/text/work-families.txt` from the
+most frequent verbs / nouns of O*NET task statements and the posting corpus (160 of the top 200 task verbs and 175 of the top 300
+nouns sit in a family; 426 / 800 verbs, 565 / 1,500 nouns). Members that only hold in a context carry a condition:
+`coach?staff|learners` (people development, not sports), `drive?vehicles|trucks|forklifts` (not "drive revenue"), `client?care`.
+
+```js
+import { relatePhrases, sameWorkWord, unitsOf, familiesOf } from '../text/workFamilies.js';
+relatePhrases('Develop and maintain delivery schedules', 'Build and update 3-week delivery look-aheads')
+// → { same: true, how: 'action and object', action: { a: 'develop', b: 'build', family: 'create' }, object: { a: 'delivery schedules', b: 'look aheads', family: 'look_ahead' } }
+relatePhrases('drive a truck', 'drive revenue')        // → { same: false, how: 'different objects' }
+relatePhrases('age-restricted sales', 'B2B sales')     // → false;  'logistic regression' vs 'logistics' → false;  'PT' vs 'PTA' → false
+sameWorkWord('manage', 'supervise')                   // → { same: false } — managing what?
+sameWorkWord('manage', 'supervise', { context: ['staff'] })   // → { same: true, family: 'supervise', conditional: true }
+```
+
+Rules: actions agree on the same verb or a shared family whose conditions the objects of either phrase meet; objects agree on
+the same word or a shared family; when both phrases name objects and none agree, the phrases differ; light verbs (perform,
+conduct, provide …) are transparent. **Use `relatePhrases` for requirement-vs-line decisions** — it sees the objects; `sameWord`
+on bare words cannot.
 
 ## How to use it
 
@@ -114,7 +140,9 @@ null or a `guess`, try the previous role rather than inventing a field. For each
 pass the person's certifications as `credentials` too. `same` and `ladder` (up one rung, `levelOf` gap ≤ ~1.5) are the rail's core; `related` is a side-step to show with its `why`; never
 show `different` because a title was unknown — `why` says "could not place". Military roles: `militaryOccupation` first.
 
-**The verdict.** For "does this résumé show requirement R": (1) `impliedDuties(personTitle, lines)` — when R's content words sit in one
+**The verdict.** For "does this résumé show requirement R": (0) `relatePhrases(R, line)` for each résumé line — a `same` with
+`how: 'action and object'` is a paraphrase you may show as proof (cite the person's line); `how: 'action'` or `'object'` alone is
+partial evidence. (1) `impliedDuties(personTitle, lines)` — when R's content words sit in one
 of those task statements AND a résumé line shares at least one specific word with R, accept weaker lexical evidence (still cite the
 person's line, never the task text). (2) Compare requirement words to résumé words with `sameWord` after your own stop-word removal:
 family matches (educate/education, schedule/scheduled, lead/led) are safe; synonym matches are strong but rare. Do not mark a gap

@@ -14,7 +14,7 @@ import { useState } from 'react'
 import Icon from '@/components/ui/Icon'
 import { bulletFromAnswer } from '@/lib/resume/engine-client'
 // display spelling of canonical skills — the same table the verdict sentence uses
-import { displaySkill } from '@/lib/optimizer/explainScore.js'
+import { displaySkill } from '@/lib/optimizer/displaySkill.js'
 import { requirementCounts, groupByProof, countHeadline } from '@/lib/requirementList.js'
 import { bandTone } from './fitRead.js'
 import s from './Verdict.module.css'
