@@ -135,7 +135,9 @@ export default function JobsPage() {
     setWhereOpen(true)
     setTimeout(() => locRef.current?.focus(), 0)
   }
-  const radiusLabel = radius === '0' ? 'Remote' : hasCity ? `${radius} mi` : 'Anywhere'
+  // A state typed alone is the whole state: the radius means nothing there (the select says "Whole state").
+  const wholeState = area?.kind === 'state' && location.trim() === area.typed
+  const radiusLabel = wholeState ? 'whole state' : radius === '0' ? 'Remote' : hasCity ? `${radius} mi` : 'Anywhere'
   // Follow the URL: Back/Forward open or close the listing; a page loaded on ?job= (Back from another
   // page) reopens it once its row is known — from the results, the rail, or this tab's listing cache.
   useEffect(() => {
@@ -233,11 +235,14 @@ export default function JobsPage() {
                   "Anywhere" (Remote stays available) instead of a dangling "25 mi". */}
               <select
                 className={bar.radius}
-                aria-label="Distance"
-                value={hasCity || radius === '0' ? radius : 'any'}
+                aria-label={wholeState ? `Distance — not used: this search covers all of ${area?.label}` : 'Distance'}
+                value={wholeState ? 'state' : hasCity || radius === '0' ? radius : 'any'}
+                disabled={wholeState}
                 onChange={e => setRadius(e.target.value === 'any' ? '25' : e.target.value)}
               >
-                {hasCity ? (
+                {wholeState ? (
+                  <option value="state">Whole state</option>
+                ) : hasCity ? (
                   <>
                     <option value="10">10 mi</option>
                     <option value="25">25 mi</option>

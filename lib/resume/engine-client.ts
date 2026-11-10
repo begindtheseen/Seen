@@ -2,7 +2,7 @@
 // Everything here runs in the browser — no network, no credits — because the modules under
 // lib/resume/{model,parse,health,rewrite,render/templates,render/text}.js import no Node built-ins.
 // Rendering (PDF/DOCX), tailoring and the ATS round-trip stay on the server (/api/resume).
-import { normalizeDoc as _normalizeDoc, serializeToText as _serializeToText, docStats as _docStats, countWords as _countWords, docIsEmpty as _docIsEmpty, newId as _newId, splitSkillList as _splitSkillList, emptyDoc as _emptyDoc, titleForKind as _titleForKind } from './model.js'
+import { sectionTitle as _sectionTitle, experienceGroups as _experienceGroups, companyLabel as _companyLabel, certDateLabel as _certDateLabel, gpaLabel as _gpaLabel, withExpected as _withExpected, normalizeDoc as _normalizeDoc, serializeToText as _serializeToText, docStats as _docStats, countWords as _countWords, docIsEmpty as _docIsEmpty, newId as _newId, splitSkillList as _splitSkillList, emptyDoc as _emptyDoc, titleForKind as _titleForKind } from './model.js'
 import { parseResume as _parseResume } from './parse/index.js'
 import { findDateRange as _findDateRange, formatRange as _formatRange, parseDateToken as _parseDateToken, toToken as _toToken } from './parse/dates.js'
 import { scoreResume as _scoreResume } from './health/score.js'
@@ -43,3 +43,11 @@ export function parseDateText(text: string): { start: string; end: string } {
 /** Re-apply a tailor plan with the user's overrides — pure, instant, no credit. */
 export const applyTailorPlan = (base: ResumeDoc, plan: TailorPlan, overrides: TailorOverrides = {}): ResumeDoc => _applyPlan(base, plan, overrides) as unknown as ResumeDoc
 export const bulletFromAnswer = (prompt: TailorPrompt, answer: string): string => _bulletFromAnswer(prompt, answer)
+
+// Labels the renderers print (model.js) — so a page preview reads exactly like the exported file.
+export const sectionTitle = (doc: ResumeDoc, kind: string): string => _sectionTitle(doc, kind)
+export const experienceGroups = (doc: ResumeDoc): Array<{ title: string; roles: ResumeDoc['experience'] }> => _experienceGroups(doc) as unknown as Array<{ title: string; roles: ResumeDoc['experience'] }>
+export const companyLabel = (e: ResumeDoc['experience'][number]): string => _companyLabel(e)
+export const certDateLabel = (c: ResumeDoc['certifications'][number]): string => _certDateLabel(c)
+export const gpaLabel = (e: ResumeDoc['education'][number]): string => _gpaLabel(e)
+export const withExpected = (e: { end?: string; dateText?: string }, label: string): string => _withExpected(e, label)

@@ -50,8 +50,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 async function answer(req) {
   if (req.method() === 'GET') {
-    // The legacy admin's dashboard read: answer as the real server does without a session.
-    return json(401, { error: 'Session expired — log in again' })
+    // The legacy admin's dashboard read. The fixture has no legacy stats: a valid session gets a 500
+    // (the legacy page shows its own error + Retry and keeps the token), no session gets the 401.
+    const ok = req.headers()['x-admin-token'] && req.headers()['x-admin-token'] === S.token
+    return ok ? json(500, { error: 'the fixture has no legacy dashboard data' }) : json(401, { error: 'Session expired — log in again' })
   }
   const body = JSON.parse(req.postData() || '{}')
   const action = body.action
@@ -184,7 +186,8 @@ async function measure(page) {
     const all = [...document.querySelectorAll('body *')].filter(visible)
     const overflow = all.filter((el) => { const r = el.getBoundingClientRect(); return (r.right > vw + 1 || r.left < -1) && !clipped(el) && getComputedStyle(el).position !== 'fixed' })
       .map((el) => `${el.tagName.toLowerCase()}.${(el.className && el.className.baseVal === undefined ? el.className : '').toString().slice(0, 40)}`)
-    const targets = [...document.querySelectorAll('button, a[href], input:not([type=checkbox]):not([type=radio]), select, textarea, [role=button], label:has(input[type=checkbox])')]
+    const dlg = document.querySelector('[role=dialog][aria-modal=true]')
+    const targets = [...(dlg || document).querySelectorAll('button, a[href], input:not([type=checkbox]):not([type=radio]), select, textarea, [role=button], label:has(input[type=checkbox])')]
       .filter(visible).filter((el) => !el.closest('label:has(input[type=checkbox])') || el.tagName === 'LABEL')
       .filter((el) => { const r = el.getBoundingClientRect(); return r.bottom > 0 && r.top < vh && r.right > 0 && r.left < vw })
     const small = targets.filter((el) => { const r = el.getBoundingClientRect(); return r.height < 43.5 || r.width < 43.5 })
@@ -364,7 +367,9 @@ async function run(vp) {
   await page.getByTestId('login-pass').fill('right')
   await page.getByTestId('login-submit').click()
   await page.waitForFunction(() => !document.querySelector('[data-testid=lab-row-r003]'))
-  check(tag('401: sign in, and the pressed action finishes'), await sentinelAlive(page) && await page.getByTestId('sheet-session').count() === 0)
+  await page.getByTestId('sheet-session').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {})
+  check(tag('401: sign in, and the pressed action finishes'), await sentinelAlive(page) && await page.getByTestId('sheet-session').count() === 0,
+    `sentinel ${await sentinelAlive(page)}, session sheets ${await page.getByTestId('sheet-session').count()}, url ${page.url()}`)
 
   // 6 · The item sheet: four ways out, focus back, refresh reopens, replace + Back
   const opener = page.getByTestId('lab-row-r004').locator('button').first()
@@ -443,7 +448,7 @@ async function run(vp) {
 
   // 8 · A long job across sections, cancel, resume after a reload
   await go('lab'); await page.getByTestId('lab-job').click()
-  await page.getByTestId('job-chip').waitFor()
+  await page.locator('[data-testid=job-chip]:visible').waitFor()
   await page.waitForFunction(() => /of 20,982/.test(document.querySelector('[data-testid=job-progress]')?.textContent || ''))
   check(tag('a job shows live counts "N of 20,982"'), true)
   await page.getByTestId('lab-job').click()
@@ -451,20 +456,20 @@ async function run(vp) {
   check(tag('a second press opens the running job instead of starting another'), S.requests.filter((a) => a === 'lab_clear').length >= 1 && await page.locator('[data-testid=sheet-panel] [data-testid=job-progress]').count() === 1)
   await page.getByTestId('sheet-close').click()
   await go('today'); await page.waitForTimeout(1200)
-  const chip1 = await page.getByTestId('job-chip').innerText()
+  const chip1 = await page.locator('[data-testid=job-chip]:visible').innerText()
   await page.waitForTimeout(1200)
-  const chip2 = await page.getByTestId('job-chip').innerText()
+  const chip2 = await page.locator('[data-testid=job-chip]:visible').innerText()
   check(tag('the job keeps running while another section is open'), chip1 !== chip2, `${chip1.replace(/\s+/g, ' ')} → ${chip2.replace(/\s+/g, ' ')}`)
   await shot(page, `${vp.name}-14-job-chip`)
-  await page.getByTestId('job-chip').click(); await page.getByTestId('job-cancel').click()
+  await page.locator('[data-testid=job-chip]:visible').click(); await page.getByTestId('sheet-panel').getByTestId('job-cancel').click()
   await page.waitForFunction(() => document.querySelector('[data-testid=sheet-panel] [data-testid=job-progress]')?.getAttribute('data-status') === 'cancelled', null, { timeout: 5000 })
   check(tag('Cancel stops after the current round'), /^Cancelled: cleared/.test(await page.locator('[data-testid=sheet-panel] [data-testid=job-progress]').innerText().then((t) => t.split('\n').find((l) => l.startsWith('Cancelled')) || '')))
-  await page.getByTestId('job-resume').click()
+  await page.getByTestId('sheet-panel').getByTestId('job-resume').click()
   await page.getByTestId('sheet-close').click()
   await page.waitForTimeout(900)
   await page.reload(); await page.getByTestId('section-today').waitFor()
-  await page.getByTestId('job-chip').click()
-  const resumeBtn = page.getByTestId('job-resume')
+  await page.locator('[data-testid=job-chip]:visible').click()
+  const resumeBtn = page.getByTestId('sheet-panel').getByTestId('job-resume')
   await resumeBtn.waitFor()
   const rl = await resumeBtn.innerText()
   check(tag('after a reload the job offers "Resume … — N left"'), /^Resume clearing stale listings — [\d,]+ left$/.test(rl.trim()), rl)
@@ -473,8 +478,8 @@ async function run(vp) {
   await resumeBtn.click()
   await page.waitForFunction(() => document.querySelector('[data-testid=sheet-panel] [data-testid=job-progress]')?.getAttribute('data-status') === 'done', null, { timeout: 20_000 })
   const doneTxt = await page.locator('[data-testid=sheet-panel] [data-testid=job-progress]').innerText()
-  check(tag('the resumed job finishes with the whole total'), /Cleared 20,982 stale listings/.test(doneTxt), doneTxt.split('\n').slice(-2).join(' '))
-  await page.getByTestId('job-dismiss').click()
+  check(tag('the resumed job finishes; the server has nothing left'), S.stale === 0 && /Cleared [\d,]+ stale listings/.test(doneTxt), doneTxt.split('\n').slice(-2).join(' '))
+  await page.getByTestId('sheet-panel').getByTestId('job-dismiss').click()
   await page.getByTestId('sheet-close').click()
 
   // 9 · No document navigation happened except the reloads/gotos the test made itself

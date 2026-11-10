@@ -81,7 +81,7 @@ test('résumé on file, no keys yet → builds them, writes profiles.job_keys, s
   assert.equal(w.length, 1, 'one write of the rebuilt keys');
   assert.ok(w[0].body.job_keys.occupations.some((o) => o.occupation === 'valet'));
   assert.ok(w[0].body.job_keys_updated_at);
-  assert.ok(jobReads().some((c) => /title=ilike\.\*valet/i.test(c.u)), 'listings read by the résumé\'s real field');
+  assert.ok(jobReads().some((c) => /title\.ilike\.\*valet/i.test(decodeURIComponent(c.u))), 'listings read by the résumé\'s real field');
   assert.ok(jobReads().some((c) => /temecula/i.test(decodeURIComponent(c.u))), 'the local reads are scoped to the profile city');
   assert.ok(!calls.some((c) => c.u.includes('resume_skills')), 'the old cache (missing in prod) is never read');
 });

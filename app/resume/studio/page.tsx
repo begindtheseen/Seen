@@ -33,6 +33,7 @@ import type { ResumeDoc, Health } from '@/lib/resume/types'
 import type { SavedJob } from '@/lib/types'
 import { showToast } from '@/lib/toast'
 import ParseNotice from '@/components/resume/ParseNotice'
+import { refile } from '@/components/resume/refile.js'
 
 type Tab = 'edit' | 'health' | 'tailor' | 'export'
 const HANDOFF_KEY = 'seen_studio_job'
@@ -310,7 +311,7 @@ function StudioInner() {
 
         {mode === 'editor' && doc && (
           <>
-            {!activeId && <div style={{ marginBottom: '1rem' }}><ParseNotice doc={baseDoc} /></div>}
+            {!activeId && <div style={{ marginBottom: '1rem' }}><ParseNotice doc={baseDoc} onPaste={() => setMode('paste')} onRefile={(u, answer) => { if (baseDoc) onChange(refile(baseDoc, u, answer) as unknown as ResumeDoc) }} /></div>}
             {variants.length > 0 && (
               <div className={s.variants} style={{ marginBottom: '1rem' }}>
                 <span className={s.label} style={{ margin: 0 }}>Versions</span>

@@ -20,8 +20,15 @@ import { httpHref } from '@/lib/safeHref.js'
 import { ResumeDocStore } from '@/lib/stores/ResumeDocStore'
 import PostingInput from '@/components/jobs/PostingInput'
 import { needsSignIn, outOfCredits } from '@/lib/toolAuth.js'
+import FitRead, { type FitData } from '@/components/optimizer/FitRead'
+import { ChangeList, BlockedResult, ResultTopLine, usePaidVersion, type Tailored, type Charge, type Blocked } from '@/components/optimizer/PaidResult'
+import { creditCostLabel } from '@/lib/creditRules'
 
 const LINES_PER_PAGE = 46
+// What the tailor answer carries besides the plan (reports/t3-paid.md §1, `action:'tailor'`): the shared charge
+// rule, the blocked verdict, the structured change list — feature-detected (an older stored result has none).
+type TailorExtra = { tailored?: Tailored | null; charge?: Charge | null; blocked?: Blocked | null; charged?: boolean; balance?: number; fit?: FitData | null }
+type Layout = 'chronological' | 'relevance' | 'as_written'
 
 export interface TailorJob { title: string; company: string; description: string; jobId: string; url?: string }
 type Props = {
@@ -56,6 +63,9 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
   const [overrides, setOverrides] = useState<TailorOverrides>({})
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [showAll, setShowAll] = useState(false)
+  const [extra, setExtra] = useState<TailorExtra>({})
+  // read-only list of every change the server made (the overrides below are how a person overrules them here)
+  const changeView = usePaidVersion(extra.tailored && extra.tailored.doc ? extra.tailored : null, 'studio')
 
   useEffect(() => { if (initialJob) setJob(initialJob) }, [initialJob])
 
@@ -68,14 +78,15 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
     const rec = ResumeDocStore.getTailor(user?.id)
     if (!rec) return
     setPlan(rec.plan as TailorPlan); setBaseDoc(rec.baseDoc); setOverrides((rec.overrides || {}) as TailorOverrides); setAnswers(rec.answers || {})
-    const rj = rec.job as TailorJob | undefined
-    if (rj && !initialJob) setJob(rj)
+    const rj = rec.job as (TailorJob & { result?: TailorExtra }) | undefined
+    if (rj && !initialJob) { const { result, ...j } = rj; setJob(j) }
+    if (rj && rj.result) setExtra(rj.result)
     setState('done')
   }, [restored, user?.id, initialJob])
   useEffect(() => {
     if (state !== 'done' || !plan || !baseDoc) return
-    ResumeDocStore.putTailor(user?.id, { job, plan, baseDoc, overrides, answers })
-  }, [state, plan, baseDoc, overrides, answers, job, user?.id])
+    ResumeDocStore.putTailor(user?.id, { job: { ...job, result: extra }, plan, baseDoc, overrides, answers })
+  }, [state, plan, baseDoc, overrides, answers, job, extra, user?.id])
 
   function pickSaved(id: string) {
     setSavedId(id)
@@ -128,7 +139,11 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
       }
       if (!res.ok || !data.plan) { setError(data.error || 'Could not tailor this résumé. Try again.'); setState('error'); return }
       window.dispatchEvent(new Event('seen:credits-updated'))
-      setNote((data as { no_gain?: boolean; note?: string }).no_gain ? ((data as { note?: string }).note || 'This posting already scores as high as your résumé goes — no credit was used.') : '')
+      setNote((data as { no_gain?: boolean; note?: string }).no_gain ? ((data as { note?: string }).note || '') : '')
+      const x = data as unknown as TailorExtra & { statements?: unknown; matched_requirements?: unknown; unsupported_requirements?: unknown; constraints?: unknown; field_match?: unknown }
+      // the fit read rides along only when the answer carries the reader's statements (server request: tailor → statements)
+      const fit = x.statements ? ({ verdict: data.plan.score?.verdict, statements: x.statements, matched_requirements: x.matched_requirements, unsupported_requirements: x.unsupported_requirements, constraints: x.constraints, field_match: x.field_match } as FitData) : null
+      setExtra({ tailored: x.tailored || null, charge: x.charge || (x.tailored && x.tailored.charge) || null, blocked: x.blocked || null, charged: !!x.charged, balance: typeof x.balance === 'number' ? x.balance : undefined, fit })
       setPlan(data.plan); setBaseDoc(clone(doc)); setOverrides({}); setAnswers({})
       setState('done')
       markQuiet() // nothing optional pops over a result the person just paid for
@@ -152,7 +167,8 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
   // the PDF had 3, Dev 2026-10-25).
   const shownBullets = (itemId: string) => finalVariant ? (finalVariant.experience.find((e) => e.id === itemId)?.bullets.length ?? 0) : 0
   const summaryOn = overrides.summary !== false
-  const layout = overrides.layout || plan?.strategy?.layout || 'chronological'
+  const layout: Layout = (overrides.layout as Layout | undefined) || (plan?.strategy?.layout as Layout | undefined) || 'chronological'
+  const setLayout = (l: Layout) => setOverrides((o) => ({ ...o, layout: l as TailorOverrides['layout'] }))
   const rewrites = plan?.rewrites || []
   const accepted = new Set(Array.isArray(overrides.rewrites) ? overrides.rewrites : overrides.rewrites === true ? rewrites.map((r) => r.bulletId) : [])
   const toggleRewrite = (id: string) => setOverrides((o) => { const cur = new Set(Array.isArray(o.rewrites) ? o.rewrites : o.rewrites === true ? rewrites.map((r) => r.bulletId) : []); if (cur.has(id)) cur.delete(id); else cur.add(id); return { ...o, rewrites: [...cur] } })
@@ -191,8 +207,17 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
         {error && <div className={s.err} style={{ marginTop: '.5rem', marginBottom: 0 }}>{error}{previewLink && <> <a href={previewLink} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', fontWeight: 600 }}>Open the listing ↗</a></>}</div>}
       </div>
 
-      {state === 'done' && plan && finalVariant && (
+      {state === 'done' && plan && extra.blocked && (
+        <div className={s.card}>
+          <ResultTopLine charge={extra.charge} charged={!!extra.charged} pro={pro} balance={extra.balance ?? null} cost={creditCostLabel(RESUME_OPTIMIZE_COST)} />
+          <div style={{ marginTop: 'var(--sp-3)' }}><BlockedResult b={extra.blocked} jobsHref="/jobs" /></div>
+          {extra.fit && <div style={{ marginTop: 'var(--sp-4)' }}><FitRead data={extra.fit} compact brief /></div>}
+        </div>
+      )}
+      {state === 'done' && plan && finalVariant && !extra.blocked && (
         <>
+          {extra.charge && <ResultTopLine charge={extra.charge} charged={!!extra.charged} pro={pro} balance={extra.balance ?? null} cost={creditCostLabel(RESUME_OPTIMIZE_COST)} />}
+          {extra.fit && <div className={s.card}><FitRead data={extra.fit} compact /></div>}
           <div className={s.card}>
             {noRequirements || plan.score.after == null || plan.score.before == null ? (
               <div className={s.dim} style={{ color: 'var(--amber)' }}>{plan.score.verdict?.withheld ? plan.score.verdict.sentence : 'The posting text gave us no requirements to match — this version is arranged from the job title and family only.'} Paste the full posting (requirements and responsibilities) for a real match score.</div>
@@ -206,7 +231,7 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
                 </div>
                 {/* the same one-sentence why the Optimize modal and /resume show; the gate first */}
                 {plan.score.verdict && <p className={s.dim} style={{ marginTop: '.5rem', color: plan.score.verdict.gate ? 'var(--amber)' : undefined }}>{plan.score.verdict.sentence.replace(/^\d+ — /, '')}</p>}
-                {note && <p className={s.dim} style={{ marginTop: '.5rem' }}>{note}</p>}
+                {note && !extra.charge && <p className={s.dim} style={{ marginTop: '.5rem' }}>{note}</p>}
                 {plan.summaryKept && <p className={s.dim} style={{ marginTop: '.25rem' }}>Your own summary stays — it scored higher against this posting than a rewritten one.</p>}
               </>
             )}
@@ -215,9 +240,11 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
             </p>
             <div className={s.opts} style={{ marginTop: '.5rem' }}>
               <span className={s.label} style={{ margin: 0 }}>Layout</span>
-              <button type="button" className={`${s.tiny}${layout === 'relevance' ? ` ${s.chipGreen}` : ''}`} onClick={() => setOverrides((o) => ({ ...o, layout: 'relevance' }))}>Relevant first</button>
-              <button type="button" className={`${s.tiny}${layout === 'chronological' ? ` ${s.chipGreen}` : ''}`} onClick={() => setOverrides((o) => ({ ...o, layout: 'chronological' }))}>Chronological</button>
-              <span className={s.muted}>{layout === 'relevance' ? 'Relevant Experience leads; other roles are lines under Additional Experience.' : 'Most recent first; irrelevant roles condensed.'}</span>
+              {/* one option always shows as selected — the plan's own layout may be "as written" */}
+              <button type="button" aria-pressed={layout === 'as_written'} className={`${s.tiny}${layout === 'as_written' ? ` ${s.chipGreen}` : ''}`} onClick={() => setLayout('as_written')}>As you wrote it</button>
+              <button type="button" aria-pressed={layout === 'relevance'} className={`${s.tiny}${layout === 'relevance' ? ` ${s.chipGreen}` : ''}`} onClick={() => setLayout('relevance')}>Relevant first</button>
+              <button type="button" aria-pressed={layout === 'chronological'} className={`${s.tiny}${layout === 'chronological' ? ` ${s.chipGreen}` : ''}`} onClick={() => setLayout('chronological')}>Chronological</button>
+              <span className={s.muted}>{layout === 'relevance' ? 'Relevant Experience leads; other roles are lines under Additional Experience.' : layout === 'as_written' ? 'Your roles in the order you wrote them.' : 'Most recent first; irrelevant roles condensed.'}</span>
             </div>
             {layout === 'relevance' && plan.strategy?.layout !== 'relevance' && (
               <div className={s.muted} style={{ color: 'var(--amber)', marginTop: '.25rem' }}>⚠ This puts an older role above your current job. Store-level and hourly recruiters read that top-down as a gap — keep Chronological unless the older role is the only relevant one.</div>
@@ -227,6 +254,14 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
               <span className={s.muted} style={{ alignSelf: 'center' }}>Your base résumé stays exactly as it is.</span>
             </div>
           </div>
+
+          {extra.tailored && (extra.tailored.changes || []).length > 0 && (
+            <div className={s.card} data-testid="tailor-changes">
+              <span className={s.secTitle}>Every change, before → after</span>
+              <div className={s.dim} style={{ margin: '.25rem 0 .5rem' }}>What this version changes from your résumé, with the requirement each one serves. Overrule them below.</div>
+              <ChangeList t={extra.tailored} v={changeView} readOnly />
+            </div>
+          )}
 
           {decisions.length > 0 && (
             <div className={s.card}>

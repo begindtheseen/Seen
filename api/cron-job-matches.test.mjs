@@ -57,7 +57,7 @@ globalThis.fetch = async (url, opts = {}) => {
       return new Response('', { status: 201 });
     }
     if (method === 'DELETE') { st.deletes++; const key = u.searchParams.get('job_key').replace(/^eq\./, ''); st.log = st.log.filter((r) => r.job_key !== key); return new Response('', { status: 204 }); }
-    if (path.includes('sent_at=gte.')) return json([], 200, { 'content-range': `0-0/${st.log.length}` });
+    if (path.includes('sent_at=gte.')) { const since = Date.parse(u.searchParams.get('sent_at').replace(/^gte\./, '')); return json(st.log.filter((r) => Date.parse(r.sent_at) >= since)); }
     return json([...st.log].sort((a, b) => (a.sent_at < b.sent_at ? 1 : -1)));
   }
   if (table === 'profiles') {
@@ -134,7 +134,7 @@ test('the next run the same day respects the 4-hour gap; never the same job twic
   for (const r of st.log) r.sent_at = new Date(Date.now() - 5 * 3600e3).toISOString();
   const third = await run();
   assert.equal(third.body.sent, 0, JSON.stringify(third.body));
-  assert.equal(third.body.skipped.no_good_match, 1);
+  assert.equal(third.body.skipped.no_good_match, 1, JSON.stringify(third.body));
   // A new cashier listing then goes out on its own.
   st.jobs.push(listing('j4', 'Cashier', 'ralphs grocery'));
   const fourth = await run();
@@ -353,4 +353,12 @@ test('teaser hole: a dry run reads the posting but writes nothing back', async (
   assert.equal(wrote, 1, 'the reader was answered');
   assert.ok(!st.jobs[0].description.includes('security industry'), 'nothing reached the database');
   assert.equal(res.body.picked[0].reason, 'no_readable_match');
+});
+
+test('limits count emails, not log rows: one email with two extra jobs is one of the two a day', async () => {
+  const { countEmails } = await import('./cron-job-matches.js');
+  const t0 = Date.parse('2026-11-10T16:05:00Z');
+  const rows = [0, 2, 3].map((s) => ({ user_id: 'u', sent_at: new Date(t0 + s * 1000).toISOString() }));
+  assert.equal(countEmails(rows), 1);
+  assert.equal(countEmails([...rows, { user_id: 'u', sent_at: new Date(t0 + 5 * 3600e3).toISOString() }, { user_id: 'v', sent_at: new Date(t0).toISOString() }]), 3);
 });

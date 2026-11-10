@@ -64,7 +64,7 @@
 .searchClear { position: absolute; right: 0; top: 0; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; color: var(--text-3); cursor: pointer; border-radius: var(--r-control); }
 .searchClear:hover { color: var(--text-1); }
 .chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
-.chips :global(.ui-chip) { min-height: 44px; }
+.chips :global(.ui-chip) { min-height: 44px; min-width: 44px; justify-content: center; }
 .chipCount { font-size: var(--fs-meta); color: var(--text-3); }
 
 /* ── Empty / error / skeleton / stale line ────────────────────────────────────────────────────── */

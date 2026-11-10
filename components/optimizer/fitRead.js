@@ -1,0 +1,166 @@
+// THE fit read, as the screen shows it — built ONLY from fields the server returned (runOptimizer's
+// `statements`, `constraints`, `verdict`, `field_match`). Nothing here re-derives a verdict, a status, a
+// count or a band: it groups, orders and words what the reader and the verdict already decided.
+//
+// Screen rules (director's brief, phase B):
+//  - each requirement as the posting states it, with one of four states carried by an icon AND a word:
+//    Shown (the person's line quoted under it) · Partly (the line + what is missing, in words) · Not shown ·
+//    Only you can say (physical, schedule, eligibility, traits — asked as a question, never a failure);
+//  - required first, then duties, then preferred (labelled);
+//  - one résumé line that proves several statements is quoted once; later rows point back to it;
+//  - the posting's promises ("No experience required") sit in their own quiet block;
+//  - graded gates in plain words with what was counted (constraints[].sentence, written by the server).
+
+/** @typedef {'shown'|'partly'|'not_shown'|'ask'} RowState */
+
+const STATE_OF = { shown: 'shown', partly: 'partly', not_shown: 'not_shown', cannot_tell: 'ask' };
+// Gate kinds the verdict grades (constraints.js); physical / schedule asks are statements of their own.
+const GATE_KINDS = new Set(['years', 'seniority', 'management', 'degree', 'education', 'certification', 'license', 'licence', 'language', 'clearance', 'age', 'work_authorization']);
+const GRADE_STATE = { met: 'shown', partly: 'partly', not_shown: 'not_shown', cannot_tell: 'ask' };
+
+const clean = (t) => String(t || '').replace(/\s+/g, ' ').trim();
+/** The proof line as people read it: no bullet glyph. */
+export const proofText = (t) => clean(t).replace(/^[•\-*·–—]+\s*/, '');
+const key = (t) => proofText(t).toLowerCase();
+
+// A role header ("Guest Experience Team Lead — Target | Phoenix, AZ | Mar 2021 – Sep 2026") is the verdict's
+// evidence for a years/title match; a bullet or a summary sentence is better proof to quote when both are there.
+const looksLikeHeader = (t) => /\|/.test(t) && /\b(?:19|20)\d{2}\b/.test(t) && t.split(/\s+/).length <= 18;
+
+/** The line to quote for a statement: its first evidence line, preferring a bullet over a role header. */
+export function proofOf(st) {
+  const ev = (st && Array.isArray(st.evidence) ? st.evidence : []).map((e) => proofText(e && e.line)).filter(Boolean);
+  if (!ev.length) return '';
+  return ev.find((l) => !looksLikeHeader(l)) || ev[0];
+}
+
+// "what is missing, in words": the reader's `missing` names words of the statement no line shows. Single
+// short function words ("find", "give", "date") and fragments are noise on a screen — they are left out, and
+// at most three are said.
+export function missingWords(st) {
+  const raw = (st && Array.isArray(st.missing) ? st.missing : []).flatMap((m) => String(m || '').split(/\s*,\s*/));
+  const seen = new Set();
+  const out = [];
+  for (const w of raw.map(clean)) {
+    if (!w) continue;
+    const words = w.split(/\s+/);
+    if (words.length === 1 && w.length < 5 && !/^[A-Z0-9&+#.]{2,}$/.test(w)) continue;
+    if (words.length > 6) continue;
+    const k = w.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(w);
+    if (out.length >= 3) break;
+  }
+  return out;
+}
+
+const join = (xs) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
+
+// verbs a physical / schedule / eligibility line starts with — "Stand, walk, and smile…" becomes
+// "Can you stand, walk, and smile…?"
+const ASK_VERB = /^(?:stand|walk|lift|push|pull|carry|climb|stoop|kneel|bend|sit|work|travel|be|have|speak|read|write|drive|commute|reach|handle|operate|pass|maintain|obtain|relocate|wear|use|tolerate|perform|follow|communicate|learn|adapt|attend|respond|remain|move|stay|start|hold|provide|submit|complete|reside|live|report)\b/i;
+
+/** A statement only the person can answer, phrased as a question to them (never as a failure). */
+export function askQuestion(text) {
+  const t = clean(text).replace(/[.;:]+$/, '');
+  if (!t) return '';
+  if (ASK_VERB.test(t)) return `Can you ${t.charAt(0).toLowerCase()}${t.slice(1)}?`;
+  return `${t} — is that true for you?`;
+}
+
+/**
+ * The statements in display groups, each row with its state, its quote (once per line) and its words.
+ * Returns null when the answer carries no statements (an older cached response) — the caller then shows the
+ * verdict's requirement list instead.
+ * @param {{ statements?: Array<Record<string, any>> }} d
+ */
+export function fitGroups(d) {
+  const sts = d && Array.isArray(d.statements) ? d.statements.filter((s) => s && clean(s.text)) : [];
+  if (!sts.length) return null;
+  const rows = [];
+  const promises = [];
+  for (const st of sts) {
+    if (st.kind === 'promise') { promises.push({ id: st.id, text: clean(st.text), source: clean(st.source) }); continue; }
+    const state = /** @type {RowState} */ (STATE_OF[st.status] || 'not_shown');
+    const group = state === 'ask' ? 'ask' : st.importance === 'preferred' || st.kind === 'preferred' ? 'preferred' : st.importance === 'duty' || st.kind === 'duty' ? 'duty' : 'required';
+    rows.push({
+      id: String(st.id || rows.length),
+      text: clean(st.text),
+      state,
+      group,
+      preferred: st.importance === 'preferred' || st.kind === 'preferred',
+      line: state === 'shown' || state === 'partly' ? proofOf(st) : '',
+      // a role header ("Warehouse Associate — Midwest Distribution | 2021 – Present") is the person's JOB, not a line they wrote
+      lineIsJob: false,
+      missing: state === 'partly' ? missingWords(st) : [],
+      question: state === 'ask' ? askQuestion(st.text) : '',
+      source: clean(st.source),
+    });
+  }
+  for (const r of rows) if (r.line && looksLikeHeader(r.line)) r.lineIsJob = true;
+  // what they require, the work itself, then what only the person can say (traits, hours, lifting), preferred last
+  const order = ['required', 'duty', 'ask', 'preferred'];
+  const groups = order.map((g) => ({ key: g, rows: rows.filter((r) => r.group === g) })).filter((g) => g.rows.length);
+  // one quote per line: the first row (in display order) quotes it; later rows point back to that row
+  const firstBy = new Map();
+  for (const g of groups) for (const r of g.rows) {
+    if (!r.line) continue;
+    const k = key(r.line);
+    if (firstBy.has(k)) r.sameAs = firstBy.get(k); else firstBy.set(k, r.text);
+  }
+  return { groups, promises, total: rows.length };
+}
+
+/** Group heading: plain label + the count of THIS group's rows that are shown (states from the server). */
+export function groupHeading(g) {
+  const n = g.rows.length;
+  const shown = g.rows.filter((r) => r.state === 'shown').length;
+  const partly = g.rows.filter((r) => r.state === 'partly').length;
+  const tally = `${shown} of ${n} shown${partly ? `, ${partly} partly` : ''}`;
+  if (g.key === 'required') return { label: 'What they require', tally };
+  if (g.key === 'duty') return { label: 'The work itself', tally };
+  if (g.key === 'preferred') return { label: 'Preferred — not required', tally };
+  return { label: 'Only you can say', tally: `${n} question${n === 1 ? '' : 's'}` };
+}
+
+/** "Partly" in words: what the line shows is quoted; this says what it does not. */
+export function partlySentence(r) {
+  return r.missing.length ? `Not on your résumé: ${join(r.missing)}.` : 'Your line shows part of this, not all of it.';
+}
+
+/**
+ * Graded gates in plain words, from constraints the verdict graded (sentence written by the server, e.g.
+ * "Your résumé shows about 4 years leading a kitchen crew (Kitchen Manager, 2021–now); they ask for 5+.").
+ * @param {Array<Record<string, any>>} constraints
+ */
+export function gateRows(constraints) {
+  const out = [];
+  const seen = new Set();
+  for (const c of constraints || []) {
+    if (!c || !GATE_KINDS.has(String(c.kind))) continue;
+    const text = clean(c.sentence || c.message);
+    if (!text || seen.has(text)) continue;
+    seen.add(text);
+    const state = GRADE_STATE[c.grade] || (c.status === 'met' ? 'shown' : c.status === 'ask' ? 'ask' : c.status === 'partial' ? 'partly' : 'not_shown');
+    out.push({ kind: String(c.kind), text, state, caps: !!c.caps, quote: clean(c.posting_quote), preferred: c.importance === 'preferred' });
+  }
+  // a gate that stops the application first, then what is short, then what is met
+  const rank = (r) => (r.caps ? 0 : r.state === 'not_shown' ? 1 : r.state === 'partly' ? 2 : r.state === 'ask' ? 3 : 4);
+  return out.sort((a, b) => rank(a) - rank(b));
+}
+
+/** The field verdict when the reader KNOWS the posting is other work (known !== false); null otherwise. */
+export function differentField(fm) {
+  if (!fm || fm.level !== 'different' || fm.known === false) return null;
+  return { sentence: clean(fm.sentence), carries: Array.isArray(fm.transferable) ? fm.transferable.filter(Boolean).slice(0, 5) : [] };
+}
+
+/** The verdict sentence without its leading score ("51 — You show …" → "You show …"). */
+export function verdictSentence(v) {
+  if (!v) return '';
+  const t = clean(v.sentence);
+  return v.withheld ? t : t.replace(/^\d+\s*[—-]\s*/, '');
+}
+
+export const STATE_WORD = { shown: 'Shown', partly: 'Partly', not_shown: 'Not shown', ask: 'Only you can say' };

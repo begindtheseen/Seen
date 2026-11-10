@@ -9,6 +9,8 @@
   width: min(640px, 100%); max-height: 90dvh; display: flex; flex-direction: column; overflow: hidden;
   background: var(--surface-overlay); border: 1px solid var(--border-2); border-radius: var(--r-panel); box-shadow: var(--sh-overlay);
 }
+/* the finished résumé reads wider on a desktop (changes and the page side by side are one tap apart) */
+@media (min-width: 1024px) { .sheet[data-wide='1'] { width: min(var(--w-mid), 100%); } }
 @media (max-width: 600px) {
   .scrim { padding: 0; align-items: stretch; }
   .sheet { width: 100%; max-height: none; height: 100dvh; border-radius: 0; border: 0; }

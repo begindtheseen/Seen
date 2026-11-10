@@ -47,6 +47,12 @@ test('a malformed answer reads as unknown, never throws', () => {
   assert.equal(readToday({ stats: { listings_live: -5, reports_24h: Number.NaN } }).stats.listings_live, null)
 })
 
+test('"ok" with no runs recorded reads as unknown, never "on time"', () => {
+  const v = readToday({ ...OK, system: { ok: true, line: 'No cron reports its runs yet (17 scheduled).' } })
+  assert.equal(v.system.ok, null)
+  assert.equal(readToday(OK).system.ok, true)
+})
+
 test('money and the fold line read as a person would say them', () => {
   assert.equal(money(4997), '$49.97'); assert.equal(money(0), '$0.00'); assert.equal(money(123456789), '$1,234,567.89')
   assert.equal(emptyLine([{ label: 'Data issues' }]), 'Nothing waiting in Data issues.')

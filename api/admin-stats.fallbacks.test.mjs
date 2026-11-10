@@ -8,7 +8,6 @@ process.env.SUPABASE_URL = 'https://db.test';
 process.env.SUPABASE_SERVICE_KEY = 'test-service-key';
 const { default: handler } = await import('./admin-stats.js');
 const { world, RPCS, caller, createFakeRest } = await import('../lib/server/admin/testing/world.mjs');
-const { markDuplicates } = await import('../lib/server/reportReview.js');
 const C = await import('../lib/server/admin/testing/contract.mjs');
 
 const pending = (r) => r.needs_review === true && !['admin_rejected', 'duplicate_import'].includes(r.trust_reason);
@@ -133,7 +132,6 @@ test('admin_job_dupes_plan: 404 → whole-table scan → the same plan', async (
 
 test('job dupes, a table too big for one request: resumable passes, never "did not finish"', async () => {
   const fake = createFakeRest({ tables: world({ jobs: 2500 }), rpcs: RPCS });
-  const call = await caller(handler, fake);
   const listings = await import('../lib/server/admin/listings.js');
   // Make the whole-table read "run out of time" on the first call by slowing every jobs page.
   const realFetch = fake.fetch;
@@ -151,7 +149,6 @@ test('job dupes, a table too big for one request: resumable passes, never "did n
   assert.equal(r.complete, true);
   assert.ok(r.suspected > 0);
   listings.TUNING.scanBudgetMs = listings.DEDUPE_SCAN_BUDGET_MS;
-  void call;
 });
 
 test('cron_runs absent: crons with no record read "unknown", never a guess', async () => {
@@ -168,4 +165,3 @@ test('cron_runs absent: crons with no record read "unknown", never a guess', asy
   assert.equal(archive.last_result, 'ok', 'collector_runs already records this one');
 });
 
-void markDuplicates;

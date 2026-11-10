@@ -102,6 +102,25 @@ async function findAlertMatches(alerts, geo, rows) {
 // fails, is gone, or cannot be read. Bounded: at most MAX_FETCHES per user per run, inside the run's
 // clock; a row that could not be read is not tried again on this instance for UNREADABLE_TTL_MS.
 export const MAX_FETCHES = 4;
+
+/** How many emails a set of log rows stands for: one person's rows within two minutes are one email. */
+export function countEmails(rows) {
+  const byUser = new Map();
+  for (const r of rows || []) {
+    const t = Date.parse(r.sent_at);
+    if (!Number.isFinite(t)) continue;
+    const list = byUser.get(r.user_id) || [];
+    list.push(t);
+    byUser.set(r.user_id, list);
+  }
+  let n = 0;
+  for (const list of byUser.values()) {
+    list.sort((a, b) => a - b);
+    let last = -Infinity;
+    for (const t of list) { if (t - last > 120_000) n++; last = t; }
+  }
+  return n;
+}
 const FETCH_TIMEOUT_MS = 7000;
 const UNREADABLE_TTL_MS = 6 * 3600e3;
 const _unreadable = new Map();
@@ -167,9 +186,12 @@ async function run(req, res, { loadGeo, fetchFull = fetchFullPosting }) {
 
   try {
     const dayStart = pacificDayStart(new Date()).toISOString();
-    const todayRes = await q(`job_match_email_log?sent_at=gte.${encodeURIComponent(dayStart)}&select=id`, { headers: { Prefer: 'count=exact', Range: '0-0' } });
+    // Emails, not log rows: one email claims its main job and up to MORE_ITEMS extra jobs (rows seconds apart).
+    const todayRes = await q(`job_match_email_log?sent_at=gte.${encodeURIComponent(dayStart)}&select=user_id,sent_at&order=sent_at.asc&limit=5000`);
     if (!todayRes.ok) return res.status(200).json({ ok: false, reason: 'log_unreadable', status: todayRes.status });
-    let sentToday = Number(String(todayRes.headers.get('content-range') || '').split('/')[1]) || 0;
+    const todayRows = await todayRes.json().catch(() => null);
+    if (!Array.isArray(todayRows)) return res.status(200).json({ ok: false, reason: 'log_unreadable' });
+    let sentToday = countEmails(todayRows);
     summary.sent_today_before = sentToday;
 
     // Everyone with a résumé on file (keyset pages; PostgREST caps a read at 1,000 rows).
@@ -223,7 +245,7 @@ async function run(req, res, { loadGeo, fetchFull = fetchFullPosting }) {
       if (!log || !apps || !saved) { skip('history_unreadable'); continue; } // never risk a repeat
       const dayStartMs = Date.parse(dayStart);
       const todays = log.filter((r) => Date.parse(r.sent_at) >= dayStartMs);
-      if (!ignoreLimits && !canSendNow({ sentToday: todays.length, lastSentAt: log[0]?.sent_at || null })) { skip('user_limit'); continue; }
+      if (!ignoreLimits && !canSendNow({ sentToday: countEmails(todays.map((r) => ({ ...r, user_id: uid }))), lastSentAt: log[0]?.sent_at || null })) { skip('user_limit'); continue; }
 
       const prefs = alertPrefs.get(uid) || null;
       let found;

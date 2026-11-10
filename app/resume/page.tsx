@@ -25,7 +25,9 @@ import { WELCOME_CREDITS } from '@/lib/creditRules'
 import { LOCK_NOTE, PASS_AFTER_WIN } from '@/lib/pricing'
 import { signupHref } from '@/lib/signupIntent.js'
 import dynamic from 'next/dynamic'
-import { VerdictCard, RequirementsView, Checklist, PaidPlanView, type Verdict, type ConstraintRow, type PaidPlan } from '@/components/optimizer/Verdict'
+import { PaidPlanView, type Verdict, type ConstraintRow, type PaidPlan } from '@/components/optimizer/Verdict'
+import FitRead, { type FitData } from '@/components/optimizer/FitRead'
+import { PaidResult, BlockedResult, ResultTopLine, DownloadVersion, usePaidVersion, type Tailored, type Charge, type Blocked, type Question } from '@/components/optimizer/PaidResult'
 import rs from './resume.module.css'
 import CreditConfirmDialog from '@/components/CreditConfirmDialog'
 import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
@@ -197,7 +199,8 @@ function FitView({ out, intel, jobCompany, insights }: { out: OptimizerOutput; i
   const metrics = (out.explanation.contributions || []).filter(c => c.scored !== false && c.factor !== 'risk_penalty' && c.factor !== 'company_process_score' && c.factor !== 'ats_coverage')
   return (
     <div style={{ animation: 'fadeUp .3s ease both' }}>
-      <Card><VerdictCard verdict={out.verdict} note={`${out.confidence_label} confidence · free`} /></Card>
+      {/* THE fit read: band, sentence, graded gates, every requirement with its state and your line (free) */}
+      <Card><FitRead data={out as unknown as FitData} note={`${out.confidence_label} confidence · free`} /></Card>
 
       {out.verdict.score != null && metrics.length > 0 && (
         <Card>
@@ -218,8 +221,6 @@ function FitView({ out, intel, jobCompany, insights }: { out: OptimizerOutput; i
         </Card>
       )}
 
-      {(out.matched_requirements.length > 0 || out.unsupported_requirements.length > 0) && <Card><RequirementsView matched={out.matched_requirements} missing={out.unsupported_requirements} /></Card>}
-      {(out.constraints || []).some(c => c.status === 'ask') && <Card><Checklist constraints={out.constraints} /></Card>}
 
       <Card>
         {kicker('Company hiring risk')}
@@ -266,6 +267,30 @@ function FitView({ out, intel, jobCompany, insights }: { out: OptimizerOutput; i
 
 // ═══ REWRITE TAB — the PAID deliverables (plan, moves, questions, availability, summary, bullets) ═══
 function RewriteView({ out, copy, copied, onRerun, pro }: { out: PaidOptimize; copy: (t: string, k: string) => void; copied: string | null; onRerun?: () => void; pro?: boolean | null }) {
+  // the finished résumé (phase-B contract) when the answer carries it; the legacy plan otherwise
+  const x = out as PaidOptimize & { tailored?: Tailored | null; charge?: Charge | null; blocked?: Blocked | null; questions?: Question[]; charged?: boolean; balance?: number }
+  const tailored = !x.blocked && x.tailored && x.tailored.doc ? x.tailored : null
+  const version = usePaidVersion(tailored, `resume:${tailored ? tailored.text?.length || 0 : 0}`)
+  if (x.blocked) return (
+    <div className="ai-stack" data-testid="resume-blocked">
+      <ResultTopLine charge={x.charge} charged={!!x.charged} cached={!!out.cached} pro={pro} balance={x.balance ?? null} cost={OPTIMIZE_PRICE} />
+      <BlockedResult b={x.blocked} jobsHref="/jobs" />
+    </div>
+  )
+  if (tailored) return (
+    <div className="ai-stack" data-testid="resume-version">
+      <ResultTopLine charge={x.charge || tailored.charge} charged={!!x.charged} cached={!!out.cached} pro={pro} balance={x.balance ?? null} cost={OPTIMIZE_PRICE} />
+      <PaidResult t={tailored} questions={(x.questions || []) as Question[]} v={version} />
+      <DownloadVersion doc={version.doc} />
+      {out.application_message && (
+        <details>
+          <summary style={{ minHeight: 44, display: 'flex', alignItems: 'center', cursor: 'pointer', color: 'var(--accent)', fontWeight: 600, fontSize: 'var(--fs-sm)' }}>Message to the employer</summary>
+          <p style={{ fontSize: 'var(--fs-body)', color: 'var(--text-2)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{out.application_message}</p>
+          <button type="button" className="ui-btn ui-btn--secondary" onClick={() => copy(out.application_message || '', 'msg')}>{copied === 'msg' ? 'Copied' : 'Copy message'}</button>
+        </details>
+      )}
+    </div>
+  )
   const real = realBulletsOf(out)
   const guidance = (out.optimized_bullets || []).filter(b => isGuidance(b.original) || isGuidance(b.optimized))
   return (

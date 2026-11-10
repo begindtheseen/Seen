@@ -50,7 +50,7 @@ type InterviewRecord = {
 type Pay = { unit: 'hour' | 'year'; low: number; high: number; listings: number; scope: 'role' | 'company' | 'market' }
 type FollowUp = { thankYouBy: string; followUpOn: string; lastCheckOn: string }
 type RecordData = { record: InterviewRecord; pay: Pay | null; follow_up: FollowUp; guide?: Guide | null; sample_question?: { q: string; why: string; principle: string | null } | null }
-type Answer = { q: string; answer: string; resume_fact: string; coached?: boolean; script?: boolean; frame?: boolean; exercise?: boolean; practice?: string; reference?: string; hint?: string; company?: boolean; principle?: string | null }
+type Answer = { q: string; answer: string; resume_fact: string; coached?: boolean; script?: boolean; frame?: boolean; exercise?: boolean; practice?: string; reference?: string; hint?: string; company?: boolean; principle?: string | null; source?: string }
 type Pack = {
   questions: { q: string; why: string; company?: boolean; principle?: string | null }[]
   answers: Answer[]
@@ -531,7 +531,7 @@ function AnswerEditor({ a, company, values, notes, onSave, defaultOpen, title, t
   const finished = isFinished(a.answer, vals)
   const composed = composeAnswer(a.answer, vals)
   const touched = vals.some(v => v && v.trim())
-  const tag = tagText || (a.exercise ? 'Practised at a keyboard, not answered out loud' : a.company ? `${company} question${a.principle ? ` · ${a.principle}` : ''}` : a.script ? 'From your résumé’s dates and the posting' : a.frame ? `No line on your résumé fits this one yet — answer in ${n} short lines` : 'From your résumé')
+  const tag = tagText || (a.exercise ? 'Practised at a keyboard, not answered out loud' : a.company ? `${company} question${a.principle ? ` · ${a.principle}` : ''}` : a.script ? 'From your résumé’s dates and the posting' : a.frame ? `No line on your résumé fits this one yet — answer in ${n === 1 ? 'one short line' : `${n} short lines`}` : 'From your résumé')
   const save = () => { if (timer.current) clearTimeout(timer.current); flush() }
   const queue = () => { if (timer.current) clearTimeout(timer.current); timer.current = setTimeout(() => flush(), 600) }
   return (
@@ -551,7 +551,8 @@ function AnswerEditor({ a, company, values, notes, onSave, defaultOpen, title, t
         </div>
       )}
       {a.reference && <p className={s.ref}>{a.reference}</p>}
-      {a.hint && !touched && <p className={s.ref}>A line of yours that might hold this story: “{a.hint}” — if it does, tell it in the three boxes above.</p>}
+      {a.source && <p className={s.ref}>From the posting: “{a.source}”</p>}
+      {a.hint && !touched && <p className={s.ref}>A line of yours that might hold this story: “{a.hint}” — if it does, tell it in {n === 1 ? 'the box above' : n > 1 ? `the ${n} boxes above` : 'your answer'}.</p>}
       {!!notes?.length && (
         <div className={s.notes}>
           <div className={s.label}>Your words from before the rebuild</div>

@@ -167,7 +167,12 @@ export class QueryCache {
         data: { ...page, rows: merged.rows, next: keepNext } as unknown,
         pending, error: undefined, status: 'ok', fetching: false, stale: false, updatedAt: this.now(),
       }, true)
-      if (opts.reveal && pending.length) this.showPending(key)
+      if (opts.reveal && pending.length) {
+        // The owner caused this read: show the list in the server's order (Undo puts rows back where they were).
+        const freshIds = new Set((page.rows || []).map(reg.idOf))
+        const rows = [...(page.rows || []), ...merged.rows.filter((r) => !freshIds.has(reg.idOf(r)))]
+        this.set(key, { data: { ...page, rows, next: keepNext } as unknown, pending: [] }, true)
+      }
       return
     }
     this.set(key, { data: res as unknown, pending: [], error: undefined, status: 'ok', fetching: false, stale: false, updatedAt: this.now() }, true)

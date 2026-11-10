@@ -39,7 +39,13 @@ function ItemBody({ place, shell, setTitle }: { place: ItemPlace; shell: ShellAp
     return <ItemNotFound detail={p.reason === 'unknown_kind' ? `“${p.raw}” is not something the admin can open.` : 'The link is missing the item’s id.'} />
   }
   const load = ITEM_VIEWS[p.ref.kind]
-  if (!load) return <ItemNotFound kind={p.ref.kind} detail={`${ITEM_LABEL[p.ref.kind]}s cannot be opened in the new admin yet — the legacy admin still has them.`} />
+  if (!load) {
+    return (
+      <EmptyState icon="hourglass" title="Not in the new admin yet."
+        body={`${ITEM_LABEL[p.ref.kind]} sheets are still being rebuilt. The legacy admin has this ${ITEM_LABEL[p.ref.kind].toLowerCase()} — same sign-in.`}
+        action={<Button variant="secondary" href="/admin/legacy" iconRight="arrow-right">Open the legacy admin</Button>} />
+    )
+  }
   const props: ItemViewProps = { kind: p.ref.kind, id: p.ref.id, close: place.close, open: shell.openItem, setTitle }
   return <Loadable key={`${p.ref.kind}:${p.ref.id}`} load={load} props={props} what={`this ${ITEM_LABEL[p.ref.kind].toLowerCase()}`} />
 }
@@ -147,7 +153,7 @@ export default function SheetHost({ place, panel, setPanel, shell }: { place: It
   const itemDesc = title && title.key === itemKey ? title.d : p.ok ? `id ${p.ref.id}` : undefined
 
   const head = useMemo(() => {
-    if (layer === 'session') return { t: 'Session ended', d: 'Sign in again to continue. Whatever you just pressed finishes after you sign in.' }
+    if (layer === 'session') return { t: 'Session ended', d: 'Sign in again to continue. Anything that was waiting finishes after you sign in.' }
     if (layer === 'panel' && panel) {
       if (panel.kind === 'search') return { t: 'Search', d: undefined }
       if (panel.kind === 'more') return { t: 'More', d: undefined }

@@ -39,6 +39,8 @@ export type Job = AdminJobState & {
   stopped?: 'cancel' | 'cap' | 'no_progress' | 'reload' | 'error'
   /** It can be resumed from `cursor` (paused at a cap, stopped by a reload). */
   resumable?: boolean
+  /** A reload interrupted it once: a round in flight then may have been done but not counted. */
+  reloaded?: boolean
   lost_rounds: number
   ended_at?: string
 }
@@ -79,7 +81,7 @@ export function jobSummary(j: Job, lastMessage = ''): string {
   const rounds = j.rounds === 1 ? '1 round' : `${j.rounds} rounds`
   switch (j.status) {
     case 'done':
-      return `${did} in ${rounds}.${tail ? ` ${tail}.` : ''}`
+      return `${did} in ${rounds}.${tail ? ` ${tail}.` : ''}${j.reloaded ? ' A round that was running when the page reloaded may have done more than is counted here.' : ''}`
     case 'cancelled':
       if (j.stopped === 'cap') return `Paused after ${rounds}: ${did.toLowerCase()}${left ? `, ${left}` : ''}. Resume to continue.`
       if (j.stopped === 'reload') return `Stopped when the page reloaded: ${did.toLowerCase()}${left ? `, ${left}` : ''}.`
@@ -132,7 +134,7 @@ export function createJobManager(deps: {
       for (const j of Array.isArray(saved) ? saved : []) {
         if (!j || !j.id || !j.action) continue
         if (j.status === 'running' || j.status === 'cancelling') {
-          const fixed: Job = { ...j, status: 'cancelled', stopped: 'reload', resumable: true }
+          const fixed: Job = { ...j, status: 'cancelled', stopped: 'reload', resumable: true, reloaded: true }
           fixed.message = jobSummary(fixed)
           jobs.set(j.id, fixed)
         } else jobs.set(j.id, j)

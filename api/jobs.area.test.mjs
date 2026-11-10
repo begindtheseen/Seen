@@ -54,6 +54,10 @@ function pg(u) {
       const [op, val] = [v.slice(0, v.indexOf('.')), v.slice(v.indexOf('.') + 1)];
       if (op === 'is') rows = rows.filter((r) => (val === 'null' ? r[k] == null : r[k] != null));
       else rows = rows.filter((r) => r[k] != null && (op === 'gte' ? r[k] >= Number(val) : r[k] <= Number(val)));
+    } else if (k === 'or') {
+      const terms = v.slice(1, -1).split(',').map((t) => t.replace(/^location\.ilike\./, ''));
+      const res = terms.map((t) => new RegExp(`^${t.split('').map((c) => (c === '*' ? '.*' : c === '_' ? '.' : c.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))).join('')}$`, 'is'));
+      rows = rows.filter((r) => res.some((re) => re.test(r.location || '')));
     } else if (k === 'location' && v.startsWith('imatch.')) {
       const re = new RegExp(v.slice(7), 'i');
       rows = rows.filter((r) => re.test(r.location || ''));
@@ -182,6 +186,7 @@ test('a ZIP is centred on its own area; a suburb on its town', async () => {
 test('a whole state lists every row placed in that state, state-only rows included', async () => {
   const { rows, total, pages } = await all({ query: '', location: 'Arizona', radius: '25' });
   assert.equal(pages[0].area.kind, 'state');
+  assert.equal(pages[0].mode, 'state', 'nothing downstream reads a state search as a radius');
   assert.equal(pages[0].radius, null);
   assert.equal(rows.length, total);
   assert.ok(rows.some((j) => j.location === 'Arizona'));
@@ -227,3 +232,33 @@ test('titled search is unchanged: still the relevance path', async () => {
   assert.notEqual(r.body.mode, 'area');
   assert.ok(r.body.jobs.length > 0);
 });
+
+test('load: at most 4 reads in flight, a capped number of reads, and a partial answer says so', async () => {
+  _clearAreaCache();
+  const { readAreaRows, _inFlight } = await import('../lib/server/areaSearch.js');
+  let peak = 0, reads = 0;
+  const slow = async (path) => {
+    reads++;
+    peak = Math.max(peak, _inFlight());
+    await new Promise((r) => setTimeout(r, 30));
+    return pg(new URL(`https://db.example/rest/v1/${path}`));
+  };
+  const area = { kind: 'point', lat: PHX.lat, lng: PHX.lng, name: 'Phoenix', state: 'AZ' };
+  const full = await readAreaRows({ db: slow, area, miles: 100 });
+  assert.ok(peak <= 4, `peak in flight ${peak}`);
+  assert.equal(full.complete, true);
+  assert.equal(full.reads, reads);
+  // A tiny budget: the answer comes back in time, says it is not complete, and the read finishes behind it.
+  _clearAreaCache();
+  let finished = null;
+  const t0 = Date.now();
+  const part = await readAreaRows({ db: slow, area, miles: 100, budgetMs: 20, waitUntil: (p) => { finished = p; } });
+  assert.ok(Date.now() - t0 < 500);
+  assert.equal(part.complete, false);
+  assert.equal(part.pending, true);
+  await finished;
+  const again = await readAreaRows({ db: slow, area, miles: 100 });
+  assert.equal(again.cached, true, 'the background read filled the cache');
+  assert.equal(again.rows.length, full.rows.length);
+});
+

@@ -30,6 +30,9 @@ export interface AreaInfo {
   includeRemote: boolean
   wider: { radius: number; total: number } | null
   complete: boolean
+  /** What was typed in the place box for this search. */
+  typed: string
+  sort: 'nearest' | 'recent'
 }
 // An area search the server could not run as asked: an unknown / foreign / ambiguous place, "near me" with no
 // position, or Remote with no title.
@@ -43,7 +46,7 @@ export function areaStatus(a: AreaInfo): string {
   if (!n) return `No jobs ${where}`
   const remote = a.includeRemote && a.remoteTotal ? ` · ${a.remoteTotal.toLocaleString('en-US')} of them remote` : ''
   const partial = a.complete ? '' : ' found so far — still counting'
-  return `${jobs} ${where}${remote}${partial} · ${a.kind === 'state' ? 'newest first' : 'nearest first'}`
+  return `${jobs} ${where}${remote}${partial} · ${a.kind === 'state' || a.sort === 'recent' ? 'newest first' : 'nearest first'}`
 }
 const searchCache = new Map<string, CachedSearch>()
 // The last few searches also live in this tab's sessionStorage, so Back from a listing, a company
@@ -120,7 +123,7 @@ export type SortMode = 'best' | 'transparency' | 'waste' | 'recent' | 'nearest'
 // A search result as the API serves it: `relevance` (server rank for the typed query) and
 // `in_radius` (false = a fill-in from further away / remote, which never sorts above an in-radius row).
 // `related` (false = an opening that only shares a word with the search — listed under "Other openings").
-export interface SearchJob extends Job { relevance?: number | null; in_radius?: boolean; related?: boolean; distance_miles?: number | null; near_place?: string | null; remote?: boolean }
+export interface SearchJob extends Job { relevance?: number | null; in_radius?: boolean; related?: boolean; distance_miles?: number | null; distance_by?: string | null; near_place?: string | null; remote?: boolean }
 export type RecReason = 'no_resume' | 'no_signal' | 'no_city' | 'no_matches' | 'unavailable' | null
 export type NicheFilter = '' | 'tech' | 'healthcare' | 'retail' | 'logistics' | 'finance' | 'other'
 export type LevelFilter = '' | 'entry' | 'mid' | 'senior'
@@ -168,6 +171,7 @@ function toJobs(items: unknown[], loc: string): SearchJob[] {
       apply_mode: j.apply_mode === 'seen' || j.apply_mode === 'both' ? j.apply_mode : 'external',
       // Area search: how far the listing is from the searched place, measured by lib/geo/radius.js.
       distance_miles: typeof j.distance_miles === 'number' ? j.distance_miles : null,
+      distance_by: typeof j.distance_by === 'string' ? j.distance_by : null,
       near_place: typeof j.near_place === 'string' ? j.near_place : null,
       remote: j.remote === true,
     }
@@ -467,7 +471,7 @@ export function useJobSearch() {
       setRecCity(typeof data.city === 'string' && data.city ? data.city : null)
       setRecCitySource(data.city_source === 'resume' || data.city_source === 'profile' ? data.city_source : null)
       if (Array.isArray(data.jobs) && data.jobs.length) {
-        const raw: Array<Job & { match_reason: string | null; match_note: string | null }> = (data.jobs as Record<string, unknown>[]).map(j => ({
+        const raw: Array<Job & { match_reason: string | null; match_note: string | null; summary_only: boolean }> = (data.jobs as Record<string, unknown>[]).map(j => ({
           id: String(j.id || 'rec_' + Math.random().toString(36).slice(2, 8)),
           title: String(j.title || ''),
           company: String(j.company || ''),
@@ -483,6 +487,8 @@ export function useJobSearch() {
           // Why this job matched the résumé (the server's sentence), shown under each row by ResumeMatches.
           match_reason: j.match_reason ? String(j.match_reason) : null,
           match_note: j.match_note ? String(j.match_note) : null,
+          // A teaser listing (the posting's summary only): the rail says so under the match.
+          summary_only: Boolean(j.summary_only),
         }))
         setRecommended(raw)
         setRecSkills(Array.isArray(data.skills) ? data.skills : [])
@@ -803,7 +809,7 @@ export function useJobSearch() {
     else { setFiltered([]); setStatusMsg(c.problem?.message || '') }
     setStatus('done')
   }
-  async function searchArea(loc: string, rad: string, { commit = true, restore = false }: { commit?: boolean; restore?: boolean } = {}) {
+  async function searchArea(loc: string, rad: string, { commit = true, restore = false, silent = false }: { commit?: boolean; restore?: boolean; silent?: boolean } = {}) {
     searchedOnceRef.current = true
     if (sortRef.current !== 'recent' && sortRef.current !== 'nearest') { sortRef.current = 'nearest'; setSort('nearest') }
     const key = areaKey(loc, rad)
@@ -824,9 +830,12 @@ export function useJobSearch() {
     const ctrl = new AbortController()
     abortRef.current = ctrl
     inflightKeyRef.current = key
-    setStatus('loading'); setStatusMsg('Searching...'); setNotice(null)
-    hasMoreRef.current = false; setHasMore(false)
-    setJobs([]); setFiltered([])
+    // A "still counting" re-ask keeps the rows on screen; a new search clears them.
+    if (!silent) {
+      setStatus('loading'); setStatusMsg('Searching...'); setNotice(null)
+      hasMoreRef.current = false; setHasMore(false)
+      setJobs([]); setFiltered([])
+    }
     let authToken: string | null = null
     if (isLoggedIn) { try { authToken = await token() } catch { /* anonymous bucket */ } }
     for (let attempt = 0; ; attempt++) {
@@ -842,7 +851,7 @@ export function useJobSearch() {
         const entry: CachedSearch = d.area
           ? {
               jobs: rows, ts: Date.now(), hasMore: d.has_more === true, pages: 1, notice: null, label: null, cursor: d.next_cursor ?? null, problem: null,
-              area: { total: d.total ?? rows.length, remoteTotal: d.remote_total ?? 0, label: d.area.label, kind: d.area.kind, radius: d.area.radius, includeRemote: d.include_remote === true, wider: d.wider ?? null, complete: d.complete !== false },
+              area: { total: d.total ?? rows.length, remoteTotal: d.remote_total ?? 0, label: d.area.label, kind: d.area.kind, radius: d.area.radius, includeRemote: d.include_remote === true, wider: d.wider ?? null, complete: d.complete !== false, typed: loc, sort: sortRef.current === 'recent' ? 'recent' : 'nearest' },
             }
           : { jobs: [], ts: Date.now(), hasMore: false, pages: 1, notice: null, label: null, cursor: null, area: null,
               problem: { message: d.message || 'That place could not be searched.', suggestions: d.unplaced?.suggestions || [], reason: d.unplaced?.reason ?? null, needTitle: d.need_title === true } }
@@ -851,12 +860,12 @@ export function useJobSearch() {
         if (d.pending && entry.area) {
           entry.area.complete = false
           showArea(entry)
-          if ((opts_pendingTries[key] = (opts_pendingTries[key] || 0) + 1) <= 6) {
-            topupTimerRef.current = setTimeout(() => { if (seq === searchSeqRef.current) { inflightKeyRef.current = null; void searchArea(loc, rad, { commit: false }) } }, 3000)
+          if ((pendingTriesRef.current[key] = (pendingTriesRef.current[key] || 0) + 1) <= 8) {
+            topupTimerRef.current = setTimeout(() => { if (seq === searchSeqRef.current) { inflightKeyRef.current = null; void searchArea(loc, rad, { commit: false, silent: true }) } }, 5000)
           }
           return
         }
-        delete opts_pendingTries[key]
+        delete pendingTriesRef.current[key]
         cacheSearch(key, entry)
         showArea(entry)
         return
@@ -869,7 +878,6 @@ export function useJobSearch() {
       }
     }
   }
-  const opts_pendingTries: Record<string, number> = pendingTriesRef.current
   async function loadMoreArea(c: { loc: string; radius: string }) {
     const key = areaKey(c.loc, c.radius)
     const seq = searchSeqRef.current

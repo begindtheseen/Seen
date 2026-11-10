@@ -8,7 +8,7 @@ process.env.SUPABASE_URL = 'https://db.test';
 process.env.SUPABASE_SERVICE_KEY = 'test-service-key';
 delete process.env.STRIPE_SECRET_KEY;
 const { default: handler, ACTIONS } = await import('./admin-stats.js');
-const { world, RPCS, caller, createFakeRest, uid, TOKEN } = await import('../lib/server/admin/testing/world.mjs');
+const { world, RPCS, caller, createFakeRest, uid } = await import('../lib/server/admin/testing/world.mjs');
 const C = await import('../lib/server/admin/testing/contract.mjs');
 
 const fake = createFakeRest({ tables: world(), rpcs: RPCS });

@@ -5,8 +5,10 @@
 // one verdict + the one requirement list) and asks whether this exact optimization is already paid for.
 // A credit is spent only on the price-tagged button.
 //
-// Phase-B seams (the finished-résumé contract): `ResultDownload` is where the downloadable résumé VERSION
-// replaces "your résumé as uploaded"; `PlanChanges` already lists each change before → after with its why.
+// Phase B (the finished-résumé contract): the free step is THE fit read (components/optimizer/FitRead) and the
+// offer is the probe's own counts; the paid step is a finished résumé (components/optimizer/PaidResult) — the
+// changes before → after with their why, the document as a page, and ONE filled button that downloads the
+// CURRENT version (accepted changes only) through the Studio export. Blocked and free outcomes say so plainly.
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import Icon from '@/components/ui/Icon'
@@ -19,7 +21,7 @@ import { _syncRaw } from '@/lib/sync'
 import { ResumeStore } from '@/lib/stores/ResumeStore'
 import UpgradeModal from './UpgradeModal'
 import CreditConfirmDialog from './CreditConfirmDialog'
-import { LOCK_NOTE, PASS_AFTER_WIN } from '@/lib/pricing'
+import { PASS_AFTER_WIN } from '@/lib/pricing'
 import { RESUME_OPTIMIZE_COST, creditCostLabel, priceLabel } from '@/lib/creditRules'
 import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
 import { trackApplyClick } from '@/lib/trackApply'
@@ -29,7 +31,10 @@ import { loginHref, httpHref } from '@/lib/safeHref.js'
 import { afterPendingBack } from '@/lib/nav/urlState'
 import { markQuiet } from '@/lib/quietWindow'
 import { markOptimized } from '@/lib/optimizedJobs'
-import { VerdictCard, VerdictStrip, RequirementsView, Checklist, PlanChanges, CopyBtn, planChangeCount, type Verdict, type RequirementRow, type ConstraintRow, type PaidPlan } from './optimizer/Verdict'
+import { RequirementsView, Checklist, PlanChanges, CopyBtn, planChangeCount, type Verdict, type RequirementRow, type ConstraintRow, type PaidPlan } from './optimizer/Verdict'
+import FitRead, { type Statement, type FieldMatch } from './optimizer/FitRead'
+import { PaidResult, BlockedResult, ResultTopLine, PaidOffer, BuildSteps, usePaidVersion, type Tailored, type Charge, type Blocked, type ChangeCounts, type Question } from './optimizer/PaidResult'
+import { renderText } from '@/lib/resume/engine-client'
 import PostingInput, { PostingReadRow, type PostingRead } from './jobs/PostingInput'
 import ResumePicker from './resume/ResumePicker'
 import ParseNotice from './resume/ParseNotice'
@@ -46,14 +51,13 @@ import s from './ApplyOptimizeModal.module.css'
 // Fallback for the server's 422 no_requirements message (lib/server/optimizePackage.js unoptimizableListing).
 const NO_REQUIREMENTS_NOTE = "This posting doesn't list enough requirements to optimize against. No credit was used."
 
-interface OptimizeBullet { original: string; optimized: string; humanized?: string; addresses: string }
 
 // What an endpoint said it read (server request in reports/s-screens-a.md — read when present, never guessed).
 interface PostingEcho { title?: string; company?: string; source?: string; host?: string }
 
 // The paid package (api/resume.js tool:optimize → lib/server/optimizePackage.js): a strict superset of the free check.
-interface OptimizeResult extends PaidPlan {
-  optimized_bullets?: OptimizeBullet[]
+interface OptimizeResult extends Omit<PaidPlan, 'questions'> {
+  questions?: Question[]
   wording_notes?: string[]
   _seenfit_score?: number | null
   verdict?: Verdict
@@ -64,6 +68,18 @@ interface OptimizeResult extends PaidPlan {
   charged?: boolean
   balance?: number
   posting?: PostingEcho
+  // phase-B contract (reports/t3-paid.md §1) — feature-detected: an older cached answer has none of these
+  statements?: Statement[]
+  field_match?: FieldMatch | null
+  tailored?: Tailored | null
+  charge?: Charge | null
+  blocked?: Blocked | null
+  change_counts?: ChangeCounts | null
+  requirements_listed?: number
+  no_gain?: boolean
+  note?: string
+  cost?: number
+  pro?: boolean
 }
 // The free check (api/optimizer.js action:optimize).
 interface FreeDiagnosis {
@@ -72,26 +88,22 @@ interface FreeDiagnosis {
   unsupported_requirements: RequirementRow[]
   constraints: ConstraintRow[]
   posting?: PostingEcho
+  statements?: Statement[]
+  field_match?: FieldMatch | null
+  requirements_listed?: number
 }
 type ApiErr = { error?: string; message?: string; reason?: string; from_link?: boolean; credits_required?: boolean; pro_required?: boolean; requirement_count?: number }
 
-// HumanProof "package mode" response (/api/optimizer action:'humanize' with bullets[]).
-interface HpItem { original: string; humanized_text: string; human_signal: number }
-interface HumanProofResult { package: { bullets: HpItem[] }; humanproof_score: number; ai_slop_risk: 'low' | 'medium' | 'high' }
 
 type Step =
   | 'loading-resume' | 'checking' | 'needs-posting' | 'no-requirements' | 'not-logged-in' | 'signin'
-  | 'no-resume' | 'resume-corrupted' | 'choose' | 'optimizing' | 'review' | 'sending' | 'done'
-type HpState = 'idle' | 'loading' | 'done' | 'locked' | 'error'
+  | 'no-resume' | 'resume-corrupted' | 'choose' | 'optimizing' | 'review'
 
 // Which posting the sheet is about. `other` = a link to a DIFFERENT posting was pasted in this job's sheet:
 // the header follows what was read and nothing is sent under this job's title (UX audit F8 — a Saxbys link was
 // scored as "Sales Associate · Petco").
 interface PostingCtx { pasted: string | null; title: string; company: string; other: boolean; link: string | null }
 
-// A bullet is a real before → after rewrite unless either side is a "(…)" guidance placeholder.
-const isGuidance = (x: string) => /^\s*\(/.test(String(x || ''))
-const tone = (n: number): 'good' | 'caution' | undefined => n >= 70 ? 'good' : n >= 45 ? 'caution' : undefined
 
 function Waiting({ text }: { text: string }) {
   return <div className={s.wait} role="status"><div className={s.spin} aria-hidden="true" /><p className={s.waitText}>{text}</p></div>
@@ -111,7 +123,7 @@ function StateHead({ icon, tone: t, title, children }: { icon: Parameters<typeof
 
 export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: Job; onClose: () => void; onApplied: () => void }) {
   const router = useRouter()
-  const { isLoggedIn, user, profile } = useAuth()
+  const { isLoggedIn, user } = useAuth()
   const sheetRef = useRef<HTMLDivElement>(null)
   useFocusTrap(sheetRef, true)
   const [step, setStep] = useState<Step>('loading-resume')
@@ -120,14 +132,12 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
   const [resumeId, setResumeId] = useState<string | null>(null)
   const [pickErr, setPickErr] = useState('')
   const [result, setResult] = useState<OptimizeResult | null>(null)
+  const [probe, setProbe] = useState<OptimizeResult | null>(null)
   const [error, setError] = useState('')
   const [showUpgrade, setShowUpgrade] = useState(false)
   const [upgradeReason, setUpgradeReason] = useState<'credits' | 'generic' | 'pro'>('credits')
-  const [upgradeFeature, setUpgradeFeature] = useState<string | undefined>(undefined)
   const [pro, setPro] = useState<boolean | null>(null)
   const [balance, setBalance] = useState<number | null>(null)
-  const [hpState, setHpState] = useState<HpState>('idle')
-  const [hp, setHp] = useState<HumanProofResult | null>(null)
   const [diag, setDiag] = useState<FreeDiagnosis | null>(null)
   const [ctx, setCtx] = useState<PostingCtx>({ pasted: null, title: job.title, company: job.company, other: false, link: null })
   const [read, setRead] = useState<PostingRead | null>(null)
@@ -135,12 +145,11 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
   const [postingLinkFailed, setPostingLinkFailed] = useState(false)
   const [noReqNote, setNoReqNote] = useState('')
   const [copied, setCopied] = useState<string | null>(null)
-  const [prepping, setPrepping] = useState(false)
-  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null)
-  const [pdfFailed, setPdfFailed] = useState(false)
-  const [pdfName, setPdfName] = useState('Resume.pdf')
-  const [answers, setAnswers] = useState<Record<string, string>>({})
   const [confirming, setConfirming] = useState(false)
+  // the downloadable version: built from the CURRENT document (accepted changes only), pre-built so the
+  // download runs inside the tap (iOS); keyed by the document so a toggle never serves a stale file
+  const [pdf, setPdf] = useState<{ key: string; blob: Blob } | null>(null)
+  const [pdfState, setPdfState] = useState<'idle' | 'building' | 'failed'>('idle')
   // lines of the résumé the parser could not place — named on screen before anything is scored (no silent loss)
   const resumeDoc = useMemo(() => { try { return resumeText.length > 50 ? parseResumeText(resumeText) : null } catch { return null } }, [resumeText])
 
@@ -175,7 +184,7 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
     if (!text || text.length <= 50) { setPickErr('Could not open that résumé — try again.'); return }
     setResumeId(r.id)
     setResumeText(text)
-    setResult(null); setDiag(null); setHp(null); setHpState('idle'); setPdfBlob(null); setPdfFailed(false)
+    setResult(null); setDiag(null); setProbe(null); setPdf(null)
     void prepare(text, ctx)
   }
   const showPicker = ['choose', 'review', 'needs-posting', 'no-requirements'].includes(step)
@@ -204,17 +213,17 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
       : { ...who, jobDescription: job.description || '', jobSource: job.source || null, jobId: job.id }
   }
 
-  function readFrom(c: PostingCtx, d: { matched_requirements?: RequirementRow[]; unsupported_requirements?: RequirementRow[]; posting?: PostingEcho } | null): PostingRead | null {
+  function readFrom(c: PostingCtx, d: { matched_requirements?: RequirementRow[]; unsupported_requirements?: RequirementRow[]; posting?: PostingEcho; requirements_listed?: number } | null): PostingRead | null {
     if (!c.pasted) return null
-    const n = d ? requirementCounts({ matched: d.matched_requirements || [], missing: d.unsupported_requirements || [] }).total : null
+    // the server's ONE count when it sends it (requirements_listed); else the rows it listed
+    const n = d ? (typeof d.requirements_listed === 'number' ? d.requirements_listed : requirementCounts({ matched: d.matched_requirements || [], missing: d.unsupported_requirements || [] }).total) : null
     const echo = d?.posting || null
-    const f = readFacts({ pasted: c.pasted, server: echo ? { title: echo.title, company: echo.company } : (c.other ? { title: c.title, company: c.company } : null), job: { title: c.title, company: c.company }, requirements: n })
-    return f
+    return readFacts({ pasted: c.pasted, server: echo ? { title: echo.title, company: echo.company } : (c.other ? { title: c.title, company: c.company } : null), job: { title: c.title, company: c.company }, requirements: n })
   }
 
-  // Free: the check + a cache probe. Never spends a credit.
+  // Free: the check + a cache probe (which builds the package and says what a credit would do). Never charges.
   async function prepare(text: string, c: PostingCtx) {
-    setStep('checking'); setError('')
+    setStep('checking'); setError(''); setProbe(null)
     try {
       const headers = await aiHeaders()
       const body = postingBody(c)
@@ -222,18 +231,20 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
         fetch('/api/resume', { method: 'POST', headers, body: JSON.stringify({ tool: 'optimize', probe: true, resume: text, ...body }) }),
         fetch('/api/optimizer', { method: 'POST', headers, body: JSON.stringify({ action: 'optimize', resumeText: text, ...body, remoteOk: /remote/i.test(c.pasted || job.description || '') }) }),
       ])
-      const probe = await probeRes.json().catch(() => ({})) as OptimizeResult & ApiErr
+      const pr = await probeRes.json().catch(() => ({})) as OptimizeResult & ApiErr
       const d = await diagRes.json().catch(() => ({})) as FreeDiagnosis & ApiErr
-      if (needsSignIn(probeRes.status, probe)) { setStep('signin'); return }
-      if (probe.error === 'preview_only' || d.error === 'preview_only') {
-        setPostingGone(probe.reason === 'gone' || d.reason === 'gone')
-        setPostingLinkFailed(!!(probe.from_link || d.from_link))
+      if (needsSignIn(probeRes.status, pr)) { setStep('signin'); return }
+      if (pr.error === 'preview_only' || d.error === 'preview_only') {
+        setPostingGone(pr.reason === 'gone' || d.reason === 'gone')
+        setPostingLinkFailed(!!(pr.from_link || d.from_link))
         setStep('needs-posting'); return
       }
       setRead(readFrom(c, diagRes.ok ? d : null))
-      if (probe.error === 'no_requirements') { setNoReqNote(probe.message || NO_REQUIREMENTS_NOTE); setDiag(diagRes.ok && d.verdict ? d : null); setStep('no-requirements'); return }
-      if (probe.error === 'RESUME_CORRUPTED') { setStep('resume-corrupted'); return }
-      if (probeRes.ok && probe.cached) { showResult(probe); return }
+      if (pr.error === 'no_requirements') { setNoReqNote(pr.message || NO_REQUIREMENTS_NOTE); setDiag(diagRes.ok && d.verdict ? d : null); setStep('no-requirements'); return }
+      if (pr.error === 'RESUME_CORRUPTED') { setStep('resume-corrupted'); return }
+      // already built for this job + résumé in the last 7 days: the result comes back, no credit
+      if (probeRes.ok && pr.cached) { showResult(pr); return }
+      if (probeRes.ok) setProbe(pr)
       setDiag(diagRes.ok && d.verdict ? d : null)
       setStep('choose')
     } catch {
@@ -248,7 +259,7 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
     const c: PostingCtx = other
       ? { pasted: t, title: '', company: '', other: true, link: httpHref(/^https?:\/\//i.test(t) ? t : `https://${t}`) }
       : { pasted: t, title: job.title, company: job.company, other: false, link: null }
-    setCtx(c); setResult(null); setDiag(null); setPdfBlob(null); setPdfFailed(false)
+    setCtx(c); setResult(null); setDiag(null); setPdf(null)
     void prepare(resumeText, c)
   }
   function correctPosting(v: { title: string; company: string }) {
@@ -263,8 +274,10 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
     setStep('review')
   }
 
+  // The probe said this build costs nothing (or the person is Pro): no confirm dialog for a free build.
+  const buildIsFree = !!probe && probe.cost === 0
   function pressOptimize() {
-    if (pro === true || hasConfirmedCreditUse(user?.id)) void runOptimize()
+    if (pro === true || buildIsFree || hasConfirmedCreditUse(user?.id)) void runOptimize()
     else setConfirming(true)
   }
 
@@ -279,22 +292,8 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
   }, [isLoggedIn])
   useEffect(() => { refreshCredits() }, [refreshCredits, user?.id])
 
-  // Pre-build the PDF while the result is read, so the download runs inside the tap (iOS).
-  useEffect(() => {
-    if (step === 'review' && result && !pdfBlob && !prepping && !pdfFailed) void preparePdf()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, result, pdfBlob, pdfFailed])
-
-  const seenPairs = new Set<string>()
-  const realBullets = (result?.optimized_bullets || [])
-    .filter(b => !isGuidance(b.original) && !isGuidance(b.optimized))
-    .filter(b => { const k = `${b.original.trim().toLowerCase()}→${b.optimized.trim().toLowerCase()}`; if (seenPairs.has(k)) return false; seenPairs.add(k); return true })
-  const wordingNotes = (result?.wording_notes || []).slice(0, 3)
-  const changeCount = result ? planChangeCount(result) + realBullets.length : 0
-
   async function runOptimize(fresh = false) {
-    setStep('optimizing'); setError('')
-    setHp(null); setHpState('idle'); setPdfBlob(null); setPdfFailed(false); setAnswers({})
+    setStep('optimizing'); setError(''); setPdf(null)
     try {
       const headers = await aiHeaders()
       const r = await fetch('/api/resume', {
@@ -305,91 +304,69 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
         const e = await r.json().catch(() => ({})) as ApiErr
         // An expired session is a sign-in, never the paywall (F2) — checked before credits.
         if (needsSignIn(r.status, e)) { setStep('signin'); return }
-        if (outOfCredits(r.status, e)) { setUpgradeReason('credits'); setUpgradeFeature(undefined); setShowUpgrade(true); setStep('choose'); return }
+        if (outOfCredits(r.status, e)) { setUpgradeReason('credits'); setShowUpgrade(true); setStep('choose'); return }
         if (e.error === 'preview_only') { setPostingGone(e.reason === 'gone'); setPostingLinkFailed(!!e.from_link); setStep('needs-posting'); return }
         if (e.error === 'no_requirements') { setNoReqNote(e.message || NO_REQUIREMENTS_NOTE); setStep('no-requirements'); return }
         if (e.error === 'RESUME_CORRUPTED') { setStep('resume-corrupted'); return }
-        throw new Error(e.message || 'Could not build your changes. No credit was used — try again.')
+        throw new Error(e.message || 'Could not build your version. No credit was used — try again.')
       }
       const data = await r.json() as OptimizeResult
       if (data.charged) { window.dispatchEvent(new Event('seen:credits-updated')); void refreshCredits() }
       showResult(data)
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Could not build your changes — try again.')
+      setError(e instanceof Error ? e.message : 'Could not build your version — try again.')
       setStep('choose')
     }
-  }
-
-  async function runHumanProof() {
-    if (!realBullets.length) return
-    setHpState('loading'); setError('')
-    try {
-      const r = await fetch('/api/optimizer', {
-        method: 'POST', headers: await aiHeaders(),
-        body: JSON.stringify({ action: 'humanize', bullets: realBullets.map(b => b.optimized), jobId: job.id, jobTitle: ctx.title, company: ctx.company, jobDescription: ctx.pasted || job.description || '', resumeText }),
-      })
-      const data = await r.json().catch(() => ({}))
-      if (needsSignIn(r.status, data)) { setStep('signin'); return }
-      if (r.status === 403 && !data.locked) { setHpState('error'); return }
-      if ((r.status === 402 || data.locked) && (data.pro_required || data.credits_required)) { setHpState('locked'); return }
-      if (!r.ok || data.error || !data.package) { setHpState('error'); return }
-      window.dispatchEvent(new Event('seen:credits-updated'))
-      setHp(data as HumanProofResult)
-      setHpState('done')
-    } catch { setHpState('error') }
   }
 
   async function copyText(text: string, key: string) {
     try { await navigator.clipboard.writeText(text); setCopied(key); setTimeout(() => setCopied(null), 1600) } catch { /* ignore */ }
   }
 
-  // "Copy everything": exactly what the result shows that the credit paid for, in the same order (F5).
-  function buildPackageText(): string {
-    if (!result) return ''
-    const L: string[] = []
-    L.push(`${ctx.title || 'This posting'}${ctx.company ? ` — ${ctx.company}` : ''}`)
-    if (result.verdict?.score != null) L.push(`Fit: ${result.verdict.score}/100${result.verdict.band ? ` (${result.verdict.band})` : ''}`)
-    const add = (h: string, rows: string[]) => { if (rows.length) { L.push('', h, ...rows) } }
-    add('MOVE UP (no words change)', (result.reorder || []).map(m => `• ${m.role}${m.company ? `, ${m.company}` : ''} — line ${m.from} → ${m.to || 1}: ${m.text}`))
-    if (result.summary && !result.summary.kept) add('NEW SUMMARY (from your own facts)', [result.summary.text])
-    add('REWORD (use only if it reads right to you)', (result.rewrite_plan || []).map(r => `• ${r.to}`))
-    const hpBullets = hp?.package?.bullets?.map(b => b.humanized_text) || []
-    add(hpBullets.length ? 'REWORDED BULLETS (HumanProof)' : 'REWORDED BULLETS', hpBullets.length ? hpBullets.map(b => `• ${b}`) : realBullets.map(b => `• ${b.optimized}`))
-    add('NUMBERS YOU ADDED', (result.questions || []).map(q => answers[q.id]).filter(Boolean).map(b => `• ${b}`))
-    if (result.availability) add('AVAILABILITY LINE (add only if true)', [result.availability.text])
-    if (result.application_message) add('MESSAGE TO THE EMPLOYER', [result.application_message])
-    return L.join('\n')
-  }
+  // ── the person's version: the server's finished résumé + their toggles and answers (kept for this tab) ──
+  const tailored = result && !result.blocked && result.tailored && result.tailored.doc ? result.tailored : null
+  const version = usePaidVersion(tailored, `${job.id}:${ctx.pasted ? 'p' : 'l'}:${resumeText.length}`)
+  const docKey = version.doc ? JSON.stringify(version.doc) : ''
+  const fileBase = (() => {
+    const n = String(version.doc?.basics?.name || '').replace(/[^\w .'-]/g, '').trim()
+    return /^[A-Za-z][\w.'-]*(\s+[A-Za-z][\w.'-]*){1,3}$/.test(n) ? `${n} - Resume` : 'Resume'
+  })()
 
-  function derivePdfName(): string {
-    const cleanName = (resumeText.split(/\r?\n/).map(l => l.trim()).find(Boolean) || '').replace(/[^\w .'-]/g, '').trim()
-    const looksLikeName = /^[A-Z][\w.'-]*(\s+[A-Z][\w.'-]*){1,3}$/.test(cleanName)
-    return looksLikeName ? `${cleanName} — Resume.pdf` : 'Resume.pdf'
+  async function exportVersion(format: 'pdf' | 'docx'): Promise<Blob | null> {
+    if (!version.doc) return null
+    const res = await fetch('/api/resume', { method: 'POST', headers: await aiHeaders(), body: JSON.stringify({ action: 'export', doc: version.doc, format }) })
+    if (!res.ok) return null
+    return await res.blob()
   }
+  // pre-build the PDF of the current version (debounced: a toggle re-builds once the person pauses)
+  useEffect(() => {
+    if (step !== 'review' || !version.doc) return
+    if (pdf && pdf.key === docKey) return
+    let live = true
+    const t = setTimeout(async () => {
+      setPdfState('building')
+      try { const b = await exportVersion('pdf'); if (!live) return; if (b) { setPdf({ key: docKey, blob: b }); setPdfState('idle') } else setPdfState('failed') } catch { if (live) setPdfState('failed') }
+    }, 500)
+    return () => { live = false; clearTimeout(t) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, docKey])
 
-  // Phase A: the PDF is the résumé AS UPLOADED (the button says so). No job title is sent, so nothing is
-  // printed under the name that the person never held (F1). Phase B: the applied résumé version goes here.
-  async function preparePdf() {
-    setPrepping(true)
-    try {
-      const res = await fetch('/api/resume', {
-        method: 'POST', headers: await aiHeaders(),
-        body: JSON.stringify({ action: 'download_resume', resume: resumeText }),
-      })
-      if (!res.ok) { setPdfFailed(true); setPrepping(false); return }
-      setPdfBlob(await res.blob())
-      setPdfName(derivePdfName())
-    } catch { setPdfFailed(true) }
-    setPrepping(false)
-  }
-
-  function saveBlob() {
-    if (!pdfBlob) return
-    const url = URL.createObjectURL(pdfBlob)
+  function saveBlob(blob: Blob, name: string) {
+    const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href = url; a.download = pdfName
+    a.href = url; a.download = name
     document.body.appendChild(a); a.click(); a.remove()
     setTimeout(() => URL.revokeObjectURL(url), 10000)
+  }
+  async function downloadPdf() {
+    if (pdf && pdf.key === docKey) { saveBlob(pdf.blob, `${fileBase}.pdf`); return }
+    setPdfState('building')
+    const b = await exportVersion('pdf').catch(() => null)
+    if (b) { setPdf({ key: docKey, blob: b }); setPdfState('idle'); saveBlob(b, `${fileBase}.pdf`) } else setPdfState('failed')
+  }
+  async function downloadDocx() {
+    const b = await exportVersion('docx').catch(() => null)
+    if (b) saveBlob(b, `${fileBase}.docx`); else setError('The Word file did not build — try the PDF, or try again.')
   }
 
   // The posting the sheet is about: the listing's own link, or the link pasted for another posting.
@@ -401,93 +378,102 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
     onApplied(); onClose()
   }
 
-  async function approveAndSend() {
-    setStep('sending')
-    const email = user?.email || profile?.email || ''
-    try {
-      await fetch('/api/resume', {
-        method: 'POST', headers: await aiHeaders(),
-        body: JSON.stringify({
-          action: 'email_analysis', email, co: ctx.company || job.company, role: ctx.title || job.title, jid: job.id, jobUrl: applyHref || undefined,
-          bullets: realBullets.map(b => ({ original: b.original, optimized: b.optimized, addresses: b.addresses, note: '' })),
-          optimizedBullets: realBullets.map(b => b.optimized),
-          humanproofBullets: hp ? hp.package.bullets.map(b => b.humanized_text) : undefined,
-          applicationMessage: result?.application_message || undefined,
-          fitScore: result?.verdict?.score ?? undefined,
-          jobTitle: ctx.title, company: ctx.company,
-          resume: resumeText, jobDescription: ctx.pasted || job.description || '',
-        }),
-      })
-    } catch { /* email is best-effort, never blocks the flow */ }
-    setStep('done')
-  }
-
   function applyWithoutOptimize() { openPosting() }
   function goTo(href: string) { onClose(); setTimeout(() => afterPendingBack(() => router.push(href)), 0) }
+  const matchedJobsHref = '/jobs'
 
   const head = ctx.other ? (read?.title || ctx.title || (read?.host ? `The posting at ${read.host}` : 'The posting you pasted')) : job.title
   const headCo = ctx.other ? (read?.company || ctx.company) : job.company
-  const title = step === 'review' ? 'Your changes for this job'
-    : step === 'done' ? 'Sent' : step === 'signin' ? 'Sign in again'
+  const blocked = (result && result.blocked) || (step === 'choose' && probe && probe.blocked) || null
+  const title = step === 'review' ? (blocked ? 'Why nothing was changed' : tailored ? 'Your résumé for this job' : 'Your changes for this job')
+    : step === 'signin' ? 'Sign in again'
     : 'Optimize for this job'
-  const total = result ? requirementCounts({ matched: result.matched_requirements || [], missing: result.unsupported_requirements || [] }).total : 0
   const otherNote = ctx.other ? `This sheet is now about the posting you pasted, not ${job.title}${job.company ? ` · ${job.company}` : ''}.` : undefined
   const readRow = read && (step === 'choose' || step === 'review' || step === 'no-requirements')
     ? <PostingReadRow read={read} note={otherNote} onCorrect={step === 'review' ? undefined : correctPosting} onPasteAnother={step === 'review' ? undefined : () => { setRead(null); setStep('needs-posting'); setPostingGone(false); setPostingLinkFailed(false) }} />
     : null
   const errorBox = error ? <p className={s.err} role="alert"><Icon name="circle-alert" size={16} />{error}</p> : null
+  const cost = creditCostLabel(RESUME_OPTIMIZE_COST)
+
+  // Real steps, real counts — only numbers the server returned (requirements_listed, statement statuses, the change list).
+  const steps = useMemo(() => {
+    if (!result || !tailored) return [] as string[]
+    const out: string[] = []
+    // one source for both counts: the reader's statements (the same rows the fit read lists); else the one listed count
+    const st = (result.statements || []).filter((x) => x.kind !== 'promise')
+    const proved = st.filter((x) => x.status === 'shown' || x.status === 'partly').length
+    const asks = st.filter((x) => x.status === 'cannot_tell').length
+    if (st.length) {
+      out.push(`Read ${st.length} thing${st.length === 1 ? '' : 's'} the posting asks for`)
+      if (proved) out.push(`Matched ${proved} to lines on your résumé${asks ? ` (${asks} only you can answer)` : ''}`)
+    } else if (typeof result.requirements_listed === 'number') out.push(`Read ${result.requirements_listed} requirement${result.requirements_listed === 1 ? '' : 's'} in the posting`)
+    const built = (tailored.changes || []).filter((c) => c.type !== 'format' && c.type !== 'heading').length
+    out.push(built ? `Built ${built} change${built === 1 ? '' : 's'} to your résumé` : 'Found nothing worth changing in your lines')
+    const qn = (result.questions || []).length
+    if (qn) out.push(`Kept ${Math.min(3, qn)} question${Math.min(3, qn) === 1 ? '' : 's'} only you can answer`)
+    return out
+  }, [result, tailored])
 
   // ── the footer: the screen's one filled action + text links ──
   let foot: React.ReactNode = null
-  if (step === 'choose') {
+  if (step === 'choose' && blocked) {
     foot = <>
-      <Button variant="primary" size="lg" full data-testid="modal-optimize-btn" onClick={pressOptimize}>Optimize for this job · {priceLabel(RESUME_OPTIMIZE_COST, pro)}</Button>
-      {applyHref && <div className={s.links}><button type="button" className={s.textBtn} onClick={applyWithoutOptimize}>{ctx.other ? 'Open this posting' : 'Apply without optimizing · free'}<Icon name="arrow-up-right" size={14} /></button></div>}
+      <Button variant="secondary" size="lg" full icon="search" onClick={() => goTo(matchedJobsHref)} data-testid="modal-matched">Jobs matched to your résumé</Button>
+      {applyHref && <div className={s.links}><button type="button" className={s.textBtn} onClick={applyWithoutOptimize}>{ctx.other ? 'Open this posting' : 'Apply anyway'}<Icon name="arrow-up-right" size={14} /></button></div>}
+    </>
+  } else if (step === 'choose') {
+    foot = <>
+      <Button variant="primary" size="lg" full data-testid="modal-optimize-btn" onClick={pressOptimize}>{buildIsFree ? 'Build my version · free' : `Build my version · ${priceLabel(RESUME_OPTIMIZE_COST, pro)}`}</Button>
+      {applyHref && <div className={s.links}><button type="button" className={s.textBtn} onClick={applyWithoutOptimize}>{ctx.other ? 'Open this posting' : 'Apply without changes · free'}<Icon name="arrow-up-right" size={14} /></button></div>}
+    </>
+  } else if (step === 'review' && tailored) {
+    foot = <>
+      <Button variant="primary" size="lg" full icon="download" onClick={() => { void downloadPdf() }} disabled={pdfState === 'building' && !pdf} data-testid="modal-download">
+        {pdfState === 'building' && !(pdf && pdf.key === docKey) ? 'Preparing your PDF…' : pdfState === 'failed' ? 'Try the download again' : 'Download this version'}
+      </Button>
+      <div className={s.links}>
+        <button type="button" className={s.textBtn} onClick={() => { void downloadDocx() }} data-testid="modal-docx">Word (.docx)</button>
+        <button type="button" className={s.textBtn} data-done={copied === 'pkg' ? '1' : undefined} onClick={() => version.doc && copyText(renderText(version.doc), 'pkg')} data-testid="modal-copy-all">{copied === 'pkg' ? 'Copied' : 'Copy text'}</button>
+        {applyHref && <button type="button" className={s.textBtn} onClick={openPosting} data-testid="modal-apply">{ctx.other ? 'Open this posting' : 'Apply'}<Icon name="arrow-up-right" size={14} /></button>}
+      </div>
+    </>
+  } else if (step === 'review' && blocked) {
+    foot = <>
+      <Button variant="secondary" size="lg" full icon="search" onClick={() => goTo(matchedJobsHref)}>Jobs matched to your résumé</Button>
+      {applyHref && <div className={s.links}><button type="button" className={s.textBtn} onClick={openPosting} data-testid="modal-apply">{ctx.other ? 'Open this posting' : 'Apply anyway'}<Icon name="arrow-up-right" size={14} /></button></div>}
     </>
   } else if (step === 'review') {
     foot = <>
       {applyHref
         ? <Button variant="primary" size="lg" full onClick={openPosting} iconRight="arrow-up-right" data-testid="modal-apply">{ctx.other ? 'Open this posting' : 'Apply'}</Button>
         : <Button variant="primary" size="lg" full onClick={() => { onApplied(); onClose() }}>I applied — start tracking</Button>}
-      <div className={s.links}>
-        <button type="button" className={s.textBtn} data-done={copied === 'pkg' ? '1' : undefined} onClick={() => copyText(buildPackageText(), 'pkg')} data-testid="modal-copy-all">{copied === 'pkg' ? 'Copied' : 'Copy everything'}</button>
-        {/* phase-B seam (ResultDownload): today this is the résumé exactly as uploaded */}
-        <button type="button" className={s.textBtn} onClick={() => { if (pdfBlob) saveBlob(); else { setPdfFailed(false); void preparePdf() } }} disabled={prepping} data-testid="modal-download">
-          <Icon name="download" size={14} />{prepping ? 'Preparing…' : pdfFailed ? 'Retry: your résumé as uploaded' : 'Download your résumé as uploaded'}
-        </button>
-        <button type="button" className={s.textBtn} onClick={approveAndSend}>Email me this</button>
-      </div>
     </>
   } else if (step === 'needs-posting' && !postingGone) {
-    foot = applyHref ? <div className={s.links}><button type="button" className={s.textBtn} onClick={applyWithoutOptimize}>Apply without optimizing · free<Icon name="arrow-up-right" size={14} /></button></div> : null
+    foot = applyHref ? <div className={s.links}><button type="button" className={s.textBtn} onClick={applyWithoutOptimize}>Apply without changes · free<Icon name="arrow-up-right" size={14} /></button></div> : null
   } else if (step === 'needs-posting' && postingGone) {
     foot = <>
       <Button variant="secondary" size="lg" full icon="search" onClick={() => goTo(similarJobsHref(job))} data-testid="modal-similar">Find open {job.title} jobs</Button>
       {job.company && <div className={s.links}><button type="button" className={s.textBtn} onClick={() => goTo(`/jobs?q=${encodeURIComponent(job.company)}`)}>Find other jobs at {job.company}</button></div>}
     </>
   } else if (step === 'no-requirements') {
-    foot = applyHref ? <Button variant="primary" size="lg" full onClick={applyWithoutOptimize} iconRight="arrow-up-right">{ctx.other ? 'Open this posting' : 'Apply without optimizing · free'}</Button> : null
+    foot = applyHref ? <Button variant="primary" size="lg" full onClick={applyWithoutOptimize} iconRight="arrow-up-right">{ctx.other ? 'Open this posting' : 'Apply without changes · free'}</Button> : null
   } else if (step === 'optimizing') {
     foot = applyHref ? <div className={s.links}><button type="button" className={s.textBtn} onClick={applyWithoutOptimize}>Skip — just apply<Icon name="arrow-up-right" size={14} /></button></div> : null
-  } else if (step === 'done') {
-    foot = <>
-      {applyHref
-        ? <Button variant="primary" size="lg" full onClick={openPosting} iconRight="arrow-up-right">{ctx.other ? 'Open this posting' : 'Apply'}</Button>
-        : <Button variant="primary" size="lg" full onClick={() => { onApplied(); onClose() }}>I applied — start tracking</Button>}
-      <div className={s.links}><button type="button" className={s.textBtn} onClick={onClose}>Close — I&apos;ll apply later</button></div>
-    </>
   }
+
+  // the legacy plan (an answer with no `tailored` document — never charged for a document it cannot give)
+  const legacyCount = result && !tailored && !blocked ? planChangeCount(result as unknown as PaidPlan) : 0
 
   return (
     <>
-    {showUpgrade && <UpgradeModal reason={upgradeReason} featureName={upgradeFeature} onClose={() => setShowUpgrade(false)} />}
+    {showUpgrade && <UpgradeModal reason={upgradeReason} onClose={() => setShowUpgrade(false)} />}
     {confirming && (
-      <CreditConfirmDialog cost={RESUME_OPTIMIZE_COST} action={`optimize your résumé for ${ctx.title || 'this posting'}${ctx.company ? ` at ${ctx.company}` : ''}`}
+      <CreditConfirmDialog cost={RESUME_OPTIMIZE_COST} action={`rebuild your résumé for ${ctx.title || 'this posting'}${ctx.company ? ` at ${ctx.company}` : ''}`}
         onConfirm={() => { setConfirming(false); void runOptimize() }} onCancel={() => setConfirming(false)} />
     )}
     <ModalPortal onBack={onClose}>
     <div className={s.scrim} onClick={onClose}>
-      <div ref={sheetRef} role="dialog" aria-modal="true" aria-label={title} className={s.sheet} onClick={e => e.stopPropagation()}>
+      <div ref={sheetRef} role="dialog" aria-modal="true" aria-label={title} className={s.sheet} data-wide={step === 'review' && tailored ? '1' : undefined} onClick={e => e.stopPropagation()}>
         <div className={s.head}>
           <div className={s.headText}>
             <h2 className={s.title}>{title}</h2>
@@ -504,7 +490,7 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
         <div className={s.body} data-sheet-body>
           {showPicker && <ResumePicker list={resumeList} selectedId={resumeId} onPick={r => { void pickResume(r) }} note="Switching re-checks your fit · free" />}
           {showPicker && pickErr && <p className={s.err} role="alert"><Icon name="circle-alert" size={16} />{pickErr}</p>}
-          {(step === 'choose' || step === 'review') && <ParseNotice doc={resumeDoc} onPaste={() => goTo(`/resume?company=${encodeURIComponent(job.company)}&role=${encodeURIComponent(job.title)}&reupload=1`)} />}
+          {(step === 'choose' || step === 'review') && <ParseNotice doc={resumeDoc} onPaste={() => goTo(`/resume?company=${encodeURIComponent(job.company)}&role=${encodeURIComponent(job.title)}&reupload=1`)} studioHref="/resume/studio" />}
 
           {step === 'loading-resume' && <Waiting text="Opening your résumé…" />}
           {step === 'checking' && <Waiting text={ctx.pasted && linkHost(ctx.pasted) ? `Opening ${linkHost(ctx.pasted)} and reading the posting against your résumé…` : `Reading the ${ctx.title || 'posting'}${ctx.company ? ` posting at ${ctx.company}` : ''} against your résumé…`} />}
@@ -548,10 +534,8 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
             <div className={s.state} data-testid="no-requirements">
               {readRow}
               <StateHead icon="file-text" tone="caution" title="Not enough requirements to optimize against">
-                {/* the count comes from the rows listed below, never a second number from the refusal (they disagreed: "2" above "1 of 1") */}
-                <p className={s.p}>{diag
-                  ? (() => { const n = requirementCounts({ matched: diag.matched_requirements, missing: diag.unsupported_requirements }).total; return `Seen could read ${n === 0 ? 'no requirements' : `only ${n} requirement${n === 1 ? '' : 's'}`} in ${ctx.title || 'this posting'}${ctx.company ? ` at ${ctx.company}` : ''} — too few to optimize against. No credit was used.` })()
-                  : (noReqNote || NO_REQUIREMENTS_NOTE)}</p>
+                {/* the server's sentence names its own count; the rows below are the same reading */}
+                <p className={s.p}>{noReqNote || NO_REQUIREMENTS_NOTE}</p>
               </StateHead>
               {diag && <RequirementsView matched={diag.matched_requirements} missing={diag.unsupported_requirements} />}
               <details className={s.disclose}>
@@ -575,7 +559,7 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
             <div className={s.state}>
               <StateHead icon="file-text" title="Add your résumé first"><p className={s.p}>Seen checks your résumé against {job.title}{job.company ? ` at ${job.company}` : ''}. Upload it once and every job can use it.</p></StateHead>
               <Button variant="primary" size="lg" full onClick={() => goTo(`/resume?company=${encodeURIComponent(job.company)}&role=${encodeURIComponent(job.title)}`)}>Add my résumé</Button>
-              {applyHref && <button type="button" className={s.textBtn} onClick={applyWithoutOptimize}>Apply without optimizing · free<Icon name="arrow-up-right" size={14} /></button>}
+              {applyHref && <button type="button" className={s.textBtn} onClick={applyWithoutOptimize}>Apply without changes · free<Icon name="arrow-up-right" size={14} /></button>}
             </div>
           )}
 
@@ -584,73 +568,62 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
             <div className={s.state} data-testid="resume-corrupted">
               <StateHead icon="file-text" tone="caution" title="We couldn't read your saved résumé"><p className={s.p}>It didn&apos;t convert to clean text — common with résumés exported or scanned on a phone. Upload it again, or paste its text, and this check runs. Nothing was charged.</p></StateHead>
               <Button variant="primary" size="lg" full onClick={() => goTo(`/resume?company=${encodeURIComponent(job.company)}&role=${encodeURIComponent(job.title)}&reupload=1`)}>Upload or paste my résumé</Button>
-              {applyHref && <button type="button" className={s.textBtn} onClick={applyWithoutOptimize}>Apply without optimizing · free<Icon name="arrow-up-right" size={14} /></button>}
+              {applyHref && <button type="button" className={s.textBtn} onClick={applyWithoutOptimize}>Apply without changes · free<Icon name="arrow-up-right" size={14} /></button>}
             </div>
           )}
 
-          {/* ── choose: the free check ── */}
+          {/* ── choose: THE fit read (free) + what a credit does for THIS job (the probe's counts) ── */}
           {step === 'choose' && (
             <>
               {readRow}
               {errorBox}
-              {diag ? (
-                <>
-                  <VerdictCard verdict={diag.verdict} note="free" />
-                  <RequirementsView matched={diag.matched_requirements} missing={diag.unsupported_requirements} />
-                  <Checklist constraints={diag.constraints} />
-                </>
-              ) : <p className={s.fine}>The free check didn&apos;t load. You can still optimize, or close and try again.</p>}
-              <div className={s.offer}>
-                <h3 className={s.h3}>{pro === true ? 'Optimize' : creditCostLabel(RESUME_OPTIMIZE_COST)}: your changes for this job</h3>
-                <p className={s.p} data-testid="modal-offer">{diag ? offerSentence({ ...requirementCounts({ matched: diag.matched_requirements, missing: diag.unsupported_requirements }), title: ctx.title, company: ctx.company, show: displaySkill }) : offerSentence({ shown: [], missing: [], title: ctx.title, company: ctx.company })}</p>
-                <p className={s.fine}>You copy the changes you want into your résumé; the file itself is not rewritten yet. Kept for 7 days.</p>
-              </div>
+              {blocked
+                ? <>
+                    {diag && <FitRead data={diag} note="free" compact brief />}
+                    <BlockedResult b={blocked} jobsHref={matchedJobsHref} showLink={false} />
+                  </>
+                : <>
+                    {diag
+                      ? <>
+                          <FitRead data={diag} note="free" />
+                          {!diag.statements?.length && <Checklist constraints={diag.constraints} />}
+                        </>
+                      : <p className={s.fine}>The free check didn&apos;t load. You can still optimize, or close and try again.</p>}
+                    <PaidOffer probe={probe} price={pro === true ? 'Pro' : cost}
+                      fallback={diag ? offerSentence({ ...requirementCounts({ matched: diag.matched_requirements, missing: diag.unsupported_requirements }), title: ctx.title, company: ctx.company, show: displaySkill }) : offerSentence({ shown: [], missing: [], title: ctx.title, company: ctx.company })} />
+                  </>}
             </>
           )}
 
-          {step === 'optimizing' && <Waiting text={`Building your changes for ${ctx.title || 'this posting'}…`} />}
+          {step === 'optimizing' && <Waiting text={`Rebuilding your résumé for ${ctx.title || 'this posting'}…`} />}
 
-          {/* ── review: the paid result — the work first (F3) ── */}
-          {step === 'review' && result && (
+          {/* ── review: a blocked answer — no changes, no questions, no message ── */}
+          {step === 'review' && result && blocked && (
+            <>
+              {readRow}
+              <ResultTopLine charge={result.charge} charged={!!result.charged} cached={!!result.cached} pro={pro} balance={balance} cost={cost} />
+              <BlockedResult b={blocked} jobsHref={matchedJobsHref} showLink={false} />
+              <FitRead data={result} compact brief />
+            </>
+          )}
+
+          {/* ── review: the finished résumé ── */}
+          {step === 'review' && result && tailored && (
             <>
               {errorBox}
               {readRow}
-              {result.verdict && (
-                <VerdictStrip verdict={result.verdict} total={total}
-                  extra={result.cached ? 'already built — no credit used' : result.charged && pro !== true ? `${creditCostLabel(RESUME_OPTIMIZE_COST)} used${balance != null ? ` · ${balance} left` : ''}` : undefined} />
-              )}
-
-              <section className={s.section} aria-label="Your changes">
-                <h3 className={s.h3} data-testid="change-count">{changeCount === 0 ? 'Nothing to change' : `${changeCount} change${changeCount === 1 ? '' : 's'} for this job`}</h3>
-                {changeCount === 0
-                  ? <p className={s.p}>{(() => { const c = requirementCounts({ matched: result.matched_requirements || [], missing: result.unsupported_requirements || [] }); const top = c.shown.slice(0, 2).map(r => displaySkill(r.surface)); return `${top.length ? `Your lines for ${top.join(' and ')} already lead their roles` : 'No line of yours needs to move'}, and no summary or wording Seen could build scores higher for ${ctx.title || 'this posting'}.${c.missing.length ? ` The ${c.missing.length} requirement${c.missing.length === 1 ? '' : 's'} below are not on your résumé — only you can add them, and only if they're true.` : ''}` })()}</p>
-                  : <PlanChanges plan={result} onAnswer={(id, b) => setAnswers(a => ({ ...a, [id]: b }))} />}
-                {result.summary?.kept && changeCount > 0 && <p className={s.fine}>Your own summary stays — it scored higher against this posting than a rewritten one.</p>}
-              </section>
-
-              {realBullets.length > 0 && (
-                <section className={s.section} aria-label="Reworded bullets">
-                  <h3 className={s.h3}>{realBullets.length} of your bullet{realBullets.length === 1 ? '' : 's'}, reworded</h3>
-                  <ul className={s.list}>
-                    {(hp?.package?.bullets?.length ? hp.package.bullets.map((b, i) => ({ original: realBullets[i]?.original || b.original, optimized: b.humanized_text })) : realBullets).map((b, i) => (
-                      <li key={i} className={s.pair}><p className={s.pairBefore}>{b.original}</p><p className={s.pairAfter}>{b.optimized}</p></li>
-                    ))}
-                  </ul>
-                  {hpState === 'idle' && <Button variant="secondary" onClick={runHumanProof}>Check them for your own voice (HumanProof)</Button>}
-                  {hpState === 'loading' && <Waiting text="Checking your voice…" />}
-                  {hpState === 'error' && <p className={s.fine}>HumanProof didn&apos;t run. The bullets above are ready to use. <button type="button" className={s.textBtn} onClick={runHumanProof}>Retry</button></p>}
-                  {hpState === 'locked' && (
-                    <div className={s.offer}>
-                      <p className={s.p}>HumanProof checks reworded bullets for generic tone. {LOCK_NOTE}</p>
-                      <Button variant="secondary" icon="lock" onClick={() => { setUpgradeReason('pro'); setUpgradeFeature('HumanProof'); setShowUpgrade(true) }}>Unlock HumanProof</Button>
-                    </div>
-                  )}
-                  {hpState === 'done' && hp && (
-                    <div className={s.hpScore}><div className={s.hpRing} data-tone={tone(hp.humanproof_score)}>{hp.humanproof_score}</div><p className={s.fine}>HumanProof score · {hp.ai_slop_risk} risk of generic wording</p></div>
-                  )}
+              <ResultTopLine charge={result.charge || tailored.charge} charged={!!result.charged} cached={!!result.cached} pro={pro} balance={balance} cost={cost} />
+              <BuildSteps steps={steps} />
+              <PaidResult t={tailored} questions={result.questions || []} v={version} />
+              {result.availability && (
+                <section className={s.section} aria-label="Availability line">
+                  <h3 className={s.h3}>A line about when you can work</h3>
+                  {result.availability.conflict && <p className={s.fine}><Icon name="triangle-alert" size={14} label="Conflict" /> {result.availability.conflict}</p>}
+                  <p className={s.msg}>{result.availability.text}</p>
+                  <p className={s.fine}>{result.availability.why}</p>
+                  <CopyBtn text={result.availability.text} label="Copy the line" />
                 </section>
               )}
-
               {result.application_message && (
                 <details className={s.disclose} data-testid="modal-message">
                   <summary>Message to the employer</summary>
@@ -660,39 +633,38 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
                   </div>
                 </details>
               )}
-
-              <RequirementsView matched={result.matched_requirements || []} missing={result.unsupported_requirements || []} />
-              <Checklist constraints={result.constraints || []} />
-
-              {wordingNotes.length > 0 && (
-                <section className={s.section} aria-label="Same thing, different word">
-                  <h3 className={s.h3}>Same thing, different word</h3>
-                  <ul className={s.list}>{wordingNotes.map((n, i) => <li key={i} className={s.note}>{n}</li>)}</ul>
-                </section>
-              )}
-
+              <FitRead data={result} compact />
               {result.cached && (
                 <p className={s.ledger}>
-                  You optimized this job with this résumé in the last 7 days. {pro === true ? 'Re-running is unlimited with Pro.' : `A re-run costs ${creditCostLabel(RESUME_OPTIMIZE_COST)}.`}{' '}
-                  <button type="button" data-testid="modal-rerun" className={s.ledgerBtn} onClick={() => { void runOptimize(true) }}>Re-run with the latest engine</button>
+                  You built this version with this résumé in the last 7 days. {pro === true ? 'Rebuilding is unlimited with Pro.' : `A rebuild costs ${cost}.`}{' '}
+                  <button type="button" data-testid="modal-rerun" className={s.ledgerBtn} onClick={() => { void runOptimize(true) }}>Rebuild with the latest engine</button>
                 </p>
               )}
-              {pro === false && result.charged && changeCount > 0 && (
+              {pro === false && result.charged && (
                 <p className={s.ledger} data-testid="credit-ledger">
-                  <button type="button" className={s.ledgerBtn} onClick={() => { setUpgradeReason('generic'); setUpgradeFeature(undefined); setShowUpgrade(true) }}>{PASS_AFTER_WIN}</button>
+                  <button type="button" className={s.ledgerBtn} onClick={() => { setUpgradeReason('generic'); setShowUpgrade(true) }}>{PASS_AFTER_WIN}</button>
                 </p>
               )}
             </>
           )}
 
-          {step === 'sending' && <Waiting text={`Sending this to ${user?.email || profile?.email || 'your email'}…`} />}
-
-          {step === 'done' && (
-            <div className={s.state}>
-              <StateHead icon="mail" title="Check your email">
-                <p className={s.p}>Your changes and your résumé (as uploaded) are on the way to <b>{user?.email || profile?.email || 'your inbox'}</b>.</p>
-              </StateHead>
-            </div>
+          {/* ── review: an older answer with no document (feature-detected) ── */}
+          {step === 'review' && result && !tailored && !blocked && (
+            <>
+              {errorBox}
+              {readRow}
+              <section className={s.section} aria-label="Your changes">
+                <h3 className={s.h3} data-testid="change-count">{legacyCount === 0 ? 'Nothing to change' : `${legacyCount} change${legacyCount === 1 ? '' : 's'} for this job`}</h3>
+                {legacyCount > 0 && <PlanChanges plan={result as unknown as PaidPlan} />}
+              </section>
+              {result.application_message && (
+                <details className={s.disclose} data-testid="modal-message">
+                  <summary>Message to the employer</summary>
+                  <div className={s.section}><p className={s.msg}>{result.application_message}</p><CopyBtn text={result.application_message} label="Copy message" /></div>
+                </details>
+              )}
+              <FitRead data={result} compact />
+            </>
           )}
         </div>
 
@@ -703,4 +675,3 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
     </>
   )
 }
-

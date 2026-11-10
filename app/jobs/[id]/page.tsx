@@ -43,8 +43,9 @@ import Icon from '@/components/ui/Icon'
 import StatTile from '@/components/ui/StatTile'
 import { wastedEffortTone, wastedEffortWord } from '@/lib/ui/tone.js'
 import d from './detail.module.css'
+import InsightsView, { insightsOfferSentence, type InsightsData, type InsightsProbe } from '@/components/optimizer/InsightsView'
 
-interface Insights {
+interface Insights extends InsightsData {
   what_they_want: string[]
   hidden_requirements: string[]
   insider_tip: string
@@ -81,6 +82,10 @@ interface InsightsResponse extends Partial<Insights> {
   balance?: number
   credits_required?: boolean
   error?: string
+  requirements_read?: number
+  item_count?: number
+  condition_count?: number
+  has_pay?: boolean
 }
 
 function companyNameOf(j: Job): string { return displayCompanyName(j.company) || j.company }
@@ -123,6 +128,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const [showFullDesc, setShowFullDesc] = useState(false)
   const [insightPrice, setInsightPrice] = useState<number>(JOB_INSIGHTS_COST)
   const [insightNote, setInsightNote] = useState('')
+  const [insightProbe, setInsightProbe] = useState<InsightsProbe | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [showApplyModal, setShowApplyModal] = useState(false)
   const [showCheckpoint, setShowCheckpoint] = useState(false)
@@ -256,7 +262,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       })
       const d = await res.json() as InsightsResponse
       if (d._src === 'unread') { setInsightNote(d.message || ''); setInsightsState('unread'); return }
-      if (d._src === 'uncached') { setInsightPrice(typeof d.price === 'number' ? d.price : JOB_INSIGHTS_COST); setInsightsState('uncached'); return }
+      if (d._src === 'uncached') { setInsightPrice(typeof d.price === 'number' ? d.price : JOB_INSIGHTS_COST); setInsightProbe(d); setInsightsState('uncached'); return }
       if (d.what_they_want?.length) {
         try { localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), v: JOB_INSIGHTS_VERSION, data: d })) } catch { /* ignore */ }
         setInsights(d as Insights)
@@ -340,10 +346,10 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       })
       const d = await res.json() as InsightsResponse & { link_failed?: boolean; reason?: string; posting?: { title?: string; company?: string } }
       if (d.link_failed) { setInsightNote(d.reason === 'gone' ? 'That link says the job was taken down, so there is nothing left to read.' : "That site doesn't let Seen read it. Open it, select all of its text, and paste the text here."); setInsightsState('link_failed'); return }
-      // the job-insights answer carries no requirement count yet (server request) — the row shows none rather than a guess
-      setPastedRead(readFacts({ pasted: text, server: d.posting || null, job: { title: job.title, company: companyNameOf(job) }, requirements: null }))
+      // the server's own count (requirements_read, every answer incl. a probe miss); none when it sent none
+      setPastedRead(readFacts({ pasted: text, server: d.posting || null, job: { title: job.title, company: companyNameOf(job) }, requirements: typeof d.requirements_read === 'number' ? d.requirements_read : null }))
       if (d._src === 'unread') { setInsightNote(d.message || ''); setInsightsState('unread'); return }
-      if (d._src === 'uncached') { setInsightPrice(typeof d.price === 'number' ? d.price : JOB_INSIGHTS_COST); setInsightsState('uncached'); return }
+      if (d._src === 'uncached') { setInsightPrice(typeof d.price === 'number' ? d.price : JOB_INSIGHTS_COST); setInsightProbe(d); setInsightsState('uncached'); return }
       if (d.what_they_want?.length) { setInsights(d as Insights); setInsightsState('done') } else setInsightsState('unavailable')
     } catch { setInsightsState('unavailable') }
   }, [job])
@@ -527,7 +533,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             )}
             {insightsState === 'uncached' && (
               <div className={d.stack}>
-                <p className={d.p}>What the posting asks for, the expectations it leaves unstated, and a summary — {priceLabel(insightPrice, pro)}. Once built it is free for everyone for 7 days.</p>
+                <p className={d.p} data-testid="insights-offer">{insightsOfferSentence(insightProbe) || 'What the posting asks for, dealbreakers first, each with the sentence it comes from; the conditions it states; the pay it lists.'}</p>
                 <Button variant="secondary" onClick={revealInsights} data-testid="reveal-insights" icon="sparkles">Show job insights · {priceLabel(insightPrice, pro)}</Button>
               </div>
             )}
@@ -544,22 +550,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             {insightsState === 'done' && insightNote && <p className={d.fine}>{insightNote}</p>}
             {insightsState === 'done' && insights && (
               <>
-                <ul className={d.list}>
-                  {insights.what_they_want.map((item, i) => <li key={i}><Icon name="check" size={14} className={d.listIco} />{item}</li>)}
-                </ul>
-                {(insights.hidden_requirements?.length > 0 || insights.insider_tip) && (
-                  <div className={d.rule}>
-                    {insights.hidden_requirements?.length > 0 && (
-                      <>
-                        <h3 className="ui-eyebrow">Unstated expectations</h3>
-                        <ul className={d.list}>
-                          {insights.hidden_requirements.map((r, i) => <li key={i}><Icon name="circle-alert" size={14} className={d.listIcoWarn} />{r}</li>)}
-                        </ul>
-                      </>
-                    )}
-                    {insights.insider_tip && <p className={d.tip}><b>Tip: </b>{insights.insider_tip}</p>}
-                  </div>
-                )}
+                <InsightsView data={insights} />
+                {insights.shared === true && <p className={d.fine}>Built once for this posting — free for anyone who opens it in the next 7 days.</p>}
               </>
             )}
           </section>

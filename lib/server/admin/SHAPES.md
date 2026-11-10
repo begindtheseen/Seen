@@ -70,10 +70,9 @@ One session per submit. 5 attempts / 15 min / IP (429 `rate_limited`), 5 wrong p
   ],
   "system": { "ok": false, "line": "1 cron needs a look: refresh-jobs last ran 9 h ago.",
     "failing": [ { "name": "refresh-jobs", "last_run": "2026-11-10T09:00:03.000Z", "detail": "overdue — next run was 2026-11-10T14:00:00.000Z" } ] },
-  "extra": { "reports_7d": 122, "signups_7d": 9, "errors_24h": 6, "recompute_waiting": 0,
-             "reports_by_day_30": [ { "date": "2026-10-12", "count": 140 } ],
-             "top_companies_30d": [ { "company": "Walmart", "count": 61 } ],
-             "outcome_mix_30d": { "ghosted": 1200, "rejected": 900, "interview": 700, "offer": 120, "waiting": 2034 } } }
+  "extra": { "reports_7d": 122, "signups_7d": 9, "signups_today": 1, "errors_24h": 6, "recompute_waiting": 0,
+             "listings_total": 158082, "listings_added_today": 951, "listings_counts_source": "rpc",
+             "revenue_source": "credit_transactions reason=purchase_<sku> × …; employer_purchases.amount_cents" } }
 ```
 - `source`: `"rpc"` (one `admin_overview(p_today)` call) or `"fallback"` (bounded parallel counts; each has its own
   ~6 s cap). The California day (`pacificDayStart`) is `p_today`; "24h" stats are rolling 24 hours.
@@ -81,7 +80,7 @@ One session per submit. 5 attempts / 15 min / IP (429 `rate_limited`), 5 wrong p
   price in `lib/server/creditRules.js ONE_TIME_SKUS`, plus `employer_purchases.amount_cents` (status paid/fulfilled)
   in the last 7 days. Seen sells no subscriptions: no MRR / trial / past-due field exists anywhere.
 - `listings_stale` = clearable stale (what "Clear stale" removes, `staleSweep.STALE_CLEARABLE_FILTER`).
-- `extra.*_30d` come from SQL (RPC) or a keyset read of the newest 30 days (fallback) — never the oldest 1,000.
+- The 30-day chart / top companies / outcome mix are `reports_stats` (kept off Today so it stays fast).
 - Touched: none (read). Cache key: `overview`.
 
 ### `search` `{ q }` → `AdminSearch`
@@ -94,18 +93,21 @@ One session per submit. 5 attempts / 15 min / IP (429 `rate_limited`), 5 wrong p
     { "kind": "report", "id": "c3d4…-uuid", "title": "Walmart · ghosted", "sub": "Oct 30, 2026 · held" } ] }
 ```
 `q`: an email (or part), a company name, a listing id or apply URL, a report id, a user id. ≤ 25 results.
-Uses `admin_search(p_q)` when present, else parallel exact/prefix reads (all values through `lib/server/pgrest.js`).
+Parallel exact / contains reads (every value through `lib/server/pgrest.js`); a uuid looks up users, listings and reports; an http(s) URL looks up listings by apply link.
 For `kind:'company'` the `id` is the company name (open `?item=company:<name>`).
 
-### `activity_log` `{ after?, action?, target?, include_logins?, limit? }` → `AdminList<AdminActivityRow>`
+### `activity_log` `{ after?, filter_action?, target?, include_logins?, limit? }` → `AdminList<AdminActivityRow>`
+(`action` in the body is the route name, so the contract's `action?` filter travels as `filter_action`.)
 ```json
 { "ok": true, "as_of": "…", "next": "MjAyNi0xMS0xMFQxNzo1OTowMC4wMDBafDIxMDI",
   "rows": [ { "id": "2103", "at": "2026-11-10T18:00:11.000Z", "admin": "owner", "action": "review_held",
               "target_kind": "bulk", "target_id": null,
               "summary": "Approved 288 held reports (12 skipped)", "undoable": true } ] }
 ```
-Newest first, keyset (`next` → `after`). `action` filters exactly; `target` = `"<kind>:<id>"` (e.g. `job:9a1b…`).
-Logins are hidden unless `include_logins: true` (the hourly automated login is most of the table).
+Newest first, keyset (`next` → `after`). `filter_action` filters exactly; `target` = `"<kind>:<id>"` (e.g. `job:9a1b…`).
+Logins are hidden unless `include_logins: true` (the hourly automated login is most of the table). A bulk decision
+shows as its one batch row (`review_held`, whose Undo covers every report); the per-report rows appear with
+`include_batch_rows: true`, or when filtering by action or target.
 `undoable` is true for: `review_held` (bulk), `approve_held_report`/`reject_held_report`, `*_report` moderation
 (approve/reject/hold/restore), `merge_companies` / `auto_merge_pair`, `delete_listing`, `dismiss_inactive_report`,
 `set_pro_window`, `set_flag`, `update_reddit_dispute`, `resolve_issue`/`dismiss_issue`, `update_cluster`,
@@ -161,7 +163,9 @@ scheduled interval + 1 h grace.
 Every pending row is read (keyset pages internally, no 1,000 cap; `truncated` true only past 20,000).
 `flags` may include `possible_duplicate`, `anti_gaming_hold`, `not_a_hiring_outcome`, `no_source_link`.
 
-### `review_held` `{ decision: "approve"|"reject", ids: string[] }` → `AdminOk`  (THE bulk fix)
+### `review_held` `{ decision: "approve"|"reject", ids: string[], request_id?: uuid, include_duplicates?: boolean }` → `AdminOk`  (THE bulk fix)
+Send ONE `request_id` per press and reuse it on Retry / continuation: rows that press already decided are then
+reported as `already_done_last_try` and one Undo covers every row of the press.
 Any number of ids (1–5,000) in the body. Written in chunks of ≤100 ids per PostgREST call, or in one
 `admin_review_reports(p_ids, p_decision, p_admin)` call when that RPC exists. Every write repeats the
 "still pending" filter and counts the rows it changed. Rows flagged `possible_duplicate` are NOT approved by a
@@ -208,6 +212,9 @@ Repeat while `complete:false`, passing `cursor` back (needed only when the queue
   "state": "live", "counted": true, "employeeReview": false, "rules": "passes" } ] }
 ```
 Newest first, keyset. `q` = company name contains.
+
+### `reports_stats` `{}` → `AdminOk` `rows:[{ total, by_day:[{date,count}]×30 (California days), top_companies:[{company,count}], outcome_mix:{ghosted,rejected,interview,offer,waiting}, source }]`
+Every report of the last 30 California days (keyset read) — the old chart read the oldest 1,000.
 
 ### `report_detail` `{ id }` → `AdminOk` with `rows:[ReportRow & { history: AdminActivityRow[] }]`
 
@@ -283,12 +290,14 @@ conditional on `status=eq.paid` — a second press says "Already fulfilled"). To
 `counts: { total, active, added_today, stale_or_expired, stale_clearable, expired_kept, stale_overdue, source:"rpc"|"exact" }`
 — each `number|null`; `failed: string[]`.
 
-### `jobs_browse` `{ filters: { q?, company?, source?, status?, since?, sort?, cursor?, limit? } }` → `AdminList<JobRow>`
+### `listings_browse` `{ filters: { q?, company?, location?, source?, status?, visible?, employer?, since?, sort?, limit? }, after? }` → `AdminList<JobRow>`
+`next` is a string; pass it back as `after`. (`jobs_browse` is the Seen Command form: same filters, `filters.cursor` = the
+object `next` it returns — not contract-shaped, do not use it in the new UI.)
 Rows: `id,title,company,location,source,availability_status,status,created_at,last_seen_at,expires_at,salary_min,salary_max,salary,apply_url,is_employer_posted,score,remote`
-(`lib/server/jobAdmin.js LIST_SELECT`). `next` = the cursor to pass as `filters.cursor`. Legacy `jobs`, `sort` kept.
+(`lib/server/jobAdmin.js LIST_SELECT`). `total` = exact count for the filters.
 
 ### `job_detail` `{ job_id }` → `AdminOk` with `rows:[{ job, holders, history, suppressed, on_site }]` (+ the same fields at top level, legacy)
-### `job_edit` `{ job_id, patch }` → `AdminOk` (`fields: string[]`, `rows:[job]`, undoable). Legacy `job_update` keeps `changed: string[]`.
+### `job_edit` `{ job_id, patch }` (patch keys: lib/server/jobAdmin.js EDITABLE) → `AdminOk` (`fields: string[]`, `rows:[job]`, undoable). Legacy `job_update` keeps `changed: string[]`.
 ### `job_restore` `{ job_id }` → `AdminOk` (`changed:1`, `rows:[job]`).
 
 ### `purge_stale_jobs` `{}` → `AdminOk` job — "Clear stale"
@@ -343,7 +352,9 @@ Legal audit PDF / package: `POST /api/admin-company-audit-pdf|package` `{ compan
 Server-side search over every profile (email contains, or an exact user id). `pro` = an active `pro_until`.
 ### `user_detail` `{ user_id }` → `AdminOk` `rows:[UserRow & { ledger: [{ delta, reason, created_at }], applications: number|null, reports: number|null }]`
 ### `set_pro_window` `{ user_id, until: ISO-date | null }` → `AdminOk`
-Writes `ai_credits.pro_until` ONLY (never `balance`, never `pro`). `null` ends it now. Prior value in the audit row;
+Writes `ai_credits.pro_until` ONLY on a grant (never `balance`, `pro` or `comped`, never a purchase row — so a grant can
+never read as revenue). `null` ends it now; ending also clears an older grant's lifetime `pro` / `comped` flags (else the
+account would stay Pro). Prior value in the audit row;
 undoable. `rows:[UserRow]`. Touched `users, user:<id>, activity`.
 `set_pro` (legacy) `{ user_id, pro }` → maps to `set_pro_window` (`pro:true` → now + 30 days, `pro:false` → null);
 it never touches a balance.

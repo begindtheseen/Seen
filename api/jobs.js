@@ -1175,12 +1175,7 @@ async function handleAreaSearch(req, res, body) {
     if (!resp.ok) throw new Error(`area read ${resp.status}: ${(await resp.text()).slice(0, 160)}`);
     return resp.json();
   };
-  // The planner's estimate of a count (no table scan) — used to tell whether the coordinate backfill has run.
-  db.count = async (path) => {
-    const resp = await fetch(`${U}/rest/v1/${path}`, { headers: { ...headers, Prefer: 'count=estimated', Range: '0-0' } });
-    const m = String(resp.headers.get('content-range') || '').match(/\/(\d+)$/);
-    return m ? Number(m[1]) : NaN;
-  };
+
   try {
     const [suppressed, tenantNames] = await Promise.all([getSuppressedSet(U, headers), loadTenantNames(U, headers)]);
     const exclude = (row) => isSeedListing(row) || titleNamesNonUs(row.title) || (row.apply_url && suppressed.has(_normUrl(row.apply_url)));
