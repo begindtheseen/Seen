@@ -33,9 +33,9 @@
 develop_people: train, cross-train, upskill, onboard, orient, ramp up ; near: coach, mentor, teach, instruct, educate, develop, guide, groom
 lead_people: supervise, lead, manage, oversee, direct, head, run, captain, boss ; near: coordinate, guide, organize
 hire: hire, recruit, staff ; near: interview, source, screen, select, attract
-evaluate_people: evaluate, appraise, assess, review, rate, grade ; near: observe, monitor
+#  (fewer than 3 corpus instances, not shipped) evaluate_people: evaluate, appraise, assess, review, rate, grade ; near: observe, monitor
 schedule_people: schedule, roster, assign, deploy, allocate, dispatch ; near: plan, organize, coordinate
-motivate: motivate, engage, inspire, energize, rally, empower ; near: encourage, recognize, reward
+#  (fewer than 3 corpus instances, not shipped) motivate: motivate, engage, inspire, energize, rally, empower ; near: encourage, recognize, reward
 #  (fewer than 3 corpus instances, not shipped) discipline: discipline, counsel, correct, write up ; near: terminate, fire
 assist_people: assist, support, help, back up, aid ; near: cover for, relieve
 edges: coach => train, mentor => coach, mentor => develop, coach => develop, instruct => train, teach => train, cross-train => train, upskill => train, supervise => assign, manage => schedule
@@ -61,14 +61,14 @@ meet_deadline: meet, hit, make, keep, beat ; near: manage, track
 count_stock: count, cycle count, inventory, tally, take ; near: audit, reconcile, verify, check, scan
 receive: receive, unload, offload, check in, accept, intake ; near: process, sort, inspect
 stow: stock, restock, replenish, shelve, put away, stow, fill, refill, load in ; near: rotate, organize, face, front, display
-present_stock: face, front, merchandise, display, arrange, zone, set, recover, set up ; near: organize, price, tag
+#  (fewer than 3 corpus instances, not shipped) present_stock: face, front, merchandise, display, arrange, zone, set, recover, set up ; near: organize, price, tag
 pick_pack: pick, pull, select, pack, package, wrap, box, bag ; near: label, kit, sort, stage
 ship_load: ship, load, dispatch, send, palletize, stage ; near: route, schedule
 move_stock: move, transport, carry, lift, haul, deliver, transfer, relocate, convey, push, tow ; near: drive, unload, load
 manage_stock: manage, control, maintain, oversee, own ; near: track, monitor, plan, forecast
 #  (fewer than 3 corpus instances, not shipped) order_stock: order, reorder, purchase, buy, procure, requisition, source ; near: request, forecast
 #  (fewer than 3 corpus instances, not shipped) sell_stock: sell, upsell, cross-sell, promote, recommend, market ; near: display, demonstrate, merchandise
-price_stock: price, tag, label, mark down, ticket, sticker ; near: scan
+#  (fewer than 3 corpus instances, not shipped) price_stock: price, tag, label, mark down, ticket, sticker ; near: scan
 edges: cycle count => count, restock => stock, replenish => stock, haul => move, palletize => load
 
 @class problem: complaint, issue, problem, concern, escalation, dispute, conflict, ticket, incident, discrepancy, error, bug, defect, objection, grievance, outage, failure, malfunction, fault, glitch, exception, breakdown, roadblock, blocker, challenge, obstacle, case, claim, variance, shortage, mistake, root cause, crisis, emergency
@@ -241,12 +241,12 @@ process_pay: process, prepare, pay, issue, bill, invoice, post, code, run, enter
 collect_pay: collect, recover, chase, follow up on, receive ; near: process, reconcile
 edges: control => manage, contain => reduce, slash => reduce, cut => reduce, trim => reduce, reconcile => track, audit => track
 
-@class learner: student, learner, pupil, class, classroom, child, kid, youth, cohort, trainee, participant, scholar, group, camper, adult learner
-teach_learner: teach, instruct, educate, tutor, train, school, lecture, coach, mentor ; near: guide, support, engage, prepare, help
+#  (fewer than 3 corpus instances, not shipped) @class learner: student, learner, pupil, class, classroom, child, kid, youth, cohort, trainee, participant, scholar, group, camper, adult learner
+#  (fewer than 3 corpus instances, not shipped) teach_learner: teach, instruct, educate, tutor, train, school, lecture, coach, mentor ; near: guide, support, engage, prepare, help
 #  (fewer than 3 corpus instances, not shipped) assess_learner: assess, evaluate, grade, test, examine, mark, score, observe ; near: track, monitor, report on
 #  (fewer than 3 corpus instances, not shipped) supervise_learner: supervise, monitor, watch, oversee, chaperone, manage, care for ; near: guide, support, redirect
 #  (fewer than 3 corpus instances, not shipped) support_learner: support, help, assist, aid, accommodate, encourage, motivate, engage ; near: tutor, mentor, guide
-edges: tutor => teach, lecture => teach
+#  (fewer than 3 corpus instances, not shipped) edges: tutor => teach, lecture => teach
 
 @class goods_made [broad]: part, component, product, unit, assembly, item, piece, good, batch, sample, frame, cabinet, wire harness, harness, circuit board, board, weld, casting, mold, pipe, fitting, panel, structure, wall, foundation, form, concrete, drywall, framing, roof, floor, fixture, furniture, sign, garment, print, metal, steel, lumber
 assemble_goods: assemble, build, put together, construct, fabricate, make, manufacture, produce, form, frame, erect, weld, solder, mold, cast, machine, cut, bend ; near: install, finish, inspect, test, package, repair

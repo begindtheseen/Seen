@@ -238,3 +238,29 @@ because `sameWord` said false.
 
 **Field match.** `relation(a, b)` gives same / ladder / related / different with a plain `why` you may show; `group.majorTitle` names the
 field ("Healthcare Support"). Prefer codes when you already have them (cheaper, no title ambiguity).
+
+## Round 5 — the same act on the same kind of thing (`lib/text/sameAct.js`)
+
+A verb means the same act only for the kind of thing it acts on: "run" a store is "manage" a store, "run" tests is not.
+`scripts/text/act-families.txt` (→ `lib/text/data/actFamilies.json`, `node scripts/text/build-act-families.mjs`) groups verbs
+into families **by object class** (27 classes, 118 families, each seen at least 3 times in two-thirds of the (verb, object)
+pairs mined from 959 postings and the résumé fixtures; the other third was held out unseen). Each family has same-act members
+and "near" members; one-way edges (coach ⇒ train; train ⇏ coach; exceed ⇒ meet; resolve ⇒ handle) may join families of a
+class; `[broad]` classes (systems, projects, documents…) never call two different things in them the same thing; `@link`
+lines mark related families of different classes (a guess). Nouns are compared with tradeTalk's `sameThing`, whose new
+`general` field holds everyday equals in every field ("new hires" = "new associates"; CSAT ⇒ "customer feedback scores").
+
+```js
+import { sameAct, readActs } from '../text/sameAct.js';
+sameAct('Trained 12 new associates on the register', 'Onboard and train new hires')  // → same true, exact
+sameAct('Coached associates', 'train associates')     // → same true, close (one-way edge holds)
+sameAct('Trained associates', 'coach associates')     // → same false (edge read backwards)
+sameAct('Maintained equipment', 'maintain records')   // → same false (different object class)
+sameAct('Handled complaints', 'resolve complaints')   // → same false: handling does not show resolving
+sameAct('Unloaded trucks', 'Load trucks')             // → same true, guess (near) — a tie-break only
+```
+
+Trust contract: **exact** = use as fact; **close** = use, a contradicting line wins (scale is not judged: "supervised 15" vs
+"a team of 200+" is close); **guess** = tie-break only; **false** = this act pair must not count as proof — it is NOT a
+reason to mark a requirement missing (on the shared verdict sets 15 gold proof lines got a "no" from one reading of the
+line); **null** = the table does not know. Health: `act_families` in `knowledgeHealth()`.
