@@ -254,7 +254,8 @@ function DockLine({ entry, jobs, onDismiss }: { entry: DockEntry; jobs: Job[]; o
   if (job) {
     const ok = job.status === 'done'
     const st: ActionState = ok
-      ? { ...entry.state, status: 'done', result: { ...entry.state.result!, message: job.message, undo: undefined } }
+      // The server's own final sentence for the Undo ("1,040 reports are back in the review queue.") when it sent one.
+      ? { ...entry.state, status: 'done', result: { ...entry.state.result!, message: job.last_message || job.message, undo: undefined } }
       : { ...entry.state, status: 'done', error: { ok: false, code: job.resumable ? 'unknown_outcome' : 'upstream', retryable: !!job.resumable, error: job.message } }
     return <ResultLine state={st} onDismiss={onDismiss} />
   }

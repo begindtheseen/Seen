@@ -49,7 +49,7 @@ function YesNo({ onYes, onNo, onSkip }: { onYes: () => void; onNo: () => void; o
   )
 }
 
-function StatementRow({ r, answer, answerLine, onAnswer, quoted, dense = false }: { r: Row; answer?: Answer; answerLine?: string; onAnswer?: OnAnswer; quoted?: Set<string>; dense?: boolean }) {
+function StatementRow({ r, answer, answerLine, onAnswer, quoted, dense = false, saidBelow = false }: { r: Row; answer?: Answer; answerLine?: string; onAnswer?: OnAnswer; quoted?: Set<string>; dense?: boolean; saidBelow?: boolean }) {
   // in a partial list a "same line as … above" reference can point at a row that is not on screen: quote it instead
   const ref = r.sameAs && (!quoted || quoted.has(r.line.toLowerCase())) ? r.sameAs : ''
   if (quoted && r.line) quoted.add(r.line.toLowerCase())
@@ -62,7 +62,7 @@ function StatementRow({ r, answer, answerLine, onAnswer, quoted, dense = false }
     <li className={dense ? s.dense : s.row} data-state={r.state} data-testid="fit-row" data-id={r.id}>
       {!dense && <StateMark state={r.state} />}
       <p className={s.text}>{dense && <><StateMark state={r.state} />{' '}</>}{r.state === 'ask' ? r.question : r.text}{r.preferred && r.state !== 'ask' ? <span className={s.tag}> · preferred</span> : null}</p>
-      {r.byYou && (
+      {r.byYou && !saidBelow && (
         <p className={s.said} data-testid="fit-said">
           <span>{r.state === 'not_shown' ? `You said no to: “${r.text}”` : (answerLine || r.candidate?.line) ? `You said “${clip(answerLine || r.candidate?.line || '', 160)}” shows it.` : `You said yes to: “${r.text}”`}</span>
           {onAnswer && <button type="button" className={s.change} onClick={() => onAnswer(r.id, null)}>Change</button>}
@@ -118,6 +118,7 @@ export default function FitRead({ data, note, compact = false, brief = false, an
   // moves a row (or anything above the person's finger) to another part of the screen
   const panelIds = useRef<Set<string>>(new Set())
   const panelOrder = useRef<Map<string, number>>(new Map())
+  const frozenTop = useRef<string[] | null>(null)
   const v = data.verdict || null
   const diff = differentField(data.field_match || null)
   const model = fitGroups(data)
@@ -167,7 +168,13 @@ export default function FitRead({ data, note, compact = false, brief = false, an
   const firstPass = model ? (topRows(model, Math.max(3, 5 - leadGates.length), gates.map((g) => g.statementId)) as Row[]) : []
   const asking3 = firstPass.filter((r) => r.candidate && !r.byYou).length
   // rows that live in the questions panel are not repeated (or pinned) in the first list
-  const top = (model && asking3 ? (topRows(model, Math.max(3, 5 - leadGates.length - Math.ceil(asking3 / 2)), gates.map((g) => g.statementId)) as Row[]) : firstPass).filter((r) => !(r.byYou && panelIds.current.has(r.id)))
+  const computedTop = model && asking3 ? (topRows(model, Math.max(3, 5 - leadGates.length - Math.ceil(asking3 / 2)), gates.map((g) => g.statementId)) as Row[]) : firstPass
+  // once the person starts answering, the first list keeps the rows it had: an answer never adds, drops or reorders a
+  // row ABOVE the question they are tapping (no layout shift); a fresh visit computes it again
+  const answeredAny = Object.keys(answers || {}).length > 0
+  if (!answeredAny || !frozenTop.current) frozenTop.current = computedTop.map((r) => r.id)
+  const byIdRow = new Map(allRows.map((r) => [r.id, r]))
+  const top = answeredAny ? frozenTop.current.map((id) => byIdRow.get(id)).filter((r): r is Row => !!r) : computedTop
   const quoted = new Set<string>()
   const lead = (
     <>
@@ -175,7 +182,7 @@ export default function FitRead({ data, note, compact = false, brief = false, an
       {model && top.length > 0 && !open && (
         <div className={s.group} data-group="top">
           <p className={s.gHead}><span className={s.gLabel}>What matters most</span></p>
-          <ul className={s.denseList}>{top.map((r) => <StatementRow key={r.id} r={r} quoted={quoted} dense answer={answers?.[r.id]} answerLine={answerLines?.[r.id]} onAnswer={onAnswer} />)}</ul>
+          <ul className={s.denseList}>{top.map((r) => <StatementRow key={r.id} r={r} quoted={quoted} dense answer={answers?.[r.id]} answerLine={answerLines?.[r.id]} onAnswer={onAnswer} saidBelow={asking && panelIds.current.has(r.id)} />)}</ul>
         </div>
       )}
       {model && asks.length > 0 && !open && onAnswer && (
