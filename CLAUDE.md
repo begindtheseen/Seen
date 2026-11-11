@@ -143,6 +143,13 @@ Editor — comments stripped, one block per migration, and say which to run firs
   Jobs sheet). Migrations `20261111100000_admin_core`, `…110000_admin_rpcs`, `…120000_admin_health`,
   `…130000_admin_dup_checks` NOT applied; verified ONLY on the rig (fake PostgREST with the 1,000-row cap and 8 s
   statement budget), never on real Postgres.
+- **Admin acceptance (independent judge, build 4b7dc58, rig only):** "it just works — yes, with two conditions". Approve
+  all right at 140 / 340 / 1,240; every sheet leaves by ✕ / Esc / outside tap / phone Back (52 combinations); no
+  reload after any action; forced 500 / 504 / empty / 401 answers end in the truth, once. Condition 1 fixed after
+  (58c7f0e): a job a reload interrupted read the server ONCE, while its last round was still running there, and then
+  said "0 deleted, 1,300 left" beside an empty table — it now re-reads every 5 s (15 times, `RELOAD_RECHECK*` in
+  core/jobs.ts) until it settles. Condition 2 OPEN: a 1,240-report approve shows no count while the write runs (43 s at
+  250 ms per DB call; 16 s at 60 ms). Also open: on the phone a result shows inline AND in the dock.
 - **Rules that came out of it:** a tool states nothing the résumé does not state — a near-miss is "the closest I have
   done", never proof; a role header never proves a duty; a different-field posting is not charged
   (`questionsNote` / `DIFFERENT_FIELD_NOTE`); the Insights tip reads the signed-in person's résumé for their answer
