@@ -11,7 +11,7 @@
 import type { AdminErr, AdminOk } from '../contract.ts'
 import { isUnknownOutcome, type AdminApi, type ApiResult } from './api.ts'
 import type { CacheTx, QueryCache } from './cache.ts'
-import type { JobManager } from './jobs.ts'
+import { recomputeSpec, type JobManager, type Recompute } from './jobs.ts'
 
 export type ActionStatus = 'idle' | 'running' | 'done' | 'error'
 
@@ -31,6 +31,8 @@ export type ActionState = {
   checking?: boolean
   /** The request_id of this line's Undo press, reused when the Undo is asked again ("Check again"). */
   undoRid?: string
+  /** A quiet follow-up job this result started (company scores queued by a bulk Undo): <ResultLine followUp={job}/>. */
+  followJobId?: string
 }
 
 /** The longest an action or an Undo waits for one answer: a bulk Undo can take ~25–40 s on the server. */
@@ -232,7 +234,9 @@ export function createActionRunner(deps: {
       cache.invalidate([...touched])
       const message = rounds > 1 ? `${total.toLocaleString('en-US')} rows put back.${res.complete === false ? ` ${(res.remaining ?? 0).toLocaleString('en-US')} still to undo — press Undo again to continue.` : ''}` : (undoSentence(res.message) || 'Undone.')
       const unfinished = res.complete === false
-      setState(target, { status: 'done', target, args: s.args, result: { ...res, changed: total, message, undo: unfinished ? u : undefined }, undone: !unfinished })
+      const follow = deps.jobs ? recomputeSpec((res as { recompute?: Recompute }).recompute as Recompute) : null
+      const followJobId = follow ? deps.jobs!.start(follow) : undefined
+      setState(target, { status: 'done', target, args: s.args, result: { ...res, changed: total, message, undo: unfinished ? u : undefined }, undone: !unfinished, followJobId })
     } else {
       // The original result stays (its Undo button too); the line says why the Undo failed.
       setState(target, { ...s, undoing: false, checking: false, undoRid, error: res })

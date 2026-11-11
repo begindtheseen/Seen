@@ -684,3 +684,29 @@ test('round 10: a bulk Undo is one press — one request_id on every round, roun
   assert.equal(jobs.get(jid).changed, 1040, 'replayed round counted once')
   assert.equal(JOB_STATUS_KIND.undo, 'undo')
 })
+
+test('round 11: an Undo whose answer queued company scores starts the same recompute_queue_drain follow-up', async () => {
+  const sent = []
+  const api = async (action, body) => {
+    sent.push({ action, body: { ...body } })
+    if (action === 'review_held') return toResult(200, JSON.stringify({ ok: true, changed: 1040, message: 'Approved 1,040.', undo: { action: 'undo', args: { audit_id: '88' }, label: 'Undo' } }))
+    if (action === 'undo') return toResult(200, JSON.stringify({ ok: true, changed: 1040, complete: true, remaining: 0, message: '1,040 reports are back in the review queue.', recompute: { queued: 41, remaining: 41, mode: 'cursor', cursor: 'rq1' }, touched: ['held'] }))
+    return toResult(200, JSON.stringify({ ok: true, changed: 41, remaining: 0, complete: true, message: 'Updated 41 company scores.' }))
+  }
+  const jobs = createJobManager({ api, sleep: async () => {} })
+  const r = createActionRunner({ api, cache: new QueryCache(), action: 'review_held', jobs, sleep: async () => {} })
+  await r.run({ ids: ['*'] }); await r.undo()
+  const st = r.state()
+  assert.equal(st.result.message, '1,040 reports are back in the review queue.', 'the server sentence')
+  assert.ok(st.followJobId, 'a follow-up job was started')
+  await until(() => jobs.get(st.followJobId).status === 'done')
+  const drain = sent.find((c) => c.action === 'recompute_queue_drain')
+  assert.equal(drain.body.cursor, 'rq1', 'the cursor is passed when the queue table is absent')
+  assert.equal(jobs.get(st.followJobId).total, 41)
+  // same spec as Review's own follow-up → a running one is reused, never a second loop
+  assert.equal(jobs.byKey('recompute_queue_drain', { cursor: 'rq1' }).id, st.followJobId)
+  // no queued scores → no follow-up
+  const r2 = createActionRunner({ api: async (a) => toResult(200, JSON.stringify(a === 'undo' ? { ok: true, changed: 1, complete: true, message: 'Back.', recompute: { queued: 0, remaining: 0 } } : { ok: true, changed: 1, message: 'x', undo: { action: 'undo', args: { audit_id: '9' }, label: 'Undo' } })), cache: new QueryCache(), action: 'x', jobs })
+  await r2.run({}); await r2.undo()
+  assert.equal(r2.state().followJobId, undefined)
+})

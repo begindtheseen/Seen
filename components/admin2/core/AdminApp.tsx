@@ -257,9 +257,11 @@ function DockLine({ entry, jobs, onDismiss }: { entry: DockEntry; jobs: Job[]; o
       // The server's own final sentence for the Undo ("1,040 reports are back in the review queue.") when it sent one.
       ? { ...entry.state, status: 'done', result: { ...entry.state.result!, message: job.last_message || job.message, undo: undefined } }
       : { ...entry.state, status: 'done', error: { ok: false, code: job.resumable ? 'unknown_outcome' : 'upstream', retryable: !!job.resumable, error: job.message } }
-    return <ResultLine state={st} onDismiss={onDismiss} />
+    const follow = job.follow_job_id ? jobs.find((j) => j.id === job.follow_job_id) : undefined
+    return <ResultLine state={st} onDismiss={onDismiss} followUp={follow} />
   }
-  return <ResultLine state={entry.state} onUndo={entry.onUndo} onRetry={entry.onRetry} onDismiss={onDismiss} />
+  const follow = entry.state.followJobId ? jobs.find((j) => j.id === entry.state.followJobId) : undefined
+  return <ResultLine state={entry.state} onUndo={entry.onUndo} onRetry={entry.onRetry} onDismiss={onDismiss} followUp={follow} />
 }
 
 function SectionSlot({ active, children }: { active: boolean; children: ReactNode }) {

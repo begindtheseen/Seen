@@ -80,6 +80,10 @@ export type Job = AdminJobState & {
   detail?: { field: string; noun: string }
   detail_total?: number
   status_kind?: string
+  /** The follow-up job this job started when it finished (company scores queued by a bulk Undo). */
+  follow_job_id?: string
+  /** The last round's `recompute` (scores the action QUEUED rather than recomputed inline). */
+  recompute?: Recompute
   /** This job IS an Undo of that audit id (finishing it clears every line still offering that Undo). */
   undo_of?: string
   /** After a reload: the server is being asked what was really done before anything is said. */
@@ -143,6 +147,14 @@ export function jobSummary(j: Job, lastMessage = ''): string {
     default:
       return `${j.label}… ${jobProgressText(j)}`
   }
+}
+
+export type Recompute = { queued?: number; remaining?: number; mode?: string; cursor?: string }
+
+/** The follow-up for queued company scores: the SAME job a bulk decision runs (Review starts the same spec). */
+export function recomputeSpec(r: Recompute): JobSpec | null {
+  if (!r || !(typeof r.remaining === 'number' && r.remaining > 0)) return null
+  return { action: 'recompute_queue_drain', args: r.cursor ? { cursor: r.cursor } : {}, label: 'Updating company scores', past: 'Updated', noun: 'company scores', total: r.remaining }
 }
 
 export type JobStorage = { get: () => string | null; set: (v: string) => void }
@@ -295,11 +307,15 @@ export function createJobManager(deps: {
         cursor: res.cursor || undefined,
         skipped,
         last_message: res.message || cur.last_message,
+        ...((res as { recompute?: Recompute }).recompute ? { recompute: (res as { recompute?: Recompute }).recompute } : {}),
         ...undoAfter(cur, res),
       }
       if (res.complete !== false) {
         const done: Job = { ...next, status: 'done', resumable: false, ended_at: new Date(now()).toISOString() }
         done.message = jobSummary(done, lastMessage)
+        // Scores the last round queued are brought up to date without the person doing anything.
+        const follow = done.recompute ? recomputeSpec(done.recompute) : null
+        if (follow) done.follow_job_id = mgr.start(follow)
         jobs.set(id, done); persist(); emit()
         if (done.undo_of) deps.undoBus?.emit(done.undo_of)
         return
