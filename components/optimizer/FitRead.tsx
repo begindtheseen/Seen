@@ -7,7 +7,7 @@
 // never writes an answer into the résumé. Every word is the server's (fitRead.js only groups and orders); an
 // answer with no `statements` (an older cached response) falls back to the verdict's requirement list.
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import Icon from '@/components/ui/Icon'
 import type { IconName } from '@/components/ui/Icon'
 import { RequirementsView, type Verdict, type RequirementRow, type ConstraintRow } from './Verdict'
@@ -59,7 +59,7 @@ function StatementRow({ r, answer, answerLine, onAnswer, quoted, dense = false }
   // on the first screen (dense) the close-line question is asked in the questions panel below, not inline
   const askCandidate = !!r.candidate && !r.byYou && answer !== 'no' && !dense
   return (
-    <li className={dense ? s.dense : s.row} data-state={r.state} data-testid="fit-row">
+    <li className={dense ? s.dense : s.row} data-state={r.state} data-testid="fit-row" data-id={r.id}>
       {!dense && <StateMark state={r.state} />}
       <p className={s.text}>{dense && <><StateMark state={r.state} />{' '}</>}{r.state === 'ask' ? r.question : r.text}{r.preferred && r.state !== 'ask' ? <span className={s.tag}> · preferred</span> : null}</p>
       {r.byYou && (
@@ -114,6 +114,10 @@ function Group({ g, answers, answerLines, onAnswer }: { g: { key: string; rows: 
 export default function FitRead({ data, note, compact = false, brief = false, answers, answerLines, onAnswer }: { data: FitData; note?: string; compact?: boolean; brief?: boolean; answers?: Answers; answerLines?: Record<string, string>; onAnswer?: OnAnswer }) {
   const [open, setOpen] = useState(false)
   const [asking, setAsking] = useState(false)
+  // every row that has been in the questions panel stays there for this visit — answered or not — so an answer never
+  // moves a row (or anything above the person's finger) to another part of the screen
+  const panelIds = useRef<Set<string>>(new Set())
+  const panelOrder = useRef<Map<string, number>>(new Map())
   const v = data.verdict || null
   const diff = differentField(data.field_match || null)
   const model = fitGroups(data)
@@ -122,8 +126,12 @@ export default function FitRead({ data, note, compact = false, brief = false, an
   const sentence = diff ? diff.sentence : verdictSentence(v)
   const askRows = model ? ((model.groups.find((g) => g.key === 'ask') || { rows: [] }).rows as Row[]) : []
   // the questions panel: what only the person can say, and every "Closest line we found — does this show it?"
-  const candRows = model ? (model.groups.filter((g) => g.key !== 'ask').flatMap((g) => g.rows) as Row[]).filter((r) => r.candidate && !r.byYou && answers?.[r.id] !== 'no') : []
-  const asks = [...askRows, ...candRows]
+  const allRows = model ? (model.groups.flatMap((g) => g.rows) as Row[]) : []
+  const candRows = allRows.filter((r) => !askRows.includes(r) && ((r.candidate && !r.byYou && answers?.[r.id] !== 'no') || panelIds.current.has(r.id)))
+  // a row the server moved out of the ask group after an answer ("You said yes") stays where it was asked
+  const keptAsk = allRows.filter((r) => !askRows.includes(r) && !candRows.includes(r) && panelIds.current.has(r.id))
+  const asks = [...askRows, ...candRows, ...keptAsk].sort((a, b) => (panelOrder.current.get(a.id) ?? 1e6) - (panelOrder.current.get(b.id) ?? 1e6))
+  for (const r of asks) { panelIds.current.add(r.id); if (!panelOrder.current.has(r.id)) panelOrder.current.set(r.id, panelOrder.current.size) }
   const answered = asks.filter((r) => answers?.[r.id]).length
   const gateList = (list: typeof gates) => list.length > 0 && (
     <div className={s.group} data-group="gates">
@@ -158,7 +166,8 @@ export default function FitRead({ data, note, compact = false, brief = false, an
   // a close-line question takes two rows' room: the first screen holds fewer rows when it carries them
   const firstPass = model ? (topRows(model, Math.max(3, 5 - leadGates.length), gates.map((g) => g.statementId)) as Row[]) : []
   const asking3 = firstPass.filter((r) => r.candidate && !r.byYou).length
-  const top = model && asking3 ? (topRows(model, Math.max(3, 5 - leadGates.length - Math.ceil(asking3 / 2)), gates.map((g) => g.statementId)) as Row[]) : firstPass
+  // rows that live in the questions panel are not repeated (or pinned) in the first list
+  const top = (model && asking3 ? (topRows(model, Math.max(3, 5 - leadGates.length - Math.ceil(asking3 / 2)), gates.map((g) => g.statementId)) as Row[]) : firstPass).filter((r) => !(r.byYou && panelIds.current.has(r.id)))
   const quoted = new Set<string>()
   const lead = (
     <>

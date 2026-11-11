@@ -86,3 +86,12 @@ session (sign in → replay) and /admin/legacy checked against A1's real handler
 - **Counts still being checked:** `FilterChips` option `checking: { checked, total }` shows "checking N more…" instead of a
   number; `<BulkBar checking={…}>` says it and disables every button inside until the count is final (`checkingText`,
   `isChecking` from core/words.ts or ui/bits.tsx).
+
+## Round 10 (server round 10)
+- Undo sentences are final ("140 reports are back in the review queue."); lines print "Undone · <message>". The core's
+  `undoSentence` strip is now a no-op kept as a guard. **Review:** delete your own "Undid it" stripping (your files).
+- A bulk Undo is a job with ONE `request_id` per Undo press on every round (`round` 1, 2, 3…); a replay's
+  `recorded_changed` counts once; `already_undone: true` is done; after a reload `job_status { kind: 'undo', audit_id }`
+  (`JOB_STATUS_KIND.undo`). The dock shows "Undoing · Putting them back… 420 of 1,040". A single-row Undo is one call.
+- Held counts (`counts.clear_positives`, `checked {n, of, complete, label}`) are Review's to render; use the core's
+  `checking` props on FilterChips / BulkBar and show `checked.label` until `complete`.

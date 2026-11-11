@@ -249,7 +249,7 @@ function Shell({ username: initialUser, onSignedOut }: { username: string; onSig
 function DockLine({ entry, jobs, onDismiss }: { entry: DockEntry; jobs: Job[]; onDismiss: () => void }) {
   const job = entry.state.jobId ? jobs.find((j) => j.id === entry.state.jobId) : undefined
   if (job && (job.status === 'running' || job.status === 'cancelling' || job.checking)) {
-    return <ResultLine state={{ ...entry.state, status: 'running', undoing: false, checking: false }} runningText={`Undoing… ${jobProgressText(job)}`} />
+    return <ResultLine state={{ ...entry.state, status: 'running', undoing: true, checking: false }} undoingProgress={`Putting them back… ${jobProgressText(job)}`} />
   }
   if (job) {
     const ok = job.status === 'done'

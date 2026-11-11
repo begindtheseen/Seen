@@ -79,3 +79,8 @@
 .already { display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-4); background: var(--surface-1); border: 1px solid var(--good-line); border-radius: var(--r-card); min-width: 0; }
 .alreadyText { display: flex; gap: var(--sp-2); align-items: flex-start; margin: 0; font-size: var(--fs-body); color: var(--text-1); line-height: var(--lh-body); overflow-wrap: anywhere; }
 .alreadyText svg { flex-shrink: 0; margin-top: 4px; color: var(--good-text); }
+
+/* the composer's one sentence when an answer needs more (caution: the icon and the word, never colour alone) */
+.problem { display: flex; gap: var(--sp-1); align-items: flex-start; margin: 0; font-size: var(--fs-sm); color: var(--text-2); line-height: var(--lh-body); overflow-wrap: anywhere; }
+.problem svg { flex-shrink: 0; margin-top: 2px; color: var(--caution-text); }
+.problem b { font-weight: 600; color: var(--caution-text); }

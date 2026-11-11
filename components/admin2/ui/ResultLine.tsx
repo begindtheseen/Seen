@@ -36,6 +36,8 @@ export type ResultLineProps = {
    * line is REPLACED by the finished sentence — the "still updating" part is never left on screen.
    */
   followUp?: Job
+  /** While an Undo runs as a job: its live progress ("Undoing… 420 of 1,040"). The word stays "Undoing". */
+  undoingProgress?: string
 }
 
 /** What the line says while the Undo runs: never the original action's "Approving…". Pure for the test. */
@@ -51,7 +53,7 @@ export function withFollowUp(message: string, job: Job | undefined): string {
   return `${head}. ${job.message}`
 }
 
-export default function ResultLine({ state, onUndo, onRetry, onDismiss, skipLinks, runningText, followUp }: ResultLineProps) {
+export default function ResultLine({ state, onUndo, onRetry, onDismiss, skipLinks, runningText, followUp, undoingProgress }: ResultLineProps) {
   if (state.status === 'idle') return null
   const running = state.status === 'running' || state.undoing
   const err = state.error
@@ -69,7 +71,7 @@ export default function ResultLine({ state, onUndo, onRetry, onDismiss, skipLink
         {word}
       </span>
       <span className={styles.lineText}>
-        {running ? (state.undoing ? (state.checking ? 'No answer yet — asking the server whether the Undo went through…' : undoingText(state)) : state.checking ? 'No answer yet — asking the server whether it went through…' : (runningText || 'Working…')) : failed ? (
+        {running ? (state.undoing ? (state.checking ? 'No answer yet — asking the server whether the Undo went through…' : (undoingProgress || undoingText(state))) : state.checking ? 'No answer yet — asking the server whether it went through…' : (runningText || 'Working…')) : failed ? (
           <>
             {err?.error}
             {err && (err.changed || 0) > 0 ? ` ${fmt(err.changed!)} ${err.changed === 1 ? 'row was' : 'rows were'} changed before it stopped.` : ''}

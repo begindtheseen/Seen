@@ -152,36 +152,45 @@ function ChangeCard({ c, v, stuck, readOnly = false }: { c: Change; v: PaidVersi
 }
 
 const KIND_OF_Q: Record<string, string> = { detail: 'A detail only you know', number: 'A number for one of your lines', tool: 'A tool they name', credential: 'A credential they ask for', duty: 'Work they ask for' }
-// The person's words are kept as they type (on every change — a pause, a tab switch or a reload loses nothing) but they
-// become a résumé line ONLY when the person confirms the composed line ("Add this line"). Skip puts the question away.
-function QuestionCard({ qn, v }: { qn: Question; v: PaidVersion }) {
+// ONE question card for every place that asks (the sheet's paid result, /resume, Studio's Tailor panel). Each place
+// gives it an adapter (`QuestionIO`) over its own state; the card itself only asks, shows the ONE composer's answer
+// (lib/resume/tailor/questions.js composeAnswer: a line, or one sentence saying what it needs) and waits for the person
+// to confirm. Nothing typed becomes a résumé line until "Add this line"; Skip puts the question away.
+export interface QuestionIO {
+  draft: string
+  setDraft: (t: string) => void
+  /** the confirmed line, when the person added one */
+  added: string | null
+  add: (line: string, raw: string) => void
+  remove: () => void
+  skipped: boolean
+  skip: () => void
+  unskip: () => void
+}
+export function QuestionCard({ qn, io }: { qn: Question; io: QuestionIO }) {
   const kind = questionKind(qn)
   const prompt = promptFor(qn)
-  const existing = v.answered.find((a) => a.id === qn.id)
-  const answer = v.drafts[qn.id] || ''
-  const setAnswer = (t: string) => v.setDrafts((d) => ({ ...d, [qn.id]: t }))
-  // a line with two blanks ("Do [number] cycle counts [a shift / a week]") needs the number AND how often
+  const answer = io.draft
   const slots = (String(qn.template || '').match(/\[[^\]]+\]/g) || []).length
+  // every answer goes to the composer — no second opinion here about what counts as an answer
   const composed = answer.trim() ? composeAnswer(prompt as Record<string, unknown>, answer) : { line: '', problem: null as string | null }
   const line = composed.line
-  const add = () => { if (!line) return; v.setAnswered((xs) => [...xs.filter((x) => x.id !== qn.id), { id: qn.id, itemId: qn.itemId, bulletId: qn.bulletId, kind: qn.kind === 'detail' ? 'gap' : qn.kind, answerKind: prompt.answerKind, line }]) }
-  const remove = () => v.setAnswered((xs) => xs.filter((x) => x.id !== qn.id))
   const where = qn.role ? `${qn.role}${qn.company ? ` · ${qn.company}` : ''}` : ''
-  if (v.skipped.includes(qn.id)) return (
+  if (io.skipped) return (
     <li id={`chg-q:${qn.id}`} className={s.card} data-testid="question-card" data-kind={kind} data-skipped="1">
       <p className={s.why}>Skipped: {qn.question}</p>
-      <div><button type="button" className={s.toggle} onClick={() => v.setSkipped((xs) => xs.filter((x) => x !== qn.id))}>Answer it after all</button></div>
+      <div><button type="button" className={s.toggle} onClick={io.unskip}>Answer it after all</button></div>
     </li>
   )
   return (
     <li id={`chg-q:${qn.id}`} className={s.card} data-testid="question-card" data-kind={kind} data-slot={qn.slot || undefined}>
       <p className={s.kind}>{KIND_OF_Q[kind]}</p>
       {where && <p className={s.where}>{kind === 'credential' ? 'Goes under Certifications' : where}</p>}
-      {existing ? (
+      {io.added ? (
         <>
-          <p className={s.after}>{existing.line}</p>
+          <p className={s.after}>{io.added}</p>
           <p className={s.why}>Added to your version{kind === 'number' ? ' in place of the line it completes' : ''}.</p>
-          <div><button type="button" className={s.toggle} onClick={remove}>Take it out</button></div>
+          <div><button type="button" className={s.toggle} onClick={io.remove}>Take it out</button></div>
         </>
       ) : (
         <>
@@ -191,24 +200,40 @@ function QuestionCard({ qn, v }: { qn: Question; v: PaidVersion }) {
               <input autoComplete="off" className={s.input} value={answer} maxLength={kind === 'number' ? 60 : 160}
                 inputMode={kind === 'number' && qn.slot === 'insert' && slots < 2 ? 'decimal' : 'text'}
                 placeholder={kind === 'number' ? (qn.slot === 'insert' ? (slots > 1 ? 'The number, and how often' : 'The number') : 'The number and what it counts') : kind === 'tool' ? 'Where you used it, and for what' : 'In your own words'}
-                onChange={(e) => setAnswer(e.target.value)} data-testid="question-input" />
+                onChange={(e) => io.setDraft(e.target.value)} data-testid="question-input" />
             )}
           </label>
           {qn.statement && kind === 'detail' && <p className={s.why}>From the posting: “{q(qn.statement, 200)}”</p>}
-          {kind === 'number' && qn.template && <p className={s.why}>Your line becomes: “{line || blankLine(qn.template)}”</p>}
-          {kind !== 'number' && kind !== 'credential' && line && <p className={s.after} data-testid="question-line">Your line would read: “{line}”</p>}
-          {answer.trim() && !line && <p className={s.why}>{composed.problem || (kind === 'number' ? 'Include the number itself, in digits.' : 'Start with what you did, in a few words.')}</p>}
+          {kind === 'number' && qn.template && !answer.trim() && <p className={s.why}>Your line becomes: “{blankLine(qn.template)}”</p>}
+          {line && <p className={s.after} data-testid="question-line">Your line would read: “{line}”</p>}
+          {answer.trim() && !line && composed.problem && <p className={s.problem} data-testid="question-problem"><Icon name="triangle-alert" size={14} label="Needs more" /><span><b>Needs more:</b> {composed.problem}</span></p>}
           {qn.why && kind !== 'detail' && <p className={s.why}>{qn.why}</p>}
           <div className={s.qActions}>
             {kind === 'credential'
-              ? <button type="button" className={s.toggle} onClick={() => { const l = composeAnswer(prompt as Record<string, unknown>, 'yes').line; if (l) v.setAnswered((xs) => [...xs, { id: qn.id, kind: qn.kind, answerKind: 'credential', line: l }]) }} data-testid="question-yes">Yes, I hold it — add it</button>
-              : <button type="button" className={s.toggle} disabled={!line} onClick={add} data-testid="question-add">Add this line</button>}
-            <button type="button" className={s.toggle} onClick={() => v.setSkipped((xs) => [...xs.filter((x) => x !== qn.id), qn.id])} data-testid="question-skip">Skip</button>
+              ? <button type="button" className={s.toggle} onClick={() => { const l = composeAnswer(prompt as Record<string, unknown>, 'yes').line; if (l) io.add(l, 'yes') }} data-testid="question-yes">Yes, I hold it — add it</button>
+              : <button type="button" className={s.toggle} disabled={!line} onClick={() => { if (line) io.add(line, answer) }} data-testid="question-add">Add this line</button>}
+            <button type="button" className={s.toggle} onClick={io.skip} data-testid="question-skip">Skip</button>
           </div>
         </>
       )}
     </li>
   )
+}
+
+/** The paid result's adapter: drafts / skips / confirmed lines kept in the person's version (usePaidVersion). */
+function paidIO(qn: Question, v: PaidVersion): QuestionIO {
+  const prompt = promptFor(qn)
+  const existing = v.answered.find((a) => a.id === qn.id)
+  return {
+    draft: v.drafts[qn.id] || '',
+    setDraft: (t) => v.setDrafts((d) => ({ ...d, [qn.id]: t })),
+    added: existing ? existing.line : null,
+    add: (line) => v.setAnswered((xs) => [...xs.filter((x) => x.id !== qn.id), { id: qn.id, itemId: qn.itemId, bulletId: qn.bulletId, kind: qn.kind === 'detail' ? 'gap' : qn.kind, answerKind: prompt.answerKind, line }]),
+    remove: () => v.setAnswered((xs) => xs.filter((x) => x.id !== qn.id)),
+    skipped: v.skipped.includes(qn.id),
+    skip: () => v.setSkipped((xs) => [...xs.filter((x) => x !== qn.id), qn.id]),
+    unskip: () => v.setSkipped((xs) => xs.filter((x) => x !== qn.id)),
+  }
 }
 
 /** What the first lines already show — the reassurance a strong fit paid for (paid.js `already_right`). */
@@ -239,7 +264,7 @@ export function QuestionList({ questions, v }: { questions: Question[]; v: PaidV
   return (
     <section className={s.section} aria-label="Questions only you can answer">
       <h3 className={s.h3}>{qs.length === 1 ? 'One question only you can answer' : `${qs.length} questions only you can answer`}</h3>
-      <ol className={s.list}>{qs.map((x) => <QuestionCard key={x.id} qn={x} v={v} />)}</ol>
+      <ol className={s.list}>{qs.map((x) => <QuestionCard key={x.id} qn={x} io={paidIO(x, v)} />)}</ol>
     </section>
   )
 }

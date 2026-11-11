@@ -23,13 +23,14 @@ import { needsSignIn, outOfCredits } from '@/lib/toolAuth.js'
 import FitRead, { type FitData, type Answer } from '@/components/optimizer/FitRead'
 import { useConfirmations, type Confirmed } from '@/components/optimizer/useConfirmations'
 import { serializeToText } from '@/lib/resume/engine-client'
-import { ChangeList, BlockedResult, ResultTopLine, usePaidVersion, type Tailored, type Charge, type Blocked } from '@/components/optimizer/PaidResult'
+import { ChangeList, BlockedResult, ResultTopLine, usePaidVersion, QuestionCard, AlreadyRightBlock, type Tailored, type Charge, type Blocked, type AlreadyRight, type Question } from '@/components/optimizer/PaidResult'
+import { composeAnswer } from '@/lib/resume/engine-client'
 import { creditCostLabel } from '@/lib/creditRules'
 
 const LINES_PER_PAGE = 46
 // What the tailor answer carries besides the plan (reports/t3-paid.md §1, `action:'tailor'`): the shared charge
 // rule, the blocked verdict, the structured change list — feature-detected (an older stored result has none).
-type TailorExtra = { tailored?: Tailored | null; charge?: Charge | null; blocked?: Blocked | null; charged?: boolean; balance?: number; fit?: FitData | null }
+type TailorExtra = { tailored?: Tailored | null; charge?: Charge | null; blocked?: Blocked | null; charged?: boolean; balance?: number; fit?: FitData | null; already_right?: AlreadyRight | null }
 type Layout = 'chronological' | 'relevance' | 'as_written'
 
 export interface TailorJob { title: string; company: string; description: string; jobId: string; url?: string }
@@ -71,6 +72,9 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
   const [overrides, setOverrides] = useState<TailorOverrides>({})
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [showAll, setShowAll] = useState(false)
+  // the question cards' drafts and skips (a typed answer becomes a line only when the person adds it: answers[id])
+  const [qDrafts, setQDrafts] = useState<Record<string, string>>({})
+  const [qSkipped, setQSkipped] = useState<string[]>([])
   const [extra, setExtra] = useState<TailorExtra>({})
   // the person's Yes / No answers for THIS job (same store and contract as the Optimize sheet)
   const confirm = useConfirmations(user?.id, job.jobId || (job.title || job.company ? `studio-${job.company}-${job.title}`.toLowerCase().replace(/\s+/g, '-').slice(0, 80) : ''))
@@ -153,7 +157,7 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
       const x = data as unknown as TailorExtra & { statements?: unknown; matched_requirements?: unknown; unsupported_requirements?: unknown; constraints?: unknown; field_match?: unknown }
       // the fit read rides along only when the answer carries the reader's statements (server request: tailor → statements)
       const fit = x.statements ? ({ verdict: data.plan.score?.verdict, statements: x.statements, matched_requirements: x.matched_requirements, unsupported_requirements: x.unsupported_requirements, constraints: x.constraints, field_match: x.field_match } as FitData) : null
-      setExtra({ tailored: x.tailored || null, charge: x.charge || (x.tailored && x.tailored.charge) || null, blocked: x.blocked || null, charged: !!x.charged, balance: typeof x.balance === 'number' ? x.balance : undefined, fit })
+      setExtra({ already_right: (x as { already_right?: AlreadyRight | null }).already_right || null, tailored: x.tailored || null, charge: x.charge || (x.tailored && x.tailored.charge) || null, blocked: x.blocked || null, charged: !!x.charged, balance: typeof x.balance === 'number' ? x.balance : undefined, fit })
       setPlan(data.plan); setBaseDoc(clone(doc)); setOverrides({}); setAnswers({})
       setState('done')
       markQuiet() // nothing optional pops over a result the person just paid for
@@ -277,6 +281,7 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
             </div>
           </div>
 
+          {extra.already_right && <AlreadyRightBlock a={extra.already_right} />}
           {extra.tailored && (extra.tailored.changes || []).length > 0 && (
             <div className={s.card} data-testid="tailor-changes">
               <span className={s.secTitle}>Every change, before → after</span>
@@ -339,16 +344,27 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
           )}
 
           {(plan.prompts || []).length > 0 && (
-            <div className={s.card}>
-              <span className={s.secTitle} style={{ color: 'var(--blue)' }}>Make it stronger — answer what you can</span>
-              <div className={s.dim} style={{ margin: '.25rem 0 .5rem' }}>Your answers become bullets in your own words. Leave blank anything you do not know.</div>
-              {(plan.prompts || []).map((p) => (
-                <div key={p.id} style={{ marginBottom: '.5rem' }}>
-                  <span className={s.label}>{p.roleTitle}{p.company ? ` · ${p.company}` : ''}</span>
-                  <input autoComplete="off" className={s.input} value={answers[p.id] || ''} placeholder={p.question} onChange={(e) => setAnswers((a) => ({ ...a, [p.id]: e.target.value }))} />
-                  <div className={s.muted} style={{ marginTop: '.125rem' }}>{p.why}</div>
-                </div>
-              ))}
+            <div className={s.card} data-testid="tailor-questions">
+              <span className={s.secTitle}>{(plan.prompts || []).length === 1 ? 'One question only you can answer' : `${(plan.prompts || []).length} questions only you can answer`}</span>
+              {/* the same question card as the paid result: the composer's line or its one sentence, confirmed before it is added */}
+              <ol style={{ listStyle: 'none', margin: 'var(--sp-2) 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: 'var(--sp-3)' }}>
+                {(plan.prompts || []).map((p) => {
+                  const qn = { ...(p as unknown as Question), role: p.roleTitle, company: p.company } as Question
+                  const raw = answers[p.id] || ''
+                  return (
+                    <QuestionCard key={p.id} qn={qn} io={{
+                      draft: qDrafts[p.id] ?? raw,
+                      setDraft: (t) => setQDrafts((d) => ({ ...d, [p.id]: t })),
+                      added: raw ? (composeAnswer(qn as unknown as Record<string, unknown>, raw).line || null) : null,
+                      add: (_line, typed) => setAnswers((a) => ({ ...a, [p.id]: typed })),
+                      remove: () => setAnswers((a) => { const n = { ...a }; delete n[p.id]; return n }),
+                      skipped: qSkipped.includes(p.id),
+                      skip: () => setQSkipped((x) => [...x.filter((y) => y !== p.id), p.id]),
+                      unskip: () => setQSkipped((x) => x.filter((y) => y !== p.id)),
+                    }} />
+                  )
+                })}
+              </ol>
             </div>
           )}
 
