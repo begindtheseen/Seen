@@ -723,3 +723,29 @@ test('a result line with its score job: the "still updating" clause becomes live
   assert.equal(withFollowUp('140 reports are back in the review queue.', done), '140 reports are back in the review queue. Updated 70 company scores in 2 rounds.')
   assert.equal(withFollowUp('Approved 1 of 1 · 1 company score still updating.', done), 'Approved 1 of 1. Updated 70 company scores in 2 rounds.')
 })
+
+test('a job a reload interrupted keeps asking: the round in flight finishes on the server after the first read → the line says done, never "800 left"', async () => {
+  const store = memStorage()
+  store.set(JSON.stringify([{ id: 'j10', key: 'purge_stale_jobs|{}', action: 'purge_stale_jobs', args: {}, label: 'Clearing', past: 'Deleted', noun: 'listings', status: 'running', changed: 0, remaining: 800, total: 800, rounds: 0, message: '', skipped: [], lost_rounds: 0, started_at: new Date().toISOString(), rid: 'r', round_no: 0 }]))
+  let reads = 0
+  const statusRead = async () => (++reads < 3 ? { remaining: 800, done: null, complete: false } : { remaining: 0, done: null, complete: true })
+  const m = createJobManager({ api: async () => toResult(200, '{}'), storage: store, statusRead, sleep: async () => {} })
+  await until(() => m.get('j10').status === 'done')
+  assert.equal(reads, 3)
+  assert.equal(m.get('j10').remaining, 0); assert.equal(m.get('j10').changed, 800)
+  assert.match(m.get('j10').message, /^Finished on the server while the page was closed\. Deleted 800 listings/)
+  assert.doesNotMatch(m.get('j10').message, /left/)
+})
+
+test('a job a reload interrupted stops asking once the person resumes it', async () => {
+  const store = memStorage()
+  store.set(JSON.stringify([{ id: 'j11', key: 'purge_stale_jobs|{}', action: 'purge_stale_jobs', args: {}, label: 'Clearing', past: 'Deleted', noun: 'listings', status: 'running', changed: 0, remaining: 800, total: 800, rounds: 0, message: '', skipped: [], lost_rounds: 0, started_at: new Date().toISOString(), rid: 'r', round_no: 0 }]))
+  let reads = 0; let release
+  const gate = new Promise((r) => { release = r })
+  const statusRead = async () => { reads++; return { remaining: 800, done: null, complete: false } }
+  const m = createJobManager({ api: async () => toResult(200, JSON.stringify({ ok: true, changed: 800, complete: true, touched: [] })), storage: store, statusRead, sleep: async () => { await gate } })
+  await until(() => m.get('j11').resumable === true)
+  m.resume('j11'); release()
+  await until(() => m.get('j11').status === 'done')
+  assert.equal(reads, 1)
+})

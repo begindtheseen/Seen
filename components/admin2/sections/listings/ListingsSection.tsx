@@ -56,7 +56,7 @@ export default function ListingsSection({ active }: SectionProps) {
           </StatStrip>
         </div>
       ) : null}
-      <StaleBlock counts={c} countsAt={counts.updatedAt} />
+      <StaleBlock counts={c} countsAt={counts.updatedAt} counting={!c && counts.loading} />
       <Browser active={active} />
       <DupesBlock />
       <TargetBlock />
@@ -66,7 +66,9 @@ export default function ListingsSection({ active }: SectionProps) {
 }
 
 // ── Clear stale (a long job) ─────────────────────────────────────────────────────────────────────
-function StaleBlock({ counts, countsAt }: { counts: ListingCounts | null; countsAt: number }) {
+// `counting`: the first read of the counts is still under way — the button waits for it, so the confirm never opens on
+// "the plan couldn't be read" and then changes its number while open.
+function StaleBlock({ counts, countsAt, counting }: { counts: ListingCounts | null; countsAt: number; counting: boolean }) {
   const stale = counts?.stale_clearable ?? null
   const job = useAdminJob({ action: 'purge_stale_jobs', label: 'Clearing stale listings', past: 'Deleted', noun: 'listings nobody saved', total: counts?.plan?.will ?? undefined })
   const [confirming, setConfirming] = useState(false)
@@ -105,8 +107,8 @@ function StaleBlock({ counts, countsAt }: { counts: ListingCounts | null; counts
         />
       ) : (
         <div className={styles.actions}>
-          <Button variant="primary" icon="trash-2" onClick={() => (job.running ? job.start() : setConfirming(true))} disabled={!job.running && nothingLeft} data-testid="stale-clear">
-            {job.running ? 'Clearing… (show progress)' : nothingLeft ? 'Nothing stale to clear' : 'Clear stale listings'}
+          <Button variant="primary" icon="trash-2" onClick={() => (job.running ? job.start() : setConfirming(true))} disabled={!job.running && (nothingLeft || counting)} data-testid="stale-clear">
+            {job.running ? 'Clearing… (show progress)' : counting ? 'Counting what is stale…' : nothingLeft ? 'Nothing stale to clear' : 'Clear stale listings'}
           </Button>
         </div>
       )}

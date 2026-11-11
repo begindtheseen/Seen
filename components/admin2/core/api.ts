@@ -166,7 +166,7 @@ export function createAdminApi(deps: AdminApiDeps): AdminApi {
     if (first.ok || first.code !== 'unauthorized' || opts.noReauth || !deps.reauth) return first
     // The session ended mid-work: ask for a sign-in (one sheet for every waiting call) and replay once.
     const signedIn = await deps.reauth().catch(() => false)
-    if (!signedIn) return err('unauthorized', 'Not done — you are signed out. Sign in and try again.', false)
+    if (!signedIn) return err('unauthorized', 'You are signed out, so nothing was changed. Sign in and try again.', false)
     return once<T>(action, body, opts)
   }
 }

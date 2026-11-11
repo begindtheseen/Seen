@@ -43,7 +43,8 @@ export type ResultLineProps = {
 /** What the line says while the Undo runs: never the original action's "Approving…". Pure for the test. */
 export function undoingText(state: ActionState): string {
   const n = state.result?.changed || 0
-  return n > 0 ? `Undoing — putting ${fmt(n)} back…` : 'Undoing…'
+  // one change (a credit grant, one report) is just "Undoing…": "putting 1 back" reads wrong for a number that was changed
+  return n > 1 ? `Undoing — putting ${fmt(n)} back…` : 'Undoing…'
 }
 
 export default function ResultLine({ state, onUndo, onRetry, onDismiss, skipLinks, runningText, followUp, undoingProgress }: ResultLineProps) {

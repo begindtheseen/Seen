@@ -92,7 +92,8 @@ export type Job = AdminJobState & {
   ended_at?: string
 }
 
-export const JOB_LIMITS = { maxRounds: 120, budgetMs: 15 * 60_000, maxLostInARow: 2, roundTimeoutMs: 75_000 }
+// RELOAD_RECHECK*: 15 reads 5 s apart cover the longest a round in flight can still run on the server (75 s).
+export const JOB_LIMITS = { maxRounds: 120, budgetMs: 15 * 60_000, maxLostInARow: 2, roundTimeoutMs: 75_000, RELOAD_RECHECKS: 15, RELOAD_RECHECK_MS: 5_000 }
 export const JOBS_STORAGE_KEY = 'seen_admin_jobs_v1'
 
 const TRANSIENT = new Set(['timeout', 'network', 'upstream'])
@@ -242,8 +243,41 @@ export function createJobManager(deps: {
       const stopped: Job = { ...cur, checking: false, resumable: true, ...(t && typeof t.remaining === 'number' ? { remaining: t.remaining, changed: doneFrom(t.remaining) } : {}) }
       stopped.message = jobSummary(stopped)
       jobs.set(id, stopped)
+      void recheck(id)
     }
     persist(); emit()
+  }
+
+  // The round that was in flight when the page closed can still finish on the server AFTER the first read: keep
+  // asking for a while, so the line never says "800 left" beside a server that has nothing left. Stops as soon as
+  // the person resumes or dismisses the job, when the server says it is done, or after RELOAD_RECHECKS reads.
+  // A background wait that never keeps a Node process (a test run) alive; an injected sleep is used as given.
+  const idleWait = deps.sleep || ((ms: number) => new Promise<void>((r) => { const t = setTimeout(r, ms) as unknown as { unref?: () => void }; t.unref?.() }))
+  async function recheck(id: string) {
+    if (!deps.statusRead) return
+    for (let n = 0; n < limits.RELOAD_RECHECKS; n++) {
+      await idleWait(limits.RELOAD_RECHECK_MS)
+      const cur = jobs.get(id)
+      if (!cur || cur.status !== 'cancelled' || cur.stopped !== 'reload') return
+      let t: Awaited<ReturnType<NonNullable<typeof deps.statusRead>>> = null
+      try { t = await deps.statusRead(cur) } catch { t = null }
+      const now2 = jobs.get(id)
+      if (!now2 || now2.status !== 'cancelled' || now2.stopped !== 'reload') return
+      if (!t) continue
+      if (t.complete || t.remaining === 0) {
+        const changed = t.done ?? (typeof now2.total === 'number' ? Math.max(now2.changed, now2.total) : now2.changed)
+        const done: Job = { ...now2, status: 'done', resumable: false, remaining: 0, changed, ended_at: new Date(now()).toISOString() }
+        done.message = changed > 0 ? `Finished on the server while the page was closed. ${jobSummary(done)}` : 'Finished on the server while the page was closed — nothing is left to do.'
+        jobs.set(id, done); persist(); emit()
+        return
+      }
+      if (typeof t.remaining === 'number' && t.remaining !== now2.remaining) {
+        const changed = t.done ?? (typeof now2.total === 'number' ? Math.max(now2.changed, now2.total - t.remaining) : now2.changed)
+        const moved: Job = { ...now2, remaining: t.remaining, changed }
+        moved.message = jobSummary(moved)
+        jobs.set(id, moved); persist(); emit()
+      }
+    }
   }
 
   // Undone somewhere else (the activity log): a finished job no longer offers that Undo (F8).
