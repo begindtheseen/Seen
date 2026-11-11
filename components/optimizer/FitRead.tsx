@@ -49,7 +49,7 @@ function YesNo({ onYes, onNo, onSkip }: { onYes: () => void; onNo: () => void; o
   )
 }
 
-function StatementRow({ r, answer, answerLine, onAnswer, quoted, dense = false, saidBelow = false }: { r: Row; answer?: Answer; answerLine?: string; onAnswer?: OnAnswer; quoted?: Set<string>; dense?: boolean; saidBelow?: boolean }) {
+function StatementRow({ r, answer, answerLine, onAnswer, quoted, dense = false, saidBelow = false, rowRef, minH }: { r: Row; answer?: Answer; answerLine?: string; onAnswer?: OnAnswer; quoted?: Set<string>; dense?: boolean; saidBelow?: boolean; rowRef?: (el: HTMLLIElement | null) => void; minH?: number }) {
   // in a partial list a "same line as … above" reference can point at a row that is not on screen: quote it instead
   const ref = r.sameAs && (!quoted || quoted.has(r.line.toLowerCase())) ? r.sameAs : ''
   if (quoted && r.line) quoted.add(r.line.toLowerCase())
@@ -59,7 +59,7 @@ function StatementRow({ r, answer, answerLine, onAnswer, quoted, dense = false, 
   // on the first screen (dense) the close-line question is asked in the questions panel below, not inline
   const askCandidate = !!r.candidate && !r.byYou && answer !== 'no' && !dense
   return (
-    <li className={dense ? s.dense : s.row} data-state={r.state} data-testid="fit-row" data-id={r.id}>
+    <li ref={rowRef} style={minH ? { minHeight: minH } : undefined} className={dense ? s.dense : s.row} data-state={r.state} data-testid="fit-row" data-id={r.id}>
       {!dense && <StateMark state={r.state} />}
       <p className={s.text}>{dense && <><StateMark state={r.state} />{' '}</>}{r.state === 'ask' ? r.question : r.text}{r.preferred && r.state !== 'ask' ? <span className={s.tag}> · preferred</span> : null}</p>
       {r.byYou && !saidBelow && (
@@ -119,6 +119,8 @@ export default function FitRead({ data, note, compact = false, brief = false, an
   const panelIds = useRef<Set<string>>(new Set())
   const panelOrder = useRef<Map<string, number>>(new Map())
   const frozenTop = useRef<string[] | null>(null)
+  // each first-list row keeps at least the height it had before the first answer (its text may get shorter)
+  const rowHeights = useRef<Map<string, number>>(new Map())
   const v = data.verdict || null
   const diff = differentField(data.field_match || null)
   const model = fitGroups(data)
@@ -182,7 +184,7 @@ export default function FitRead({ data, note, compact = false, brief = false, an
       {model && top.length > 0 && !open && (
         <div className={s.group} data-group="top">
           <p className={s.gHead}><span className={s.gLabel}>What matters most</span></p>
-          <ul className={s.denseList}>{top.map((r) => <StatementRow key={r.id} r={r} quoted={quoted} dense answer={answers?.[r.id]} answerLine={answerLines?.[r.id]} onAnswer={onAnswer} saidBelow={asking && panelIds.current.has(r.id)} />)}</ul>
+          <ul className={s.denseList}>{top.map((r) => <StatementRow key={r.id} r={r} quoted={quoted} dense answer={answers?.[r.id]} answerLine={answerLines?.[r.id]} onAnswer={onAnswer} saidBelow={asking && panelIds.current.has(r.id)} rowRef={(el) => { if (el && !answeredAny) rowHeights.current.set(r.id, el.offsetHeight) }} minH={answeredAny ? rowHeights.current.get(r.id) : undefined} />)}</ul>
         </div>
       )}
       {model && asks.length > 0 && !open && onAnswer && (
