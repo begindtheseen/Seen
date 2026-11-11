@@ -16,6 +16,8 @@ import { gateAI } from '../lib/server/credits.js';
 import { JOB_INSIGHTS_COST } from '../lib/server/creditRules.js';
 import { buildJobInsights } from '../lib/server/jobInsights.js';
 import { loadSkillTaxonomy } from '../lib/server/skillTaxonomy.js';
+import { resolveAuthedUser } from '../lib/server/credits.js';
+import { isReadableResume } from '../lib/server/resumeReadability.js';
 import { JOB_INSIGHTS_VERSION } from '../lib/jobInsightsVersion.js';
 import { createHash } from 'node:crypto';
 
@@ -26,6 +28,24 @@ export function hashText(text) {
 // The shared-cache row id for one posting under the CURRENT generator version.
 export function insightsCacheKey(jobId, jobDescription) {
   return `${String(jobId)}:${JOB_INSIGHTS_VERSION}:${hashText(jobDescription)}`;
+}
+
+// The signed-in caller's default résumé: the profiles.resume_text mirror of their default (lib/server/resumes.js
+// writeMirror) that Interview Prep, Apply and the job keys read. Identity without touching credits
+// (resolveAuthedUser). Never throws, never logs the text; anything but a readable résumé → ''.
+async function readOwnResume(req, SUPABASE_URL, SERVICE_KEY) {
+  try {
+    if (!SUPABASE_URL || !SERVICE_KEY || !String(req.headers.authorization || '').trim()) return '';
+    const who = await resolveAuthedUser(req);
+    if (!who || !who.uid) return '';
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${encodeURIComponent(who.uid)}&select=resume_text&limit=1`, {
+      headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
+    });
+    if (!r || !r.ok) return '';
+    const rows = await r.json().catch(() => null);
+    const text = Array.isArray(rows) && rows[0] && typeof rows[0].resume_text === 'string' ? rows[0].resume_text : '';
+    return text && isReadableResume(text) ? text : '';
+  } catch { return ''; }
 }
 
 export default async function handler(req, res) {
@@ -77,9 +97,24 @@ export default async function handler(req, res) {
   // verdict's. The cached row is the record that someone already paid for THIS text under THIS
   // version; what is served is always this build, so a cache hit carries every field a fresh answer
   // does (items with their quotes, conditions, pay) — the row only stores the legacy strings.
+  // The signed-in person's default résumé, read in parallel with the build and the cache read (the same
+  // profiles.resume_text mirror the other tools read). Guests, no readable résumé or a failed read → ''.
+  const ownResume = readable ? readOwnResume(req, SUPABASE_URL, SUPABASE_SERVICE_KEY) : Promise.resolve('');
+  const taxonomy = readable ? await loadSkillTaxonomy().catch(() => null) : null;
+  // THE SHARED BUILD: no résumé, ever — this is what the job_insights row (shared by every visitor) stores
   const parsed = readable
-    ? buildJobInsights({ title: job, company, description: jobDescription, needsSummary: true, taxonomy: await loadSkillTaxonomy().catch(() => null) })
+    ? buildJobInsights({ title: job, company, description: jobDescription, needsSummary: true, taxonomy })
     : null;
+  // The answer for THIS caller: the shared build with the tip re-read against their own résumé. Only the tip
+  // fields change; nothing from it is written to the cache or logged.
+  const forCaller = async (body) => {
+    const rt = await ownResume;
+    if (!rt) return { ...body, tip_from_resume: false };
+    try {
+      const mine = buildJobInsights({ title: job, company, description: jobDescription, needsSummary: false, taxonomy, resumeText: rt });
+      return { ...body, insider_tip: mine.insider_tip, tip_source: mine.tip_source, tip_from_resume: !!mine.tip_from_resume };
+    } catch { return { ...body, tip_from_resume: false }; }
+  };
   // the message names what THIS posting does and does not state (lib/server/jobInsights.js postingNote)
   const unreadBody = (p) => ({ ...p, what_they_want: [], _src: 'unread', cost: 0, charged: false,
     message: `${p.posting_note || "This listing doesn't state what it requires."} No credit used — if the employer's site has the full posting, paste it to analyze that.` });
@@ -97,7 +132,7 @@ export default async function handler(req, res) {
         // a row that holds no read is never served as one
         if (row && (row.what_they_want || []).length) {
           if (parsed && !parsed.read) return res.status(200).json(unreadBody(parsed));
-          if (parsed) return res.status(200).json({ ...parsed, cached: true, _src: 'db', cost: 0, charged: false });
+          if (parsed) return res.status(200).json(await forCaller({ ...parsed, cached: true, _src: 'db', cost: 0, charged: false }));
           // a caller that sent no title/company: the stored strings, as they were paid for
           return res.status(200).json({
             what_they_want: row.what_they_want || [],
@@ -175,5 +210,5 @@ export default async function handler(req, res) {
   // Pro spends nothing (gateAI logs the use but takes no credit) — the answer says so itself instead
   // of claiming a charge the client had to correct (`charged && !pro`).
   const charged = !gate.pro;
-  return res.status(200).json({ ...parsed, _src: 'generated', cost: charged ? JOB_INSIGHTS_COST : 0, charged, balance: gate.balance, pro: !!gate.pro, shared });
+  return res.status(200).json(await forCaller({ ...parsed, _src: 'generated', cost: charged ? JOB_INSIGHTS_COST : 0, charged, balance: gate.balance, pro: !!gate.pro, shared }));
 }

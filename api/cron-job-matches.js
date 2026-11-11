@@ -27,7 +27,7 @@
 // résumé. Before migration 20261101120000 the columns do not exist: everyone stays on résumé matches.
 
 import { isVercelCron, hasCronSecret, hasAdminSession } from '../lib/server/cronAuth.js';
-import { findResumeMatches, finalizeMatches } from '../lib/server/resumeMatches.js';
+import { findResumeMatches, finalizeMatches, activeMatcher } from '../lib/server/resumeMatches.js';
 import {
   pickBestMatch, canSendNow, buildJobMatchEmail, jobKey, companyScoreKey, companyVerdict,
 } from '../lib/server/jobMatchEmails.js';
@@ -130,7 +130,9 @@ const _unreadable = new Map();
  * @param {Array<object>} rows ranked rows (already filtered to ones this person could be sent)
  * @returns {Promise<{ rows: Array<object>, fetched: number, dropped: Array<{ id: string, why: string }> }>}
  */
-export async function confirmFullPostings(rows, keys, { db, deadline, fetchFull = fetchFullPosting, want = 3, max = MAX_FETCHES, now = new Date() }) {
+export async function confirmFullPostings(rows, keys, { db, deadline, fetchFull = fetchFullPosting, want = 3, max = MAX_FETCHES, now = new Date(), resumeText = '' }) {
+  // the matcher injected through resumeMatches.setMatcher (match2 seam), else today's matchListing
+  const mx = activeMatcher();
   const out = []; const dropped = []; let fetched = 0;
   for (const j of rows) {
     if (out.length >= want) break;
@@ -150,7 +152,7 @@ export async function confirmFullPostings(rows, keys, { db, deadline, fetchFull 
     }
     const row = { ...j, description: full.description };
     let m;
-    try { m = matchListing(row, keys, { now, mode: 'email' }); } catch { dropped.push({ id, why: 'skipped_error' }); continue; }
+    try { m = mx ? mx(row, keys, { now, mode: 'email', resumeText }) : matchListing(row, keys, { now, mode: 'email' }); } catch { dropped.push({ id, why: 'skipped_error' }); continue; }
     if (!m.ok || m.summaryOnly || !m.reason) { dropped.push({ id, why: m.ok ? 'still_summary' : `full_posting:${m.why}` }); continue; }
     out.push({ ...row, _reason: m.reason, _basis: m.basis, _need: m.need, _have: m.have, _summaryOnly: false });
   }
@@ -268,7 +270,8 @@ async function run(req, res, { loadGeo, fetchFull = fetchFullPosting }) {
         // they meet what the listing requires — years in that field, licenses, level.
         const km = await findResumeMatches({ supabaseUrl: SUPABASE_URL, serviceKey: SERVICE_KEY, userId: uid, persist: !dry, onlyKeys: true }).catch(() => null);
         if (km?.heal) await km.heal;
-        if (km?.keys) found = found.filter((j) => matchListing(j, km.keys, { alert: true }).ok);
+        const mx = activeMatcher();
+        if (km?.keys) found = found.filter((j) => (mx ? mx(j, km.keys, { alert: true }) : matchListing(j, km.keys, { alert: true })).ok);
       } else {
         const m = await findResumeMatches({ supabaseUrl: SUPABASE_URL, serviceKey: SERVICE_KEY, userId: uid, persist: !dry, mode: 'email' });
         if (m.heal) await m.heal;
@@ -280,7 +283,8 @@ async function run(req, res, { loadGeo, fetchFull = fetchFullPosting }) {
           continue;
         }
         // "We don't know yet": the current job could not be placed — no email (never a wrong headline).
-        if (m.keys?.no_direction) {
+        // (an injected matcher reads the direction itself and answers with no rows when it has none)
+        if (m.keys?.no_direction && !activeMatcher()) {
           skip('no_direction');
           if (dry) summary.picked.push({ user: uid.slice(0, 8), reason: 'no_direction', unplaced_title: m.keys.no_direction.title, matches: [] });
           continue;
@@ -315,7 +319,7 @@ async function run(req, res, { loadGeo, fetchFull = fetchFullPosting }) {
         const open = ranked.filter((j) => j.id && !emailedKeys.has(jobKey(j)) && !emailedIds.has(String(j.id)) && !appliedIds.has(String(j.id)) && !savedIds.has(String(j.id)));
         // A dry run never writes: the reader's store / gone-marking calls answer as if done.
         const readDb = dry ? (path, opts = {}) => ((opts.method || 'GET').toUpperCase() === 'GET' ? q(path, opts) : Promise.resolve(new Response(null, { status: 204 }))) : q;
-        const c = await confirmFullPostings(open, keys, { db: readDb, deadline, fetchFull, want: 8 });
+        const c = await confirmFullPostings(open, keys, { db: readDb, deadline, fetchFull, want: 8, resumeText: residentText });
         // The final yes is the fit check's: its gates on the full posting, and a reason naming what in each
         // listing the résumé shows (no two the same). Nothing it marks "gate not met" is ever emailed.
         const f = finalizeMatches(c.rows, residentText, { limit: 6, keys, strict: true });

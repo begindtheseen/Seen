@@ -213,3 +213,55 @@ test('a posting with nothing to read: free, read:false, never gated, never cache
   assert.notEqual(res.body._src, 'db', 'an empty cached row is not served as a read');
   void stale;
 });
+
+// ── The résumé-aware tip never reaches the shared cache (director, 2026-11-11) ──
+// User A's résumé lists "food handlers card (Maricopa County)"; B's does not. A pays: A's answer quotes A's words; the
+// job_insights write carries none of A's résumé; B and a guest, served from that same row, get the conditional tip.
+test('a résumé-aware tip is the caller\'s only: never in the cache write, never in another user\'s answer', async () => {
+  const A = 'aaaaaaaa-1111-4aaa-8aaa-aaaaaaaaaaaa';
+  const B = 'bbbbbbbb-2222-4bbb-8bbb-bbbbbbbbbbbb';
+  const RES = (skills) => `Jordan Lee\nPhoenix, AZ\n\nEXPERIENCE\nShift Supervisor — Dutch Bros Coffee | Mesa, AZ | 2022 – Present\n• Run the afternoon shift with 6 to 8 baristas\n• Handle customer complaints and remakes\n• Count the drawers and do the nightly deposit\n\nSKILLS\n${skills}\n`;
+  const resumes = { [A]: RES('Toast POS, cash handling, food handlers card (Maricopa County)'), [B]: RES('Toast POS, cash handling, scheduling') };
+  const POSTING = "Shift Lead — Copper Kettle Kitchen\nWhat you bring\n- 1+ year of experience leading a shift or crew in a restaurant, coffee shop or other food service setting\n- Food handler card (or ability to get one within 30 days)\n- Cash handling experience\n- High school diploma or GED";
+  const rows = new Map();
+  const writes = [];
+  globalThis.fetch = async (url, opts = {}) => {
+    const u = new URL(String(url));
+    const method = opts.method || 'GET';
+    const auth = (opts.headers && (opts.headers.Authorization || opts.headers.authorization)) || '';
+    if (u.pathname === '/auth/v1/user') return /tok-A/.test(auth) ? mockResponse({ id: A }) : /tok-B/.test(auth) ? mockResponse({ id: B }) : mockResponse({}, { ok: false, status: 401 });
+    if (u.pathname === '/rest/v1/profiles') { const id = (u.searchParams.get('id') || '').replace(/^eq\./, ''); return mockResponse(resumes[id] ? [{ resume_text: resumes[id] }] : []); }
+    if (u.pathname === '/rest/v1/feature_flags') return mockResponse([{ status: 'on' }]);
+    if (u.pathname === '/rest/v1/rpc/consume_credit') return mockResponse([{ status: 'ok', balance: 4, pro: false }]);
+    if (u.pathname === '/rest/v1/job_insights' && method === 'POST') { writes.push(String(opts.body)); const r = JSON.parse(opts.body); rows.set(r.job_id, r); return mockResponse(null, { status: 201 }); }
+    if (u.pathname === '/rest/v1/job_insights') { const k = (u.searchParams.get('job_id') || '').replace(/^eq\./, ''); return mockResponse(rows.has(k) ? [rows.get(k)] : []); }
+    return mockResponse([]);
+  };
+  const ask = async (token, body) => {
+    const res = mockRes();
+    await handler({ method: 'POST', headers: { origin: 'https://seenjobs.io', ...(token ? { authorization: `Bearer ${token}` } : {}) }, socket: { remoteAddress: '10.9.0.' + Math.floor(Math.random() * 250) }, body }, res);
+    return res.body;
+  };
+  const job = { jobId: 'ck1', job: 'Shift Lead', company: 'Copper Kettle Kitchen', jobDescription: POSTING, needsSummary: true };
+  const a = await ask('tok-A', job);
+  assert.equal(a._src, 'generated');
+  assert.match(a.insider_tip, /Your résumé lists it as "food handlers card \(Maricopa County\)"/, a.insider_tip);
+  assert.equal(a.tip_from_resume, true);
+  assert.equal(writes.length, 1);
+  assert.doesNotMatch(writes[0], /Maricopa|food handlers card|Dutch Bros|Jordan/i, 'the shared row holds none of A\'s résumé');
+  assert.match(writes[0], /If you hold a food handler card/);
+  const b = await ask('tok-B', { ...job, probe: true });
+  assert.equal(b._src, 'db');
+  assert.match(b.insider_tip, /If you hold a food handler card/);
+  assert.equal(b.tip_from_resume, false);
+  assert.doesNotMatch(JSON.stringify(b), /Maricopa/);
+  const g = await ask(null, { ...job, probe: true });
+  assert.equal(g._src, 'db');
+  assert.match(g.insider_tip, /If you hold a food handler card/);
+  assert.equal(g.tip_from_resume, false);
+  // A's own cached view is still A's words, and costs nothing
+  const a2 = await ask('tok-A', { ...job, probe: true });
+  assert.equal(a2._src, 'db');
+  assert.equal(a2.cost, 0);
+  assert.match(a2.insider_tip, /food handlers card \(Maricopa County\)/);
+});
