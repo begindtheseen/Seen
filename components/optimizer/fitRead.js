@@ -62,6 +62,26 @@ export function askQuestion(text) {
  * verdict's requirement list instead.
  * @param {{ statements?: Array<Record<string, any>> }} d
  */
+// "I've done this" / "I hold this" / "I speak this" (x-integration "Claims"): offered on a line the reading calls not shown or
+// partly, never on a years ask (years come from the dates — the person fixes dates, not a tick; the server ignores a claim
+// on one) and never on a line already answered or settled. The wording follows what the line asks for: a credential or a
+// degree is held, a language spoken, anything else done. Only which words the button wears is decided here — what the
+// claim does is the server's (the row comes back `by: 'you'`, `claimed: true`).
+const YEARS_ASK = /\b\d{1,2}\s*\+?\s*(?:(?:-|–|to)\s*\d{1,2}\s*\+?\s*)?(?:years?|yrs?)\b|\b(?:one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:\(\d+\)\s+)?years?\b/i;
+const HOLD_KINDS = new Set(['certification', 'license', 'licence', 'credential', 'degree', 'education', 'clearance']);
+const HOLD_WORDS = /\b(?:licen[cs]e[ds]?|certif\w*|certificate|registered|degree|diploma|bachelor|master|associate'?s?\s+degree|ged|cpr|bls|acls|cdl|servsafe|food handler'?s?\s+card|clearance)\b/i;
+const SPEAK_WORDS = /\b(?:bilingual|fluent|fluency|speak|spoken|spanish|english|french|mandarin|cantonese|vietnamese|tagalog|arabic|korean|japanese|german|portuguese|russian|asl|sign language)\b/i;
+export const CLAIM_LABEL = { done: "I've done this", hold: 'I hold this', speak: 'I speak this' };
+export function claimWordFor(st, constraints) {
+  if (!st || st.by === 'you' || st.settled || st.claimed) return null;
+  if (st.status !== 'not_shown' && st.status !== 'partly') return null;
+  const linked = (constraints || []).filter((c) => c && c.statementId && c.statementId === st.id).map((c) => String(c.kind));
+  if (linked.includes('years') || YEARS_ASK.test(String(st.text || ''))) return null;
+  if (linked.includes('language') || (!linked.some((k) => HOLD_KINDS.has(k)) && SPEAK_WORDS.test(String(st.text || '')) && !HOLD_WORDS.test(String(st.text || '')))) return 'speak';
+  if (linked.some((k) => HOLD_KINDS.has(k)) || HOLD_WORDS.test(String(st.text || ''))) return 'hold';
+  return 'done';
+}
+
 export function fitGroups(d) {
   // the reader marks a malformed or low-confidence line `display: false`: it never reaches a screen
   const sts = d && Array.isArray(d.statements) ? d.statements.filter((s) => s && s.display !== false && clean(s.text)) : [];
@@ -87,6 +107,12 @@ export function fitGroups(d) {
       candidate: (state === 'not_shown' || state === 'partly') && st.candidate && clean(st.candidate.line) ? { line: proofText(st.candidate.line), why: clean(st.candidate.why) } : null,
       // the server changed this row because of the person's own answer: printed "You said …", never "your résumé shows"
       byYou: st.by === 'you',
+      // the person said they have done it / hold it (no résumé line — the server's own sentence is printed), or said the
+      // partial reading is right (the row is no longer asked about)
+      claimed: st.claimed === true,
+      claimWhy: st.claimed === true ? clean((Array.isArray(st.evidence) && st.evidence[0] && st.evidence[0].why) || '') : '',
+      settled: st.settled === true,
+      claim: claimWordFor(st, d.constraints),
       question: state === 'ask' ? askQuestion(st.text) : '',
       source: clean(st.source),
     });
@@ -158,7 +184,7 @@ export function gateRows(constraints) {
     if (!text || seen.has(head)) continue;
     seen.add(head);
     const state = GRADE_STATE[c.grade] || (c.status === 'met' ? 'shown' : c.status === 'ask' ? 'ask' : c.status === 'partial' ? 'partly' : 'not_shown');
-    out.push({ kind: String(c.kind), text, state, caps: !!c.caps, quote: clean(c.posting_quote), preferred: c.importance === 'preferred', statementId: c.statementId || null });
+    out.push({ kind: String(c.kind), text, state, caps: !!c.caps, quote: clean(c.posting_quote), preferred: c.importance === 'preferred', statementId: c.statementId || null, claimed: c.claimed === true });
   }
   // a gate that stops the application first, then what is short, then what is met
   const rank = (r) => (r.caps ? 0 : r.state === 'not_shown' ? 1 : r.state === 'partly' ? 2 : r.state === 'ask' ? 3 : 4);
@@ -186,4 +212,5 @@ export function bandTone(band) {
   return undefined;
 }
 
-export const STATE_WORD = { shown: 'Shown', partly: 'Partly', not_shown: 'Not shown', ask: 'Only you can say' };
+// 'said': a line the person said they have done / hold — not on the résumé, so never "Shown"
+export const STATE_WORD = { shown: 'Shown', partly: 'Partly', not_shown: 'Not shown', ask: 'Only you can say', said: 'You said yes' };

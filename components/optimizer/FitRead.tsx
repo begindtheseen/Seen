@@ -7,14 +7,14 @@
 // never writes an answer into the résumé. Every word is the server's (fitRead.js only groups and orders); an
 // answer with no `statements` (an older cached response) falls back to the verdict's requirement list.
 
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import Icon from '@/components/ui/Icon'
 import type { IconName } from '@/components/ui/Icon'
 import { RequirementsView, type Verdict, type RequirementRow, type ConstraintRow } from './Verdict'
-import { fitGroups, groupHeading, partlySentence, gateRows, differentField, verdictSentence, topRows, STATE_WORD } from './fitRead.js'
+import { fitGroups, groupHeading, partlySentence, gateRows, differentField, verdictSentence, topRows, STATE_WORD, CLAIM_LABEL } from './fitRead.js'
 import s from './FitRead.module.css'
 
-export interface Statement { id: string; text: string; source?: string; kind?: string; importance?: string; status?: string; display?: boolean; evidence?: { line: string; why?: string }[]; missing?: string[] }
+export interface Statement { id: string; text: string; source?: string; kind?: string; importance?: string; status?: string; display?: boolean; evidence?: { line?: string; why?: string }[]; missing?: string[]; by?: string; claimed?: boolean; settled?: boolean; candidate?: { line: string; why?: string } | null }
 export interface FieldMatch { level?: string; known?: boolean; sentence?: string; transferable?: string[]; resumeField?: string; postingField?: string }
 export interface FitData {
   verdict?: Verdict | null
@@ -23,20 +23,25 @@ export interface FitData {
   unsupported_requirements?: RequirementRow[]
   constraints?: (ConstraintRow & { grade?: string; sentence?: string; caps?: boolean; posting_quote?: string })[]
   field_match?: FieldMatch | null
+  /** R8: 'flat' when the posting arrived as one block of text — only the lines read with confidence are shown */
+  structure?: string
+  posting_note?: string | null
 }
-export type Answer = 'yes' | 'no' | 'skip'
+// 'claim' = "I've done this" / "I hold this" (sent { answer: 'yes', claim: true }); 'settle' = "That's right" on a partly
+// line (sent { answer: 'no', claim: true }) — useConfirmations.ts confirmedOf
+export type Answer = 'yes' | 'no' | 'skip' | 'claim' | 'settle'
 export type Answers = Record<string, Answer>
 
-type State = 'shown' | 'partly' | 'not_shown' | 'ask'
-const ICON: Record<State, IconName> = { shown: 'circle-check', partly: 'circle-dot', not_shown: 'circle-alert', ask: 'circle-help' }
+type State = 'shown' | 'partly' | 'not_shown' | 'ask' | 'said'
+const ICON: Record<State, IconName> = { shown: 'circle-check', partly: 'circle-dot', not_shown: 'circle-alert', ask: 'circle-help', said: 'circle-check' }
 const LIMIT: Record<string, number> = { required: 8, ask: 8, duty: 6, preferred: 6 }
 const clip = (t: string, n: number) => (t.length > n ? `${t.slice(0, n).replace(/\s+\S*$/, '')}…` : t)
 
 function StateMark({ state }: { state: State }) {
-  return <span className={s.mark} data-state={state}><Icon name={ICON[state]} size={16} />{STATE_WORD[state]}</span>
+  return <span className={s.mark} data-state={state}><Icon name={ICON[state]} size={16} />{(STATE_WORD as Record<string, string>)[state]}</span>
 }
 
-interface Row { id: string; text: string; state: State; preferred: boolean; line: string; lineIsJob?: boolean; missing: string[]; question: string; sameAs?: string; candidate?: { line: string; why: string } | null; byYou?: boolean }
+interface Row { id: string; text: string; state: State; preferred: boolean; line: string; lineIsJob?: boolean; missing: string[]; question: string; sameAs?: string; candidate?: { line: string; why: string } | null; byYou?: boolean; claimed?: boolean; claimWhy?: string; settled?: boolean; claim?: 'done' | 'hold' | 'speak' | null }
 type OnAnswer = (id: string, a: Answer | null, line?: string) => void
 
 function YesNo({ onYes, onNo, onSkip }: { onYes: () => void; onNo: () => void; onSkip?: () => void }) {
@@ -49,7 +54,13 @@ function YesNo({ onYes, onNo, onSkip }: { onYes: () => void; onNo: () => void; o
   )
 }
 
-function StatementRow({ r, answer, answerLine, onAnswer, quoted, dense = false, saidBelow = false, rowRef, minH, panel = false }: { panel?: boolean; r: Row; answer?: Answer; answerLine?: string; onAnswer?: OnAnswer; quoted?: Set<string>; dense?: boolean; saidBelow?: boolean; rowRef?: (el: HTMLLIElement | null) => void; minH?: number }) {
+// the claim control: a quiet text button (never filled — the screen's one filled button is the footer's), 44px tap box
+function ClaimButton({ word, onClick }: { word: 'done' | 'hold' | 'speak'; onClick: () => void }) {
+  return <button type="button" className={s.claim} onClick={onClick} data-testid="fit-claim" data-word={word}>{CLAIM_LABEL[word]}</button>
+}
+const CLAIM_FALLBACK = 'You said you have done this — it is not on your résumé yet.'
+
+function StatementRow({ r, answer, answerLine, onAnswer, quoted, dense = false, saidBelow = false, rowRef, minH, panel = false, noClaim = false }: { noClaim?: boolean; panel?: boolean; r: Row; answer?: Answer; answerLine?: string; onAnswer?: OnAnswer; quoted?: Set<string>; dense?: boolean; saidBelow?: boolean; rowRef?: (el: HTMLLIElement | null) => void; minH?: number }) {
   // in a partial list a "same line as … above" reference can point at a row that is not on screen: quote it instead
   const ref = r.sameAs && (!quoted || quoted.has(r.line.toLowerCase())) ? r.sameAs : ''
   if (quoted && r.line) quoted.add(r.line.toLowerCase())
@@ -58,13 +69,18 @@ function StatementRow({ r, answer, answerLine, onAnswer, quoted, dense = false, 
   // close line takes the question away: the row is then a plain "not on your résumé".
   // on the first screen (dense) the close-line question is asked in the questions panel below, not inline
   const askCandidate = !!r.candidate && !r.byYou && answer !== 'no' && !dense
+  // "I've done this" on a line the reading calls not shown or partly — never a years ask, never a line already answered
+  const canClaim = !!r.claim && !!onAnswer && !answer && !noClaim
+  // "That's right" (the partial reading is right) only where the close-line question already shows
+  const canSettle = canClaim && askCandidate && r.state === 'partly'
+  const mark: State = r.claimed ? 'said' : r.state
   return (
     <li ref={rowRef} style={minH ? { minHeight: minH } : undefined} className={dense ? s.dense : s.row} data-state={r.state} data-testid="fit-row" data-id={r.id} data-panel={panel ? '1' : undefined}>
-      {!dense && <StateMark state={r.state} />}
-      <p className={s.text}>{dense && <><StateMark state={r.state} />{' '}</>}{r.state === 'ask' ? r.question : r.text}{r.preferred && r.state !== 'ask' ? <span className={s.tag}> · preferred</span> : null}</p>
+      {!dense && <StateMark state={mark} />}
+      <p className={s.text}>{dense && <><StateMark state={mark} />{' '}</>}{r.state === 'ask' ? r.question : r.text}{r.preferred && r.state !== 'ask' ? <span className={s.tag}> · preferred</span> : null}</p>
       {r.byYou && !saidBelow && (
         <p className={s.said} data-testid="fit-said">
-          <span>{r.state === 'not_shown' ? `You said no to: “${r.text}”` : (answerLine || r.candidate?.line) ? `You said “${clip(answerLine || r.candidate?.line || '', 160)}” shows it.` : `You said yes to: “${r.text}”`}</span>
+          <span>{r.claimed ? (r.claimWhy || CLAIM_FALLBACK) : r.state === 'not_shown' ? `You said no to: “${r.text}”` : (answerLine || r.candidate?.line) ? `You said “${clip(answerLine || r.candidate?.line || '', 160)}” shows it.` : `You said yes to: “${r.text}”`}</span>
           {onAnswer && <button type="button" className={s.change} onClick={() => onAnswer(r.id, null)}>Change</button>}
         </p>
       )}
@@ -80,6 +96,15 @@ function StatementRow({ r, answer, answerLine, onAnswer, quoted, dense = false, 
           {r.candidate!.why && !dense && <p className={s.note}>{r.candidate!.why}</p>}
           {onAnswer && <YesNo onYes={() => onAnswer(r.id, 'yes', r.candidate!.line)} onNo={() => onAnswer(r.id, 'no', r.candidate!.line)} />}
         </div>
+      )}
+      {canClaim && (
+        <div className={s.claimRow}>
+          <ClaimButton word={r.claim!} onClick={() => onAnswer!(r.id, 'claim')} />
+          {canSettle && <button type="button" className={s.claim} onClick={() => onAnswer!(r.id, 'settle')} data-testid="fit-settle">That&apos;s right</button>}
+        </div>
+      )}
+      {r.settled && !r.byYou && (
+        <p className={s.said} data-testid="fit-settled"><span>You said that&apos;s right — your résumé shows part of this.</span>{onAnswer && <button type="button" className={s.change} onClick={() => onAnswer(r.id, null)}>Change</button>}</p>
       )}
       {!r.byYou && answer === 'no' && (r.candidate || answerLine) && (
         <p className={s.note} data-testid="fit-candidate-no">Not on your résumé — you said “{clip((r.candidate?.line || answerLine || ''), 80)}” does not show it.{onAnswer && <> <button type="button" className={s.change} onClick={() => onAnswer(r.id, null)}>Change</button></>}</p>
@@ -111,7 +136,7 @@ function Group({ g, answers, answerLines, onAnswer }: { g: { key: string; rows: 
  * @param brief   blocked: band only (the blocked card says why)
  * @param answers / onAnswer  the person's Yes / No / Skip on what only they can say (kept by the caller)
  */
-export default function FitRead({ data, note, compact = false, brief = false, answers, answerLines, onAnswer }: { data: FitData; note?: string; compact?: boolean; brief?: boolean; answers?: Answers; answerLines?: Record<string, string>; onAnswer?: OnAnswer }) {
+export default function FitRead({ data, note, compact = false, brief = false, answers, answerLines, onAnswer, paste }: { data: FitData; note?: string; compact?: boolean; brief?: boolean; answers?: Answers; answerLines?: Record<string, string>; onAnswer?: OnAnswer; paste?: ReactNode }) {
   const [open, setOpen] = useState(false)
   const [asking, setAsking] = useState(false)
   // every row that has been in the questions panel stays there for this visit — answered or not — so an answer never
@@ -119,6 +144,8 @@ export default function FitRead({ data, note, compact = false, brief = false, an
   const panelIds = useRef<Set<string>>(new Set())
   const panelOrder = useRef<Map<string, number>>(new Map())
   const frozenTop = useRef<string[] | null>(null)
+  // the gates on the first screen are frozen the same way: a claimed credential reads as met, and stays where it was tapped
+  const frozenGates = useRef<string[] | null>(null)
   // each first-list row keeps at least the height it had before the first answer (its text may get shorter)
   const rowHeights = useRef<Map<string, number>>(new Map())
   // the verdict sentence and the gates above the questions may be re-worded by the server after an answer: their
@@ -129,14 +156,14 @@ export default function FitRead({ data, note, compact = false, brief = false, an
   const anchor = useRef<{ id: string; top: number } | null>(null)
   const sectionRef = useRef<HTMLElement | null>(null)
   const answerWithAnchor: OnAnswer | undefined = onAnswer ? (id, a, line) => {
-    const el = sectionRef.current?.querySelector(`[data-testid=fit-row][data-id="${CSS.escape(id)}"][data-panel="1"]`) || sectionRef.current?.querySelector(`[data-testid=fit-row][data-id="${CSS.escape(id)}"]`)
+    const el = sectionRef.current?.querySelector(`[data-testid=fit-row][data-id="${CSS.escape(id)}"][data-panel="1"]`) || sectionRef.current?.querySelector(`:is([data-testid=fit-row],[data-testid=fit-gate])[data-id="${CSS.escape(id)}"]`)
     if (el) anchor.current = { id, top: el.getBoundingClientRect().top }
     onAnswer(id, a, line)
   } : undefined
   useLayoutEffect(() => {
     const a = anchor.current
     if (!a || !sectionRef.current) return
-    const el = sectionRef.current.querySelector(`[data-testid=fit-row][data-id="${CSS.escape(a.id)}"][data-panel="1"]`) || sectionRef.current.querySelector(`[data-testid=fit-row][data-id="${CSS.escape(a.id)}"]`)
+    const el = sectionRef.current.querySelector(`[data-testid=fit-row][data-id="${CSS.escape(a.id)}"][data-panel="1"]`) || sectionRef.current.querySelector(`:is([data-testid=fit-row],[data-testid=fit-gate])[data-id="${CSS.escape(a.id)}"]`)
     if (!el) return
     const delta = el.getBoundingClientRect().top - a.top
     if (Math.abs(delta) < 1) return
@@ -159,15 +186,23 @@ export default function FitRead({ data, note, compact = false, brief = false, an
   const asks = [...askRows, ...candRows, ...keptAsk].sort((a, b) => (panelOrder.current.get(a.id) ?? 1e6) - (panelOrder.current.get(b.id) ?? 1e6))
   for (const r of asks) { panelIds.current.add(r.id); if (!panelOrder.current.has(r.id)) panelOrder.current.set(r.id, panelOrder.current.size) }
   const answered = asks.filter((r) => answers?.[r.id]).length
+  const rowOfGate = (g: (typeof gates)[number]) => (g.statementId ? (allRows.find((r) => r.id === g.statementId) || null) : null)
   const gateList = (list: typeof gates) => list.length > 0 && (
     <div className={s.group} data-group="gates">
       <p className={s.gHead}><span className={s.gLabel}>What they count</span></p>
       <ul className={s.denseList}>
-        {list.map((g, i) => (
-          <li key={i} className={s.dense} data-state={g.state} data-testid="fit-gate">
-            <p className={s.gateText}><StateMark state={g.state as State} />{' '}{g.text}{g.caps ? <span className={s.tag}> · this decides the application</span> : null}</p>
-          </li>
-        ))}
+        {list.map((g, i) => {
+          const gr = rowOfGate(g)
+          const sid = g.statementId || ''
+          const canClaim = !!gr && !!gr.claim && !!answerWithAnchor && !answers?.[sid]
+          return (
+            <li key={i} className={s.dense} data-state={g.state} data-testid="fit-gate" data-id={sid || undefined}>
+              <p className={s.gateText}><StateMark state={(g.claimed ? 'said' : g.state) as State} />{' '}{g.text}{g.caps ? <span className={s.tag}> · this decides the application</span> : null}</p>
+              {canClaim && <div className={s.claimRow}><ClaimButton word={gr!.claim!} onClick={() => answerWithAnchor!(sid, 'claim')} /></div>}
+              {g.claimed && answerWithAnchor && sid && answers?.[sid] === 'claim' && <p className={s.said}><span /><button type="button" className={s.change} onClick={() => answerWithAnchor(sid, null)} data-testid="fit-gate-change">Change</button></p>}
+            </li>
+          )
+        })}
       </ul>
     </div>
   )
@@ -188,7 +223,11 @@ export default function FitRead({ data, note, compact = false, brief = false, an
   // the free step: the five rows that matter most, then one tap for the rest (and one for the questions)
   // the first screen says what stands between the person and the job: the gates not met (met ones are under
   // "Show all"), then the rows that matter most — fewer of them when gates already take the room
-  const leadGates = gates.filter((g) => g.state !== 'shown')
+  const gateKey = (g: (typeof gates)[number], i: number) => g.statementId || `${g.kind}:${i}`
+  const computedLead = gates.filter((g) => g.state !== 'shown')
+  const answeredAnyG = Object.keys(answers || {}).length > 0
+  if (!answeredAnyG || !frozenGates.current) frozenGates.current = computedLead.map((g) => gateKey(g, gates.indexOf(g)))
+  const leadGates = answeredAnyG ? frozenGates.current.map((k) => gates.find((g, i) => gateKey(g, i) === k)).filter((g): g is (typeof gates)[number] => !!g) : computedLead
   // a close-line question takes two rows' room: the first screen holds fewer rows when it carries them
   const firstPass = model ? (topRows(model, Math.max(3, 5 - leadGates.length), gates.map((g) => g.statementId)) as Row[]) : []
   const asking3 = firstPass.filter((r) => r.candidate && !r.byYou).length
@@ -207,7 +246,7 @@ export default function FitRead({ data, note, compact = false, brief = false, an
       {model && top.length > 0 && !open && (
         <div className={s.group} data-group="top">
           <p className={s.gHead}><span className={s.gLabel}>What matters most</span></p>
-          <ul className={s.denseList}>{top.map((r) => <StatementRow key={r.id} r={r} quoted={quoted} dense answer={answers?.[r.id]} answerLine={answerLines?.[r.id]} onAnswer={answerWithAnchor} saidBelow={asking && panelIds.current.has(r.id)} rowRef={(el) => { if (el && !answeredAny) rowHeights.current.set(r.id, el.offsetHeight) }} minH={answeredAny ? rowHeights.current.get(r.id) : undefined} />)}</ul>
+          <ul className={s.denseList}>{top.map((r) => <StatementRow key={r.id} r={r} quoted={quoted} dense noClaim={panelIds.current.has(r.id)} answer={answers?.[r.id]} answerLine={answerLines?.[r.id]} onAnswer={answerWithAnchor} saidBelow={asking && panelIds.current.has(r.id)} rowRef={(el) => { if (el && !answeredAny) rowHeights.current.set(r.id, el.offsetHeight) }} minH={answeredAny ? rowHeights.current.get(r.id) : undefined} />)}</ul>
         </div>
       )}
       {model && asks.length > 0 && !open && onAnswer && (
@@ -241,6 +280,12 @@ export default function FitRead({ data, note, compact = false, brief = false, an
         {sentence && !brief && <p className={s.sentence} data-testid="fit-sentence">{sentence}</p>}
         {diff && !brief && diff.carries.length > 0 && !/carries over/i.test(sentence) && <p className={s.carries}>What carries over: {diff.carries.join(', ')}.</p>}
       </div>
+      {data.structure === 'flat' && data.posting_note && model && !brief && (
+        <div className={s.postNote} data-testid="fit-posting-note">
+          <p className={s.postNoteText}><Icon name="file-text" size={16} label="Note" /><span>{data.posting_note}</span></p>
+          {paste}
+        </div>
+      )}
       {compact || brief
         ? <details className={s.disclose}><summary>{model ? `Every line the posting asks for (${model.total})` : 'What the posting asks for'}</summary>{gatesBlock}{everything}</details>
         : lead}

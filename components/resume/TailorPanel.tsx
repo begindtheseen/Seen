@@ -30,7 +30,7 @@ import { creditCostLabel } from '@/lib/creditRules'
 const LINES_PER_PAGE = 46
 // What the tailor answer carries besides the plan (reports/t3-paid.md §1, `action:'tailor'`): the shared charge
 // rule, the blocked verdict, the structured change list — feature-detected (an older stored result has none).
-type TailorExtra = { tailored?: Tailored | null; charge?: Charge | null; blocked?: Blocked | null; charged?: boolean; balance?: number; fit?: FitData | null; already_right?: AlreadyRight | null }
+type TailorExtra = { tailored?: Tailored | null; charge?: Charge | null; blocked?: Blocked | null; charged?: boolean; balance?: number; fit?: FitData | null; already_right?: AlreadyRight | null; questions_note?: string | null }
 type Layout = 'chronological' | 'relevance' | 'as_written'
 
 export interface TailorJob { title: string; company: string; description: string; jobId: string; url?: string }
@@ -71,6 +71,8 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
   const [baseDoc, setBaseDoc] = useState<ResumeDoc | null>(null) // the doc the plan was built for
   const [overrides, setOverrides] = useState<TailorOverrides>({})
   const [answers, setAnswers] = useState<Record<string, string>>({})
+  // the job a claimed line goes under, when the person had to pick one (prompt id → experience item id)
+  const [roleFor, setRoleFor] = useState<Record<string, string>>({})
   const [showAll, setShowAll] = useState(false)
   // the question cards' drafts and skips (a typed answer becomes a line only when the person adds it: answers[id])
   const [qDrafts, setQDrafts] = useState<Record<string, string>>({})
@@ -92,15 +94,16 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
     const rec = ResumeDocStore.getTailor(user?.id)
     if (!rec) return
     setPlan(rec.plan as TailorPlan); setBaseDoc(rec.baseDoc); setOverrides((rec.overrides || {}) as TailorOverrides); setAnswers(rec.answers || {})
-    const rj = rec.job as (TailorJob & { result?: TailorExtra }) | undefined
-    if (rj && !initialJob) { const { result, ...j } = rj; setJob(j) }
+    const rj = rec.job as (TailorJob & { result?: TailorExtra; roleFor?: Record<string, string> }) | undefined
+    if (rj && rj.roleFor) setRoleFor(rj.roleFor)
+    if (rj && !initialJob) { const { result, roleFor: _r, ...j } = rj; setJob(j) }
     if (rj && rj.result) setExtra(rj.result)
     setState('done')
   }, [restored, user?.id, initialJob])
   useEffect(() => {
     if (state !== 'done' || !plan || !baseDoc) return
-    ResumeDocStore.putTailor(user?.id, { job: { ...job, result: extra }, plan, baseDoc, overrides, answers })
-  }, [state, plan, baseDoc, overrides, answers, job, extra, user?.id])
+    ResumeDocStore.putTailor(user?.id, { job: { ...job, result: extra, roleFor }, plan, baseDoc, overrides, answers })
+  }, [state, plan, baseDoc, overrides, answers, job, extra, user?.id, roleFor])
 
   function pickSaved(id: string) {
     setSavedId(id)
@@ -157,8 +160,8 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
       const x = data as unknown as TailorExtra & { statements?: unknown; matched_requirements?: unknown; unsupported_requirements?: unknown; constraints?: unknown; field_match?: unknown }
       // the fit read rides along only when the answer carries the reader's statements (server request: tailor → statements)
       const fit = x.statements ? ({ verdict: data.plan.score?.verdict, statements: x.statements, matched_requirements: x.matched_requirements, unsupported_requirements: x.unsupported_requirements, constraints: x.constraints, field_match: x.field_match } as FitData) : null
-      setExtra({ already_right: (x as { already_right?: AlreadyRight | null }).already_right || null, tailored: x.tailored || null, charge: x.charge || (x.tailored && x.tailored.charge) || null, blocked: x.blocked || null, charged: !!x.charged, balance: typeof x.balance === 'number' ? x.balance : undefined, fit })
-      setPlan(data.plan); setBaseDoc(clone(doc)); setOverrides({}); setAnswers({})
+      setExtra({ questions_note: (x as { questions_note?: string | null }).questions_note || null, already_right: (x as { already_right?: AlreadyRight | null }).already_right || null, tailored: x.tailored || null, charge: x.charge || (x.tailored && x.tailored.charge) || null, blocked: x.blocked || null, charged: !!x.charged, balance: typeof x.balance === 'number' ? x.balance : undefined, fit })
+      setPlan(data.plan); setBaseDoc(clone(doc)); setOverrides({}); setAnswers({}); setRoleFor({})
       setState('done')
       markQuiet() // nothing optional pops over a result the person just paid for
     } catch { setError('Network error — try again.'); setState('error') }
@@ -179,9 +182,17 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
   // The variant the user will take: the plan re-applied with their overrides.
   const finalVariant = useMemo(() => {
     if (!plan || !baseDoc) return null
-    const prompts = plan.prompts || []
+    // a claimed line goes under the job the person picked; a credential (placed under Certifications whatever the job)
+    // rides on the first job so the plan's per-job apply loop reaches it
+    const first = baseDoc.experience?.[0]?.id
+    const prompts = (plan.prompts || []).map((p) => {
+      const pp = p as unknown as { kind?: string; answerKind?: string | null }
+      if (pp.kind !== 'claim') return p
+      if (roleFor[p.id]) return { ...p, itemId: roleFor[p.id] }
+      return pp.answerKind === 'credential' && !p.itemId && first ? { ...p, itemId: first } : p
+    })
     return applyTailorPlan(baseDoc, plan, { ...overrides, prompts, answers })
-  }, [plan, baseDoc, overrides, answers])
+  }, [plan, baseDoc, overrides, answers, roleFor])
 
   const setDecision = (itemId: string, decision: TailorDecision['decision']) => setOverrides((o) => ({ ...o, decisions: { ...(o.decisions || {}), [itemId]: decision } }))
   // Lines written from what a title implies are suggestions: added only when the person says so.
@@ -236,7 +247,7 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
       {state === 'done' && plan && extra.blocked && (
         <div className={s.card}>
           <ResultTopLine charge={extra.charge} charged={!!extra.charged} pro={pro} balance={extra.balance ?? null} cost={creditCostLabel(RESUME_OPTIMIZE_COST)} />
-          <div style={{ marginTop: 'var(--sp-3)' }}><BlockedResult b={extra.blocked} jobsHref="/jobs" /></div>
+          <div style={{ marginTop: 'var(--sp-3)' }}><BlockedResult b={extra.blocked} jobsHref="/jobs" note={extra.questions_note || null} /></div>
           {extra.fit && <div style={{ marginTop: 'var(--sp-4)' }}><FitRead data={extra.fit} compact brief /></div>}
         </div>
       )}
@@ -349,14 +360,14 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
               {/* the same question card as the paid result: the composer's line or its one sentence, confirmed before it is added */}
               <ol style={{ listStyle: 'none', margin: 'var(--sp-2) 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: 'var(--sp-3)' }}>
                 {(plan.prompts || []).map((p) => {
-                  const qn = { ...(p as unknown as Question), role: p.roleTitle, company: p.company } as Question
+                  const qn = { ...(p as unknown as Question), role: p.roleTitle, company: p.company, roles: (baseDoc?.experience || []).filter((e) => e.title || e.company).map((e) => ({ itemId: e.id, title: e.title, company: e.company })) } as Question
                   const raw = answers[p.id] || ''
                   return (
                     <QuestionCard key={p.id} qn={qn} io={{
                       draft: qDrafts[p.id] ?? raw,
                       setDraft: (t) => setQDrafts((d) => ({ ...d, [p.id]: t })),
                       added: raw ? (composeAnswer(qn as unknown as Record<string, unknown>, raw).line || null) : null,
-                      add: (_line, typed) => setAnswers((a) => ({ ...a, [p.id]: typed })),
+                      add: (_line, typed, itemId) => { if (itemId) setRoleFor((r) => ({ ...r, [p.id]: itemId })); setAnswers((a) => ({ ...a, [p.id]: typed })) },
                       remove: () => setAnswers((a) => { const n = { ...a }; delete n[p.id]; return n }),
                       skipped: qSkipped.includes(p.id),
                       skip: () => setQSkipped((x) => [...x.filter((y) => y !== p.id), p.id]),

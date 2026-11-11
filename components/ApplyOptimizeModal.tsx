@@ -32,7 +32,8 @@ import { afterPendingBack } from '@/lib/nav/urlState'
 import { markQuiet } from '@/lib/quietWindow'
 import { markOptimized } from '@/lib/optimizedJobs'
 import { RequirementsView, Checklist, PlanChanges, CopyBtn, planChangeCount, type Verdict, type RequirementRow, type ConstraintRow, type PaidPlan } from './optimizer/Verdict'
-import FitRead, { type Statement, type FieldMatch, type Answer, type Answers } from './optimizer/FitRead'
+import FitRead, { type Statement, type FieldMatch, type Answer } from './optimizer/FitRead'
+import { confirmedOf, withAnswer, type Stored } from './optimizer/useConfirmations'
 import { PaidResult, BlockedResult, ResultTopLine, PaidOffer, BuildSteps, usePaidVersion, type AlreadyRight, paidExportFields, type Tailored, type Charge, type Blocked, type ChangeCounts, type Question } from './optimizer/PaidResult'
 import { renderText } from '@/lib/resume/engine-client'
 import PostingInput, { PostingReadRow, type PostingRead } from './jobs/PostingInput'
@@ -152,19 +153,15 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
   // nothing is stored without an account (no guest key to carry into the next person's)
   const answersKey = user?.id ? `seen_confirm_v1:${user.id}:${job.id}` : ''
   // stored as { answers: { id: yes|no|skip }, lines: { id: the candidate line answered } } (round-2 shape: a bare map)
-  type Stored = { answers: Answers; lines: Record<string, string> }
   const readStored = (): Stored => { if (!answersKey) return { answers: {}, lines: {} }; try { const v = JSON.parse(localStorage.getItem(answersKey) || '{}'); return v && v.answers ? { answers: v.answers, lines: v.lines || {} } : { answers: v || {}, lines: {} } } catch { return { answers: {}, lines: {} } } }
   const [stored, setStored] = useState<Stored>(readStored)
   const answers = stored.answers
-  const confirmedOf = (st: Stored) => Object.entries(st.answers).filter(([, a]) => a !== 'skip').map(([statementId, answer]) => ({ statementId, answer, ...(st.lines[statementId] ? { line: st.lines[statementId] } : {}) }))
   const confirmed = confirmedOf(stored)
   // An answer is sent and the SERVER is asked again (free check + probe); the rows show what it sends back — a Yes it
   // did not accept leaves the question standing (x-integration "Confirmations": `{ statementId, answer, line? }` in,
   // statements changed by an answer come back `by: 'you'`).
   const onAnswer = (id: string, a: Answer | null, line?: string) => {
-    const n: Stored = { answers: { ...stored.answers }, lines: { ...stored.lines } }
-    if (a) n.answers[id] = a; else delete n.answers[id]
-    if (a && line) n.lines[id] = line; else if (!a) delete n.lines[id]
+    const n = withAnswer(stored, id, a, line)
     setStored(n)
     if (answersKey) { try { localStorage.setItem(answersKey, JSON.stringify(n)) } catch { /* storage unavailable */ } }
     if (a !== 'skip') void reask(confirmedOf(n))
@@ -628,12 +625,13 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
               {blocked
                 ? <>
                     {diag && <FitRead data={diag} note="free" compact brief />}
-                    <BlockedResult b={blocked} jobsHref={matchedJobsHref} showLink={false} fieldHref={fieldJobsHref} fieldLabel={fieldLabel} />
+                    <BlockedResult b={blocked} jobsHref={matchedJobsHref} showLink={false} fieldHref={fieldJobsHref} fieldLabel={fieldLabel} note={(probe as { questions_note?: string | null } | null)?.questions_note || null} />
                   </>
                 : <>
                     {diag
                       ? <>
-                          <FitRead data={diag} note="free" answers={answers} answerLines={stored.lines} onAnswer={onAnswer} />
+                          <FitRead data={diag} note="free" answers={answers} answerLines={stored.lines} onAnswer={onAnswer}
+                            paste={<details className={s.disclose} data-testid="flat-paste"><summary>Paste the posting with its line breaks</summary><PostingInput onSubmit={submitPosting} submitLabel="Check my fit · free" /></details>} />
                           {!diag.statements?.length && <Checklist constraints={diag.constraints} />}
                         </>
                       : <p className={s.fine}>The free check didn&apos;t load. You can still optimize, or close and try again.</p>}
@@ -650,7 +648,7 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
             <>
               {readRow}
               <ResultTopLine charge={result.charge} charged={!!result.charged} cached={!!result.cached} pro={pro} balance={balance} cost={cost} />
-              <BlockedResult b={blocked} jobsHref={matchedJobsHref} showLink={false} fieldHref={fieldJobsHref} fieldLabel={fieldLabel} />
+              <BlockedResult b={blocked} jobsHref={matchedJobsHref} showLink={false} fieldHref={fieldJobsHref} fieldLabel={fieldLabel} note={(result as { questions_note?: string | null }).questions_note || null} />
               <FitRead data={result} compact brief />
             </>
           )}

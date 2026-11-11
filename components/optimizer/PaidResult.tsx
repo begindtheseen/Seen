@@ -32,7 +32,7 @@ export interface Change {
 }
 export interface Charge { charge: boolean; reason: string; sentence: string | null; headline?: string | null; detail?: string | null }
 export interface Blocked { reason: string; sentence: string; what_would_change_it?: string[]; carries_over?: { requirement: string; line: string }[] }
-export interface Question { id: string; kind: string; facet?: string; question: string; unit?: string; requirement?: string | null; statement?: string | null; answer_kind?: string | null; term?: string; itemId?: string; role?: string; company?: string; template?: string; why?: string; bulletId?: string; line?: string; slot?: string }
+export interface Question { id: string; kind: string; heading?: string; needs_role?: boolean; roles?: { itemId: string; title?: string; company?: string }[]; answerKind?: string | null; label?: string; facet?: string; question: string; unit?: string; requirement?: string | null; statement?: string | null; answer_kind?: string | null; term?: string; itemId?: string; role?: string; company?: string; template?: string; why?: string; bulletId?: string; line?: string; slot?: string }
 export interface Tailored { doc: ResumeDoc; text?: string; changes: Change[]; kept_as_is?: string | null; visibility?: { of: number; before: number; after: number }; charge?: Charge; score_before?: number | null; score_after?: number | null; export_token?: string | null; export_key?: string | null }
 export interface ChangeCounts { reorder?: number; summary?: number; skills?: number; rewrites?: number; proposals?: number; questions?: number; availability?: number; formatting?: number }
 
@@ -151,7 +151,7 @@ function ChangeCard({ c, v, stuck, readOnly = false }: { c: Change; v: PaidVersi
   )
 }
 
-const KIND_OF_Q: Record<string, string> = { detail: 'A detail only you know', number: 'A number for one of your lines', tool: 'A tool they name', credential: 'A credential they ask for', duty: 'Work they ask for' }
+const KIND_OF_Q: Record<string, string> = { claim: 'Something you said you have done', detail: 'A detail only you know', number: 'A number for one of your lines', tool: 'A tool they name', credential: 'A credential they ask for', duty: 'Work they ask for' }
 // ONE question card for every place that asks (the sheet's paid result, /resume, Studio's Tailor panel). Each place
 // gives it an adapter (`QuestionIO`) over its own state; the card itself only asks, shows the ONE composer's answer
 // (lib/resume/tailor/questions.js composeAnswer: a line, or one sentence saying what it needs) and waits for the person
@@ -161,7 +161,8 @@ export interface QuestionIO {
   setDraft: (t: string) => void
   /** the confirmed line, when the person added one */
   added: string | null
-  add: (line: string, raw: string) => void
+  /** `itemId`: the job the person picked for a claimed line (asked when more than one job could hold it) */
+  add: (line: string, raw: string, itemId?: string) => void
   remove: () => void
   skipped: boolean
   skip: () => void
@@ -169,13 +170,18 @@ export interface QuestionIO {
 }
 export function QuestionCard({ qn, io }: { qn: Question; io: QuestionIO }) {
   const kind = questionKind(qn)
+  // a claimed line: a credential goes under Certifications; a duty under the job the person names
+  const claimCred = kind === 'claim' && (qn.answerKind || qn.answer_kind) === 'credential'
+  const pickRole = kind === 'claim' && !claimCred && !!qn.needs_role && (qn.roles || []).length > 0
+  const [role, setRole] = useState<string>(qn.itemId || '')
   const prompt = promptFor(qn)
   const answer = io.draft
   const slots = (String(qn.template || '').match(/\[[^\]]+\]/g) || []).length
   // every answer goes to the composer — no second opinion here about what counts as an answer
   const composed = answer.trim() ? composeAnswer(prompt as Record<string, unknown>, answer) : { line: '', problem: null as string | null }
   const line = composed.line
-  const where = qn.role ? `${qn.role}${qn.company ? ` · ${qn.company}` : ''}` : ''
+  const picked = pickRole ? (qn.roles || []).find((r) => r.itemId === role) : null
+  const where = claimCred ? 'Goes under Certifications' : picked ? [picked.title, picked.company].filter(Boolean).join(' · ') : qn.role ? `${qn.role}${qn.company ? ` · ${qn.company}` : ''}` : ''
   if (io.skipped) return (
     <li id={`chg-q:${qn.id}`} className={s.card} data-testid="question-card" data-kind={kind} data-skipped="1">
       <p className={s.why}>Skipped: {qn.question}</p>
@@ -184,8 +190,8 @@ export function QuestionCard({ qn, io }: { qn: Question; io: QuestionIO }) {
   )
   return (
     <li id={`chg-q:${qn.id}`} className={s.card} data-testid="question-card" data-kind={kind} data-slot={qn.slot || undefined}>
-      <p className={s.kind}>{KIND_OF_Q[kind]}</p>
-      {where && <p className={s.where}>{kind === 'credential' ? 'Goes under Certifications' : where}</p>}
+      <p className={s.kind}>{kind === 'claim' ? (claimCred ? 'A credential you said you hold' : KIND_OF_Q.claim) : KIND_OF_Q[kind]}</p>
+      {where && !pickRole && <p className={s.where}>{kind === 'credential' ? 'Goes under Certifications' : where}</p>}
       {io.added ? (
         <>
           <p className={s.after}>{io.added}</p>
@@ -199,19 +205,29 @@ export function QuestionCard({ qn, io }: { qn: Question; io: QuestionIO }) {
             {kind === 'credential' ? null : (
               <input autoComplete="off" className={s.input} value={answer} maxLength={kind === 'number' ? 60 : 160}
                 inputMode={kind === 'number' && qn.slot === 'insert' && slots < 2 ? 'decimal' : 'text'}
-                placeholder={kind === 'number' ? (qn.slot === 'insert' ? (slots > 1 ? 'The number, and how often' : 'The number') : 'The number and what it counts') : kind === 'tool' ? 'Where you used it, and for what' : 'In your own words'}
+                placeholder={kind === 'claim' ? (claimCred ? 'As written on the card, and when it expires' : 'What you did, and where') : kind === 'number' ? (qn.slot === 'insert' ? (slots > 1 ? 'The number, and how often' : 'The number') : 'The number and what it counts') : kind === 'tool' ? 'Where you used it, and for what' : 'In your own words'}
                 onChange={(e) => io.setDraft(e.target.value)} data-testid="question-input" />
             )}
           </label>
+          {pickRole && (
+            <label className={s.qLabel}>
+              Which job was it at?
+              <select className={s.input} value={role} onChange={(e) => setRole(e.target.value)} data-testid="question-role">
+                <option value="">Choose a job</option>
+                {(qn.roles || []).map((r) => <option key={r.itemId} value={r.itemId}>{[r.title, r.company].filter(Boolean).join(' · ')}</option>)}
+              </select>
+            </label>
+          )}
           {qn.statement && kind === 'detail' && <p className={s.why}>From the posting: “{q(qn.statement, 200)}”</p>}
           {kind === 'number' && qn.template && !answer.trim() && <p className={s.why}>Your line becomes: “{blankLine(qn.template)}”</p>}
           {line && <p className={s.after} data-testid="question-line">Your line would read: “{line}”</p>}
           {answer.trim() && !line && composed.problem && <p className={s.problem} data-testid="question-problem"><Icon name="triangle-alert" size={14} label="Needs more" /><span><b>Needs more:</b> {composed.problem}</span></p>}
+          {line && pickRole && !role && <p className={s.why}>Choose the job it goes under, then add it.</p>}
           {qn.why && kind !== 'detail' && <p className={s.why}>{qn.why}</p>}
           <div className={s.qActions}>
             {kind === 'credential'
               ? <button type="button" className={s.toggle} onClick={() => { const l = composeAnswer(prompt as Record<string, unknown>, 'yes').line; if (l) io.add(l, 'yes') }} data-testid="question-yes">Yes, I hold it — add it</button>
-              : <button type="button" className={s.toggle} disabled={!line} onClick={() => { if (line) io.add(line, answer) }} data-testid="question-add">Add this line</button>}
+              : <button type="button" className={s.toggle} disabled={!line || (pickRole && !role)} onClick={() => { if (line && (!pickRole || role)) io.add(line, answer, pickRole ? role : undefined) }} data-testid="question-add">Add this line</button>}
             <button type="button" className={s.toggle} onClick={io.skip} data-testid="question-skip">Skip</button>
           </div>
         </>
@@ -228,7 +244,7 @@ function paidIO(qn: Question, v: PaidVersion): QuestionIO {
     draft: v.drafts[qn.id] || '',
     setDraft: (t) => v.setDrafts((d) => ({ ...d, [qn.id]: t })),
     added: existing ? existing.line : null,
-    add: (line) => v.setAnswered((xs) => [...xs.filter((x) => x.id !== qn.id), { id: qn.id, itemId: qn.itemId, bulletId: qn.bulletId, kind: qn.kind === 'detail' ? 'gap' : qn.kind, answerKind: prompt.answerKind, line }]),
+    add: (line, _raw, itemId) => v.setAnswered((xs) => [...xs.filter((x) => x.id !== qn.id), { id: qn.id, itemId: itemId || qn.itemId, bulletId: qn.bulletId, kind: qn.kind === 'detail' ? 'gap' : qn.kind, answerKind: prompt.answerKind, line }]),
     remove: () => v.setAnswered((xs) => xs.filter((x) => x.id !== qn.id)),
     skipped: v.skipped.includes(qn.id),
     skip: () => v.setSkipped((xs) => [...xs.filter((x) => x !== qn.id), qn.id]),
@@ -324,11 +340,15 @@ export function PaidResult({ t, questions, v, defaultView, alreadyRight }: { t: 
 // "what would change it" is shown only as whole sentences the server wrote — a fragment is left out, never patched
 const isSentence = (t: string) => /^[A-Z“"]/.test(t.trim()) && /[.!?]["”]?$/.test(t.trim()) && t.trim().split(/\s+/).length >= 5
 
-export function BlockedResult({ b, jobsHref, showLink = true, fieldHref = '', fieldLabel = '' }: { b: Blocked; jobsHref: string; showLink?: boolean; fieldHref?: string; fieldLabel?: string }) {
+export function BlockedResult({ b, jobsHref, showLink = true, fieldHref = '', fieldLabel = '', note = '' }: { b: Blocked; jobsHref: string; showLink?: boolean; fieldHref?: string; fieldLabel?: string; note?: string | null }) {
   const changes = (b.what_would_change_it || []).filter(isSentence)
+  // the package's `questions_note` (why no questions are asked) — printed once, never beside the same sentence
+  const said = (t: string) => t.toLowerCase().replace(/[^a-z]+/g, ' ').trim()
+  const showNote = !!note && !said(b.sentence || '').includes(said(note).slice(0, 40))
   return (
     <section className={s.blocked} data-testid="blocked" aria-label="Why nothing was changed">
       <p className={s.blockedText}>{b.sentence}</p>
+      {showNote && <p className={s.why} data-testid="questions-note">{note}</p>}
       {(b.carries_over || []).length > 0 && (
         <div className={s.section}>
           <p className={s.label}>What carries over from your résumé</p>

@@ -144,9 +144,11 @@ export function promptFor(q) {
 /**
  * What kind of field a question gets. A number question shows a numeric field and the exact line it will
  * complete; a tool / duty / credential question shows a text field worded for what it is.
- * @returns {'detail'|'number'|'credential'|'tool'|'duty'}
+ * @returns {'claim'|'detail'|'number'|'credential'|'tool'|'duty'}
  */
 export function questionKind(q) {
+  // a line the person said they have done / hold (round 9): asked in their own words, under the job they name
+  if (q.kind === 'claim') return 'claim';
   // a detail question (paid.js detailQuestions: open as well as close, ticket times, how often you count) asks for the
   // person's own words under their current role
   if (q.kind === 'detail' || q.facet) return 'detail';

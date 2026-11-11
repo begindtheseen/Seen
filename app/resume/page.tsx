@@ -277,7 +277,7 @@ function RewriteView({ out, copy, copied, onRerun, pro }: { out: PaidOptimize; c
   if (x.blocked) return (
     <div className="ai-stack" data-testid="resume-blocked">
       <ResultTopLine charge={x.charge} charged={!!x.charged} cached={!!out.cached} pro={pro} balance={x.balance ?? null} cost={OPTIMIZE_PRICE} />
-      <BlockedResult b={x.blocked} jobsHref="/jobs" />
+      <BlockedResult b={x.blocked} jobsHref="/jobs" note={(x as { questions_note?: string | null }).questions_note || null} />
     </div>
   )
   if (tailored) return (

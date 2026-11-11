@@ -59,3 +59,14 @@
 .gateText { margin: 0; font-size: var(--fs-sm); color: var(--text-2); line-height: var(--lh-body); overflow-wrap: anywhere; }
 .candidate { display: flex; flex-direction: column; gap: var(--sp-1); margin-top: var(--sp-1); padding-left: var(--sp-3); border-left: 2px solid var(--info-line); min-width: 0; }
 .miss + .miss::before { content: ' · '; }
+
+/* "I've done this" / "I hold this" / "That's right": quiet text buttons with a 44px tap box (never filled) */
+.claimRow { display: flex; flex-wrap: wrap; column-gap: var(--sp-4); min-width: 0; }
+.claim { min-height: 44px; padding: 0; background: none; border: 0; color: var(--accent); font: inherit; font-size: var(--fs-sm); font-weight: 600; cursor: pointer; text-align: left; }
+.claim:hover { text-decoration: underline; }
+.claim:focus-visible { outline: none; box-shadow: var(--sh-focus); border-radius: var(--r-chip); }
+.mark[data-state='said'] { color: var(--info-text); }
+/* a posting that arrived as one block: one calm line above the list, with the sheet's paste action */
+.postNote { display: flex; flex-direction: column; gap: var(--sp-1); min-width: 0; }
+.postNoteText { display: flex; gap: var(--sp-2); align-items: flex-start; margin: 0; font-size: var(--fs-sm); color: var(--text-2); line-height: var(--lh-body); overflow-wrap: anywhere; }
+.postNoteText svg { flex-shrink: 0; margin-top: 2px; color: var(--text-3); }
