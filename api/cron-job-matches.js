@@ -329,7 +329,8 @@ async function run(req, res, { loadGeo, fetchFull = fetchFullPosting }) {
         for (const d of c.dropped) { const k = d.why.startsWith('gate:') ? d.why.replace(':', '_') : `teaser_${d.why.split(':')[0]}`; summary.skipped[k] = (summary.skipped[k] || 0) + 1; }
         if (dry && dryMatches) for (const dm of dryMatches) { const d = c.dropped.find((x) => x.id === String(dm.job_id)); if (d) dm.dropped = d.why; }
         if (!confirmed.length) {
-          const why = open.length ? 'no_readable_match' : 'no_good_match'; // nothing new vs. nothing readable
+          // round 12: candidates existed but none passed every check on evidence → no email (doubt means silence)
+          const why = open.length ? (f.dropped.some((d) => String(d.why).startsWith('not_positive')) || c.rows.length ? 'no_positive_match' : 'no_readable_match') : 'no_good_match';
           skip(why);
           if (dry) summary.picked.push({ user: uid.slice(0, 8), reason: why, keys: dryKeys, matches: dryMatches });
           continue;
