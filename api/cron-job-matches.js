@@ -154,7 +154,7 @@ export async function confirmFullPostings(rows, keys, { db, deadline, fetchFull 
     let m;
     try { m = mx ? mx(row, keys, { now, mode: 'email', resumeText }) : matchListing(row, keys, { now, mode: 'email' }); } catch { dropped.push({ id, why: 'skipped_error' }); continue; }
     if (!m.ok || m.summaryOnly || !m.reason) { dropped.push({ id, why: m.ok ? 'still_summary' : `full_posting:${m.why}` }); continue; }
-    out.push({ ...row, _reason: m.reason, _basis: m.basis, _need: m.need, _have: m.have, _summaryOnly: false });
+    out.push({ ...row, _reason: m.reason, _basis: m.basis, _need: m.need, _have: m.have, _checked: m.checked || [], _checks: m.checks || [], _noHeadline: ['intent', 'transfer'].includes(m.basis) || !!m.noHeadline, _headlineOk: !!m.headlineOk, _summaryOnly: false });
   }
   return { rows: out, fetched, dropped };
 }

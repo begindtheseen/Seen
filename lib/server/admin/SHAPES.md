@@ -192,7 +192,10 @@ since, so it was left alone.").
   "remaining": 960, "complete": false, "cursor": "eyJhdWRpdF9pZCI6…", "restored": 80, "total": 1040 }
 ```
 `changed` = rows restored by THIS round (sum them; count a replay's `recorded_changed` once); `restored` / `total` =
-running totals. The server re-reads the batch each round, so an interrupted or cancelled undo resumes from any later
+running totals. `recompute: { queued, remaining, mode, cursor? }` (round 11) = company scores this round QUEUED, not
+recomputed inline — run the same `recompute_queue_drain` follow-up as after the bulk decision (pass `cursor` when the
+queue table is absent). Shape of the work: rows sharing their prior values are restored by one conditional PATCH per
+≤40 ids (no read before the write); 1,040 rows take ~41 calls in one round at 60 ms per call. The server re-reads the batch each round, so an interrupted or cancelled undo resumes from any later
 press. The audit row records `undo_progress` and is marked undone only by the round that completes.
 A single-row undo (`round` absent) is one call; `request_id` alone makes it idempotent. An already-undone row without
 `round`: 409 `conflict` "That was already undone." A row that cannot be undone: 400 `bad_request`.

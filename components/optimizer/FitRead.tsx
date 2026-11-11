@@ -121,6 +121,9 @@ export default function FitRead({ data, note, compact = false, brief = false, an
   const frozenTop = useRef<string[] | null>(null)
   // each first-list row keeps at least the height it had before the first answer (its text may get shorter)
   const rowHeights = useRef<Map<string, number>>(new Map())
+  // the verdict sentence and the gates above the questions may be re-worded by the server after an answer: their
+  // blocks keep at least the height they had, so nothing under the person's finger moves
+  const blockHeights = useRef<Map<string, number>>(new Map())
   const v = data.verdict || null
   const diff = differentField(data.field_match || null)
   const model = fitGroups(data)
@@ -180,7 +183,7 @@ export default function FitRead({ data, note, compact = false, brief = false, an
   const quoted = new Set<string>()
   const lead = (
     <>
-      {open ? gatesBlock : gateList(leadGates)}
+      {(open ? gates.length > 0 : leadGates.length > 0) && (<div ref={(el) => { if (el && !answeredAny) blockHeights.current.set('gates', el.offsetHeight) }} style={answeredAny && blockHeights.current.get('gates') ? { minHeight: blockHeights.current.get('gates') } : undefined}>{open ? gatesBlock : gateList(leadGates)}</div>)}
       {model && top.length > 0 && !open && (
         <div className={s.group} data-group="top">
           <p className={s.gHead}><span className={s.gLabel}>What matters most</span></p>
@@ -208,7 +211,7 @@ export default function FitRead({ data, note, compact = false, brief = false, an
   )
   return (
     <section className={s.fit} data-testid="fit-read" aria-label="Your fit for this job">
-      <div className={s.head}>
+      <div className={s.head} ref={(el) => { if (el && !answeredAny) blockHeights.current.set('head', el.offsetHeight) }} style={answeredAny && blockHeights.current.get('head') ? { minHeight: blockHeights.current.get('head') } : undefined}>
         {v?.gate && !diff && !brief && <p className={s.gate}><Icon name="triangle-alert" size={16} label="Gate" /><span>{v.gate}</span></p>}
         <p className={s.band}>
           {v && v.score != null && !diff ? <span className={s.score}>{v.score}</span> : null}
