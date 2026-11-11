@@ -155,8 +155,8 @@ export default function FitRead({ data, note, compact = false, brief = false, an
   // above it (the verdict sentence can grow) — measured before the answer, corrected right after the new reading paints
   // Round 7: the anchor is the CONTROL the person tapped — what replaces it in the row (the "You said …" line with Change,
   // or the buttons again after Change; every such block is marked `data-landing`) lands where their finger was
-  const anchor = useRef<{ id: string; top: number; control: boolean } | null>(null)
-  const tapTop = useRef<number | null>(null)
+  const anchor = useRef<{ id: string; top: number; control: boolean; row: Element | null } | null>(null)
+  const tapTop = useRef<{ top: number; row: Element } | null>(null)
   // `budget` (screens of the scroll it sits in): when the first list would push what follows past it, the not-shown rows
   // fold into one "Show all N" line — decided once, before any answer, from the rendered height (nothing is removed:
   // opened, they appear in place of the line, below what is already on screen)
@@ -166,16 +166,18 @@ export default function FitRead({ data, note, compact = false, brief = false, an
   const sectionRef = useRef<HTMLElement | null>(null)
   const rowEl = (id: string) => sectionRef.current?.querySelector(`[data-testid=fit-row][data-id="${CSS.escape(id)}"][data-panel="1"]`) || sectionRef.current?.querySelector(`:is([data-testid=fit-row],[data-testid=fit-gate])[data-id="${CSS.escape(id)}"]`) || null
   const answerWithAnchor: OnAnswer | undefined = onAnswer ? (id, a, line) => {
-    const el = rowEl(id)
-    if (tapTop.current != null) anchor.current = { id, top: tapTop.current, control: true }
-    else if (el) anchor.current = { id, top: el.getBoundingClientRect().top, control: false }
+    // the row the finger was on (a statement can show twice — as a gate and as its own row — so never re-found by id alone)
+    const tapped = tapTop.current && tapTop.current.row.getAttribute('data-id') === id ? tapTop.current : null
+    const el = tapped ? tapped.row : rowEl(id)
+    if (tapped) anchor.current = { id, top: tapped.top, control: true, row: tapped.row }
+    else if (el) anchor.current = { id, top: el.getBoundingClientRect().top, control: false, row: el }
     tapTop.current = null
     onAnswer(id, a, line)
   } : undefined
   useLayoutEffect(() => {
     const a = anchor.current
     if (!a || !sectionRef.current) return
-    const el = rowEl(a.id)
+    const el = a.row && a.row.isConnected ? a.row : rowEl(a.id)
     if (!el) return
     // until the server's answer paints, the row may hold no landing block yet: wait for it rather than guess
     const target = a.control ? el.querySelector('[data-landing]') : el
@@ -228,7 +230,7 @@ export default function FitRead({ data, note, compact = false, brief = false, an
             <li key={i} className={s.dense} data-state={g.state} data-testid="fit-gate" data-id={sid || undefined}>
               <p className={s.gateText}><StateMark state={(g.claimed ? 'said' : g.state) as State} />{' '}{g.label ? <><span className={s.gateLabel}>{g.label}</span> — </> : null}{g.text}{g.caps ? <span className={s.tag}> · this decides the application</span> : null}</p>
               {canClaim && <div className={s.claimRow} data-landing><ClaimButton word={gr!.claim!} onClick={() => answerWithAnchor!(sid, 'claim')} /></div>}
-              {g.claimed && answerWithAnchor && sid && answers?.[sid] === 'claim' && <p className={s.said} data-landing><span /><button type="button" className={s.change} onClick={() => answerWithAnchor(sid, null)} data-testid="fit-gate-change">Change</button></p>}
+              {withClaim && g.claimed && answerWithAnchor && sid && answers?.[sid] === 'claim' && <p className={s.said} data-landing><span /><button type="button" className={s.change} onClick={() => answerWithAnchor(sid, null)} data-testid="fit-gate-change">Change</button></p>}
             </li>
           )
         })}
@@ -308,7 +310,7 @@ export default function FitRead({ data, note, compact = false, brief = false, an
   )
   return (
     <section ref={sectionRef} className={s.fit} data-testid="fit-read" aria-label="Your fit for this job"
-      onClickCapture={(e) => { const b = (e.target as HTMLElement).closest('button'); tapTop.current = b && b.closest('[data-testid=fit-row],[data-testid=fit-gate]') ? b.getBoundingClientRect().top : null }}>
+      onClickCapture={(e) => { const b = (e.target as HTMLElement).closest('button'); const row = b ? b.closest('[data-testid=fit-row],[data-testid=fit-gate]') : null; tapTop.current = b && row ? { top: b.getBoundingClientRect().top, row } : null }}>
       <div className={s.head} ref={(el) => { if (el && !answeredAny) blockHeights.current.set('head', el.offsetHeight) }} style={answeredAny && blockHeights.current.get('head') ? { minHeight: blockHeights.current.get('head') } : undefined}>
         {v?.gate && !diff && !brief && <p className={s.gate}><Icon name="triangle-alert" size={16} label="Gate" /><span>{v.gate}</span></p>}
         <p className={s.band}>
