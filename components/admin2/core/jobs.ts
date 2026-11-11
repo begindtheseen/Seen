@@ -315,7 +315,7 @@ export function createJobManager(deps: {
         done.message = jobSummary(done, lastMessage)
         // Scores the last round queued are brought up to date without the person doing anything.
         const follow = done.recompute ? recomputeSpec(done.recompute) : null
-        if (follow) done.follow_job_id = mgr.start(follow)
+        if (follow) done.follow_job_id = mgr.start(follow, { quiet: true })
         jobs.set(id, done); persist(); emit()
         if (done.undo_of) deps.undoBus?.emit(done.undo_of)
         return
@@ -341,11 +341,12 @@ export function createJobManager(deps: {
   }
 
   const mgr = {
-    /** Start the job, or return the one already running for the same action+args (and focus it). */
-    start(spec: JobSpec): string {
+    /** Start the job, or return the one already running for the same action+args. A press focuses the running one
+     *  (the Jobs sheet opens on it); a follow-up the app starts by itself (`quiet`) never opens anything. */
+    start(spec: JobSpec, opts: { quiet?: boolean } = {}): string {
       const key = jobKey(spec.action, spec.args)
       const running = findRunning(key)
-      if (running) { focusListeners.forEach((f) => f(running.id)); return running.id }
+      if (running) { if (!opts.quiet) focusListeners.forEach((f) => f(running.id)); return running.id }
       // A finished or stopped job of the same kind makes way for the new run.
       for (const j of [...jobs.values()]) if (j.key === key) jobs.delete(j.id)
       const id = `job_${now().toString(36)}_${(seq++).toString(36)}`

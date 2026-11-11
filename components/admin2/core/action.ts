@@ -235,7 +235,7 @@ export function createActionRunner(deps: {
       const message = rounds > 1 ? `${total.toLocaleString('en-US')} rows put back.${res.complete === false ? ` ${(res.remaining ?? 0).toLocaleString('en-US')} still to undo — press Undo again to continue.` : ''}` : (undoSentence(res.message) || 'Undone.')
       const unfinished = res.complete === false
       const follow = deps.jobs ? recomputeSpec((res as { recompute?: Recompute }).recompute as Recompute) : null
-      const followJobId = follow ? deps.jobs!.start(follow) : undefined
+      const followJobId = follow ? deps.jobs!.start(follow, { quiet: true }) : undefined
       setState(target, { status: 'done', target, args: s.args, result: { ...res, changed: total, message, undo: unfinished ? u : undefined }, undone: !unfinished, followJobId })
     } else {
       // The original result stays (its Undo button too); the line says why the Undo failed.

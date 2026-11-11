@@ -342,6 +342,8 @@ test('jobs: a second press returns the running job instead of starting another l
   m.onFocus((id) => focused.push(id))
   const a = m.start(SPEC); const b = m.start(SPEC)
   assert.equal(a, b); assert.deepEqual(focused, [a])
+  // a follow-up the app starts by itself reuses the running job and opens nothing
+  assert.equal(m.start(SPEC, { quiet: true }), a); assert.deepEqual(focused, [a])
   release(); await until(() => m.get(a).status === 'done')
   assert.equal(calls, 1)
   assert.equal(jobKey('a', { x: 1, y: 2 }), jobKey('a', { y: 2, x: 1 }))
