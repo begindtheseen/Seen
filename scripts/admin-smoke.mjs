@@ -463,7 +463,6 @@ async function run(vp) {
     const cover = await page.evaluate(() => {
       const dock = [...document.querySelectorAll('[data-testid=result-dock]')].find((e) => e.offsetParent)
       if (!dock) return { dock: false }
-      const d = dock.getBoundingClientRect()
       const out = []
       for (const b of document.querySelectorAll('button:not([disabled]), a[href]')) {
         if (dock.contains(b) || !b.offsetParent) continue

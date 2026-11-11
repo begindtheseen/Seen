@@ -58,5 +58,5 @@ export const withExpected = (e: { end?: string; dateText?: string }, label: stri
 export function composeAnswer(prompt: Record<string, unknown>, raw: string): { line: string; problem: string | null } {
   // ONE composer for every kind (round 7): a line from the person's words, or one sentence saying what it needs
   const r = _composeAnswer(prompt, raw)
-  return { line: String((r && r.line) || ''), problem: (r && r.problem) || null }
+  return { line: String(r.line || ''), problem: r.problem || null }
 }
