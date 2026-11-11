@@ -260,7 +260,11 @@ function DockLine({ entry, jobs, onDismiss }: { entry: DockEntry; jobs: Job[]; o
     const follow = job.follow_job_id ? jobs.find((j) => j.id === job.follow_job_id) : undefined
     return <ResultLine state={st} onDismiss={onDismiss} followUp={follow} />
   }
-  const follow = entry.state.followJobId ? jobs.find((j) => j.id === entry.state.followJobId) : undefined
+  // A decision whose answer announced a score update ("… · 69 company scores still updating"): the section starts that
+  // job itself, so the dock follows the same one — otherwise this line would say "still updating" for ever.
+  const announced = (entry.state.result as { recompute?: { remaining?: number } } | undefined)?.recompute?.remaining
+  const follow = entry.state.followJobId ? jobs.find((j) => j.id === entry.state.followJobId)
+    : announced ? [...jobs].reverse().find((j) => j.action === 'recompute_queue_drain') : undefined
   return <ResultLine state={entry.state} onUndo={entry.onUndo} onRetry={entry.onRetry} onDismiss={onDismiss} followUp={follow} />
 }
 

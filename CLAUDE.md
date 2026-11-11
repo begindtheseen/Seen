@@ -90,6 +90,72 @@ Editor — comments stripped, one block per migration, and say which to run firs
   Not handled: LinkedIn/Indeed/SAP-jobs pages (datacenter walls; the r.jina.ai rung is untestable from the sandbox),
   Workday tenants answering 403, non-English postings.
 
+## Session 2026-11-10/11: the tools program — one fit engine, claims, matched jobs, admin rebuilt (PR #392, same branch)
+- **Owner mandate:** "focus purely on our tools like the optimizer… undeniably blown away"; matched-job emails must be
+  "spot on" (a security listing asking 3 years went to someone who never worked security); search by place alone; admin
+  "from ground up… It must just work". Built by Opus agents under one director; every number below is on data NOBODY
+  tuned against unless it says otherwise.
+- **THE LESSON (cost most of two days):** a set an engineer can see reads 97–98% and means nothing. Reader 97.3% right
+  on the tuned set vs 84.8–92.1% on untouched postings; matcher rail 98.3%/82.6% tuned vs 80.0%/21.8% untouched; the
+  judge credits ~42–57% of what a recruiter credits everywhere. A hidden set you steer by is spent after one look —
+  keep a fresh one for acceptance, show builders principles and aggregates only. Two independently built judges, a
+  clean-room second matcher (`lib/server/match2/`, its field stage kept for rail recall) and a paraphrase-knowledge
+  round all hit the same ceiling: recall on new language is not reachable by more rules.
+- **The product answer to that ceiling — claims** (`lib/optimizer/confirmations.js`): on any line read not shown /
+  partly (never a years ask) the person taps "I've done this" / "I hold this". `confirmed:[{statementId, answer, claim:
+  true}]` → status shown, `by:'you'`, `claimed`, evidence carries NO résumé line ("You said you have done this — it is
+  not on your résumé yet."). The headline counts claims apart ("…you said you've done 2 more that aren't on your résumé
+  yet — add them"); the paid build asks the claimed lines first and adds a line only from the person's own words. No
+  answers → the reading is byte-identical; the cache key carries claims.
+- **One reading, one verdict:** `runOptimizer` (lib/optimizer/index.js) → statements `{id, text, status
+  shown|partly|not_shown|cannot_tell, evidence[{line,why}], missing, kind, importance}`; every tool (free check, paid
+  Optimize, Studio, Prep, Insights, matched jobs) reads THAT. Reader = `statements.js` + `extractJobFacts.js` +
+  `statementGate.js`; gates = `constraints.js` (`isHardGateFailed` / `refusingGates` is the ONE definition of a failed
+  hard requirement: years in the right kind of work — `NEAR_YEARS_SHARE` 0.7 is "partly" —, degree by subject, licence
+  current + state + rung, clearance, language, eligibility, recency, title-only conditions); `explainScore.js` holds
+  the band invariant (the headline agrees with its own lines: `AGREE_GOOD` 0.70 / `AGREE_STRONG` 0.85).
+  `rolesFromText` (extractResumeFacts.js) is the ONE résumé role reader — jobKeys' own parser dropped the first/current
+  role in all twelve header layouts (pinned in g5.test.mjs), which three matcher rule rounds failed to find because
+  they patched rules instead of checking what the layer below handed them.
+- **ENGINE_VERSION history** (`lib/optimizer/types.js`, now `seenfit-2.11.0`; it keys every cached output): 2.3 one
+  reading; 2.4 statements judged on résumé lines; 2.5 display gate; 2.6–2.7 list handling; 2.8 a list judged as a list,
+  refusal on foreign/shapeless postings; 2.9 list lead-ins, Part markers, credential cues; 2.10 a shape/confidence gate
+  that HID lines — reverted in 2.11: on untouched postings it hid ~70 real lines to remove ~15 bad ones. Repairs stay,
+  hiding is gone; a one-block posting is a fact with a note (`structure:'flat'`, `posting_note`).
+- **Matched jobs:** `profiles.job_keys` (+ `job_keys_updated_at`; migration `20261110120000_profiles_job_keys.sql`, NOT
+  applied — the code rebuilds per request without it), `lib/server/jobKeys.js` (`JOB_KEYS_VERSION` 10), rebuilt on a
+  résumé save and on applications. An email headline needs POSITIVE evidence at every point (latest role is the basis,
+  every stated requirement shown, a positive match on any stated schedule/place want, fit Good+ on the full text) —
+  else no email (`no_positive_match` in the cron's diagnostics). Unseen people: rail 80.0% precise / 21.8% recall vs
+  the live matcher's 30.8% / 7.3%; wrong headlines 1 of 5 vs 3 of 5; 0 false facts. Honest label: better than live,
+  not at target (thin rail, quiet email for occupations it has not met). Search by place alone works; radius is
+  measured from town coordinates.
+- **Shared knowledge with trust contracts:** `lib/occupations` (O*NET-derived; exact → fact, close → use unless
+  contradicted, guess → tie-break, null → unknown NOT different), `lib/text/{tradeTalk,sameAct,workFamilies,synonyms}`
+  + `lib/text/data/**` (in vercel.json includeFiles; `lib/occupations/shipping.test.mjs`);
+  `GET /api/optimizer?health=1` says whether a deployment can read them.
+- **Admin is rebuilt:** `/admin` = `components/admin2/{core,sections,ui}` on `api/admin-stats.js` +
+  `lib/server/admin/*` (contract in `SHAPES.md`). No reloads; a result shows where the person is and in a dock with
+  Undo; history per section (no dead ends). Bulk actions are idempotent JOBS (`request_id` + `round`; a lost answer is
+  re-asked via `job_status`, never reported as failed). "Approve all positive (N)" shows N only once the duplicate
+  check is complete (`counts` / `checked` from the server, `dupCache.js`) and N never changes after; a 1,040-report
+  Undo is one grouped PATCH round (was 182–401 s). A follow-up job the app starts itself is `quiet` (never opens the
+  Jobs sheet). Migrations `20261111100000_admin_core`, `…110000_admin_rpcs`, `…120000_admin_health`,
+  `…130000_admin_dup_checks` NOT applied; verified ONLY on the rig (fake PostgREST with the 1,000-row cap and 8 s
+  statement budget), never on real Postgres.
+- **Rules that came out of it:** a tool states nothing the résumé does not state — a near-miss is "the closest I have
+  done", never proof; a role header never proves a duty; a different-field posting is not charged
+  (`questionsNote` / `DIFFERENT_FIELD_NOTE`); the Insights tip reads the signed-in person's résumé for their answer
+  only and the shared cache row never holds a person's words; a detail question is asked only with a reason and always
+  ends in a line or one sentence saying what is needed.
+- **Harness:** a stop hook demands a push per turn → `[skip ci]` checkpoints between full runs (GitHub's default squash
+  message lists every subject — hand-write the merge message or CI is skipped on the merge commit); sign checkpoint
+  commits (`commit-tree -S`); an `env -i` build of a COPY needs its own `node_modules` or npx tries the registry;
+  stamp logs from `date -u`, never a guessed time; after a container restart resume agents by id and check for one
+  that stalled silently.
+- **Not verified live:** anything on real Postgres or production (admin, the matched-jobs cron, a signed-in Insights
+  call, a paid export, a prep write), a real iPhone.
+
 ## Session 2026-11-02: design system locked + persona acceptance rounds (PR #389, branch claude/alerts-radius-security)
 - **Owner asks, in order:** ditch the purple gradient ("vibecode slop") → do it with the ui-ux-pro-max skill and the five
   anti-slop rules without losing the look → "run the whole layout through the skill… test with agents until they approve
