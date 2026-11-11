@@ -583,12 +583,14 @@ function AnswerEditor({ a, company, values, notes, onSave, defaultOpen, title, t
 // "Closest line we found" on a job-match row (shown only when the prep server sends `candidate`): the same Yes / No question
 // as the fit read. The prep API takes no answers yet, so the answer is shown as the person's own words ("You said …") and
 // never as "your résumé shows"; it is not sent anywhere.
-function PrepCandidate({ line, why, answer, onAnswer }: { line: string; why?: string; answer?: string; onAnswer?: (a: 'yes' | 'no' | null) => void }) {
+function PrepCandidate({ line, why, answer, onAnswer, building = false }: { line: string; why?: string; answer?: string; onAnswer?: (a: 'yes' | 'no' | null) => void; building?: boolean }) {
   // with an answer path (`statementId` on the row) the answer is sent to the prep build as `confirmed` and the row shows what
   // the server returns (`by: 'you'`); a Yes it did not accept leaves the question standing. Without one, the person's
   // answer is shown as their own words only and sent nowhere.
   const [said, setSaid] = useState<'yes' | 'no' | null>(null)
-  if (onAnswer && answer === 'no') return <span className={s.why}>Not on your résumé — you said “{line}” does not show this. <button type="button" className={s.linkBtn} onClick={() => onAnswer(null)}>Change</button></span>
+  // while the prep rebuilds with the answer the row says so; once it is back the server's row is shown (a Yes becomes
+  // "You said …", a No takes the suggestion away). An answer the server did not accept leaves the question standing.
+  if (onAnswer && building && (answer === 'yes' || answer === 'no')) return <span className={s.why}>Rebuilding with your answer…</span>
   if (!onAnswer && said) return <span className={s.why}>{said === 'yes' ? `You said “${line}” shows this.` : `You said “${line}” does not show this.`} <button type="button" className={s.linkBtn} onClick={() => setSaid(null)}>Change</button></span>
   return (
     <span className={s.why}>
@@ -674,11 +676,12 @@ function PackView({ pack, company, fu, onFill, onRebuild, building, onConfirm, a
           <ul className={s.qs}>
             {pack.job_match.map((m, i) => (
               <li key={i}>
-                <b>{m.label}</b> <span className={s.dim}>· {MATCH_WORD[m.status] || m.status}</span>
+                <b>{m.label}</b> <span className={s.dim}>· {m.by === 'you' ? 'you said yes' : (MATCH_WORD[m.status] || m.status)}</span>
                 {m.proof && <span className={s.why}>Your line: “{m.proof}”</span>}
-                {m.by === 'you' && <span className={s.why}>{m.candidate?.line || m.proof ? `You said this line shows it: “${m.candidate?.line || m.proof}”` : 'You said yes.'}{onConfirm && m.statementId ? <> <button type="button" className={s.linkBtn} onClick={() => onConfirm(m.statementId as string, null)}>Change</button></> : null}</span>}
-                {m.by !== 'you' && !m.proof && m.candidate?.line && <PrepCandidate line={m.candidate.line} why={m.candidate.why} answer={m.statementId ? answers?.[m.statementId] : undefined} onAnswer={onConfirm && m.statementId ? (a) => onConfirm(m.statementId as string, a, m.candidate!.line) : undefined} />}
-                {m.say && <span className={s.why}>{m.say}</span>}
+                {/* the server's own "You said …" sentence when it sends one; the line the person confirmed, quoted */}
+                {m.by === 'you' && <span className={s.why}>{m.say && /^You said/.test(m.say) ? m.say : 'You said yes.'}{onConfirm && m.statementId ? <> <button type="button" className={s.linkBtn} onClick={() => onConfirm(m.statementId as string, null)}>Change</button></> : null}</span>}
+                {m.by !== 'you' && !m.proof && m.candidate?.line && <PrepCandidate building={building} line={m.candidate.line} why={m.candidate.why} answer={m.statementId ? answers?.[m.statementId] : undefined} onAnswer={onConfirm && m.statementId ? (a) => onConfirm(m.statementId as string, a, m.candidate!.line) : undefined} />}
+                {m.say && !(m.by === 'you' && /^You said/.test(m.say)) && <span className={s.why}>{m.say}</span>}
               </li>
             ))}
           </ul>
