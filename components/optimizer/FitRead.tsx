@@ -7,7 +7,7 @@
 // never writes an answer into the résumé. Every word is the server's (fitRead.js only groups and orders); an
 // answer with no `statements` (an older cached response) falls back to the verdict's requirement list.
 
-import { useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import Icon from '@/components/ui/Icon'
 import type { IconName } from '@/components/ui/Icon'
 import { RequirementsView, type Verdict, type RequirementRow, type ConstraintRow } from './Verdict'
@@ -49,7 +49,7 @@ function YesNo({ onYes, onNo, onSkip }: { onYes: () => void; onNo: () => void; o
   )
 }
 
-function StatementRow({ r, answer, answerLine, onAnswer, quoted, dense = false, saidBelow = false, rowRef, minH }: { r: Row; answer?: Answer; answerLine?: string; onAnswer?: OnAnswer; quoted?: Set<string>; dense?: boolean; saidBelow?: boolean; rowRef?: (el: HTMLLIElement | null) => void; minH?: number }) {
+function StatementRow({ r, answer, answerLine, onAnswer, quoted, dense = false, saidBelow = false, rowRef, minH, panel = false }: { panel?: boolean; r: Row; answer?: Answer; answerLine?: string; onAnswer?: OnAnswer; quoted?: Set<string>; dense?: boolean; saidBelow?: boolean; rowRef?: (el: HTMLLIElement | null) => void; minH?: number }) {
   // in a partial list a "same line as … above" reference can point at a row that is not on screen: quote it instead
   const ref = r.sameAs && (!quoted || quoted.has(r.line.toLowerCase())) ? r.sameAs : ''
   if (quoted && r.line) quoted.add(r.line.toLowerCase())
@@ -59,7 +59,7 @@ function StatementRow({ r, answer, answerLine, onAnswer, quoted, dense = false, 
   // on the first screen (dense) the close-line question is asked in the questions panel below, not inline
   const askCandidate = !!r.candidate && !r.byYou && answer !== 'no' && !dense
   return (
-    <li ref={rowRef} style={minH ? { minHeight: minH } : undefined} className={dense ? s.dense : s.row} data-state={r.state} data-testid="fit-row" data-id={r.id}>
+    <li ref={rowRef} style={minH ? { minHeight: minH } : undefined} className={dense ? s.dense : s.row} data-state={r.state} data-testid="fit-row" data-id={r.id} data-panel={panel ? '1' : undefined}>
       {!dense && <StateMark state={r.state} />}
       <p className={s.text}>{dense && <><StateMark state={r.state} />{' '}</>}{r.state === 'ask' ? r.question : r.text}{r.preferred && r.state !== 'ask' ? <span className={s.tag}> · preferred</span> : null}</p>
       {r.byYou && !saidBelow && (
@@ -124,6 +124,26 @@ export default function FitRead({ data, note, compact = false, brief = false, an
   // the verdict sentence and the gates above the questions may be re-worded by the server after an answer: their
   // blocks keep at least the height they had, so nothing under the person's finger moves
   const blockHeights = useRef<Map<string, number>>(new Map())
+  // scroll anchor: the row the person just answered stays exactly where their finger was, whatever the server re-words
+  // above it (the verdict sentence can grow) — measured before the answer, corrected right after the new reading paints
+  const anchor = useRef<{ id: string; top: number } | null>(null)
+  const sectionRef = useRef<HTMLElement | null>(null)
+  const answerWithAnchor: OnAnswer | undefined = onAnswer ? (id, a, line) => {
+    const el = sectionRef.current?.querySelector(`[data-testid=fit-row][data-id="${CSS.escape(id)}"][data-panel="1"]`) || sectionRef.current?.querySelector(`[data-testid=fit-row][data-id="${CSS.escape(id)}"]`)
+    if (el) anchor.current = { id, top: el.getBoundingClientRect().top }
+    onAnswer(id, a, line)
+  } : undefined
+  useLayoutEffect(() => {
+    const a = anchor.current
+    if (!a || !sectionRef.current) return
+    const el = sectionRef.current.querySelector(`[data-testid=fit-row][data-id="${CSS.escape(a.id)}"][data-panel="1"]`) || sectionRef.current.querySelector(`[data-testid=fit-row][data-id="${CSS.escape(a.id)}"]`)
+    if (!el) return
+    const delta = el.getBoundingClientRect().top - a.top
+    if (Math.abs(delta) < 1) return
+    let sc: HTMLElement | null = el.parentElement
+    while (sc && !/(auto|scroll)/.test(getComputedStyle(sc).overflowY)) sc = sc.parentElement
+    if (sc) sc.scrollTop += delta; else window.scrollBy(0, delta)
+  }, [data])
   const v = data.verdict || null
   const diff = differentField(data.field_match || null)
   const model = fitGroups(data)
@@ -155,7 +175,7 @@ export default function FitRead({ data, note, compact = false, brief = false, an
   const everything = (
     <>
       {model
-        ? model.groups.map((g) => <Group key={g.key} g={g as { key: string; rows: Row[] }} answers={answers} answerLines={answerLines} onAnswer={onAnswer} />)
+        ? model.groups.map((g) => <Group key={g.key} g={g as { key: string; rows: Row[] }} answers={answers} answerLines={answerLines} onAnswer={answerWithAnchor} />)
         : <RequirementsView matched={data.matched_requirements || []} missing={data.unsupported_requirements || []} />}
       {model && model.promises.length > 0 && (
         <div className={s.promises} data-testid="fit-promises">
@@ -187,14 +207,14 @@ export default function FitRead({ data, note, compact = false, brief = false, an
       {model && top.length > 0 && !open && (
         <div className={s.group} data-group="top">
           <p className={s.gHead}><span className={s.gLabel}>What matters most</span></p>
-          <ul className={s.denseList}>{top.map((r) => <StatementRow key={r.id} r={r} quoted={quoted} dense answer={answers?.[r.id]} answerLine={answerLines?.[r.id]} onAnswer={onAnswer} saidBelow={asking && panelIds.current.has(r.id)} rowRef={(el) => { if (el && !answeredAny) rowHeights.current.set(r.id, el.offsetHeight) }} minH={answeredAny ? rowHeights.current.get(r.id) : undefined} />)}</ul>
+          <ul className={s.denseList}>{top.map((r) => <StatementRow key={r.id} r={r} quoted={quoted} dense answer={answers?.[r.id]} answerLine={answerLines?.[r.id]} onAnswer={answerWithAnchor} saidBelow={asking && panelIds.current.has(r.id)} rowRef={(el) => { if (el && !answeredAny) rowHeights.current.set(r.id, el.offsetHeight) }} minH={answeredAny ? rowHeights.current.get(r.id) : undefined} />)}</ul>
         </div>
       )}
       {model && asks.length > 0 && !open && onAnswer && (
         asking
           ? <div className={s.group} data-group="questions">
               <p className={s.gHead}><span className={s.gLabel}>Questions only you can answer</span><span className={s.gTally}>{asks.length}</span></p>
-              <ul className={s.list}>{asks.map((r) => <StatementRow key={r.id} r={r} answer={answers?.[r.id]} answerLine={answerLines?.[r.id]} onAnswer={onAnswer} />)}</ul>
+              <ul className={s.list}>{asks.map((r) => <StatementRow key={r.id} r={r} answer={answers?.[r.id]} answerLine={answerLines?.[r.id]} onAnswer={answerWithAnchor} panel />)}</ul>
             </div>
           : <button type="button" className={s.more} onClick={() => setAsking(true)} data-testid="fit-ask-open">
               {answered ? `You answered ${answered} of ${asks.length} questions only you can answer — review` : `Answer ${asks.length} question${asks.length === 1 ? '' : 's'} only you can answer${candRows.length ? ' (incl. lines of yours that may show what they ask)' : ' (lifting, hours, eligibility)'}`}
@@ -210,7 +230,7 @@ export default function FitRead({ data, note, compact = false, brief = false, an
     </>
   )
   return (
-    <section className={s.fit} data-testid="fit-read" aria-label="Your fit for this job">
+    <section ref={sectionRef} className={s.fit} data-testid="fit-read" aria-label="Your fit for this job">
       <div className={s.head} ref={(el) => { if (el && !answeredAny) blockHeights.current.set('head', el.offsetHeight) }} style={answeredAny && blockHeights.current.get('head') ? { minHeight: blockHeights.current.get('head') } : undefined}>
         {v?.gate && !diff && !brief && <p className={s.gate}><Icon name="triangle-alert" size={16} label="Gate" /><span>{v.gate}</span></p>}
         <p className={s.band}>
