@@ -70,14 +70,27 @@ test('free == paid: one fit score, one band, one requirement count, on 30 real p
 test('free == paid == Studio: each statement\'s status, evidence lines and candidate agree', async () => {
   const shape = (sts) => new Map((sts || []).map((s) => [s.id, { status: s.status, evidence: (Array.isArray(s.evidence) ? s.evidence : []).map((e) => e.line), candidate: s.candidate ? s.candidate.line || null : null }]));
   let compared = 0;
-  for (let i = 0; i < 6; i++) {
-    const resume = PERSONAS[i % PERSONAS.length];
-    const j = POSTINGS[i];
-    const free = await call(optimizerHandler, { action: 'optimize', resumeText: resume, jobTitle: j.title, company: j.company, jobDescription: j.description });
+  for (let i = 0; i < 7; i++) {
+    // round 9: the last pair carries a claim and a settled row through all three tools
+    const gold = i === 6;
+    const resume = gold ? readFileSync(new URL('../lib/fixtures/crosstool/gold-shift-lead/resume-shift-supervisor.txt', import.meta.url), 'utf8') : PERSONAS[i % PERSONAS.length];
+    const j = gold ? { title: 'Shift Lead', company: 'Copper Kettle Kitchen', description: readFileSync(new URL('../lib/fixtures/crosstool/gold-shift-lead/posting-shift-lead.txt', import.meta.url), 'utf8') } : POSTINGS[i];
+    const confirmed = gold ? [{ statementId: 's9', answer: 'yes', claim: true }, { statementId: 's5', answer: 'no', claim: true }] : undefined;
+    const free = await call(optimizerHandler, { action: 'optimize', resumeText: resume, jobTitle: j.title, company: j.company, jobDescription: j.description, ...(confirmed ? { confirmed } : {}) });
     if (free.code !== 200 || !Array.isArray(free.body.statements) || !free.body.statements.length) continue;
-    const paid = await call(resumeHandler, { tool: 'optimize', resume, job: j.title, company: j.company, jobDescription: j.description, jobId: `agree-${i}`, fresh: true }, '44444444-4444-4444-8444-444444444444');
+    const paid = await call(resumeHandler, { tool: 'optimize', resume, job: j.title, company: j.company, jobDescription: j.description, jobId: `agree-${i}`, fresh: true, ...(confirmed ? { confirmed } : {}) }, '44444444-4444-4444-8444-444444444444');
     const s = await call(resumeHandler, { action: 'structure', text: resume });
-    const studio = await call(resumeHandler, { action: 'tailor', doc: s.body.doc, jobTitle: j.title, company: j.company, jobDescription: j.description }, '44444444-4444-4444-8444-444444444444');
+    const studio = await call(resumeHandler, { action: 'tailor', doc: s.body.doc, jobTitle: j.title, company: j.company, jobDescription: j.description, ...(confirmed ? { confirmed } : {}) }, '44444444-4444-4444-8444-444444444444');
+    if (gold) {
+      for (const [name, b] of [['free', free.body], ['paid', paid.body], ['studio', studio.body]]) {
+        const s9 = (b.statements || []).find((x) => x.id === 's9'), s5 = (b.statements || []).find((x) => x.id === 's5');
+        assert.ok(s9 && s9.status === 'shown' && s9.by === 'you', `${name}: claim s9 ${JSON.stringify(s9)}`);
+        assert.ok(!(s9.evidence || []).some((e) => e && e.line), `${name}: a claim carries no résumé line`);
+        assert.ok(s5 && s5.status === 'partly', `${name}: settled s5`);
+      }
+      assert.ok(paid.body.questions.some((q) => q.kind === 'claim' && q.statementId === 's9'), 'paid asks about the claim');
+      assert.ok(!paid.body.questions.some((q) => q.statementId === 's5'), 'paid re-asks a settled row');
+    }
     const f = shape(free.body.statements.filter((x) => x.display !== false && x.kind !== 'promise'));
     for (const [name, got] of [['paid', paid.body.statements], ['studio', studio.body && studio.body.statements]]) {
       assert.ok(Array.isArray(got), `${j.title}: ${name} sent no statements`);
@@ -97,5 +110,5 @@ test('free == paid == Studio: each statement\'s status, evidence lines and candi
     if (!paid.body.blocked && !studio.body.blocked && counts.every((c) => c != null)) assert.equal(new Set(counts).size, 1, `${j.title}: already right ${counts.join(' / ')}`);
     compared++;
   }
-  assert.ok(compared >= 4, `compared ${compared}`);
+  assert.ok(compared >= 5, `compared ${compared}`);
 });

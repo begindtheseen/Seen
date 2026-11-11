@@ -117,7 +117,7 @@ export function applyToggles(doc, changes, on = {}, answered = []) {
       const hit = findBullet(d, a.bulletId);
       if (hit) { hit.b.text = a.line; marks.bullets[hit.b.id] = mark; continue; }
     }
-    if (a.kind === 'gap' && a.answerKind === 'credential') {
+    if ((a.kind === 'gap' || a.kind === 'claim') && a.answerKind === 'credential') {
       if (!d.certifications.some((c) => same(c.text || c.name, a.line))) {
         const id = `ans_${a.id}`;
         d.certifications.push({ id, text: a.line, name: a.line, issuer: '', date: '', url: '' });
@@ -126,7 +126,8 @@ export function applyToggles(doc, changes, on = {}, answered = []) {
       }
       continue;
     }
-    const e = d.experience.find((x) => x.id === a.itemId) || d.experience[0];
+    // a claimed line goes only under the job the person named — never the tool's guess (round 9)
+    const e = d.experience.find((x) => x.id === a.itemId) || (a.kind === 'claim' ? null : d.experience[0]);
     if (!e) continue;
     const id = `ans_${a.id}`;
     e.bullets.unshift({ id, text: a.line });
