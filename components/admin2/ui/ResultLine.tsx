@@ -7,7 +7,7 @@
 import Icon from '@/components/ui/Icon'
 import type { AdminSkipped } from '../contract.ts'
 import type { ActionState } from '../core/action.ts'
-import { jobProgressText, type Job } from '../core/jobs.ts'
+import { withFollowUp, type Job } from '../core/jobs.ts'
 import styles from './ui.module.css'
 
 export type SkipLink = { label: string; onSelect: () => void }
@@ -44,15 +44,6 @@ export type ResultLineProps = {
 export function undoingText(state: ActionState): string {
   const n = state.result?.changed || 0
   return n > 0 ? `Undoing — putting ${fmt(n)} back…` : 'Undoing…'
-}
-
-/** The done sentence with a finished follow-up job: the part before " · " plus the job's own summary. */
-export function withFollowUp(message: string, job: Job | undefined): string {
-  if (!job) return message
-  // While it runs: one quiet clause on the same line ("· updating company scores… 12 of 41"), never a second result.
-  if (job.status === 'running' || job.status === 'cancelling') return `${message.replace(/[.\s]+$/, '')} · ${job.label.charAt(0).toLowerCase()}${job.label.slice(1)}… ${jobProgressText(job)}`
-  const head = message.split(' · ')[0].replace(/[.\s]+$/, '')
-  return `${head}. ${job.message}`
 }
 
 export default function ResultLine({ state, onUndo, onRetry, onDismiss, skipLinks, runningText, followUp, undoingProgress }: ResultLineProps) {

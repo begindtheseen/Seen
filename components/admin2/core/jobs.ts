@@ -151,6 +151,19 @@ export function jobSummary(j: Job, lastMessage = ''): string {
 
 export type Recompute = { queued?: number; remaining?: number; mode?: string; cursor?: string }
 
+/**
+ * The done sentence with its follow-up job. The answer's own "· N company scores still updating" clause is replaced by
+ * the job's live progress, then by its finished sentence; every other clause ("· 24 skipped as possible duplicates")
+ * stays.
+ */
+export function withFollowUp(message: string, job: Job | undefined): string {
+  if (!job) return message
+  const base = message.replace(/\s·\s[\d,]+ company scores? still updating/, '').replace(/[.\s]+$/, '')
+  // While it runs: one quiet clause on the same line ("· updating company scores… 12 of 41"), never a second result.
+  if (job.status === 'running' || job.status === 'cancelling') return `${base} · ${job.label.charAt(0).toLowerCase()}${job.label.slice(1)}… ${jobProgressText(job)}`
+  return `${base}. ${job.message}`
+}
+
 /** The follow-up for queued company scores: the SAME job a bulk decision runs (Review starts the same spec). */
 export function recomputeSpec(r: Recompute): JobSpec | null {
   if (!r || !(typeof r.remaining === 'number' && r.remaining > 0)) return null

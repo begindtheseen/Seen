@@ -6,7 +6,7 @@ import { parseItem, parseSection, formatItem, sectionFilters, searchForSection, 
 import { toResult, createAdminApi, createReauthGate, createAdminDownload, filenameFrom } from './api.ts'
 import { QueryCache, keyMatches, mergeListRefresh } from './cache.ts'
 import { createActionRunner, createUndoBus } from './action.ts'
-import { createJobManager, jobKey, jobProgressText, jobSummary, JOB_STATUS_KIND } from './jobs.ts'
+import { createJobManager, jobKey, jobProgressText, jobSummary, withFollowUp, JOB_STATUS_KIND } from './jobs.ts'
 const untilJ = async (fn, ms = 2000) => { const t = Date.now(); while (!fn()) { if (Date.now() - t > ms) throw new Error('timeout'); await new Promise((r) => setTimeout(r, 0)) } }
 import { readLogin } from './login.ts'
 
@@ -711,4 +711,15 @@ test('round 11: an Undo whose answer queued company scores starts the same recom
   const r2 = createActionRunner({ api: async (a) => toResult(200, JSON.stringify(a === 'undo' ? { ok: true, changed: 1, complete: true, message: 'Back.', recompute: { queued: 0, remaining: 0 } } : { ok: true, changed: 1, message: 'x', undo: { action: 'undo', args: { audit_id: '9' }, label: 'Undo' } })), cache: new QueryCache(), action: 'x', jobs })
   await r2.run({}); await r2.undo()
   assert.equal(r2.state().followJobId, undefined)
+})
+
+test('a result line with its score job: the "still updating" clause becomes live progress, then the finished sentence; skip clauses stay', () => {
+  const msg = 'Approved 140 of 164 · 24 skipped as possible duplicates · 70 company scores still updating.'
+  const running = { status: 'running', label: 'Updating company scores', changed: 12, remaining: 58, message: '' }
+  const done = { status: 'done', label: 'Updating company scores', changed: 70, remaining: 0, message: 'Updated 70 company scores in 2 rounds.' }
+  assert.equal(withFollowUp(msg, undefined), msg)
+  assert.equal(withFollowUp(msg, running), `Approved 140 of 164 · 24 skipped as possible duplicates · updating company scores… ${jobProgressText(running)}`)
+  assert.equal(withFollowUp(msg, done), 'Approved 140 of 164 · 24 skipped as possible duplicates. Updated 70 company scores in 2 rounds.')
+  assert.equal(withFollowUp('140 reports are back in the review queue.', done), '140 reports are back in the review queue. Updated 70 company scores in 2 rounds.')
+  assert.equal(withFollowUp('Approved 1 of 1 · 1 company score still updating.', done), 'Approved 1 of 1. Updated 70 company scores in 2 rounds.')
 })
