@@ -634,7 +634,7 @@ async function handleOptimizeTool(req, res, body) {
     // that this one is free, and why) before anything is spent.
     const result = buildPaidOptimize({ resume, resumeIsCanonical: true, original, jobDescription, job, company, pro: false, jobId, taxonomy, fit, posting });
     const rule = tailorCharge(result.tailored);
-    if (body.probe) return res.status(200).json({ cached: false, price: RESUME_OPTIMIZE_COST, cost: rule.charge ? RESUME_OPTIMIZE_COST : 0, charged: false, charge: { charge: rule.charge, reason: rule.reason, sentence: rule.note || (result.charge && result.charge.sentence) || null }, change_counts: result.change_counts, posting: result.posting, blocked: result.blocked, field_match: result.field_match, fit_score: result.fit_score, requirements_listed: result.requirements_listed });
+    if (body.probe) return res.status(200).json({ cached: false, price: RESUME_OPTIMIZE_COST, cost: rule.charge ? RESUME_OPTIMIZE_COST : 0, charged: false, charge: { charge: rule.charge, reason: rule.reason, sentence: rule.note || (result.charge && result.charge.sentence) || null }, change_counts: result.change_counts, posting: result.posting, blocked: result.blocked, questions_note: result.questions_note ?? null, field_match: result.field_match, fit_score: result.fit_score, requirements_listed: result.requirements_listed });
     if (!rule.charge) {
       const proNow = (await resolveProAccess(req)).pro;
       const out = { ...result, no_gain: true, note: rule.note, charge_reason: rule.reason };

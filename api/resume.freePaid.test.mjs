@@ -99,7 +99,7 @@ test('free == paid == Studio: each statement\'s status, evidence lines and candi
     }
     // round 7: the same package parts reach every screen — the fit read and what is already right (free, paid, Studio);
     // the tailoring parts (blocked, field match, charge) on both tailoring screens
-    const READ_PARTS = ['fit_score', 'fit_band', 'verdict', 'statements', 'matched_requirements', 'unsupported_requirements', 'constraints', 'hard_gates', 'already_right'];
+    const READ_PARTS = ['fit_score', 'fit_band', 'verdict', 'statements', 'matched_requirements', 'unsupported_requirements', 'constraints', 'hard_gates', 'already_right', 'questions_note'];
     const TAILOR_PARTS = ['blocked', 'field_match', 'charge'];
     const has = (b, keys) => keys.filter((k) => b && Object.prototype.hasOwnProperty.call(b, k));
     assert.deepEqual(has(free.body, READ_PARTS), READ_PARTS, `${j.title}: free parts`);
@@ -111,4 +111,22 @@ test('free == paid == Studio: each statement\'s status, evidence lines and candi
     compared++;
   }
   assert.ok(compared >= 5, `compared ${compared}`);
+});
+
+// the honest different-field line reaches every screen from the one source (free check, probe, paid, Studio)
+test('a different-field posting: free, probe, paid and Studio all carry the same questions_note', async () => {
+  const { loadPairs } = await import('../lib/fixtures/calibration/load.mjs');
+  const { DIFFERENT_FIELD_NOTE } = await import('../lib/server/optimizePackage.js');
+  const p = loadPairs().find((x) => x.label === 'different field');
+  const j = p.job;
+  const uid = '44444444-4444-4444-8444-444444444444';
+  const free = await call(optimizerHandler, { action: 'optimize', resumeText: p.resume, jobTitle: j.title, company: j.company, jobDescription: j.description });
+  const probe = await call(resumeHandler, { tool: 'optimize', probe: true, resume: p.resume, job: j.title, company: j.company, jobDescription: j.description, jobId: 'df-probe', fresh: true }, uid);
+  const paid = await call(resumeHandler, { tool: 'optimize', resume: p.resume, job: j.title, company: j.company, jobDescription: j.description, jobId: 'df-paid', fresh: true }, uid);
+  const s = await call(resumeHandler, { action: 'structure', text: p.resume });
+  const studio = await call(resumeHandler, { action: 'tailor', doc: s.body.doc, jobTitle: j.title, company: j.company, jobDescription: j.description }, uid);
+  for (const [name, b] of [['free', free.body], ['probe', probe.body], ['paid', paid.body], ['studio', studio.body]]) {
+    assert.ok(b && Object.prototype.hasOwnProperty.call(b, 'questions_note'), `${name}: no questions_note key`);
+    assert.equal(b.questions_note, DIFFERENT_FIELD_NOTE, `${name}: ${b.questions_note}`);
+  }
 });

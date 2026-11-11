@@ -12,7 +12,7 @@
 //  - BlockedResult: a different field / a failed hard gate — no changes, no questions, no message
 //  - PaidOffer + BuildSteps: what a credit will do for THIS job, from the probe's counts
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Icon from '@/components/ui/Icon'
 import Button from '@/components/ui/Button'
 import DocPage from '@/components/resume/DocPage'
@@ -168,6 +168,29 @@ export interface QuestionIO {
   skip: () => void
   unskip: () => void
 }
+// The answer box: a textarea that grows with the text (2 lines to start, about 6, then it scrolls inside), so a sentence
+// is never hidden sideways. 16px on phones (iOS does not zoom). Enter is a line break; Cmd/Ctrl+Enter adds the line.
+// Every keystroke goes to the caller's draft (kept for this tab / with the tailor record), and once more on blur.
+function AnswerBox({ value, onChange, onSubmit, placeholder, maxLength, inputMode }: { value: string; onChange: (t: string) => void; onSubmit: () => void; placeholder: string; maxLength: number; inputMode: 'text' | 'decimal' }) {
+  const ref = useRef<HTMLTextAreaElement | null>(null)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.style.height = 'auto'
+    const lh = parseFloat(getComputedStyle(el).lineHeight) || 24
+    const pad = el.offsetHeight - el.clientHeight + parseFloat(getComputedStyle(el).paddingTop) + parseFloat(getComputedStyle(el).paddingBottom)
+    const max = lh * 6 + pad
+    el.style.height = `${Math.min(el.scrollHeight + (el.offsetHeight - el.clientHeight), max)}px`
+    el.style.overflowY = el.scrollHeight + (el.offsetHeight - el.clientHeight) > max ? 'auto' : 'hidden'
+  }, [value])
+  return (
+    <textarea ref={ref} rows={2} autoComplete="off" className={`${s.input} ${s.answerBox}`} value={value} maxLength={maxLength} inputMode={inputMode} placeholder={placeholder}
+      onChange={(e) => onChange(e.target.value)} onBlur={(e) => onChange(e.target.value)}
+      onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); onSubmit() } }}
+      data-testid="question-input" />
+  )
+}
+
 export function QuestionCard({ qn, io }: { qn: Question; io: QuestionIO }) {
   const kind = questionKind(qn)
   // a claimed line: a credential goes under Certifications; a duty under the job the person names
@@ -178,7 +201,9 @@ export function QuestionCard({ qn, io }: { qn: Question; io: QuestionIO }) {
   const answer = io.draft
   const slots = (String(qn.template || '').match(/\[[^\]]+\]/g) || []).length
   // every answer goes to the composer — no second opinion here about what counts as an answer
-  const composed = answer.trim() ? composeAnswer(prompt as Record<string, unknown>, answer) : { line: '', problem: null as string | null }
+  // the box keeps the person's line breaks; the composer (and the line it shows) reads them as one line
+  const flatAnswer = answer.replace(/\s*\n\s*/g, ' ').trim()
+  const composed = flatAnswer ? composeAnswer(prompt as Record<string, unknown>, flatAnswer) : { line: '', problem: null as string | null }
   const line = composed.line
   const picked = pickRole ? (qn.roles || []).find((r) => r.itemId === role) : null
   const where = claimCred ? 'Goes under Certifications' : picked ? [picked.title, picked.company].filter(Boolean).join(' · ') : qn.role ? `${qn.role}${qn.company ? ` · ${qn.company}` : ''}` : ''
@@ -203,10 +228,10 @@ export function QuestionCard({ qn, io }: { qn: Question; io: QuestionIO }) {
           <label className={s.qLabel}>
             {qn.question}
             {kind === 'credential' ? null : (
-              <input autoComplete="off" className={s.input} value={answer} maxLength={kind === 'number' ? 60 : 160}
+              <AnswerBox value={answer} maxLength={kind === 'number' ? 60 : 400}
                 inputMode={kind === 'number' && qn.slot === 'insert' && slots < 2 ? 'decimal' : 'text'}
                 placeholder={kind === 'claim' ? (claimCred ? 'As written on the card, and when it expires' : 'What you did, and where') : kind === 'number' ? (qn.slot === 'insert' ? (slots > 1 ? 'The number, and how often' : 'The number') : 'The number and what it counts') : kind === 'tool' ? 'Where you used it, and for what' : 'In your own words'}
-                onChange={(e) => io.setDraft(e.target.value)} data-testid="question-input" />
+                onChange={io.setDraft} onSubmit={() => { const ok = line && (!pickRole || role); if (ok) io.add(line, flatAnswer, pickRole ? role : undefined) }} />
             )}
           </label>
           {pickRole && (
@@ -221,13 +246,13 @@ export function QuestionCard({ qn, io }: { qn: Question; io: QuestionIO }) {
           {qn.statement && kind === 'detail' && <p className={s.why}>From the posting: “{q(qn.statement, 200)}”</p>}
           {kind === 'number' && qn.template && !answer.trim() && <p className={s.why}>Your line becomes: “{blankLine(qn.template)}”</p>}
           {line && <p className={s.after} data-testid="question-line">Your line would read: “{line}”</p>}
-          {answer.trim() && !line && composed.problem && <p className={s.problem} data-testid="question-problem"><Icon name="triangle-alert" size={14} label="Needs more" /><span><b>Needs more:</b> {composed.problem}</span></p>}
+          {flatAnswer && !line && composed.problem && <p className={s.problem} data-testid="question-problem"><Icon name="triangle-alert" size={14} label="Needs more" /><span><b>Needs more:</b> {composed.problem}</span></p>}
           {line && pickRole && !role && <p className={s.why}>Choose the job it goes under, then add it.</p>}
           {qn.why && kind !== 'detail' && <p className={s.why}>{qn.why}</p>}
           <div className={s.qActions}>
             {kind === 'credential'
               ? <button type="button" className={s.toggle} onClick={() => { const l = composeAnswer(prompt as Record<string, unknown>, 'yes').line; if (l) io.add(l, 'yes') }} data-testid="question-yes">Yes, I hold it — add it</button>
-              : <button type="button" className={s.toggle} disabled={!line || (pickRole && !role)} onClick={() => { if (line && (!pickRole || role)) io.add(line, answer, pickRole ? role : undefined) }} data-testid="question-add">Add this line</button>}
+              : <button type="button" className={s.toggle} disabled={!line || (pickRole && !role)} onClick={() => { if (line && (!pickRole || role)) io.add(line, flatAnswer, pickRole ? role : undefined) }} data-testid="question-add">Add this line</button>}
             <button type="button" className={s.toggle} onClick={io.skip} data-testid="question-skip">Skip</button>
           </div>
         </>

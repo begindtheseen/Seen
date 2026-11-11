@@ -45,6 +45,7 @@
 .toggle:disabled { opacity: .5; cursor: default; }
 .qLabel { display: block; font-size: var(--fs-body); font-weight: 600; color: var(--text-1); line-height: var(--lh-body); overflow-wrap: anywhere; }
 .input { display: block; width: 100%; box-sizing: border-box; min-height: 44px; margin-top: var(--sp-2); background: var(--surface-2); border: 1px solid var(--border-2); border-radius: var(--r-control); padding: 0 var(--sp-3); color: var(--text-1); font: inherit; font-size: var(--fs-body); font-weight: 400; }
+.answerBox { padding: var(--sp-2) var(--sp-3); line-height: var(--lh-body); resize: none; overflow-y: hidden; } /* 16px on phones comes from the global input rule (globals.css ≤768px) */
 .input:focus-visible { outline: none; border-color: var(--accent); box-shadow: var(--sh-focus); }
 .qActions { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
 

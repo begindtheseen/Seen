@@ -94,16 +94,17 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
     const rec = ResumeDocStore.getTailor(user?.id)
     if (!rec) return
     setPlan(rec.plan as TailorPlan); setBaseDoc(rec.baseDoc); setOverrides((rec.overrides || {}) as TailorOverrides); setAnswers(rec.answers || {})
-    const rj = rec.job as (TailorJob & { result?: TailorExtra; roleFor?: Record<string, string> }) | undefined
+    const rj = rec.job as (TailorJob & { result?: TailorExtra; roleFor?: Record<string, string>; qDrafts?: Record<string, string> }) | undefined
     if (rj && rj.roleFor) setRoleFor(rj.roleFor)
-    if (rj && !initialJob) { const { result, roleFor: _r, ...j } = rj; setJob(j) }
+    if (rj && rj.qDrafts) setQDrafts(rj.qDrafts)
+    if (rj && !initialJob) { const { result, roleFor: _r, qDrafts: _d, ...j } = rj; setJob(j) }
     if (rj && rj.result) setExtra(rj.result)
     setState('done')
   }, [restored, user?.id, initialJob])
   useEffect(() => {
     if (state !== 'done' || !plan || !baseDoc) return
-    ResumeDocStore.putTailor(user?.id, { job: { ...job, result: extra, roleFor }, plan, baseDoc, overrides, answers })
-  }, [state, plan, baseDoc, overrides, answers, job, extra, user?.id, roleFor])
+    ResumeDocStore.putTailor(user?.id, { job: { ...job, result: extra, roleFor, qDrafts }, plan, baseDoc, overrides, answers })
+  }, [state, plan, baseDoc, overrides, answers, job, extra, user?.id, roleFor, qDrafts])
 
   function pickSaved(id: string) {
     setSavedId(id)
