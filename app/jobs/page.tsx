@@ -48,8 +48,12 @@ export default function JobsPage() {
     level, setLevel,
     jobType, setJobType,
     posted, setPosted,
+    pay, setPay,
     sort, setSort,
     hasFilters,
+    area,
+    areaProblem,
+    includeRemote, setIncludeRemote,
     filtered,
     status,
     statusMsg,
@@ -57,6 +61,7 @@ export default function JobsPage() {
     recommended,
     recHasResume,
     recReason,
+    recNoDirection,
     recCity,
     recCitySource,
     recSkills,
@@ -105,7 +110,10 @@ export default function JobsPage() {
   // else the résumé's own), and never once a search has been typed — the search is the page's job.
   // (The old ≥3 bar hid the one Phoenix match the audit persona had: "Nothing near Phoenix matched".)
   const typed = query.trim().length > 0
-  const showRail = isLoggedIn && !typed && (recStatus === 'loading' || recommended.length >= 1)
+  // …or with no matches because the résumé's current title gives no direction: the rail then says so (never empty, never
+  // the upload card — the person HAS a résumé)
+  const noDirection = recStatus === 'done' && recommended.length === 0 ? recNoDirection : null
+  const showRail = isLoggedIn && !typed && (recStatus === 'loading' || recommended.length >= 1 || !!noDirection)
   const showCityLine = isLoggedIn && !typed && recStatus === 'done' && recReason === 'no_city'
   // Same employer + title at several addresses → one card with "+N more locations"
   // (lib/jobs/groupListings.js). Every row is still counted in the results line.
@@ -131,7 +139,10 @@ export default function JobsPage() {
     setWhereOpen(true)
     setTimeout(() => locRef.current?.focus(), 0)
   }
-  const radiusLabel = radius === '0' ? 'Remote' : hasCity ? `${radius} mi` : 'Anywhere'
+  // A state typed alone is the whole state: the radius means nothing there (the select says "Whole state").
+  // A state or a county typed alone is that whole area: the radius means nothing there (the select says so).
+  const wholeState = (area?.kind === 'state' || area?.kind === 'county' || area?.kind === 'remote') && location.trim() === area.typed
+  const radiusLabel = wholeState ? (area?.kind === 'county' ? 'whole county' : area?.kind === 'remote' ? 'anywhere in the US' : 'whole state') : radius === '0' ? 'Remote' : hasCity ? `${radius} mi` : 'Anywhere'
   // Follow the URL: Back/Forward open or close the listing; a page loaded on ?job= (Back from another
   // page) reopens it once its row is known — from the results, the rail, or this tab's listing cache.
   useEffect(() => {
@@ -169,8 +180,8 @@ export default function JobsPage() {
             <input
               type="text"
               className={bar.input}
-              placeholder="Job title, role or company..."
-              aria-label="Job title, role or company"
+              placeholder="Job title or company — optional"
+              aria-label="Job title or company (optional — leave it empty to see every job in the place)"
               value={query}
               name="seen-job-query"
               autoComplete="off"
@@ -196,12 +207,14 @@ export default function JobsPage() {
             </button>
             <div className={bar.row} onPointerDownCapture={() => { if (searched) setWhereOpen(true) }}>
               <div className={bar.loc}>
+                <label htmlFor="jobs-location" className="sr-only">Where — city, state or ZIP code</label>
                 <input
                   type="text"
+                  id="jobs-location"
                   ref={locRef}
                   className={`${bar.input} ${bar.locInput}`}
-                  placeholder="City or state..."
-                  aria-label="City or state"
+                  placeholder="City, state or ZIP"
+                  inputMode="text"
                   value={location}
                   name="seen-job-location"
                   autoComplete="off"
@@ -214,7 +227,7 @@ export default function JobsPage() {
                 />
                 <button
                   type="button"
-                  onClick={requestGpsLocation}
+                  onClick={() => { void requestGpsLocation() }}
                   title="Use my location"
                   aria-label="Use my location"
                   disabled={gpsLoading || hasCity}
@@ -227,11 +240,15 @@ export default function JobsPage() {
                   "Anywhere" (Remote stays available) instead of a dangling "25 mi". */}
               <select
                 className={bar.radius}
-                aria-label="Distance"
-                value={hasCity || radius === '0' ? radius : 'any'}
+                aria-label={wholeState ? `Distance — not used: this search covers all of ${area?.label}` : 'Distance'}
+                title={wholeState ? `Not used: this search covers all of ${area?.label}` : undefined}
+                value={wholeState ? 'state' : hasCity || radius === '0' ? radius : 'any'}
+                disabled={wholeState}
                 onChange={e => setRadius(e.target.value === 'any' ? '25' : e.target.value)}
               >
-                {hasCity ? (
+                {wholeState ? (
+                  <option value="state">{area?.kind === 'county' ? 'Whole county' : area?.kind === 'remote' ? 'Anywhere in the US' : 'Whole state'}</option>
+                ) : hasCity ? (
                   <>
                     <option value="10">10 mi</option>
                     <option value="25">25 mi</option>
@@ -260,6 +277,7 @@ export default function JobsPage() {
             level={level} setLevel={setLevel}
             jobType={jobType} setJobType={setJobType}
             posted={posted} setPosted={setPosted}
+            pay={pay} setPay={setPay}
             hasFilters={hasFilters} clearFilters={clearFilters}
           />
         </div>
@@ -273,6 +291,7 @@ export default function JobsPage() {
             city={recCity}
             citySource={recCitySource}
             onOpen={j => setDetailJob(j)}
+            noDirection={noDirection}
           />
         )}
         {showCityLine && (
@@ -288,7 +307,7 @@ export default function JobsPage() {
           <div className={j.toolbar}>
             <p className={j.count} aria-live="polite">{statusMsg}</p>
             <div className={j.tools}>
-              {status === 'done' && typed && (
+              {status === 'done' && (typed || !!area) && (
                 <Button size="sm" variant="ghost" onClick={copySearchLink} data-testid="copy-search-link" title="Copy a link to this search" icon={copied ? 'check' : 'link'}>
                   <span className={j.hideSm}>{copied ? 'Copied' : 'Copy link'}</span>
                 </Button>
@@ -298,16 +317,33 @@ export default function JobsPage() {
                 <Chip selected={swipeMode} onClick={() => setSwipeMode(true)} icon="layers" title="Swipe mode — drag right to save, left to pass">Swipe</Chip>
               </div>
               <label htmlFor="jobs-sort" className="sr-only">Sort results</label>
-              <select id="jobs-sort" className={`ui-input ${j.sort}`} value={sort} onChange={e => setSort(e.target.value as SortMode)}>
-                <option value="best">Best match</option>
-                <option value="transparency">Best posting score</option>
-                <option value="waste">Lowest wasted-effort risk</option>
-                <option value="recent">Most recent</option>
-              </select>
+              {area ? (
+                <select id="jobs-sort" className={`ui-input ${j.sort}`} value={sort === 'recent' ? 'recent' : 'nearest'} onChange={e => setSort(e.target.value as SortMode)}>
+                  {area.kind === 'point' && <option value="nearest">Nearest first</option>}
+                  <option value="recent">Newest first</option>
+                </select>
+              ) : (
+                <select id="jobs-sort" className={`ui-input ${j.sort}`} value={sort} onChange={e => setSort(e.target.value as SortMode)}>
+                  <option value="best">Best match</option>
+                  <option value="transparency">Best posting score</option>
+                  <option value="waste">Lowest wasted-effort risk</option>
+                  <option value="recent">Most recent</option>
+                </select>
+              )}
             </div>
           </div>
         )}
         {notice && filtered.length > 0 && <div className={bar.notice} role="status">{notice}</div>}
+        {/* Area search: remote listings based here are counted apart and shown only on request. */}
+        {area && status === 'done' && area.remoteTotal > 0 && (
+          <div className={bar.areaRemote}>
+            <Chip selected={includeRemote} onClick={() => setIncludeRemote(!includeRemote)} icon="globe" data-testid="area-remote">
+              {/* The remote listings counted here are remote-only roles whose listing names a place in this area
+                  ("Remote - Phoenix, AZ", "Remote (Tempe)"). */}
+              {includeRemote ? `Showing ${area.remoteTotal.toLocaleString('en-US')} remote listing${area.remoteTotal === 1 ? '' : 's'} for ${area.label} — hide` : `Also show ${area.remoteTotal.toLocaleString('en-US')} remote listing${area.remoteTotal === 1 ? '' : 's'} for ${area.label}`}
+            </Chip>
+          </div>
+        )}
 
         {/* Results — swipe deck or list */}
         {filtered.length > 0 && swipeMode ? (
@@ -336,8 +372,15 @@ export default function JobsPage() {
           </div>
           {hasMore && (
             <Button variant="secondary" full onClick={() => loadMore()} loading={loadingMore} data-testid="show-more" className={j.more}>
-              {loadingMore ? 'Loading…' : 'Show 60 more'}
+              {loadingMore ? 'Loading…' : area
+                ? (area.jobsTotal < area.total
+                  ? `Show more · ${(area.total - filtered.length).toLocaleString('en-US')} more locations`
+                  : `Show ${Math.min(60, area.total - filtered.length)} more · ${(area.total - filtered.length).toLocaleString('en-US')} left`)
+                : 'Show 60 more'}
             </Button>
+          )}
+          {area && !hasMore && filtered.length >= 60 && (
+            <p className={bar.areaEnd}>That’s all {area.jobsTotal < area.total ? `${area.jobsTotal.toLocaleString('en-US')} jobs (${area.total.toLocaleString('en-US')} locations)` : `${area.total.toLocaleString('en-US')} jobs`}.</p>
           )}
           </>
         ) : view === 'error' ? (
@@ -349,21 +392,21 @@ export default function JobsPage() {
           <div className={j.idle}>
             <p className="ui-eyebrow">Start a search</p>
             <h2 className={j.idleTitle}>What role are you looking for?</h2>
-            <p className={j.idleSub}>Every result shows how complete its posting is and how the employer treats applicants.</p>
+            <p className={j.idleSub}>Or leave the title empty and search a city, state or ZIP to see every job Seen holds there.</p>
             <div className={j.suggest}>
               {SUGGESTED_ROLES.map(role => (
                 <Chip key={role} onClick={() => { setQuery(role); searchJobs(role) }}>{role}</Chip>
               ))}
             </div>
             {/* Only when the ACCOUNT has no résumé on file (the rail says so) — never because the rail is empty. */}
-            {isLoggedIn && recStatus === 'done' && recommended.length === 0 && recHasResume === false && (
+            {isLoggedIn && recStatus === 'done' && recommended.length === 0 && recHasResume === false && !noDirection && (
               <div className={j.resumeAsk}>
                 <p className={j.resumeTitle}>Get matches from your résumé</p>
                 <p className={j.idleSub}>Upload it once and Seen surfaces jobs that match your skills and experience level.</p>
                 <Button size="sm" variant="secondary" href="/resume" iconRight="arrow-right">Upload résumé</Button>
               </div>
             )}
-            {isLoggedIn && recStatus === 'done' && recommended.length === 0 && recHasResume === true && recReason !== 'no_city' && (
+            {isLoggedIn && recStatus === 'done' && recommended.length === 0 && recHasResume === true && recReason !== 'no_city' && !noDirection && (
               <p className={j.idleSub}>Nothing near {recCity || 'you'} matched your résumé&apos;s roles yet — search by title above.</p>
             )}
           </div>
@@ -379,6 +422,36 @@ export default function JobsPage() {
                 </div>
               </div>
             ))}
+          </div>
+        ) : view === 'empty' && areaProblem ? (
+          /* A place Seen could not search: say why, offer the places it could mean — never an unrelated list. */
+          <div className={j.idle} data-testid="area-problem">
+            <Icon name="map-pin" size={28} className={j.emptyIcon} />
+            <h2 className={j.idleTitle}>{areaProblem.message}</h2>
+            {areaProblem.suggestions.length > 0 && (
+              <>
+                <p className={j.idleSub}>{areaProblem.reason === 'ambiguous' ? 'Which one?' : 'Did you mean'}</p>
+                <div className={j.suggest}>
+                  {areaProblem.suggestions.map(s => (
+                    <Chip key={s} onClick={() => { setLocation(s); searchJobs(undefined, s) }}>{s}</Chip>
+                  ))}
+                </div>
+              </>
+            )}
+            {areaProblem.reason === 'needs_position' && (
+              <Button size="sm" variant="secondary" icon="map-pin" onClick={() => { void requestGpsLocation(true) }}>Use my location</Button>
+            )}
+          </div>
+        ) : view === 'empty' && area ? (
+          <div className={j.idle} data-testid="area-empty">
+            <Icon name="map-pin" size={28} className={j.emptyIcon} />
+            <h2 className={j.idleTitle}>{hasFilters ? `No jobs match these filters ${area.kind !== 'point' ? `in ${area.label}` : `within ${area.radius} miles of ${area.label}`}` : `No jobs on Seen ${area.kind !== 'point' ? `in ${area.label}` : `within ${area.radius} miles of ${area.label}`} yet`}</h2>
+            {area.wider && area.wider.total > 0 && (
+              <Button size="sm" variant="secondary" onClick={() => setRadius(String(area.wider!.radius))} iconRight="arrow-right">
+                {`${area.wider.total.toLocaleString('en-US')} within ${area.wider.radius} miles`}
+              </Button>
+            )}
+            {hasFilters && <Button size="sm" variant="ghost" onClick={clearFilters}>Clear filters</Button>}
           </div>
         ) : view === 'empty' ? (
           <div className={j.idle}>

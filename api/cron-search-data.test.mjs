@@ -25,7 +25,8 @@ test('auth: cron header or CRON_SECRET bearer; anything else 401', async () => {
 test('no credentials: { ok:true, skipped:"no_credentials" } and not one request (IndexNow is production-only)', async () => {
   let calls = 0;
   const real = global.fetch;
-  global.fetch = async () => { calls++; return json([]); };
+  // (the cron's own run record — lib/server/cronRecord.js → cron_runs — is not a search-data request)
+  global.fetch = async (u) => { if (!String(u).includes('/rest/v1/cron_runs')) calls++; return json([]); };
   try {
     const r = await call({ method: 'GET', headers: { authorization: 'Bearer cron' }, query: {} });
     assert.equal(r.code, 200);

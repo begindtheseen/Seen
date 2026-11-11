@@ -1,13 +1,17 @@
-// Job-match emails (owner request 2026-10-24). Twice a day, for every account with a résumé on file:
-// find the listings that match it (the SAME matcher as the /jobs "Matched to your résumé" rail —
-// lib/server/resumeMatches.js), pick the single best one the person has not applied to, saved, or
-// heard about (lib/server/jobMatchEmails.js pickBestMatch), and email an invitation to apply with
-// the listing's Seen link. At most 2 a California day, at least 4 hours apart, never the same job
-// twice. The résumé is read fresh every run, so a changed résumé means new matches.
+// Job-match emails (owner request 2026-10-24; rebuilt on job keys 2026-11-10). Twice a day, for every
+// account with a résumé on file: find the listings that match it (the SAME matcher as the /jobs
+// "Matched to your résumé" rail — lib/server/resumeMatches.js on the person's job keys,
+// lib/server/jobKeys.js), pick the best one the person has not applied to, saved, or heard about
+// (lib/server/jobMatchEmails.js pickBestMatch, plus up to two more from other employers), and email it
+// with the reason from their own résumé or applications and the listing's Seen link. At most 2 a
+// California day, at least 4 hours apart, never the same job twice. The keys are rebuilt whenever the
+// résumé text or recent applications differ from what they were built from, so a changed résumé means
+// new matches. Nothing matched → no email (an email with nothing spot-on is worse than none).
 //
 // Auth: Vercel's cron GET (Authorization: Bearer CRON_SECRET, lib/server/cronAuth.js); a manual run
-// with the secret or an admin session. `?dry=1` (manual only) picks and reports without claiming or
-// sending — the safe way to see what the next run would send.
+// with the secret or an admin session. `?dry=1` (manual only) reports, per user, every match with its
+// reason and the email it would send, without claiming, sending, or writing keys; `&user=<uuid>` limits
+// it to one account (`&all=1` ignores the daily/4-hour limits so a check never reads "user_limit").
 //
 // Idempotent and race-safe: the (user_id, job_key) log row is CLAIMED before the send; a failed send
 // deletes the claim so a later run can retry. No RESEND_KEY → a dry run.
@@ -23,7 +27,7 @@
 // résumé. Before migration 20261101120000 the columns do not exist: everyone stays on résumé matches.
 
 import { isVercelCron, hasCronSecret, hasAdminSession } from '../lib/server/cronAuth.js';
-import { findResumeMatches } from '../lib/server/resumeMatches.js';
+import { findResumeMatches, finalizeMatches, activeMatcher } from '../lib/server/resumeMatches.js';
 import {
   pickBestMatch, canSendNow, buildJobMatchEmail, jobKey, companyScoreKey, companyVerdict,
 } from '../lib/server/jobMatchEmails.js';
@@ -34,6 +38,9 @@ import { logError } from '../lib/server/errlog.js';
 import { boundingBox } from '../lib/server/geo.js';
 import { scoreRow } from '../lib/server/jobScore.js';
 import { prefsFromRow, matchAlerts, alertDbTerm, ALERT_NEW_DAYS } from '../lib/server/jobAlerts.js';
+import { matchListing } from '../lib/server/jobKeys.js';
+import { fetchFullPosting } from '../lib/server/fullPosting.js';
+import { withCronRecord } from '../lib/server/cronRecord.js';
 
 const SITE = 'https://seenjobs.io';
 const BUDGET_MS = 240_000;
@@ -89,12 +96,75 @@ async function findAlertMatches(alerts, geo, rows) {
     .sort((a, b) => b._matchScore - a._matchScore);
 }
 
-export default function handler(req, res) { return run(req, res, { loadGeo: loadUsPlaces }); }
+// ── A summary is not a posting (2026-11-10, the GSG incident) ─────────────────────────────────────
+// A listing may be EMAILED only when its requirements were read from the full posting. A row whose stored
+// text is a teaser is read through lib/server/fullPosting.js (which also stores the posting on the row and
+// marks a closed one gone), the match rule runs again on the full text, and the row is dropped when it
+// fails, is gone, or cannot be read. Bounded: at most MAX_FETCHES per user per run, inside the run's
+// clock; a row that could not be read is not tried again on this instance for UNREADABLE_TTL_MS.
+export const MAX_FETCHES = 4;
 
-/** The handler with its geocoder swapped (tests). */
-export function makeHandler({ loadGeo = loadUsPlaces } = {}) { return (req, res) => run(req, res, { loadGeo }); }
+/** How many emails a set of log rows stands for: one person's rows within two minutes are one email. */
+export function countEmails(rows) {
+  const byUser = new Map();
+  for (const r of rows || []) {
+    const t = Date.parse(r.sent_at);
+    if (!Number.isFinite(t)) continue;
+    const list = byUser.get(r.user_id) || [];
+    list.push(t);
+    byUser.set(r.user_id, list);
+  }
+  let n = 0;
+  for (const list of byUser.values()) {
+    list.sort((a, b) => a - b);
+    let last = -Infinity;
+    for (const t of list) { if (t - last > 120_000) n++; last = t; }
+  }
+  return n;
+}
+const FETCH_TIMEOUT_MS = 7000;
+const UNREADABLE_TTL_MS = 6 * 3600e3;
+const _unreadable = new Map();
 
-async function run(req, res, { loadGeo }) {
+/**
+ * @param {Array<object>} rows ranked rows (already filtered to ones this person could be sent)
+ * @returns {Promise<{ rows: Array<object>, fetched: number, dropped: Array<{ id: string, why: string }> }>}
+ */
+export async function confirmFullPostings(rows, keys, { db, deadline, fetchFull = fetchFullPosting, want = 3, max = MAX_FETCHES, now = new Date(), resumeText = '' }) {
+  // the matcher injected through resumeMatches.setMatcher (match2 seam), else today's matchListing
+  const mx = activeMatcher();
+  const out = []; const dropped = []; let fetched = 0;
+  for (const j of rows) {
+    if (out.length >= want) break;
+    if (!j._summaryOnly) { out.push(j); continue; }
+    const id = String(j.id);
+    const miss = _unreadable.get(id);
+    if (miss && Date.now() - miss < UNREADABLE_TTL_MS) { dropped.push({ id, why: 'unreadable_recently' }); continue; }
+    if (fetched >= max || Date.now() > deadline - FETCH_TIMEOUT_MS - 5000) { dropped.push({ id, why: 'no_time' }); continue; }
+    fetched++;
+    let full = null;
+    try { full = await fetchFull({ jobId: id, db, timeoutMs: FETCH_TIMEOUT_MS }); } catch { full = null; }
+    if (!full || !full.ok) {
+      _unreadable.set(id, Date.now());
+      // the same title at the same level as a job they hold or held: kept as a non-headline line, said as a summary
+      if (j._sameRung && full?.reason !== 'gone') { out.push({ ...j, _noHeadline: true, _reason: `${j._reason} Seen could only read a summary of this listing — check its requirements before you apply.` }); continue; }
+      dropped.push({ id, why: full?.reason === 'gone' ? 'gone' : 'unreadable' }); continue;
+    }
+    const row = { ...j, description: full.description };
+    let m;
+    try { m = mx ? mx(row, keys, { now, mode: 'email', resumeText }) : matchListing(row, keys, { now, mode: 'email' }); } catch { dropped.push({ id, why: 'skipped_error' }); continue; }
+    if (!m.ok || m.summaryOnly || !m.reason) { dropped.push({ id, why: m.ok ? 'still_summary' : `full_posting:${m.why}` }); continue; }
+    out.push({ ...row, _reason: m.reason, _basis: m.basis, _need: m.need, _have: m.have, _checked: m.checked || [], _checks: m.checks || [], _noHeadline: ['intent', 'transfer'].includes(m.basis) || !!m.noHeadline, _headlineOk: !!m.headlineOk, _summaryOnly: false });
+  }
+  return { rows: out, fetched, dropped };
+}
+
+function handler(req, res) { return run(req, res, { loadGeo: loadUsPlaces }); }
+
+/** The handler with its geocoder / full-posting reader swapped (tests). */
+export function makeHandler({ loadGeo = loadUsPlaces, fetchFull = fetchFullPosting } = {}) { return (req, res) => run(req, res, { loadGeo, fetchFull }); }
+
+async function run(req, res, { loadGeo, fetchFull = fetchFullPosting }) {
   if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' });
   const cron = req.method === 'GET' && isVercelCron(req);
   const manual = !cron && (hasCronSecret(req) || await hasAdminSession(req));
@@ -107,7 +177,11 @@ async function run(req, res, { loadGeo }) {
   if (!SUPABASE_URL || !SERVICE_KEY) return res.status(500).json({ error: 'db_not_configured' });
 
   const qDry = String(req.query?.dry ?? '') === '1';
-  const dry = (manual && qDry) || !RESEND_KEY;
+  // `?dry=1` is honoured for every authorised caller (it only removes effects): before 2026-11-10 a GET
+  // with `Authorization: Bearer <CRON_SECRET>` counted as Vercel's cron and ignored dry=1 — a "check" sent mail.
+  const dry = qDry || !RESEND_KEY;
+  const onlyUser = (manual || dry) && /^[0-9a-f-]{36}$/i.test(String(req.query?.user || '')) ? String(req.query.user).toLowerCase() : null;
+  const ignoreLimits = dry && String(req.query?.all ?? '') === '1';
   const dailyCap = Math.max(0, Number(process.env.JOB_MATCH_DAILY_CAP ?? 40) || 0);
   const skipDomains = String(process.env.JOB_MATCH_SKIP_DOMAINS ?? 'seenjobs.io').split(',').map((d) => d.trim().toLowerCase()).filter(Boolean);
   const deadline = Date.now() + BUDGET_MS;
@@ -121,9 +195,12 @@ async function run(req, res, { loadGeo }) {
 
   try {
     const dayStart = pacificDayStart(new Date()).toISOString();
-    const todayRes = await q(`job_match_email_log?sent_at=gte.${encodeURIComponent(dayStart)}&select=id`, { headers: { Prefer: 'count=exact', Range: '0-0' } });
+    // Emails, not log rows: one email claims its main job and up to MORE_ITEMS extra jobs (rows seconds apart).
+    const todayRes = await q(`job_match_email_log?sent_at=gte.${encodeURIComponent(dayStart)}&select=user_id,sent_at&order=sent_at.asc&limit=5000`);
     if (!todayRes.ok) return res.status(200).json({ ok: false, reason: 'log_unreadable', status: todayRes.status });
-    let sentToday = Number(String(todayRes.headers.get('content-range') || '').split('/')[1]) || 0;
+    const todayRows = await todayRes.json().catch(() => null);
+    if (!Array.isArray(todayRows)) return res.status(200).json({ ok: false, reason: 'log_unreadable' });
+    let sentToday = countEmails(todayRows);
     summary.sent_today_before = sentToday;
 
     // Everyone with a résumé on file (keyset pages; PostgREST caps a read at 1,000 rows).
@@ -156,6 +233,7 @@ async function run(req, res, { loadGeo }) {
     }
     const known = new Set(users);
     for (const id of alertPrefs.keys()) if (!known.has(id)) users.push(id);
+    if (onlyUser) { const keep = users.filter((id) => String(id).toLowerCase() === onlyUser); users.length = 0; users.push(...keep); }
     summary.users = users.length;
     summary.alert_users = alertPrefs.size;
     const geo = alertPrefs.size ? await loadGeo() : null;
@@ -163,7 +241,7 @@ async function run(req, res, { loadGeo }) {
 
     for (const uid of users) {
       if (Date.now() > deadline) { skip('out_of_time'); continue; }
-      if (sentToday >= dailyCap) { skip('daily_cap'); continue; }
+      if (sentToday >= dailyCap && !ignoreLimits) { skip('daily_cap'); continue; }
       if (optOut.has(uid)) { skip('opted_out'); continue; }
 
       // This person's history: what Seen already emailed, applied to, saved.
@@ -176,28 +254,91 @@ async function run(req, res, { loadGeo }) {
       if (!log || !apps || !saved) { skip('history_unreadable'); continue; } // never risk a repeat
       const dayStartMs = Date.parse(dayStart);
       const todays = log.filter((r) => Date.parse(r.sent_at) >= dayStartMs);
-      if (!canSendNow({ sentToday: todays.length, lastSentAt: log[0]?.sent_at || null })) { skip('user_limit'); continue; }
+      if (!ignoreLimits && !canSendNow({ sentToday: countEmails(todays.map((r) => ({ ...r, user_id: uid }))), lastSentAt: log[0]?.sent_at || null })) { skip('user_limit'); continue; }
 
       const prefs = alertPrefs.get(uid) || null;
       let found;
       let city = null;
+      let keys = null;
+      let residentText = '';
       if (prefs) {
         if (!prefs.alerts.length) { skip('no_alerts'); continue; }
         if (!geo) { skip('geo_unavailable'); continue; }
         found = await findAlertMatches(prefs.alerts, geo, rows);
         if (!found) { skip('jobs_unreadable'); continue; }
+        // Their own alert words choose the field; their résumé (when there is one) still decides whether
+        // they meet what the listing requires — years in that field, licenses, level.
+        const km = await findResumeMatches({ supabaseUrl: SUPABASE_URL, serviceKey: SERVICE_KEY, userId: uid, persist: !dry, onlyKeys: true }).catch(() => null);
+        if (km?.heal) await km.heal;
+        const mx = activeMatcher();
+        if (km?.keys) found = found.filter((j) => (mx ? mx(j, km.keys, { alert: true }) : matchListing(j, km.keys, { alert: true })).ok);
       } else {
-        const m = await findResumeMatches({ supabaseUrl: SUPABASE_URL, serviceKey: SERVICE_KEY, userId: uid, allowFloor: false });
+        const m = await findResumeMatches({ supabaseUrl: SUPABASE_URL, serviceKey: SERVICE_KEY, userId: uid, persist: !dry, mode: 'email' });
         if (m.heal) await m.heal;
-        if (m.reason) { skip(m.reason); continue; }
+        // listings that made a helper throw were skipped (never the whole person); counted here
+        if (m.skippedError) summary.skipped.skipped_error = (summary.skipped.skipped_error || 0) + m.skippedError;
+        if (m.reason) {
+          skip(m.reason);
+          if (dry) summary.picked.push({ user: uid.slice(0, 8), reason: m.reason, matches: [] });
+          continue;
+        }
+        // "We don't know yet": the current job could not be placed — no email (never a wrong headline).
+        // (an injected matcher reads the direction itself and answers with no rows when it has none)
+        if (m.keys?.no_direction && !activeMatcher()) {
+          skip('no_direction');
+          if (dry) summary.picked.push({ user: uid.slice(0, 8), reason: 'no_direction', unplaced_title: m.keys.no_direction.title, matches: [] });
+          continue;
+        }
         found = m.ranked;
         city = m.city;
+        keys = m.keys;
+        residentText = m.resumeText || '';
       }
       const ranked = found.map((j) => withTenantName(j, tenantNames));
-      if (!ranked.length) { skip('no_matches'); continue; }
+      const dryMatches = dry && !prefs ? ranked.slice(0, 15).map((j) => ({ job_id: j.id, title: j.title, company: j.company, location: j.location, miles: j._miles ?? null, remote: !!j._remote, reason: j._reason, basis: j._basis, summary_only: !!j._summaryOnly })) : null;
+      const dryKeys = dry && keys ? {
+        occupations: (keys.occupations || []).map((o) => `${o.label} · ${o.years} yr${o.current ? ' · current' : ''}`),
+        applied: (keys.applied || []).map((a) => `${a.title} at ${a.company || '?'} (${a.at})`),
+        education: (keys.education || []).map((e) => `${e.degree} ${e.field}${e.studying ? ' (studying)' : ''}`),
+        credentials: keys.credentials || [],
+      } : null;
+      if (!ranked.length) {
+        skip('no_matches');
+        if (dry) summary.picked.push({ user: uid.slice(0, 8), reason: 'no_matches', keys: dryKeys, matches: [] });
+        continue;
+      }
+
+      // Teasers: read the full posting for the best candidates this person could actually be sent, and keep
+      // only the ones that still match on the full text (résumé mode; alert rows are their own words).
+      let confirmed = ranked;
+      if (!prefs) {
+        const emailedKeys = new Set(log.map((r) => r.job_key));
+        const emailedIds = new Set(log.map((r) => String(r.job_id)));
+        const appliedIds = new Set(apps.map((a) => a.job_id).filter(Boolean).map(String));
+        const savedIds = new Set(saved.map((s) => s.job_id).filter(Boolean).map(String));
+        const open = ranked.filter((j) => j.id && !emailedKeys.has(jobKey(j)) && !emailedIds.has(String(j.id)) && !appliedIds.has(String(j.id)) && !savedIds.has(String(j.id)));
+        // A dry run never writes: the reader's store / gone-marking calls answer as if done.
+        const readDb = dry ? (path, opts = {}) => ((opts.method || 'GET').toUpperCase() === 'GET' ? q(path, opts) : Promise.resolve(new Response(null, { status: 204 }))) : q;
+        const c = await confirmFullPostings(open, keys, { db: readDb, deadline, fetchFull, want: 8, resumeText: residentText });
+        // The final yes is the fit check's: its gates on the full posting, and a reason naming what in each
+        // listing the résumé shows (no two the same). Nothing it marks "gate not met" is ever emailed.
+        const f = finalizeMatches(c.rows, residentText, { limit: 6, keys, strict: true });
+        confirmed = f.rows;
+        for (const d of f.dropped) { c.dropped.push(d); }
+        summary.full_posting_reads = (summary.full_posting_reads || 0) + c.fetched;
+        for (const d of c.dropped) { const k = d.why.startsWith('gate:') ? d.why.replace(':', '_') : `teaser_${d.why.split(':')[0]}`; summary.skipped[k] = (summary.skipped[k] || 0) + 1; }
+        if (dry && dryMatches) for (const dm of dryMatches) { const d = c.dropped.find((x) => x.id === String(dm.job_id)); if (d) dm.dropped = d.why; }
+        if (!confirmed.length) {
+          // round 12: candidates existed but none passed every check on evidence → no email (doubt means silence)
+          const why = open.length ? (f.dropped.some((d) => String(d.why).startsWith('not_positive')) || c.rows.length ? 'no_positive_match' : 'no_readable_match') : 'no_good_match';
+          skip(why);
+          if (dry) summary.picked.push({ user: uid.slice(0, 8), reason: why, keys: dryKeys, matches: dryMatches });
+          continue;
+        }
+      }
 
       // The employers' Seen grades, for the D/F gate and the email's verdict line.
-      const companies = [...new Set(ranked.slice(0, 40).map((j) => companyScoreKey(j.company)).filter(Boolean))];
+      const companies = [...new Set(confirmed.slice(0, 40).map((j) => companyScoreKey(j.company)).filter(Boolean))];
       const scores = new Map();
       if (companies.length) {
         const list = companies.map((c) => `"${c.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`).join(',');
@@ -206,7 +347,7 @@ async function run(req, res, { loadGeo }) {
         for (const s of sr) scores.set(companyScoreKey(s.company_name), s);
       }
 
-      const pick = pickBestMatch(ranked, {
+      const pick = pickBestMatch(confirmed, {
         emailedKeys: new Set(log.map((r) => r.job_key)),
         emailedJobIds: new Set(log.map((r) => String(r.job_id))),
         appliedJobIds: new Set(apps.map((a) => a.job_id).filter(Boolean).map(String)),
@@ -216,7 +357,11 @@ async function run(req, res, { loadGeo }) {
         scores,
         alertMode: !!prefs,
       });
-      if (!pick) { skip('no_good_match'); continue; }
+      if (!pick) {
+        skip('no_good_match');
+        if (dry) summary.picked.push({ user: uid.slice(0, 8), reason: 'no_good_match', keys: dryKeys, matches: dryMatches });
+        continue;
+      }
       const { job } = pick;
       const verdict = companyVerdict(scores.get(companyScoreKey(job.company)));
 
@@ -236,10 +381,15 @@ async function run(req, res, { loadGeo }) {
       const companyPageUrl = verdict ? `${SITE}/company/${encodeURIComponent(String(job.company).toLowerCase().replace(/\s+/g, '-'))}?${utm}` : null;
       const unsubUrl = `${SITE}/api/unsubscribe?list=job_matches&uid=${u}&token=${unsubToken(uid, EMAIL_SECRET, 'job_matches')}`;
       const settingsUrl = alert ? `${SITE}/profile?${utm}#alerts` : null;
-      const mail = buildJobMatchEmail({ job, verdict, city, applyUrl, unsubUrl, companyPageUrl, alert, settingsUrl });
-      const report = { user: uid.slice(0, 8), job_id: job.id, title: job.title, company: job.company, location: job.location, phrase: job._phrase, alert: alert ? alert.keywords : null, grade: verdict?.letter || null, subject: mail.subject };
+      const more = (pick.more || []).map((m) => ({ ...m, url: `${SITE}/jobs/${encodeURIComponent(String(m.job.id))}?${utm}` }));
+      const mail0 = { job, verdict, city, applyUrl, unsubUrl, companyPageUrl, alert, settingsUrl };
+      const report = { user: uid.slice(0, 8), job_id: job.id, title: job.title, company: job.company, location: job.location, reason: job._reason || null, alert: alert ? alert.keywords : null, grade: verdict?.letter || null, more: more.map((m) => ({ job_id: m.job.id, title: m.job.title, company: m.job.company, reason: m.job._reason })) };
 
-      if (dry) { summary.picked.push(report); continue; }
+      if (dry) {
+        const mail = buildJobMatchEmail({ ...mail0, more });
+        summary.picked.push({ ...report, subject: mail.subject, text: mail.text, keys: dryKeys, matches: dryMatches });
+        continue;
+      }
 
       const key = jobKey(job);
       const claim = await q('job_match_email_log', {
@@ -248,7 +398,23 @@ async function run(req, res, { loadGeo }) {
       });
       if (claim.status === 409) { skip('already_sent'); continue; }
       if (!claim.ok) { skip('claim_failed'); continue; }
-      const release = () => q(`job_match_email_log?user_id=eq.${u}&job_key=eq.${encodeURIComponent(key)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }).catch(() => {});
+      // The extra items are claimed too (never sent twice); one that cannot be claimed is left out.
+      const claimedMore = [];
+      for (const m of more) {
+        const mk = jobKey(m.job);
+        const c = await q('job_match_email_log', {
+          method: 'POST', headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify({ user_id: uid, job_id: String(m.job.id), job_key: mk, company: companyScoreKey(m.job.company) }),
+        }).catch(() => null);
+        if (c && c.ok) claimedMore.push({ ...m, key: mk });
+      }
+      const release = async () => {
+        for (const k of [key, ...claimedMore.map((m) => m.key)]) {
+          await q(`job_match_email_log?user_id=eq.${u}&job_key=eq.${encodeURIComponent(k)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }).catch(() => {});
+        }
+      };
+      const mail = buildJobMatchEmail({ ...mail0, more: claimedMore });
+      report.subject = mail.subject;
 
       try {
         const send = await fetch('https://api.resend.com/emails', {
@@ -274,3 +440,5 @@ async function run(req, res, { loadGeo }) {
   }
 }
 
+// every Vercel cron run is recorded for Admin → System (ok / partial / failed, a short count, duration_ms)
+export default withCronRecord('cron-job-matches', handler);

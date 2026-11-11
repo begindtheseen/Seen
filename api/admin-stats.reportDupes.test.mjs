@@ -87,9 +87,12 @@ test('one press marks every copy, audits it, and the rescored company counts eac
     assert.deepEqual(p.body, { needs_review: true, trust_reason: 'duplicate_import' }, 'nothing deleted, weight untouched');
     assert.match(p.u, /trust_reason\.neq\.duplicate_import/);
   }
+  // One audit row per copy, plus one batch row (admin remake round 5) that is the press's single Undo.
   const audit = calls.filter((c) => c.u.includes('/admin_audit_log') && c.method === 'POST').flatMap((c) => c.body);
-  assert.equal(audit.length, 35);
-  assert.ok(audit.every((a) => a.action === 'mark_duplicate_report' && a.metadata.duplicate_of && a.metadata.prior));
+  const perCopy = audit.filter((a) => a.action === 'mark_duplicate_report');
+  assert.equal(perCopy.length, 35);
+  assert.ok(perCopy.every((a) => a.metadata.duplicate_of && a.metadata.prior && a.metadata.batch_id));
+  assert.equal(audit.filter((a) => a.action === 'dedupe_reports').length, 1);
   const saved = calls.find((c) => c.method === 'POST' && c.u.includes('/company_scores?on_conflict'));
   assert.ok(saved, 'the company score is recomputed');
   assert.equal(saved.body.first_party_report_count, 5, 'five hiring accounts, not ten');

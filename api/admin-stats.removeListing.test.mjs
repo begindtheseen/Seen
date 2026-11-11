@@ -87,7 +87,7 @@ test('remove_listing reports failure instead of claiming success', async () => {
   const rejected = mockResponse('{"code":"23514","message":"violates check constraint"}', { ok: false, status: 400 });
   const { res, calls } = await callRemove({ jobPatch: rejected });
   assert.equal(res.statusCode, 502);
-  assert.equal(res.jsonBody.ok, undefined);
+  assert.equal(res.jsonBody.ok, false, 'errors answer the admin contract (ok:false, code, retryable) — admin remake 2026-11-10');
   assert.match(String(res.jsonBody.error), /Could not remove listing/);
   assert.equal(calls.some((c) => c.url.includes('/admin_audit_log')), false,
     'must NOT audit-log a removal that the database refused');

@@ -18,6 +18,7 @@ import { logError } from '../lib/server/errlog.js';
 import { runEnrichment } from '../lib/server/companyEnrichmentWorker.js';
 import { readEnrichConfig } from './_utils/companyEnrichment.js';
 import { isVercelCron } from '../lib/server/cronAuth.js';
+import { recordCronRun } from '../lib/server/cronRun.js';
 
 async function authorized(req) {
   if (isVercelCron(req)) return true;
@@ -49,9 +50,11 @@ export default async function handler(req, res) {
     for (const c of summary.companies) {
       if (c.status === 'error' || c.status === 'retry') logError('enrich-companies/company', c.reason || 'failed', { company: c.company });
     }
+    if (isVercelCron(req)) await recordCronRun('enrich-companies', summary.ok ? 'ok' : 'failed', summary.ok ? `${(summary.companies || []).length} companies` : (summary.reason || 'not ok'));
     return res.status(200).json(summary);
   } catch (e) {
     logError('enrich-companies', e);
+    if (isVercelCron(req)) await recordCronRun('enrich-companies', 'failed', 'enrichment run failed');
     return res.status(500).json({ ok: false, error: 'enrichment run failed' });
   }
 }

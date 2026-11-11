@@ -23,6 +23,7 @@ import { submitUrls, indexableCompanyUrls, recentlySubmitted, everSubmitted, ind
 import { hasMentionCount } from '../lib/server/scoreColumns.js';
 import { SCORE_TTL_MS } from '../lib/server/reportCounts.js';
 import { isVercelCron } from '../lib/server/cronAuth.js';
+import { withCronRecord } from '../lib/server/cronRecord.js';
 
 const RUN_MS = 100_000; // vercel.json maxDuration 120 s
 
@@ -97,7 +98,7 @@ export async function runSearchData({ env = process.env, fetchImpl = fetch, now 
   return out;
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   const q = req.query || {};
   const cron = process.env.CRON_SECRET;
   // Vercel's cron call carries the CRON_SECRET bearer (lib/server/cronAuth.js); x-vercel-cron is spoofable and ignored.
@@ -115,3 +116,6 @@ export default async function handler(req, res) {
     return res.status(500).json({ ok: false, error: 'search data run failed' });
   }
 }
+
+// every Vercel cron run is recorded for Admin → System (ok / partial / failed, a short count, duration_ms)
+export default withCronRecord('cron-search-data', handler);

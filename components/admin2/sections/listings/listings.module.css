@@ -1,0 +1,80 @@
+/* Listings / Companies / People / System share this module's block styles (tokens only, 8px grid, 4px
+   steps inside a component, every control ≥44px, text ≥12px, minmax(0,1fr) tracks). */
+.wrap { display: flex; flex-direction: column; min-width: 0; gap: var(--sp-6); }
+.block { display: flex; flex-direction: column; gap: var(--sp-3); min-width: 0; padding: var(--sp-4); background: var(--surface-1); border: 1px solid var(--border-1); border-radius: var(--r-card); }
+.blockFlat { display: flex; flex-direction: column; gap: var(--sp-3); min-width: 0; }
+.blockHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2) var(--sp-3); }
+.h2 { font-size: var(--fs-meta); font-weight: 600; letter-spacing: var(--ls-meta); text-transform: uppercase; color: var(--text-3); }
+.text { font-size: var(--fs-sm); color: var(--text-2); line-height: var(--lh-body); overflow-wrap: anywhere; }
+.quiet { font-size: var(--fs-sm); color: var(--text-3); line-height: var(--lh-ui); overflow-wrap: anywhere; }
+.strong { color: var(--text-1); font-weight: 600; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.actions :global(.ui-btn), .block :global(.ui-btn), .blockFlat :global(.ui-btn), .item :global(.ui-btn) { min-height: 44px; }
+.actions > [data-testid='confirm-step'] { flex: 1 1 100%; }
+
+/* Filters: a search field, chips, then selects in a grid that folds to one column on a phone. */
+.toolbar { display: flex; flex-direction: column; gap: var(--sp-3); min-width: 0; }
+.filters { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: var(--sp-2); }
+.field { display: flex; flex-direction: column; gap: var(--sp-1); min-width: 0; font-size: var(--fs-sm); color: var(--text-2); }
+.field :global(.ui-input) { min-height: 44px; }
+.inline { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--sp-2); }
+.inline > .field { flex: 1 1 160px; }
+.narrow { max-width: 160px; }
+@media (max-width: 767px) { .field :global(.ui-input) { font-size: var(--fs-lead); } .narrow { max-width: none; } }
+
+/* Desktop key hint line: hidden on touch screens (its words make no sense without a keyboard). */
+.keys { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-3); font-size: var(--fs-meta); color: var(--text-3); }
+.keys > span { display: inline-flex; align-items: center; gap: var(--sp-1); }
+@media (hover: none) { .keys { display: none; } }
+
+/* Small facts grid (a sheet or a block): label over value. */
+.facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 160px), 1fr)); gap: var(--sp-3); margin: 0; }
+.fact { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.factLabel { font-size: var(--fs-meta); font-weight: 600; letter-spacing: var(--ls-meta); text-transform: uppercase; color: var(--text-3); }
+.factValue { margin: 0; font-size: var(--fs-body); color: var(--text-1); overflow-wrap: anywhere; }
+.factSub { margin: 0; font-size: var(--fs-sm); color: var(--text-3); line-height: var(--lh-ui); }
+
+/* Simple lines (history, ledger, examples). */
+.lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.lineItem { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-3); min-width: 0; padding: var(--sp-2) var(--sp-3); border: 1px solid var(--border-1); border-radius: var(--r-control); background: var(--surface-1); font-size: var(--fs-sm); color: var(--text-2); }
+.lineMain { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
+.lineSide { flex: none; color: var(--text-3); font-size: var(--fs-meta); }
+
+/* Duplicate plan: one card per example group. */
+.groups { display: flex; flex-direction: column; gap: var(--sp-2); }
+.group { display: flex; flex-direction: column; gap: var(--sp-1); min-width: 0; padding: var(--sp-3); border: 1px solid var(--border-1); border-radius: var(--r-control); background: var(--surface-2); }
+.groupLine { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-2); min-width: 0; font-size: var(--fs-sm); color: var(--text-2); }
+.groupText { flex: 1 1 180px; min-width: 0; overflow-wrap: anywhere; }
+
+/* Item sheets. */
+.item { display: flex; flex-direction: column; gap: var(--sp-6); min-width: 0; }
+.itemPart { display: flex; flex-direction: column; gap: var(--sp-3); min-width: 0; }
+.form { display: flex; flex-direction: column; gap: var(--sp-3); min-width: 0; }
+.formGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: var(--sp-3); }
+.link { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
+/* A link on its own row inside a sentence: the whole row is the 44px target (a stored URL can be one short word). */
+.linkRow { display: flex; align-items: center; min-height: 44px; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.linkBtn { min-height: 44px; padding: 0 var(--sp-1); border: 0; background: transparent; color: var(--accent); font: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; text-align: left; }
+
+/* A plain table-like list that stacks on a phone (sources, crons, flags, sign-up sources). */
+.table { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.tr { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) auto; align-items: center; gap: var(--sp-1) var(--sp-3); min-width: 0; padding: var(--sp-2) var(--sp-3); min-height: 56px; border: 1px solid var(--border-1); border-radius: var(--r-control); background: var(--surface-1); font-size: var(--fs-sm); }
+.trName { min-width: 0; font-weight: 600; color: var(--text-1); overflow-wrap: anywhere; }
+.trBody { min-width: 0; display: flex; flex-direction: column; gap: 2px; color: var(--text-2); overflow-wrap: anywhere; }
+.trSide { min-width: 0; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-2); }
+.trBad { border-color: var(--bad-line); }
+@media (max-width: 559px) {
+  .tr { grid-template-columns: minmax(0, 1fr); }
+  .trSide { justify-content: flex-start; }
+}
+
+/* A bar for a number among others (sign-up sources, errors by route). Width set by a transform only. */
+.barRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--sp-1) var(--sp-3); align-items: center; font-size: var(--fs-sm); color: var(--text-2); }
+.barTrack { grid-column: 1 / -1; position: relative; height: 4px; border-radius: var(--r-pill); background: var(--surface-3); overflow: hidden; }
+.barFill { position: absolute; inset: 0; background: var(--text-3); transform-origin: left center; }
+.barNum { color: var(--text-1); font-weight: 600; }
+
+/* A finished job's line (the server's sentence). */
+.doneLine { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3); border-radius: var(--r-control); border: 1px solid var(--good-line); background: var(--good-tint); font-size: var(--fs-sm); line-height: var(--lh-ui); }
+.doneWord { display: inline-flex; align-items: center; gap: var(--sp-1); font-weight: 600; color: var(--good-text); white-space: nowrap; }
+.doneText { flex: 1 1 220px; min-width: 0; color: var(--text-2); overflow-wrap: anywhere; }

@@ -41,57 +41,58 @@
   "functions": {
     "api/employer-listings.js": {
       "maxDuration": 60,
-      "includeFiles": "lib/geo/data/**"
+      "includeFiles": "{lib/geo/data/**,lib/occupations/data/**,lib/text/data/**}"
     },
     "api/job-insights.js": {
-      "maxDuration": 20
+      "maxDuration": 20,
+      "includeFiles": "{lib/occupations/data/**,lib/text/data/**}"
     },
     "api/optimizer.js": {
       "maxDuration": 30,
-      "includeFiles": "lib/geo/data/**"
+      "includeFiles": "{lib/geo/data/**,lib/occupations/data/**,lib/text/data/**}"
     },
     "api/refresh-jobs.js": {
       "maxDuration": 300,
-      "includeFiles": "lib/geo/data/**"
+      "includeFiles": "{lib/geo/data/**,lib/occupations/data/**,lib/text/data/**}"
     },
     "api/refresh-employer-boards.js": {
       "maxDuration": 300,
-      "includeFiles": "lib/geo/data/**"
+      "includeFiles": "{lib/geo/data/**,lib/occupations/data/**,lib/text/data/**}"
     },
     "api/local-company-jobs.js": {
       "maxDuration": 300,
-      "includeFiles": "lib/geo/data/**"
+      "includeFiles": "{lib/geo/data/**,lib/occupations/data/**,lib/text/data/**}"
     },
     "api/ingest-local-career-jobs.js": {
       "maxDuration": 60,
-      "includeFiles": "lib/geo/data/**"
+      "includeFiles": "{lib/geo/data/**,lib/occupations/data/**,lib/text/data/**}"
     },
     "api/discover-sources.js": {
       "maxDuration": 300,
-      "includeFiles": "lib/geo/data/**"
+      "includeFiles": "{lib/geo/data/**,lib/occupations/data/**,lib/text/data/**}"
     },
     "api/refresh-stale-jobs.js": {
       "maxDuration": 300,
-      "includeFiles": "lib/geo/data/**"
+      "includeFiles": "{lib/geo/data/**,lib/occupations/data/**,lib/text/data/**}"
     },
     "api/prune-jobs.js": {
       "maxDuration": 60
     },
     "api/resume.js": {
       "maxDuration": 30,
-      "includeFiles": "{node_modules/pdfjs-dist/**,lib/resume/extract/pdfWorker.js,lib/geo/data/**}"
+      "includeFiles": "{node_modules/pdfjs-dist/**,lib/resume/extract/pdfWorker.js,lib/geo/data/**,lib/occupations/data/**,lib/text/data/**}"
     },
     "api/apply.js": {
       "maxDuration": 30,
-      "includeFiles": "{node_modules/pdfjs-dist/**,lib/resume/extract/pdfWorker.js}"
+      "includeFiles": "{node_modules/pdfjs-dist/**,lib/resume/extract/pdfWorker.js,lib/occupations/data/**,lib/text/data/**}"
     },
     "api/jobs.js": {
       "maxDuration": 60,
-      "includeFiles": "lib/geo/data/**"
+      "includeFiles": "{lib/geo/data/**,lib/occupations/data/**,lib/text/data/**}"
     },
     "api/ingest-local-indeed.js": {
       "maxDuration": 60,
-      "includeFiles": "lib/geo/data/**"
+      "includeFiles": "{lib/geo/data/**,lib/occupations/data/**,lib/text/data/**}"
     },
     "api/ingest-local-company-intel.js": {
       "maxDuration": 60
@@ -107,14 +108,14 @@
     },
     "api/user-sync.js": {
       "maxDuration": 15,
-      "includeFiles": "lib/geo/data/**"
+      "includeFiles": "{lib/geo/data/**,lib/occupations/data/**,lib/text/data/**}"
     },
     "api/demand.js": {
       "maxDuration": 60
     },
     "api/reports.js": {
       "maxDuration": 300,
-      "includeFiles": "lib/geo/data/**"
+      "includeFiles": "{lib/geo/data/**,lib/occupations/data/**,lib/text/data/**}"
     },
     "api/stripe.js": {
       "maxDuration": 30
@@ -130,21 +131,22 @@
     },
     "api/inbox-email.js": {
       "maxDuration": 60,
-      "includeFiles": "lib/geo/data/**"
+      "includeFiles": "{lib/geo/data/**,lib/occupations/data/**,lib/text/data/**}"
     },
     "api/cron-search-data.js": {
       "maxDuration": 120
     },
     "api/cron-job-matches.js": {
       "maxDuration": 300,
-      "includeFiles": "lib/geo/data/**"
+      "includeFiles": "{lib/geo/data/**,lib/occupations/data/**,lib/text/data/**}"
     },
     "api/interview-prep.js": {
-      "maxDuration": 150
+      "maxDuration": 150,
+      "includeFiles": "{lib/occupations/data/**,lib/text/data/**}"
     },
     "api/optimize.js": {
       "maxDuration": 30,
-      "includeFiles": "lib/geo/data/**"
+      "includeFiles": "{lib/geo/data/**,lib/occupations/data/**,lib/text/data/**}"
     }
   },
   "crons": [

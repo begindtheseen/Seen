@@ -6,7 +6,7 @@
 .skel { display: flex; flex-direction: column; gap: var(--sp-2); }
 .p { margin: 0; font-size: var(--fs-body); color: var(--text-3); line-height: var(--lh-body); }
 .fine { margin: 0; display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-sm); color: var(--text-3); line-height: 1.5; }
-.link { color: var(--accent); }
+.link { color: var(--accent); padding: 12px 0; } /* inline: the vertical padding gives a 44px tap box without moving the line */
 .h2 { margin: 0 0 var(--sp-2); font-family: var(--display); font-weight: 700; font-size: var(--fs-h3); letter-spacing: var(--ls-heading); color: var(--text-1); }
 
 .head { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: var(--sp-4); align-items: start; padding: var(--sp-5); border-radius: var(--r-panel); background: var(--surface-1); border: 1px solid var(--border-2); box-shadow: var(--sh-raised); }

@@ -4,7 +4,10 @@ import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { gateAI, resolveProAccess, resolveAuthedUser } from '../lib/server/credits.js';
 import { RESUME_OPTIMIZE_COST } from '../lib/server/creditRules.js';
-import { previewOnlyOrFetch } from '../lib/server/postingGate.js';
+import { postingTextForReader } from '../lib/server/jobInsights.js';
+import { readPosting } from '../lib/server/postingRead.js';
+import { createHash } from 'crypto';
+import { paidExportToken, paidExportAllowed } from '../lib/server/paidExport.js';
 import { optimizeCacheKey, readCachedOptimize, writeCachedOptimize } from '../lib/server/optimizeCache.js';
 import { buildPaidOptimize, unoptimizableListing } from '../lib/server/optimizePackage.js';
 import { runAdvantage, requirementsStated, extractEmployment, extractCareerSignal, buildResumeDocument, resumeFileName } from '../lib/server/resumeAnalysis.js';
@@ -91,6 +94,34 @@ async function listingPostedAt(body) {
   } catch (_) { return null; }
 }
 
+// A failed credit gate, said for what it is: a missing or expired session is `signin_required` (401) and is
+// never shown as "out of credits"; only a real shortfall carries `credits_required` (402).
+export function gateFailure(gate) {
+  if (gate && gate.status === 401) return { error: 'signin_required', message: gate.error || 'Sign in to continue.', signin_required: true };
+  return { error: gate.error, credits_required: !!gate.credits_required, ...(gate.pro_required ? { pro_required: true } : {}), balance: gate.balance ?? 0 };
+}
+const SIGNIN_REQUIRED = { error: 'signin_required', message: 'Sign in to continue.', signin_required: true };
+
+// The credit rule for a tailored résumé (tool:optimize AND action:tailor): ONE decision, made in
+// lib/resume/tailor/paid.js chargeDecision AFTER the package is built, carried on `tailored.charge`. Charged only when
+// nothing blocks the application, at least one applied change of substance beyond formatting was made, and the
+// document is measurably better for this posting (more of what the résumé proves sits where a recruiter reads first,
+// or a thin / cliché summary was replaced) — and never when the fit would drop. Otherwise free, with one sentence.
+/** The scoring context with the person's answers (only when there are any: no answers = the context unchanged). */
+export function withConfirmed(fit, confirmed) {
+  return Array.isArray(confirmed) && confirmed.length ? { ...(fit || {}), confirmed } : fit;
+}
+
+export function tailorCharge(tailored) {
+  if (!tailored) return { charge: false, reason: 'no_document', note: 'Nothing could be tailored for this posting, so no credit was used.' };
+  const before = tailored.score_before, after = tailored.score_after;
+  if (typeof before === 'number' && typeof after === 'number' && after < before) return { charge: false, reason: 'fit_drop', note: `The changes would lower your match (${before} → ${after}), so they are not applied and no credit was used.` };
+  const c = tailored.charge || { charge: false, reason: 'no_change', sentence: tailored.kept_as_is || 'Nothing of substance changed for this posting, so no credit was used.' };
+  return { charge: !!c.charge, reason: c.reason, note: c.charge ? null : c.sentence };
+}
+
+export { readPosting };
+
 export default async function handler(req, res) {
   const _o = req.headers.origin || '';
   const _devO = !_o || _o.includes('localhost') || _o.includes('127.0.0.1');
@@ -166,7 +197,7 @@ export default async function handler(req, res) {
 
   // Credit gate — 1 credit per call; Pro users are never charged (consume_credit answers pro:true)
   const gate = await gateAI(req, `resume_${tool || 'tool'}`);
-  if (!gate.ok) return res.status(gate.status).json({ error: gate.error, credits_required: gate.credits_required, balance: gate.balance ?? 0 });
+  if (!gate.ok) return res.status(gate.status).json(gateFailure(gate));
 
   try {
     if (!tool) return res.status(400).json({ error: 'Missing tool parameter' });
@@ -369,13 +400,8 @@ export function buildResumePDF(document, meta = {}) {
          .text(d.name, LEFT, doc.y, { width: W, align: 'center' });
       doc.moveDown(0.22);
     }
-    // Subtle target-role context line (only when we know it) — not fabricated.
-    const targetLine = sanitizeForStandardFont([meta.role, meta.company].filter(Boolean).join('   ·   '));
-    if (targetLine) {
-      doc.fillColor(META).font('Times-Italic').fontSize(10.5)
-         .text(targetLine, LEFT, doc.y, { width: W, align: 'center' });
-      doc.moveDown(0.22);
-    }
+    // No target-role line under the name: the résumé says who the person is, never the job they want.
+    const targetLine = '';
     if (contactBits.length) {
       doc.fillColor(INK).font('Times-Roman').fontSize(10)
          .text(contactBits.join('   ·   '), LEFT, doc.y, { width: W, align: 'center' });
@@ -572,34 +598,53 @@ function drawFooter(doc, LEFT, W, RULE, FOOT, footerBand) {
 async function handleOptimizeTool(req, res, body) {
   try {
     const authed = await resolveAuthedUser(req);
-    if (!authed?.uid) return res.status(401).json({ error: 'Sign in to use AI features', credits_required: true });
+    if (!authed?.uid) return res.status(401).json(SIGNIN_REQUIRED);
     if (!body.resume) return res.status(400).json({ error: 'Resume required' });
     if (!isReadableResume(body.resume)) return res.status(400).json({ error: 'RESUME_CORRUPTED' });
-    // a teaser with a saved job behind it becomes the fetched posting on `body` (lib/server/fullPosting.js)
-    const preview = await previewOnlyOrFetch(body);
+    // a teaser with a saved job behind it becomes the fetched posting on `body` (lib/server/fullPosting.js); a pasted
+    // link is read and its own title / employer are what the result names
+    const original = String(body.resume);
+    const { preview, posting } = await readPosting(body);
     if (preview) return res.status(preview.status).json({ ...preview.body, charged: false });
+    // the SAME posting text the fit check and Job Insights read (markup turned into lines)
+    body.jobDescription = postingTextForReader(body.jobDescription);
     const { job, company, jobDescription, jobId } = body;
     // The canonical text and the shared taxonomy — the same inputs the free fit check and the Studio
     // score, so the three screens print one number (lib/resume/canonical.js, skillTaxonomy.js).
     const resume = canonicalResumeText(body.resume);
-    const [taxonomy, fit] = await Promise.all([loadSkillTaxonomy(), fitContext({ company, jobDescription })]);
+    const [taxonomy, fit0] = await Promise.all([loadSkillTaxonomy(), fitContext({ company, jobDescription })]);
+    // the person's answers ride in the scoring context into every runOptimizer call of the package (confirmations.js)
+    const fit = withConfirmed(fit0, body.confirmed);
 
     // The cache key carries the parser + optimizer versions (optimizeCache.js): a result built by an
     // older engine is never served (Tasha got a pre-fix "(1,800 subscribers)." summary, 2026-10-25).
     // `fresh: true` (the "Re-run" button) skips the cache.
-    const key = optimizeCacheKey({ uid: authed.uid, jobId, jobDescription, resume });
+    const key = optimizeCacheKey({ uid: authed.uid, jobId, jobDescription, resume, confirmed: body.confirmed });
     const hit = body.fresh ? null : await readCachedOptimize(authed.uid, key);
-    if (hit) return res.status(200).json({ ...hit.output, cached: true, cached_at: hit.created_at, charged: false });
+    if (hit) {
+      const paidBefore = !hit.output.no_gain;
+      const tail = hit.output.tailored ? { ...hit.output.tailored, export_token: paidBefore ? paidExportToken(authed.uid, key) : null, export_key: paidBefore ? key : null } : hit.output.tailored;
+      return res.status(200).json({ ...hit.output, tailored: tail, cached: true, cached_at: hit.created_at, charged: false });
+    }
     // A posting with no measurable requirements has nothing to optimize against: refused free,
     // probe or not, before the credit gate (the modal said "No score" and then charged a credit).
     const unoptimizable = unoptimizableListing({ resume, jobDescription, job, company, taxonomy });
     if (unoptimizable) return res.status(422).json({ error: 'no_requirements', ...unoptimizable, cost: 0, charged: false });
-    if (body.probe) return res.status(200).json({ cached: false, price: RESUME_OPTIMIZE_COST, charged: false });
-
+    // The package is built BEFORE the credit — on the probe too, so the offer can say exactly what a credit buys (or
+    // that this one is free, and why) before anything is spent.
+    const result = buildPaidOptimize({ resume, resumeIsCanonical: true, original, jobDescription, job, company, pro: false, jobId, taxonomy, fit, posting });
+    const rule = tailorCharge(result.tailored);
+    if (body.probe) return res.status(200).json({ cached: false, price: RESUME_OPTIMIZE_COST, cost: rule.charge ? RESUME_OPTIMIZE_COST : 0, charged: false, charge: { charge: rule.charge, reason: rule.reason, sentence: rule.note || (result.charge && result.charge.sentence) || null }, change_counts: result.change_counts, posting: result.posting, blocked: result.blocked, questions_note: result.questions_note ?? null, field_match: result.field_match, fit_score: result.fit_score, requirements_listed: result.requirements_listed });
+    if (!rule.charge) {
+      const proNow = (await resolveProAccess(req)).pro;
+      const out = { ...result, no_gain: true, note: rule.note, charge_reason: rule.reason };
+      const stored = await writeCachedOptimize(authed.uid, key, out);
+      return res.status(200).json({ ...out, cached: false, cache_saved: stored, charged: false, pro: !!proNow });
+    }
     const gate = await gateAI(req, 'resume_optimize');
-    if (!gate.ok) return res.status(gate.status).json({ error: gate.error, credits_required: gate.credits_required, pro_required: gate.pro_required, balance: gate.balance ?? 0 });
-    const result = buildPaidOptimize({ resume, jobDescription, job, company, pro: gate.pro, jobId, taxonomy, fit });
+    if (!gate.ok) return res.status(gate.status).json(gateFailure(gate));
     const stored = await writeCachedOptimize(authed.uid, key, result);
+    if (result.tailored) { result.tailored.export_token = paidExportToken(authed.uid, key); result.tailored.export_key = key; }
     // charged is what the gate did: a Pro user is never charged (consume_credit answers pro:true)
     return res.status(200).json({ ...result, cached: false, cache_saved: stored, charged: !gate.pro, pro: !!gate.pro, balance: gate.balance });
   } catch (err) {
@@ -627,22 +672,28 @@ async function handleStudio(req, res, body) {
       case 'ats_check': return res.status(200).json(await atsCheckAction(body));
       case 'export': {
         // Effective Pro status (no credit consumed) decides branding — same rule as download_resume.
+        // a paid tailored version (its export token, this user's, unexpired) exports without the footer, like Pro
         const { pro } = await resolveProAccess(req);
-        const out = await exportAction(body, { pro });
+        const unbranded = pro || await paidExportAllowed(req, body, resolveAuthedUser);
+        const out = await exportAction(body, { pro: unbranded });
         const asciiName = out.fileName.replace(/[^\x20-\x7E]/g, '-').replace(/"/g, '');
         res.setHeader('Content-Type', out.contentType);
         res.setHeader('Content-Disposition', `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(out.fileName)}`);
         res.setHeader('Cache-Control', 'no-store');
         res.setHeader('X-Seen-Template', out.template || '');
         res.setHeader('X-Seen-Pages', String(out.pages || ''));
-        res.setHeader('X-Seen-Branded', pro ? '0' : '1');
+        res.setHeader('X-Seen-Branded', unbranded ? '0' : '1');
         return res.status(200).send(out.buffer);
       }
       case 'tailor': {
+        // identity first: a missing or expired session answers 401 signin_required before anything is read, run or charged
+        if (!(await resolveAuthedUser(req))) return res.status(401).json(SIGNIN_REQUIRED);
         // a posting that is only a preview is never charged (a title-only tailor stays allowed)
         if (String(body.jobDescription || '').trim()) {
-          const preview = await previewOnlyOrFetch(body);
-          if (preview) return res.status(preview.status).json({ ...preview.body, charged: false });
+          const read = await readPosting(body);
+          if (read.preview) return res.status(read.preview.status).json({ ...read.preview.body, charged: false });
+          body._posting = read.posting;
+          body.jobDescription = postingTextForReader(body.jobDescription);
         }
         const [taxonomy, fit] = await Promise.all([loadSkillTaxonomy(), fitContext({ company: body.company, jobDescription: body.jobDescription })]);
         // A posting that states no requirements has nothing to tailor against: refused free, before
@@ -653,15 +704,23 @@ async function handleStudio(req, res, body) {
         }
         // The plan is computed BEFORE the credit is taken: a tailor that cannot move the fit score (an
         // engineer's résumé went 70 → 70 and paid 1 credit, round 1) is returned free, with a plain reason.
-        if (!(await resolveAuthedUser(req))) return res.status(401).json({ error: 'Sign in to use AI features', credits_required: true });
-        const out = await tailorAction(body, { taxonomy, fit });
-        const before = out?.plan?.score?.before, after = out?.plan?.score?.after;
-        if (typeof before === 'number' && typeof after === 'number' && after <= before) {
+        const out = await tailorAction(body, { taxonomy, fit: withConfirmed(fit, body.confirmed) });
+        if (body._posting) out.posting = { ...body._posting, title: body._posting.title || body.jobTitle || null };
+        const rule = tailorCharge(out.tailored);
+        if (!rule.charge) {
           const proNow = (await resolveProAccess(req)).pro;
-          return res.status(200).json({ ...out, charged: false, no_gain: true, pro: !!proNow, note: `This posting scores ${before}/100 against your résumé as it is — tailoring would not raise it, so no credit was used.` });
+          return res.status(200).json({ ...out, charged: false, no_gain: true, pro: !!proNow, note: rule.note, charge_reason: rule.reason });
         }
         const gate = await gateAI(req, 'resume_tailor');
-        if (!gate.ok) return res.status(gate.status).json({ error: gate.error, credits_required: gate.credits_required, pro_required: gate.pro_required, balance: gate.balance ?? 0 });
+        if (!gate.ok) return res.status(gate.status).json(gateFailure(gate));
+        // a credit-bought Studio version exports without the footer: a token bound to this user and THIS result (a stable
+        // key over the posting and the base document), carried by the Studio to the export of that version only
+        const who = await resolveAuthedUser(req);
+        if (out.tailored && who && who.uid) {
+          const studioKey = `studio:${createHash('sha256').update(`${String(body.jobDescription || '')}\n${String(body.jobTitle || '')}\n${serializeToText(docFromBody(body))}`).digest('base64url').slice(0, 32)}`;
+          out.tailored.export_token = paidExportToken(who.uid, studioKey);
+          out.tailored.export_key = studioKey;
+        }
         return res.status(200).json({ ...out, balance: gate.balance, pro: !!gate.pro, charged: !gate.pro });
       }
       default: return res.status(400).json({ error: `Unknown action: ${body.action}` });
@@ -682,8 +741,9 @@ async function buildExportPdf({ resume, doc: docIn, job, company, jobDescription
   let doc = docIn && typeof docIn === 'object' ? normalizeDoc(docIn) : null;
   if (!doc || docIsEmpty(doc)) { try { doc = parseResume({ text: String(resume || ''), source: 'text' }); } catch { doc = null; } }
   if (doc && !docIsEmpty(doc) && (doc.experience.length || doc.skills.length || doc.basics.summary)) {
-    // The target role becomes the headline only when the candidate wrote none (never the company).
-    const r = await renderPdf(doc, { template: template || 'classic', pro, targetLine: !doc.basics.headline && job ? String(job).slice(0, 120) : '' });
+    // The document as given — never a target job title printed as the person's headline: a title they never
+    // held is a falsehood on their résumé (director's decision G).
+    const r = await renderPdf(doc, { template: template || 'classic', pro });
     return { buffer: r.buffer, name: doc.basics.name || '', pages: r.pages, template: r.template };
   }
   const legacy = buildResumeDocument({ resume, jobDescription, job, company });

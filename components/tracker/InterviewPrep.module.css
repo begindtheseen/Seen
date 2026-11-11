@@ -68,3 +68,7 @@
 .fill::placeholder { color: var(--muted); }
 .finished { margin: .5rem 0 .5rem; padding: .5rem .75rem; border-left: 2px solid var(--accent); background: var(--accent-tint); border-radius: 6px; }
 .watch { margin: .25rem 0; font-size: var(--fs-sm); line-height: 1.55; color: var(--caution-text); overflow-wrap: anywhere; }
+
+/* the Yes / No on a "Closest line we found" row (outlined text buttons, 44px tall) */
+.linkBtn { display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--sp-2); background: none; border: 1px solid var(--border-2); border-radius: var(--r-control); color: var(--accent); font: inherit; font-size: var(--fs-sm); font-weight: 600; cursor: pointer; }
+.linkBtn:focus-visible { outline: none; box-shadow: var(--sh-focus); }

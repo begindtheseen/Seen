@@ -18,15 +18,19 @@ import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { gateAI } from '../lib/server/credits.js';
 import { runOptimizer, ENGINE_VERSION } from '../lib/optimizer/index.js';
-import { previewOnlyOrFetch } from '../lib/server/postingGate.js';
-import { freeDiagnostic } from '../lib/server/optimizePackage.js';
-import { extractJobFacts } from '../lib/optimizer/extractJobFacts.js';
-import { termFromLabel } from '../lib/optimizer/postingTerms.js';
+import { freeDiagnostic, listedRequirements, listedCoverage, postingInfo, alreadyRightOf, questionsNote } from '../lib/server/optimizePackage.js';
+import { parseResume } from '../lib/resume/parse/index.js';
+import { postingTextForReader } from '../lib/server/jobInsights.js';
+import { employerDisplayName } from '../lib/text/employerName.js';
+import { readPosting } from '../lib/server/postingRead.js';
+import { extractJobFacts, postingTermKey } from '../lib/optimizer/extractJobFacts.js';
+import { termFromLabel, POSTING_TERMS_VERSION } from '../lib/optimizer/postingTerms.js';
 import { runHumanProof, HUMANPROOF_ENGINE_VERSION } from '../lib/humanizer/index.js';
 import { buildHumanProofPackage, normalizeBulletList } from '../lib/server/humanizePackage.js';
 import { loadSkillTaxonomy } from '../lib/server/skillTaxonomy.js';
 import { fitContext, postingSaysRemote } from '../lib/server/fitContext.js';
 import { canonicalResumeText } from '../lib/resume/canonical.js';
+import { knowledgeHealth } from '../lib/server/knowledgeHealth.js';
 
 // ── auth: derive the user id from the Supabase JWT (same pattern as api/apply.js) ──
 function verifyJWT(token, secret) {
@@ -150,27 +154,33 @@ async function loadPhraseRules(db) {
 async function loadTaxonomy() { return loadSkillTaxonomy(); }
 
 // ── cached job_facts per job_id (fast repeat runs) ──
-async function getCachedJobFacts(db, jobId) {
+const TERM_ROW_MARK = 'term:'; // job_facts.normalized_label prefix of a posting-term row (storage encoding only)
+export async function getCachedJobFacts(db, jobId) {
   if (!jobId) return null;
   try {
     const r = await db(`job_facts?job_id=eq.${encodeURIComponent(String(jobId))}&select=fact_type,label,normalized_label,weight,confidence,importance&limit=500`);
     if (!r.ok) return null;
     const rows = await r.json();
     if (!rows?.length) return null;
-    return rows.map((row) => ({
-      factType: row.fact_type,
-      label: row.label,
-      normalizedLabel: row.normalized_label,
-      importance: row.importance || 'required',
-      weight: Number(row.weight) || (row.importance === 'preferred' ? 0.6 : 1),
-      confidence: Number(row.confidence) || 0.8,
-      // a requirement in the posting's own words is matched by its words (lib/optimizer/postingTerms.js)
-      ...(String(row.normalized_label || '').startsWith('term:') ? { term: termFromLabel(row.label), hard: false } : {}),
-    }));
+    return rows.map((row) => {
+      // A requirement in the posting's own words is matched by its words (lib/optimizer/postingTerms.js).
+      // The table has no column for that, so the cache marks the stored row (TERM_ROW_MARK, storage only —
+      // never in a fact) and the fact is rebuilt from its label: key = the label's own words, as the reader makes it.
+      const isTerm = String(row.normalized_label || '').startsWith(TERM_ROW_MARK);
+      return {
+        factType: row.fact_type,
+        label: row.label,
+        normalizedLabel: isTerm ? postingTermKey(row.label) : row.normalized_label,
+        importance: row.importance || 'required',
+        weight: Number(row.weight) || (row.importance === 'preferred' ? 0.6 : 1),
+        confidence: Number(row.confidence) || 0.8,
+        ...(isTerm ? { term: termFromLabel(row.label), hard: false, extractor: POSTING_TERMS_VERSION } : {}),
+      };
+    });
   } catch { return null; }
 }
 
-async function cacheJobFacts(db, jobId, facts) {
+export async function cacheJobFacts(db, jobId, facts) {
   if (!jobId || !facts?.length) return;
   try {
     await db(`job_facts?job_id=eq.${encodeURIComponent(String(jobId))}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
@@ -182,7 +192,7 @@ async function cacheJobFacts(db, jobId, facts) {
           job_id: String(jobId),
           fact_type: f.factType,
           label: f.label,
-          normalized_label: f.normalizedLabel,
+          normalized_label: f.term ? `${TERM_ROW_MARK}${f.normalizedLabel}` : f.normalizedLabel,
           weight: f.weight,
           confidence: f.confidence,
           importance: f.importance,
@@ -192,6 +202,11 @@ async function cacheJobFacts(db, jobId, facts) {
   } catch (e) { console.error('optimizer cacheJobFacts:', e.message); }
 }
 
+function healthAsked(req) {
+  if (req.query && req.query.health != null) return true;
+  try { return new URL(req.url || '', 'http://x').searchParams.has('health'); } catch { return false; }
+}
+
 export default async function handler(req, res) {
   const _o = req.headers.origin || '';
   const _devO = !_o || _o.includes('localhost') || _o.includes('127.0.0.1');
@@ -199,6 +214,12 @@ export default async function handler(req, res) {
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
+  // GET ?health=1 — which shipped data files this deployed function can read (lib/server/knowledgeHealth.js).
+  // No database, no rate-limit row, nothing about anyone: true / false per data set and the engine version.
+  if (req.method === 'GET' && healthAsked(req)) {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).json(knowledgeHealth());
+  }
   if (await applyRateLimit(req, res, 'optimizer')) return;
   if (req.method !== 'POST') return res.status(405).end('Method not allowed');
 
@@ -461,11 +482,17 @@ export default async function handler(req, res) {
     }
     // A preview-only listing (≤520-char teaser) has nothing to measure — Seen first follows the saved job's own
     // link for the posting (lib/server/fullPosting.js); only then the same paste box as the paid path.
-    if (String(body.jobDescription || '').trim()) {
-      const preview = await previewOnlyOrFetch(body);
-      if (preview) return res.status(preview.status).json({ ...preview.body, charged: false });
+    let posting = null;
+    // the SAME rule as the paid path (api/resume.js tool:optimize): the posting is always read through readPosting —
+    // a saved job with no text sent is fetched in full, a teaser is refused, a pasted link is read — so the free check
+    // and the paid package score one posting text
+    if (String(body.jobDescription || '').trim() || jobId) {
+      const read = await readPosting(body);
+      if (read.preview) return res.status(read.preview.status).json({ ...read.preview.body, charged: false });
+      posting = read.posting;
     }
-    const jobDescription = body.jobDescription;
+    // the SAME posting text Job Insights reads (markup turned into lines), so an HTML posting reads the same in both tools
+    const jobDescription = postingTextForReader(body.jobDescription);
     // a pasted link may have named the job (lib/server/postingGate.js)
     const jobTitle = body.jobTitle || body.job || reqTitle;
     const company = body.company || reqCompany;
@@ -486,10 +513,8 @@ export default async function handler(req, res) {
     // posting text was sent at all.
     let jobFacts = null;
     let factsSource = 'extracted';
-    if (haveDb && jobId && !String(jobDescription || '').trim()) {
-      jobFacts = await getCachedJobFacts(db, jobId);
-      if (jobFacts) factsSource = 'cache';
-    }
+    // (no read of the flat job_facts cache: it carries no gates and no statements, so a cached reading scored a
+    // different verdict than the paid path for the same pair — free 35 vs paid 52. The posting is read in full above.)
     if (!jobFacts) {
       jobFacts = extractJobFacts(jobDescription || '', { jobTitle, company, taxonomy: taxonomy || undefined });
       if (haveDb && jobId && jobFacts.length) cacheJobFacts(db, jobId, jobFacts).catch(() => {});
@@ -505,6 +530,8 @@ export default async function handler(req, res) {
         jobDescription,
         jobFacts,
         ...fit,
+        // the person's Yes / No on lines only they can answer (lib/optimizer/confirmations.js validates every entry)
+        ...(Array.isArray(body.confirmed) && body.confirmed.length ? { confirmed: body.confirmed } : {}),
       },
       { taxonomy }
     );
@@ -537,8 +564,16 @@ export default async function handler(req, res) {
     // paid package (api/resume.js tool:optimize) — the credit buys a strict superset of this.
     // The V2 and Resume-Intelligence engines no longer ride here: their second and third scores
     // contradicted the one verdict on the same screen (2026-10-24 audits, D4).
+    const free = freeDiagnostic(output);
     return res.status(200).json({
-      ...freeDiagnostic(output),
+      ...free,
+      // ONE requirement count and a coverage figure over the SAME rows the list shows (lib/server/optimizePackage.js)
+      requirements_listed: typeof output.requirement_count === 'number' ? output.requirement_count : listedRequirements(output).length,
+      ats_coverage: listedCoverage(output),
+      posting: postingInfo(posting, { job: jobTitle, company: employerDisplayName({ company: company || '', postingText: jobDescription || '' }) || company }),
+      // what the page ALREADY does right, read with the same first-read measure the paid result and the Studio use
+      already_right: (() => { try { return alreadyRightOf(output, parseResume({ text: canonicalResumeText(String(resumeText)), source: 'text' }), employerDisplayName({ company: company || '', postingText: jobDescription || '' }) || company); } catch { return null; } })(),
+      questions_note: questionsNote({ out: output }),
       legacy_seenfit_compatible: true,
       run_id: runId, _facts_source: factsSource, _engine_version: ENGINE_VERSION,
     });

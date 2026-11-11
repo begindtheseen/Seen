@@ -4,6 +4,7 @@ import { geocodeLocation, haversineMiles } from '../lib/server/geo.js';
 import { computeCityDemand, normalizeCityLabel } from '../lib/server/demandFromCorpus.js';
 import { isVercelCron } from '../lib/server/cronAuth.js';
 import { ilikePrefix } from '../lib/server/pgrest.js';
+import { withCronRecord } from '../lib/server/cronRecord.js';
 
 // /api/demand — Demand data hub.
 //
@@ -52,7 +53,7 @@ async function route(req, res) {
 // Fail-open wrapper — /api/demand is non-critical and must NEVER return 500.
 // Any unexpected runtime error degrades to a safe 200 empty payload. (Module-load
 // is already safe: this route imports only plain .js, never .ts.)
-export default async function handler(req, res) {
+async function handler(req, res) {
   try {
     return await route(req, res);
   } catch (e) {
@@ -526,3 +527,6 @@ async function handlePost(req, res) {
 
   return res.status(200).json({ ok: true, rows_upserted: rowsUpserted, bls_period: blsPeriod, data_version: dataVersion });
 }
+
+// every Vercel cron run is recorded for Admin → System (ok / partial / failed, a short count, duration_ms)
+export default withCronRecord('demand', handler);

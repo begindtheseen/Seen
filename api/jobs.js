@@ -4,10 +4,11 @@ import { getQueryExpansion } from '../lib/server/expand.js';
 import { applyRateLimit, rateLimit, rateLimitGlobal, resolveRateBucket } from '../lib/server/ratelimit.js';
 import { jobsReadFromQuery, setPublicCache } from '../lib/server/publicRead.js';
 import { logError } from '../lib/server/errlog.js';
+import { checkLiveness, checkableId } from '../lib/server/listingLiveness.js';
 import { filterAndRank, relevanceScore, isTitleRelated, sortByProximity, locationDbTerm, expandQueryTerms, parseLocation, locationScore, searchFitFromSignal } from './_utils/jobRelevance.js';
 import { sortByPriority, companyMatchesQuery, queryNamesCompany, isSeedListing } from '../lib/server/jobPriority.js';
 import { waitUntil } from '@vercel/functions';
-import { aggregateForQuery, upsertJobs, inferLevel, wasRecentlyPulled, recordPull, adzunaPay, cleanDescription } from '../lib/server/jobSources.js';
+import { aggregateForQuery, inferLevel, wasRecentlyPulled, recordPull } from '../lib/server/jobSources.js';
 
 // Adzuna rows stored before 2026-10-20 carry Adzuna's own salary ESTIMATE (salary_is_predicted) as if it were
 // the posting's pay (adzunaPay() drops estimates at ingest since then; a re-seen row keeps its old value). A
@@ -47,26 +48,27 @@ import { aggregateWithSources } from '../lib/jobs/expand.js';
 import { scoreJob, wasteScore, scoreRow, explainListingScore } from '../lib/server/jobScore.js';
 import { computeListingFreshness } from '../lib/server/listingFreshness.js';
 import { listingSignals } from '../lib/server/listingSignals.js';
-import { geocodeLocation, haversineMiles, milesToKm, hasUsableCoords, sanitizeCoords, boundingBox } from '../lib/server/geo.js';
+import { geocodeLocation, haversineMiles, milesToKm, hasUsableCoords, boundingBox } from '../lib/server/geo.js';
 import { findResumeMatches } from '../lib/server/resumeMatches.js';
 import { geocodePlace, placesWithin } from '../lib/geo/usPlaces.js';
+import { placeListing, withinRadius, inState as geoInState, placeSearch, RADIUS_OPTIONS, stateName, isNonUsLocation } from '../lib/geo/radius.js';
+import { readAreaRows, rankArea, pageArea } from '../lib/server/areaSearch.js';
 import { MIN_HOURLY } from '../lib/jobs/pay.js';
-import { collapseLocationVariants } from '../lib/jobs/groupListings.js';
+import { collapseLocationVariants, roleKey } from '../lib/jobs/groupListings.js';
 
 // ── Where a listing is ──────────────────────────────────────────────────────────────────────
 // A row's point: its own coordinates, else its location text placed by the vendored US places
 // table (lib/geo/usPlaces.js). Text naming only a state ("Arizona", "Remote - TX") has no point,
 // and neither does a non-US line. Exported for the tests.
+// Both are lib/geo/radius.js (placeListing / inState) — the one rule every surface measures by.
 export function rowPoint(j) {
   if (!j) return null;
-  const text = j.location || '';
-  if (text && locationScope(text) === 'non_us') return null;
-  const placed = text ? geocodePlace(text) : null;
-  if (placed && placed.stateOnly) return null; // coords on a state-only row are the state's middle
-  if (hasUsableCoords(j)) return { lat: Number(j.lat), lng: Number(j.lng) };
-  return placed;
+  const p = placeListing(j);
+  const first = p.points[0];
+  if (!first) return null;
+  return p.source === 'coords' ? { lat: first.lat, lng: first.lng } : { lat: first.lat, lng: first.lng, name: first.name, state: first.state };
 }
-const inState = (j, state) => { const g = j && j.location ? geocodePlace(j.location) : null; return !!g && g.state === state; };
+const inState = (j, state) => !!j && geoInState(j, state);
 
 // PostgREST-safe ilike value: no logic-tree punctuation; a "." matches anything ("St. Louis" / "St Louis").
 const ilikeTerm = (s) => String(s || '').replace(/[(),*\\:"]/g, ' ').replace(/\./g, '*').replace(/\s+/g, ' ').trim().toLowerCase();
@@ -270,13 +272,6 @@ export default async function handler(req, res) {
   if (typeof _body === 'string') { try { _body = JSON.parse(_body); } catch(e) { _body = {}; } }
   if (!_body || typeof _body !== 'object') _body = {};
 
-  // ── Location-jobs: merged from api/fetch-location-jobs.js ──────────────────
-  if (_body.action === 'location' || (_body.location && !_body.query)) {
-    const { allowed: rlOk } = await rateLimit(req, 'fetch-location-jobs');
-    if (!rlOk) return res.status(429).json({ error: 'Too many requests — slow down.', jobs: [] });
-    return handleLocationJobs(req, res, _body);
-  }
-
   // Rate bucket: the signed-in USER when the request carries a verifiable JWT, else the IP.
   // Per-user buckets are the scale fix for shared IPs (household/office/CGNAT) — users no
   // longer starve each other out of one shared allowance.
@@ -300,6 +295,26 @@ export default async function handler(req, res) {
   if (_body.action === 'recommended') {
     if (await applyRateLimit(req, res, 'job-read', { bucketKey: rlBucket.key })) return;
     return handleRecommended(req, res, _body);
+  }
+
+  // ── Is this job still open? One polite request to its source, asked when its page/drawer opens ──
+  // (lib/server/listingLiveness.js). A row checked in the last 24 h is answered from the row; a job the
+  // source says is gone is hidden from search at once and kept for anyone who saved or applied to it.
+  if (_body.action === 'liveness') {
+    if (await applyRateLimit(req, res, 'job-read', { bucketKey: rlBucket.key })) return;
+    const id = checkableId(_body.id);
+    if (!id) return res.status(200).json({ state: 'unknown', checked_at: null, via: 'no_row', fresh: false });
+    const U = process.env.SUPABASE_URL, K = process.env.SUPABASE_SERVICE_KEY;
+    if (!U || !K) return res.status(503).json({ error: 'DB unavailable' });
+    const db = (path, opts = {}) => fetch(`${U}/rest/v1/${path}`, { ...opts, headers: { apikey: K, Authorization: `Bearer ${K}`, 'Content-Type': 'application/json', ...(opts.headers || {}) } });
+    try {
+      const out = await checkLiveness({ jobId: id, db });
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json(out);
+    } catch (e) {
+      logError('jobs/liveness', e.message);
+      return res.status(200).json({ state: 'unknown', checked_at: null, via: 'error', fresh: false });
+    }
   }
 
   // ── Get single job by ID — direct link / refresh fallback ──────────────────
@@ -368,7 +383,12 @@ export default async function handler(req, res) {
   try {
     let body = _body;
     const { query, location, radius } = body;
-    if (!query) return res.status(400).json({ error: 'No query' });
+    // A place and no title: every open listing Seen holds in that area (lib/server/areaSearch.js). Seen's own
+    // rows only — the untitled path once pulled six fixed job categories from Adzuna into the corpus.
+    if (!String(query || '').trim()) {
+      if (String(location || '').trim()) return await handleAreaSearch(req, res, body);
+      return res.status(400).json({ error: 'No query' });
+    }
 
     const rawQuery = String(query).trim().slice(0, 200);
     if (!rawQuery) return res.status(400).json({ error: 'No query' });
@@ -451,8 +471,10 @@ export default async function handler(req, res) {
       if (isRemote) return isRemoteListing(j);
       if (searchState) return inState(j, searchState) || locationScore(j.location, parsedLoc) >= 2;
       if (!center) return locationScore(j.location, parsedLoc) >= 2;
-      const p = rowPoint(j);
-      if (p) return haversineMiles(center, p) <= radiusMiles + 1;
+      // lib/geo/radius.js withinRadius: any of the row's places within the radius, exactly (no buffer, so a
+      // wider radius always holds every row of a narrower one).
+      const w = withinRadius(j, center, radiusMiles);
+      if (w.miles != null) return w.in;
       return namesSearchedCity(j);
     };
     const applyRadius = (list) => (Array.isArray(list) ? list : []).filter(nearSearch);
@@ -480,7 +502,7 @@ export default async function handler(req, res) {
       // Phoenix" on 2026-10-23). An Adzuna teaser of a posting we hold in full from the employer's
       // board is hidden behind that full-text row (lib/jobs/listingTwins.js).
       for (const j of preferFullText([...inArea.map(toUiRow), ...base])) {
-        if (locationScope(j.location) === 'non_us' || titleNamesNonUs(j.title)) continue;
+        if (isNonUsLocation(j.location) || titleNamesNonUs(j.title)) continue;
         if (isSeedListing(j)) { seedsDropped++; continue; }
         const key = j.id || `${(j.title || '').toLowerCase()}|${(j.company || '').toLowerCase()}|${(j.location || '').toLowerCase()}`;
         if (seenKeys.has(key)) continue;
@@ -621,7 +643,7 @@ export default async function handler(req, res) {
         dbMatches = applyRadius(dbMatches);
         // Rows serve() would drop anyway (Seen's own seed rows, non-US places) leave the ranked set here,
         // so a page sliced from it is a full page, never 59 rows.
-        const kept = dbMatches.filter((j) => !isSeedListing(j) && locationScope(j.location) !== 'non_us' && !titleNamesNonUs(j.title));
+        const kept = dbMatches.filter((j) => !isSeedListing(j) && !isNonUsLocation(j.location) && !titleNamesNonUs(j.title));
         seedsDropped += dbMatches.filter(isSeedListing).length;
         dbMatches = kept;
 
@@ -1039,7 +1061,10 @@ async function handleCompanyJobs(req, res, body) {
   }
 }
 
-// ── handleRecommended: personalized jobs from resume_skills ──────────────────
+// ── handleRecommended: "Matched to your résumé" from the person's job keys ──────
+// lib/server/resumeMatches.js findResumeMatches — the SAME matcher as the matched-jobs emails. Each job
+// carries `match_reason` ("You were a Cashier at Fry's Food Stores (2019–2023).") and the response says
+// what it counts. No padding: zero matches is reason 'no_matches'.
 async function handleRecommended(req, res, _body) {
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
@@ -1057,27 +1082,29 @@ async function handleRecommended(req, res, _body) {
   };
 
   try {
-    // One matcher for the rail and the job-match emails (lib/server/resumeMatches.js): the canonical
-    // résumé (profiles.resume_text), the self-healed resume_skills cache, the family + city bar.
-    const m = await findResumeMatches({ supabaseUrl: SUPABASE_URL, serviceKey: SUPABASE_SERVICE_KEY, userId: user_id, allowFloor: true });
+    const m = await findResumeMatches({ supabaseUrl: SUPABASE_URL, serviceKey: SUPABASE_SERVICE_KEY, userId: user_id });
     const hasResume = m.hasResume;
     const heal = m.heal;
-    const topSkills = m.skills;
-    const seniority = m.seniority;
-    const fn = m.fn;
-    if (m.reason === 'no_resume') return res.status(200).json({ ok: true, jobs: [], has_resume: false, reason: 'no_resume' });
-    if (m.reason === 'no_signal' || m.reason === 'unavailable') {
+    // The current title nothing could place ("unknown is not a direction"): the screen says so and offers a search.
+    const nd = m.keys && m.keys.no_direction ? { title: String(m.keys.no_direction.title || '').slice(0, 120), company: m.keys.no_direction.company ? String(m.keys.no_direction.company).slice(0, 120) : null } : null;
+    if (m.reason) {
       if (heal) await heal;
-      return res.status(200).json({ ok: true, jobs: [], has_resume: hasResume, reason: m.reason });
-    }
-    if (m.reason === 'no_city') {
-      if (heal) await heal;
-      return res.status(200).json({ ok: true, jobs: [], skills: topSkills, seniority, function: fn, has_resume: hasResume, reason: 'no_city' });
+      return res.status(200).json({ ok: true, jobs: [], skills: [], has_resume: hasResume, city: m.city || null, city_source: m.citySource || null, reason: m.reason, no_direction: nd });
     }
     const { ranked, city, citySource } = m;
 
+    // A summary row is shown only for the person's own job, labelled — and never when its source has closed:
+    // up to 4 of them get the drawer's liveness check (lib/server/listingLiveness.js: answered from the row when
+    // it was checked in the last 24 h, else one paced request, 3 s cap, cached; a closed one is marked expired).
+    const pool = ranked.slice(0, 12);
+    const liveDb = (path, opts = {}) => fetch(`${SUPABASE_URL}/rest/v1/${path}`, { ...opts, headers: { ...dbHeaders, ...(opts.headers || {}) } });
+    let checks = 0;
+    const live = await Promise.all(pool.map((j) => (j._summaryOnly && checkableId(j.id) && checks++ < 4
+      ? checkLiveness({ jobId: j.id, db: liveDb, timeoutMs: 3000 }).catch(() => null)
+      : null)));
+    const shown = pool.filter((j, i) => live[i]?.state !== 'gone');
     const names = await loadTenantNames(SUPABASE_URL, dbHeaders);
-    const jobs = ranked.slice(0, 8).map(j => withTenantName({
+    const jobs = shown.slice(0, 8).map(j => withTenantName({
       id: j.id,
       title: j.title,
       company: j.company,
@@ -1089,102 +1116,139 @@ async function handleRecommended(req, res, _body) {
       type: j.type || 'Full-time',
       level: inferLevel(j.title || ''),
       source: j.source || 'Seen',
+      match_reason: j._reason,
+      // the checks behind the sentence (field, licences, years, limits, level) — each one passed
+      match_checks: Array.isArray(j._checks) ? j._checks : undefined,
+      match_basis: j._basis,
+      summary_only: !!j._summaryOnly,
+      miles: Number.isFinite(j._miles) ? j._miles : null,
+      remote: !!j._remote,
       ...scoreRow(j),
     }, names));
 
-    if (heal) await heal; // the self-healed cache row lands before the function returns
-    return res.status(200).json({ ok: true, jobs, skills: topSkills, seniority, function: fn, has_resume: hasResume, city, city_source: citySource, reason: jobs.length ? null : 'no_matches' });
+    if (heal) await heal; // rebuilt keys land before the function returns
+    return res.status(200).json({ ok: true, jobs, skills: [], seniority: null, function: null, has_resume: hasResume, city, city_source: citySource, matched_total: ranked.length, reason: jobs.length ? null : (nd ? 'no_direction' : 'no_matches'), no_direction: nd });
   } catch (e) {
     logError('jobs/recommended', e.message, { user_id });
     return res.status(500).json({ error: e.message, jobs: [] });
   }
 }
 
-// ── handleLocationJobs: merged from api/fetch-location-jobs.js ────────────────
-const _STATE_ABBR = {'Alabama':'AL','Alaska':'AK','Arizona':'AZ','Arkansas':'AR','California':'CA','Colorado':'CO','Connecticut':'CT','Delaware':'DE','Florida':'FL','Georgia':'GA','Hawaii':'HI','Idaho':'ID','Illinois':'IL','Indiana':'IN','Iowa':'IA','Kansas':'KS','Kentucky':'KY','Louisiana':'LA','Maine':'ME','Maryland':'MD','Massachusetts':'MA','Michigan':'MI','Minnesota':'MN','Mississippi':'MS','Missouri':'MO','Montana':'MT','Nebraska':'NE','Nevada':'NV','New Hampshire':'NH','New Jersey':'NJ','New Mexico':'NM','New York':'NY','North Carolina':'NC','North Dakota':'ND','Ohio':'OH','Oklahoma':'OK','Oregon':'OR','Pennsylvania':'PA','Rhode Island':'RI','South Carolina':'SC','South Dakota':'SD','Tennessee':'TN','Texas':'TX','Utah':'UT','Vermont':'VT','Virginia':'VA','Washington':'WA','West Virginia':'WV','Wisconsin':'WI','Wyoming':'WY','District of Columbia':'DC'};
+// ── Area search: a place and no title ────────────────────────────────────────────────────────
+// Every open US listing Seen holds within the radius of the place (or in the state, for a whole-state search),
+// nearest first (or newest first), with the true total and a cursor that pages to the last one. Remote
+// listings are not "in the area": they are counted apart (`remote_total`) and included only on request
+// (`include_remote`). Filters run here, before the count, so the total is what a person can page through.
+// No live third-party pull. lib/server/areaSearch.js holds the read / measure / page logic.
+const AREA_PAGE = 60;
+const AREA_FULL_COLS = 'id,title,company,location,salary,apply_url,description,type,level,source,score,waste_score,search_query,lat,lng,created_at,is_employer_posted,ats_tenant';
+const AREA_SORTS = new Set(['nearest', 'recent']);
+const AREA_LEVELS = new Set(['entry', 'senior']);
+const AREA_TYPES = new Set(['Full-time', 'Part-time']);
+const AREA_POSTED = new Set(['1', '7', '30']);
+const AREA_NICHES = new Set(['tech', 'healthcare', 'retail', 'logistics', 'finance', 'other']);
 
-function _normalizeLoc(loc) {
-  if (!loc) return loc;
-  const parts = loc.split(',').map(p => p.trim());
-  const abbr = _STATE_ABBR[parts[1] || ''] || (parts[1] || '');
-  return abbr ? `${parts[0]}, ${abbr}` : parts[0];
-}
+async function handleAreaSearch(req, res, body) {
+  const t0 = Date.now();
+  const U = process.env.SUPABASE_URL, K = process.env.SUPABASE_SERVICE_KEY;
+  const loc = String(body.location || '').trim().slice(0, 120);
+  let place = placeSearch(loc);
+  // The device's position, when the person allowed it (the 📍 button): the search is centred on them, not on
+  // their town's middle. Only US-mainland/AK/HI/PR coordinates are taken.
+  const glat = Number(body.lat), glng = Number(body.lng);
+  if (Number.isFinite(glat) && Number.isFinite(glng) && glat > 17 && glat < 72 && glng > -180 && glng < -64 && (place.kind === 'point' || place.reason === 'needs_position')) {
+    place = { ...place, kind: 'point', lat: glat, lng: glng, label: place.kind === 'point' ? `your location (near ${place.label})` : 'your location', reason: null, suggestions: [], device: true };
+  }
+  const base = { ok: true, mode: 'area', query: '', location: loc, jobs: [], total: 0, remote_total: 0, in_radius: 0, has_more: false, next_cursor: null };
+  // "remote" / "Remote US" typed as the place, or the Remote option with no title: every remote job in the US.
+  if (place.kind !== 'remote' && (String(body.radius) === '0' || String(body.radius).toLowerCase() === 'remote')) {
+    place = { kind: 'remote', lat: null, lng: null, state: null, name: null, label: 'Remote jobs in the US', zip: null, reason: null, suggestions: [] };
+  }
+  if (place.kind === 'none') {
+    const message = place.reason === 'non_us' ? `Seen lists jobs in the United States — “${loc}” is outside it.`
+      : place.reason === 'needs_position' ? 'Type a city or ZIP, or allow your location.'
+      : place.reason === 'ambiguous' ? `There’s more than one ${loc} — pick the one you mean.`
+      : place.reason === 'not_in_state' ? `We couldn’t find “${loc.split(',')[0].trim()}” in that state.`
+      : `We couldn’t find a US place called “${loc}”.`;
+    return res.status(200).json({ ...base, area: null, unplaced: { reason: place.reason, suggestions: place.suggestions }, message });
+  }
+  if (!U || !K) return res.status(503).json({ error: 'DB unavailable', jobs: [] });
+  const r = parseInt(body.radius, 10);
+  const miles = place.kind === 'state' || place.kind === 'county' || place.kind === 'remote' ? null : (Number.isFinite(r) && r >= 5 && r <= 500 ? r : 25);
+  const sort = AREA_SORTS.has(body.sort) ? body.sort : 'nearest';
+  const includeRemote = body.include_remote === true;
+  const filters = {
+    niche: AREA_NICHES.has(body.niche) ? body.niche : '',
+    level: AREA_LEVELS.has(body.level) ? body.level : '',
+    jobType: AREA_TYPES.has(body.type) ? body.type : '',
+    posted: AREA_POSTED.has(String(body.posted)) ? String(body.posted) : '',
+    pay: body.pay === true,
+  };
+  const headers = { apikey: K, Authorization: `Bearer ${K}` };
+  const db = async (path) => {
+    const resp = await fetch(`${U}/rest/v1/${path}`, { headers });
+    if (!resp.ok) throw new Error(`area read ${resp.status}: ${(await resp.text()).slice(0, 160)}`);
+    return resp.json();
+  };
 
-const _CATS_BY_INDUSTRY = {
-  tech: ['Software Engineer','Data Analyst','Product Manager','DevOps Engineer','UX Designer'],
-  healthcare: ['Registered Nurse','Medical Assistant','Physical Therapist','LVN','CNA'],
-  finance: ['Financial Analyst','Accountant','Business Analyst','Operations Manager','Project Manager'],
-  logistics: ['Warehouse Associate','CDL Truck Driver','Operations Manager','Supply Chain Analyst','Logistics Coordinator'],
-  retail: ['Customer Service Representative','Restaurant Manager','Retail Manager','Sales Representative','Store Manager'],
-  other: ['Project Manager','Operations Manager','Customer Service Representative','Marketing Manager','HR Manager'],
-  default: ['Customer Service Representative','Registered Nurse','Software Engineer','Sales Representative','Project Manager','Data Analyst','Accountant','Operations Manager'],
-};
-
-async function _fetchAdzuna(what, where, appId, appKey, distKm) {
-  const url = new URL('https://api.adzuna.com/v1/api/jobs/us/search/1');
-  url.searchParams.set('app_id', appId); url.searchParams.set('app_key', appKey);
-  url.searchParams.set('what', what); url.searchParams.set('results_per_page', '50'); url.searchParams.set('sort_by', 'date');
-  if (where && where.toLowerCase() !== 'remote') { url.searchParams.set('where', where); if (distKm) url.searchParams.set('distance', distKm.toString()); }
-  const ctrl = new AbortController(); const tmo = setTimeout(() => ctrl.abort(), 8000);
   try {
-    const res = await fetch(url.toString(), { headers: { Accept: 'application/json' }, signal: ctrl.signal });
-    clearTimeout(tmo); if (!res.ok) return [];
-    const data = await res.json();
-    const expires = new Date(Date.now() + 7*24*60*60*1000).toISOString();
-    return (data.results||[]).map(j => {
-      // Adzuna's own salary ESTIMATE (salary_is_predicted) is not the employer's pay — never shown or
-      // scored as it; an annualised hourly wage is shown as the hourly figure the posting states.
-      const description = cleanDescription(j.description || '');
-      const pay = adzunaPay(j, description);
-      const salary = pay.salary;
-      // Keep Adzuna's coordinates so location-browsed listings are distance-filterable too;
-      // (0,0)/non-finite → NULL (honest "unknown"), never a bogus equator point.
-      const { lat: adzLat, lng: adzLng } = sanitizeCoords(j.latitude, j.longitude);
-      const mapped = {
-        title: j.title||what,
-        company: j.company?.display_name||'Unknown',
-        location: j.location?.display_name||where,
-        salary,
-        salary_min: Math.round(pay.salaryMin) || 0,
-        description,
-        apply_url: j.redirect_url||null,
-        source: 'Adzuna',
-        type: j.contract_time==='part_time'?'Part-time':'Full-time',
-        level: inferLevel(j.title || ''),
-        search_query: what,
-        expires_at: expires,
-        lat: adzLat,
-        lng: adzLng,
-      };
-      return { ...mapped, score: scoreJob(mapped), waste_score: wasteScore(mapped) };
-    }).filter(j=>j.company!=='Unknown'&&j.apply_url);
-  } catch(e) { clearTimeout(tmo); return []; }
-}
+    const [suppressed, tenantNames] = await Promise.all([getSuppressedSet(U, headers), loadTenantNames(U, headers)]);
+    const exclude = (row) => isSeedListing(row) || titleNamesNonUs(row.title) || (row.apply_url && suppressed.has(_normUrl(row.apply_url)));
+    const rankOpts = { includeRemote, filters, sort, exclude, level: inferLevel, salary: honestSalary };
+    const count = async (m) => {
+      const { rows } = await readAreaRows({ db, area: place, miles: m, budgetMs: 4000, waitUntil });
+      return rankArea(rows, place, m, rankOpts);
+    };
+    const { rows, complete, cached, pending, reads } = await readAreaRows({ db, area: place, miles: miles ?? 0, waitUntil });
+    const { list, remoteTotal, onsiteTotal } = rankArea(rows, place, miles ?? 0, rankOpts);
+    const { page, hasMore, nextCursor, before } = pageArea(list, typeof body.cursor === 'string' ? body.cursor : null, AREA_PAGE, sort);
 
-async function handleLocationJobs(req, res, body) {
-  const APP_ID = process.env.ADZUNA_APP_ID, APP_KEY = process.env.ADZUNA_APP_KEY;
-  const SUPABASE_URL = process.env.SUPABASE_URL, SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
-  if (!APP_ID || !APP_KEY) return res.status(200).json({ error: 'Adzuna not configured', jobs: [] });
-  try {
-    const { location, industry, radius } = body;
-    if (!location) return res.status(400).json({ error: 'No location', jobs: [] });
-    const cats = _CATS_BY_INDUSTRY[industry] || _CATS_BY_INDUSTRY.default;
-    const distKm = radius ? Math.round(parseInt(radius) * 1.609) : 40;
-    const normLoc = _normalizeLoc(location), cityOnly = normLoc.split(',')[0].trim();
-    let results = await Promise.allSettled(cats.slice(0,6).map(cat => _fetchAdzuna(cat, normLoc, APP_ID, APP_KEY, distKm)));
-    let allJobs = results.filter(r=>r.status==='fulfilled').flatMap(r=>r.value);
-    if (!allJobs.length && cityOnly !== normLoc) {
-      results = await Promise.allSettled(cats.slice(0,4).map(cat => _fetchAdzuna(cat, cityOnly, APP_ID, APP_KEY, distKm)));
-      allJobs = results.filter(r=>r.status==='fulfilled').flatMap(r=>r.value);
+    // The page's full rows, in the page's order (a row deleted since the read is simply not shown).
+    let full = [];
+    if (page.length) {
+      const ids = page.map((x) => x.row.id).filter((id) => /^[0-9a-f-]{36}$/i.test(String(id)));
+      const got = ids.length ? await db(`jobs?id=in.(${ids.join(',')})&select=${AREA_FULL_COLS}`) : [];
+      const byId = new Map((Array.isArray(got) ? got : []).map((j) => [String(j.id), j]));
+      full = page.map((x) => {
+        const j = byId.get(String(x.row.id));
+        if (!j) return null;
+        return {
+          ...toUiRow(j, loc),
+          in_radius: true, related: true, remote: x.remote,
+          distance_miles: x.miles, distance_by: x.by, near_place: x.place,
+        };
+      }).filter(Boolean);
     }
-    if (SUPABASE_URL && SUPABASE_SERVICE_KEY && allJobs.length) {
-      // upsertJobs stamps company_id + creates any missing companies, so location
-      // browsing grows the companies table too (not just jobs).
-      await upsertJobs(allJobs, SUPABASE_URL, SUPABASE_SERVICE_KEY);
+    const jobs = applyTenantNames(full, tenantNames);
+
+    // Nothing here → say how many the next radius up holds.
+    let wider = null;
+    if (!list.length && place.kind === 'point' && complete) {
+      const next = RADIUS_OPTIONS.find((o) => o > miles);
+      if (next) { const w = await count(next); wider = { radius: next, total: w.list.length, remote_total: w.remoteTotal }; }
     }
-    return res.status(200).json({ ok:true, jobs:allJobs, location });
-  } catch(err) {
-    logError('fetch-location-jobs', err.message);
-    return res.status(500).json({ error: err.message, jobs: [] });
+    console.log(`AREA: "${loc}" ${miles ?? 'state'}mi — ${list.length} (${onsiteTotal} on-site, ${remoteTotal} remote) of ${rows.length} rows, ${reads} reads${cached ? ' (cached)' : ''}, page from ${before}, ${Date.now() - t0}ms${complete ? '' : pending ? ' STILL READING' : ' INCOMPLETE'}`);
+    // Not user-specific (no position, no account): the edge may serve it to the next visitor for two minutes.
+    // A partial answer ("still counting") is never cached.
+    if (complete && !place.device) res.setHeader('Cache-Control', 'public, s-maxage=120, stale-while-revalidate=300');
+    else res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).json({
+      ...base,
+      mode: place.kind === 'state' || place.kind === 'county' || place.kind === 'remote' ? place.kind : 'area',
+      ...(place.understood ? { understood: place.understood } : {}),
+      pending: pending === true,
+      jobs, in_radius: jobs.length,
+      // The page shows one card per employer + job title (lib/jobs/groupListings.js — "+N more locations"), so the
+      // count of jobs is told apart from the count of listings (locations).
+      total: list.length, jobs_total: new Set(list.map((x) => roleKey(x.row))).size,
+      onsite_total: onsiteTotal, remote_total: remoteTotal, include_remote: includeRemote,
+      has_more: hasMore, next_cursor: nextCursor, offset: before, page_size: AREA_PAGE, sort,
+      radius: miles,
+      area: { kind: place.kind, label: place.label, name: place.name, state: place.state, state_name: place.state ? stateName(place.state) : null, zip: place.zip, approx: place.approx === true, lat: place.lat, lng: place.lng, radius: miles },
+      complete, wider, _src: cached ? 'area-cached' : 'area', ms: Date.now() - t0,
+    });
+  } catch (e) {
+    logError('jobs/area', e.message, { loc });
+    return res.status(500).json({ error: 'The area search did not finish — try again.', jobs: [] });
   }
 }

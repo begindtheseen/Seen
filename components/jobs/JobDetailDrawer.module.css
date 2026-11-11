@@ -19,3 +19,6 @@
 @media (prefers-reduced-motion: reduce) { .scrim, .panel { transition: none; } }
 .grow { flex: 1 1 auto; min-width: 0; } /* the secondary (Optimize) gives way */
 .main { flex: 1 1 auto; min-width: max-content; } /* the one filled button keeps its whole label (round 3: "Ap…" at 390 and 1280) */
+
+/* every control in the drawer is a 44px tap target at every width */
+.tap { min-height: 44px; }

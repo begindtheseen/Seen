@@ -1,0 +1,13 @@
+Frontend Engineer
+
+Brightline builds scheduling software for 5,000 clinics.
+
+Responsibilities
+- Build and ship React features end to end with the product team
+- Write tests and review pull requests
+- Improve page load performance and accessibility
+
+Requirements
+- 3+ years of professional experience with React and TypeScript
+- Experience with REST APIs
+- Bachelor's degree in computer science or equivalent experience

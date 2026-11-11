@@ -1,0 +1,52 @@
+/* The one admin overlay. Solid surface, solid dim (no blur — iOS paints a full-screen backdrop-filter
+   black). The head (title + ✕) and the foot (actions) stay put; only the body scrolls. */
+.scrim {
+  position: fixed; inset: 0; z-index: 1000;
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  display: flex; justify-content: flex-end; align-items: stretch;
+  animation: fadeIn var(--dur-state) var(--ease-out) backwards;
+}
+.panel {
+  position: relative; display: flex; flex-direction: column;
+  width: min(560px, 100vw); height: 100%; max-height: 100dvh;
+  background: var(--surface-overlay); border-left: 1px solid var(--border-2);
+  box-shadow: var(--sh-overlay); outline: none;
+}
+.head {
+  flex: none; display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-3);
+  padding: var(--sp-5) var(--sp-4) var(--sp-4) var(--sp-6);
+  border-bottom: 1px solid var(--border-1);
+}
+.titles { min-width: 0; padding-top: var(--sp-2); }
+.title {
+  font-family: var(--display); font-size: var(--fs-h3); font-weight: 700; letter-spacing: var(--ls-heading);
+  line-height: var(--lh-snug); color: var(--text-1); overflow-wrap: anywhere;
+}
+.desc { margin-top: var(--sp-1); font-size: var(--fs-sm); color: var(--text-3); line-height: var(--lh-ui); overflow-wrap: anywhere; }
+.close {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; border-radius: var(--r-control);
+  background: transparent; border: 1px solid var(--border-1); color: var(--text-2); cursor: pointer;
+}
+.close:hover { background: var(--surface-2); color: var(--text-1); }
+.close:focus-visible { outline: none; box-shadow: var(--sh-focus); }
+.body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: var(--sp-6); }
+.foot {
+  flex: none; display: flex; flex-wrap: wrap; gap: var(--sp-2); justify-content: flex-end;
+  padding: var(--sp-4) var(--sp-6) calc(var(--sp-4) + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--border-1); background: var(--surface-overlay);
+}
+.foot > :global(.ui-btn) { min-height: 44px; }
+
+@media (max-width: 767px) {
+  .scrim { align-items: flex-end; justify-content: stretch; }
+  .panel {
+    width: 100%; height: auto; max-height: 92dvh;
+    border-left: 0; border-top: 1px solid var(--border-2); border-radius: var(--r-panel) var(--r-panel) 0 0;
+  }
+  .head { padding: var(--sp-4) var(--sp-3) var(--sp-3) var(--sp-4); }
+  .body { padding: var(--sp-4) var(--sp-4) calc(var(--sp-6) + env(safe-area-inset-bottom, 0px)); }
+  .foot { padding: var(--sp-3) var(--sp-4) calc(var(--sp-3) + env(safe-area-inset-bottom, 0px)); }
+  .foot > :global(.ui-btn) { flex: 1 1 auto; }
+}
+@media (prefers-reduced-motion: reduce) { .scrim { animation: none; } }

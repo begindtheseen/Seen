@@ -1,0 +1,242 @@
+[
+ {
+  "resume": "cna",
+  "posting": 260,
+  "label": "good",
+  "why": "hospital ICU patient care assistant; STNA in Ohio, long-term care, CNA licence state differs"
+ },
+ {
+  "resume": "cna",
+  "posting": 39,
+  "label": "strong",
+  "why": "caregiver in senior living; 3 years doing exactly this"
+ },
+ {
+  "resume": "cna",
+  "posting": 456,
+  "label": "stretch",
+  "why": "autism behavior technician with children; patient care next to it, different work"
+ },
+ {
+  "resume": "cna",
+  "posting": 646,
+  "label": "long shot",
+  "why": "RN med-surg; she is a nursing assistant, no RN licence"
+ },
+ {
+  "resume": "icu-nurse",
+  "posting": 646,
+  "label": "good",
+  "why": "bedside RN med-surg/tele; 5 yrs ICU; Michigan licence needed"
+ },
+ {
+  "resume": "icu-nurse",
+  "posting": 366,
+  "label": "good",
+  "why": "RN in senior living community; bedside RN, different setting"
+ },
+ {
+  "resume": "icu-nurse",
+  "posting": 150,
+  "label": "good",
+  "why": "hospice LPN job; RN overqualified, home/hospice setting new"
+ },
+ {
+  "resume": "rn-home-health",
+  "posting": 320,
+  "label": "good",
+  "why": "pediatric private duty RN; home RN, peds preferred not required"
+ },
+ {
+  "resume": "medical-assistant",
+  "posting": 143,
+  "label": "good",
+  "why": "medical receptionist; MA does registration and scheduling"
+ },
+ {
+  "resume": "medical-assistant",
+  "posting": 677,
+  "label": "good",
+  "why": "healthcare customer service advocate; patient-facing healthcare"
+ },
+ {
+  "resume": "support-lead",
+  "posting": 677,
+  "label": "strong",
+  "why": "healthcare customer service; 6 yrs support incl insurance"
+ },
+ {
+  "resume": "admin",
+  "posting": 409,
+  "label": "strong",
+  "why": "administrative specialist; 12 yrs office admin"
+ },
+ {
+  "resume": "admin",
+  "posting": 143,
+  "label": "good",
+  "why": "medical receptionist; dental office manager, overqualified, 12-hour shifts"
+ },
+ {
+  "resume": "cashier",
+  "posting": 148,
+  "label": "good",
+  "why": "full-time store associate; 1 yr retail cashier"
+ },
+ {
+  "resume": "cashier",
+  "posting": 286,
+  "label": "good",
+  "why": "barista; register experience, food service adjacent"
+ },
+ {
+  "resume": "cashier",
+  "posting": 469,
+  "label": "good",
+  "why": "car wash customer service attendant; register and customers"
+ },
+ {
+  "resume": "maria",
+  "posting": 588,
+  "label": "good",
+  "why": "Aldi retail manager trainee; 9 yrs team lead at Target"
+ },
+ {
+  "resume": "warehouse",
+  "posting": 643,
+  "label": "long shot",
+  "why": "warehouse manager needs 7+ yrs DC management; he is an associate with lead duties"
+ },
+ {
+  "resume": "warehouse",
+  "posting": 509,
+  "label": "good",
+  "why": "manufacturing associate; warehouse worker with forklift, adjacent"
+ },
+ {
+  "resume": "kitchen-manager",
+  "posting": 643,
+  "label": "long shot",
+  "why": "warehouse manager; manages kitchens, not distribution centers"
+ },
+ {
+  "resume": "electrician",
+  "posting": 478,
+  "label": "stretch",
+  "why": "electrical lead installer needs a California residential certification; AZ journeyman"
+ },
+ {
+  "resume": "electrician",
+  "posting": 113,
+  "label": "good",
+  "why": "fire safety installation helper; journeyman overqualified"
+ },
+ {
+  "resume": "hvac-tech",
+  "posting": 267,
+  "label": "good",
+  "why": "plant maintenance technician, 5 yrs maintenance, welding; HVAC 7 yrs"
+ },
+ {
+  "resume": "hvac-tech",
+  "posting": 648,
+  "label": "good",
+  "why": "industrial assembly-line mechanic; maintenance and repair field"
+ },
+ {
+  "resume": "hvac-tech",
+  "posting": 354,
+  "label": "good",
+  "why": "equipment rental tool technician; repairs equipment, has tools and licence"
+ },
+ {
+  "resume": "hvac-tech",
+  "posting": 495,
+  "label": "different field",
+  "why": "backend platform engineer"
+ },
+ {
+  "resume": "bootcamp-dev",
+  "posting": 495,
+  "label": "long shot",
+  "why": "backend platform engineer 5+ yrs; one year of frontend agency work"
+ },
+ {
+  "resume": "dev",
+  "posting": 495,
+  "label": "strong",
+  "why": "backend platform engineer 5+ yrs; senior backend 8 yrs"
+ },
+ {
+  "resume": "dev",
+  "posting": 303,
+  "label": "long shot",
+  "why": "Excel-heavy office data analyst for legal/finance; software engineer"
+ },
+ {
+  "resume": "accountant",
+  "posting": 303,
+  "label": "good",
+  "why": "Excel data analyst wanting finance/accounting office experience; CPA"
+ },
+ {
+  "resume": "staff-accountant",
+  "posting": 292,
+  "label": "stretch",
+  "why": "senior government accountant; 3 yrs staff accountant"
+ },
+ {
+  "resume": "accountant",
+  "posting": 292,
+  "label": "good",
+  "why": "senior government accountant; 5 yrs, CPA, not government"
+ },
+ {
+  "resume": "account-executive",
+  "posting": 415,
+  "label": "strong",
+  "why": "inside sales rep 1+ yrs, bachelor's; AE with inside sales"
+ },
+ {
+  "resume": "maria",
+  "posting": 415,
+  "label": "long shot",
+  "why": "inside sales with bachelor's required; retail lead, no degree"
+ },
+ {
+  "resume": "maria",
+  "posting": 300,
+  "label": "good",
+  "why": "associate sales rep, no experience needed; retail sales and customer service"
+ },
+ {
+  "resume": "marketing-coordinator",
+  "posting": 555,
+  "label": "stretch",
+  "why": "digital marketing manager, 4+ yrs B2B digital; consumer-products coordinator"
+ },
+ {
+  "resume": "marketing-coordinator",
+  "posting": 142,
+  "label": "long shot",
+  "why": "senior partner marketing manager 7+ yrs B2B SaaS"
+ },
+ {
+  "resume": "tasha",
+  "posting": 555,
+  "label": "long shot",
+  "why": "digital marketing manager 4+ yrs; junior marketer"
+ },
+ {
+  "resume": "teacher",
+  "posting": 316,
+  "label": "good",
+  "why": "City Year tutor and mentor, entry level; certified teacher overqualified"
+ },
+ {
+  "resume": "teacher",
+  "posting": 131,
+  "label": "good",
+  "why": "school behavior technician; teacher in schools, RBT obtainable within 30 days"
+ }
+]

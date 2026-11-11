@@ -35,12 +35,14 @@ export default function JobFilters({
   level, setLevel,
   jobType, setJobType,
   posted, setPosted,
+  pay = false, setPay,
   hasFilters, clearFilters,
 }: {
   niche: NicheFilter; setNiche: (v: NicheFilter) => void
   level: LevelFilter; setLevel: (v: LevelFilter) => void
   jobType: TypeFilter; setJobType: (v: TypeFilter) => void
   posted: PostedFilter; setPosted: (v: PostedFilter) => void
+  pay?: boolean; setPay?: (v: boolean) => void
   hasFilters: boolean; clearFilters: () => void
 }) {
   const [open, setOpen] = useState(false)
@@ -61,6 +63,7 @@ export default function JobFilters({
   if (level) active.push({ k: 'level', text: label(LEVEL, level), clear: () => setLevel('' as LevelFilter) })
   if (jobType) active.push({ k: 'type', text: label(TYPE, jobType), clear: () => setJobType('' as TypeFilter) })
   if (posted) active.push({ k: 'posted', text: label(POSTED, posted), clear: () => setPosted('' as PostedFilter) })
+  if (pay && setPay) active.push({ k: 'pay', text: 'Shows pay', clear: () => setPay(false) })
 
   return (
     <div className={styles.wrap} ref={ref}>
@@ -111,6 +114,15 @@ export default function JobFilters({
               {POSTED.map(([v, t]) => <option key={v} value={v}>{t}</option>)}
             </select>
           </label>
+          {setPay && (
+            <label className={styles.row}>
+              <span className={styles.label}>Pay</span>
+              <select className={styles.select} value={pay ? '1' : ''} onChange={e => setPay(e.target.value === '1')}>
+                <option value="">Any listing</option>
+                <option value="1">Only listings that show pay</option>
+              </select>
+            </label>
+          )}
           <div className={styles.foot}>
             <button type="button" className={styles.clear} onClick={clearFilters} disabled={!hasFilters}>Clear all</button>
             <button type="button" className={styles.done} onClick={() => setOpen(false)}>Done</button>

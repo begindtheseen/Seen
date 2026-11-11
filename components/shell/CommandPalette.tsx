@@ -87,6 +87,7 @@ export default function CommandPalette() {
   // Shortcuts: ⌘K / Ctrl+K toggles; "g" then a letter jumps (never while typing in a field).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (pathname?.startsWith('/admin')) return // the admin has its own search and keys
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault(); setOpen(v => !v); return
       }
@@ -103,7 +104,7 @@ export default function CommandPalette() {
     window.addEventListener('keydown', onKey)
     window.addEventListener('seen:palette', onOpen)
     return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('seen:palette', onOpen) }
-  }, [open, isSeeker, go])
+  }, [open, isSeeker, go, pathname])
 
   // Fresh state each time it opens; pull the user's own applications + recently checked companies.
   useEffect(() => {

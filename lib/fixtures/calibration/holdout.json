@@ -1,0 +1,182 @@
+[
+ {
+  "resume": "cashier",
+  "posting": 13,
+  "label": "good",
+  "why": "seasonal part-time sales associate; one year of retail register work"
+ },
+ {
+  "resume": "maria",
+  "posting": 13,
+  "label": "good",
+  "why": "seasonal sales associate; overqualified retail lead"
+ },
+ {
+  "resume": "account-executive",
+  "posting": 116,
+  "label": "strong",
+  "why": "2-4 yrs account management/sales in SaaS, Salesforce/Gong/Outreach \u2014 all shown"
+ },
+ {
+  "resume": "account-executive",
+  "posting": 112,
+  "label": "good",
+  "why": "senior AE at a publisher; B2B sales years fit, industry differs"
+ },
+ {
+  "resume": "support-lead",
+  "posting": 116,
+  "label": "stretch",
+  "why": "account manager in SaaS; support background, not sales"
+ },
+ {
+  "resume": "support-lead",
+  "posting": 149,
+  "label": "good",
+  "why": "client care rep; strong service, not veterinary"
+ },
+ {
+  "resume": "cashier",
+  "posting": 149,
+  "label": "stretch",
+  "why": "client care rep wants customer-service experience; one year cashier"
+ },
+ {
+  "resume": "warehouse",
+  "posting": 263,
+  "label": "good",
+  "why": "warehouse delivery driver: warehouse + did delivery driving"
+ },
+ {
+  "resume": "warehouse",
+  "posting": 202,
+  "label": "stretch",
+  "why": "box truck driver; delivery experience is DoorDash, no CDL/box truck"
+ },
+ {
+  "resume": "electrician",
+  "posting": 309,
+  "label": "good",
+  "why": "maintenance mechanic wants electrical trade experience; 5 yrs maintenance in manufacturing not shown"
+ },
+ {
+  "resume": "admin",
+  "posting": 272,
+  "label": "good",
+  "why": "desk clerk: office/clerical and customer service years"
+ },
+ {
+  "resume": "admin",
+  "posting": 284,
+  "label": "stretch",
+  "why": "legal admin assistant 3-5 yrs litigation LAA; no legal experience"
+ },
+ {
+  "resume": "cashier",
+  "posting": 301,
+  "label": "good",
+  "why": "deli clerk at Kroger; she is a Kroger cashier"
+ },
+ {
+  "resume": "kitchen-manager",
+  "posting": 301,
+  "label": "good",
+  "why": "deli clerk; food prep and safety, overqualified"
+ },
+ {
+  "resume": "kitchen-manager",
+  "posting": 342,
+  "label": "good",
+  "why": "chef in training; experienced cook"
+ },
+ {
+  "resume": "kitchen-manager",
+  "posting": 273,
+  "label": "good",
+  "why": "grill master; ran the grill for years"
+ },
+ {
+  "resume": "nurse",
+  "posting": 366,
+  "label": "strong",
+  "why": "RN licence, nursing experience"
+ },
+ {
+  "resume": "rn-home-health",
+  "posting": 437,
+  "label": "strong",
+  "why": "home health RN, CPR/BLS, EMR (HCHB)"
+ },
+ {
+  "resume": "nurse",
+  "posting": 437,
+  "label": "good",
+  "why": "RN with med-surg/telemetry vs home health RN"
+ },
+ {
+  "resume": "medical-assistant",
+  "posting": 260,
+  "label": "stretch",
+  "why": "CNA required; she is a medical assistant without CNA"
+ },
+ {
+  "resume": "medical-assistant",
+  "posting": 423,
+  "label": "good",
+  "why": "home health aide; patient care experience, CHHA training offered"
+ },
+ {
+  "resume": "nurse",
+  "posting": 423,
+  "label": "good",
+  "why": "home health aide; RN with CNA history, overqualified"
+ },
+ {
+  "resume": "dev",
+  "posting": 397,
+  "label": "strong",
+  "why": "6+ yrs SWE/platform, AWS, Kubernetes, Docker"
+ },
+ {
+  "resume": "dev",
+  "posting": 383,
+  "label": "good",
+  "why": "8+ yrs production code; he has ~8, data infrastructure interest"
+ },
+ {
+  "resume": "new-grad-dev",
+  "posting": 397,
+  "label": "long shot",
+  "why": "6+ yrs platform engineering; one-year junior"
+ },
+ {
+  "resume": "new-grad-dev",
+  "posting": 425,
+  "label": "stretch",
+  "why": "DevOps engineer; junior web developer"
+ },
+ {
+  "resume": "accountant",
+  "posting": 412,
+  "label": "good",
+  "why": "senior accountant 5-7 yrs; she has 5-6 with public accounting"
+ },
+ {
+  "resume": "admin",
+  "posting": 412,
+  "label": "long shot",
+  "why": "senior accountant needs accounting degree and 5-7 yrs; she did bookkeeping volunteer"
+ },
+ {
+  "resume": "teacher",
+  "posting": 64,
+  "label": "stretch",
+  "why": "HR generalist; no HR experience, people skills adjacent"
+ },
+ {
+  "resume": "tasha",
+  "posting": 13,
+  "label": "good",
+  "why": "seasonal sales associate; barista customer experience"
+ }
+]

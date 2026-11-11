@@ -1,6 +1,9 @@
 'use client'
 
-// "Matched to your résumé" — a compact rail of local, same-role-family listings. Replaces the
+// "Matched to your résumé" — a compact rail of local listings that fit the jobs on the person's résumé
+// (or ones they applied to lately). Each row carries the server's `match_reason` — the sentence that says
+// why, built from their own résumé ("You were a Cashier at Fry's Food Stores (2019–2023).") — under the
+// employer line (api/jobs.js handleRecommended → lib/server/jobKeys.js matchListing). Replaces the
 // 340px swipe deck that opened the signed-in /jobs page with a Dallas hotel-sales job for a
 // Phoenix sales associate (live audit 2026-10-23). The page shows it with ≥1 real in-radius match
 // (the second audit's persona had exactly one Phoenix match and saw nothing) and hides it the
@@ -12,7 +15,7 @@ import ListingScoreRing from '@/components/jobs/ListingScoreRing'
 import { displayCompanyName } from '@/lib/companyDisplay'
 import { displayPay } from '@/lib/jobs/pay.js'
 
-export default function ResumeMatches({ jobs, loading, skills, city, citySource, onOpen }: {
+export default function ResumeMatches({ jobs, loading, skills, city, citySource, onOpen, noDirection }: {
   jobs: Job[]
   loading: boolean
   skills: string[]
@@ -20,6 +23,8 @@ export default function ResumeMatches({ jobs, loading, skills, city, citySource,
   /** Where the city came from — the profile, or the résumé's own contact line. */
   citySource?: 'profile' | 'resume' | null
   onOpen: (job: Job) => void
+  /** The server's `no_direction` state: the person's current title could not be placed (feature-detected; the page passes it). */
+  noDirection?: { title?: string | null; company?: string | null } | null
 }) {
   const rows = jobs.slice(0, 5)
   return (
@@ -28,16 +33,28 @@ export default function ResumeMatches({ jobs, loading, skills, city, citySource,
         <span style={{ width: 20, height: 1.5, background: 'var(--text-3)', display: 'inline-block', flexShrink: 0 }} />
         Matched to your résumé
         {city && (
-          <span style={{ color: 'var(--dim)', letterSpacing: 'normal', textTransform: 'none', fontSize: 'var(--fs-meta)' }}>· near {city}{citySource === 'resume' ? ' (from your résumé)' : ''}, same role family{skills.length ? ` · ${skills.slice(0, 2).join(', ')}` : ''}</span>
+          <span style={{ color: 'var(--dim)', letterSpacing: 'normal', textTransform: 'none', fontSize: 'var(--fs-meta)' }}>· near {city}{citySource === 'resume' ? ' (from your résumé)' : ''}{skills.length ? ` · ${skills.slice(0, 2).join(', ')}` : ''}</span>
         )}
       </div>
-      {loading ? (
+      {noDirection ? (
+        <div data-testid="rail-no-direction" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-1)' }}>
+          <p style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', color: 'var(--text-2)', lineHeight: 1.5, margin: 0 }}>
+            Seen couldn&apos;t tell what kind of work {noDirection.title ? `“${noDirection.title}”${noDirection.company ? ` at ${noDirection.company}` : ''}` : 'your current job'} is, so it has nothing to match jobs on yet. A line under that job on your résumé saying what you do there fixes it.
+          </p>
+          <span style={{ display: 'flex', flexWrap: 'wrap', columnGap: 'var(--sp-4)' }}>
+            <a href="/resume/studio" style={{ color: 'var(--accent)', fontWeight: 600, fontSize: 'var(--fs-sm)', display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>Add it in Résumé Studio</a>
+            <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-3)', display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>or search by title above</span>
+          </span>
+        </div>
+      ) : loading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
           {[0, 1].map(i => <div key={i} style={{ height: 46, background: 'var(--raised)', borderRadius: 10, animation: `pulse 1.4s ${i * 0.15}s ease infinite` }} />)}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
           {rows.map(job => {
+            const reason = (job as Job & { match_reason?: string | null }).match_reason || null
+            const summaryOnly = (job as Job & { summary_only?: boolean }).summary_only === true
             return (
               <button
                 key={job.id}
@@ -49,6 +66,8 @@ export default function ResumeMatches({ jobs, loading, skills, city, citySource,
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--white)', letterSpacing: '-.015em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{job.title}</div>
                   <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayCompanyName(job.company)}{job.location ? ` · ${displayLocation(job.location)}` : ''}{displayPay(job) ? ` · ${displayPay(job)}` : ''}</div>
+                  {reason && <div data-testid="match-reason" style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--text-3)', marginTop: 2, lineHeight: 1.4 }}>{reason}</div>}
+                  {summaryOnly && <div data-testid="summary-only" style={{ fontFamily: 'var(--body)', fontSize: 'var(--fs-meta)', color: 'var(--text-3)', marginTop: 2, lineHeight: 1.4 }}>Summary only — open it to see the full requirements</div>}
                 </div>
                 <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-meta)', color: 'var(--accent)', flexShrink: 0 }}>Open →</span>
               </button>

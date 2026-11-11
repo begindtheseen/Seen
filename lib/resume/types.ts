@@ -5,7 +5,11 @@
 export interface ResumeLink { kind: 'linkedin' | 'github' | 'portfolio' | 'other'; url: string; label: string }
 export interface ResumeBasics { name: string; headline: string; email: string; phone: string; location: string; links: ResumeLink[]; summary: string }
 export interface ResumeBullet { id: string; text: string }
-export interface ResumeExperience { id: string; title: string; company: string; location: string; employmentType: string; start: string; end: string; dateText: string; summary: string; bullets: ResumeBullet[]; group?: string }
+export interface ResumeExperience { id: string; title: string; company: string; location: string; employmentType: string; start: string; end: string; dateText: string; summary: string; bullets: ResumeBullet[]; group?: string
+  /** the person's descriptor beside the employer ("(agency, 12 people)"), printed after it, never spoken as the name */
+  companyNote?: string
+  /** normal-cased title / employer for composed sentences ("KITCHEN MANAGER" → "Kitchen Manager"); computed by normalizeDoc */
+  displayTitle?: string; displayCompany?: string }
 export interface ResumeEducation { id: string; school: string; degree: string; field: string; location: string; start: string; end: string; dateText: string; gpa: string; details: ResumeBullet[] }
 export interface ResumeSkillGroup { id: string; label: string; items: string[] }
 export interface ResumeCertification { id: string; name: string; issuer: string; date: string; text: string }
@@ -19,7 +23,14 @@ export interface ResumeMeta {
   tailoredFor: { company: string; role: string; jobId?: string } | null
   provenance: Array<Record<string, unknown> & { kind: string }>
   baseDocId: string | null
+  /** parse-time source-line accounting (lib/resume/parse/fidelity.js): `unplaced` lines are kept under
+   *  "Additional Information" (keptIn) and should be shown as "N lines we could not place — check them" */
+  fidelity?: ResumeFidelity
 }
+export interface ResumeFidelityLine { line: string; index: number; nearestSection: string; keptIn?: string; missing?: string[] }
+/** a line filed by weak evidence (content over heading, an unfamiliar heading, an undated "job"): ask, don't assert */
+export interface ResumeFidelityUncertain { line: string; placedIn: string; why: string }
+export interface ResumeFidelity { version: string; placed: number; total: number; unplaced: ResumeFidelityLine[]; altered: ResumeFidelityLine[]; uncertain?: ResumeFidelityUncertain[] }
 export interface ResumeDoc {
   schema: string; id: string; kind: 'base' | 'variant'
   basics: ResumeBasics

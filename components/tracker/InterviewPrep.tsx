@@ -25,7 +25,11 @@ import { useCheckout } from '@/lib/useCheckout'
 import { funnelEvent } from '@/lib/funnel'
 import { splitAnswer, composeAnswer, isFinished, blankCount } from './prepAnswer'
 import { localDay, localTime, isoFrom } from '@/lib/interviewTime'
+// ONE posting text: the cap the server and the fit check use (20,000 characters, lines kept)
+import { PREP_POSTING_MAX } from '@/lib/server/prepPosting.js'
 import s from './InterviewPrep.module.css'
+import { useAuth } from '@/lib/auth'
+import { useConfirmations, type Confirmed } from '@/components/optimizer/useConfirmations'
 
 const SKU = PREP
 const PRICE = PREP_PRICE
@@ -48,13 +52,13 @@ type InterviewRecord = {
 type Pay = { unit: 'hour' | 'year'; low: number; high: number; listings: number; scope: 'role' | 'company' | 'market' }
 type FollowUp = { thankYouBy: string; followUpOn: string; lastCheckOn: string }
 type RecordData = { record: InterviewRecord; pay: Pay | null; follow_up: FollowUp; guide?: Guide | null; sample_question?: { q: string; why: string; principle: string | null } | null }
-type Answer = { q: string; answer: string; resume_fact: string; coached?: boolean; script?: boolean; frame?: boolean; exercise?: boolean; practice?: string; reference?: string; hint?: string; company?: boolean; principle?: string | null }
+type Answer = { q: string; answer: string; resume_fact: string; coached?: boolean; script?: boolean; frame?: boolean; exercise?: boolean; practice?: string; reference?: string; hint?: string; company?: boolean; principle?: string | null; source?: string }
 type Pack = {
   questions: { q: string; why: string; company?: boolean; principle?: string | null }[]
   answers: Answer[]
   intro: string | null
   resume_check?: { line: string; note: string }[]
-  job_match?: { label: string; status: 'shown' | 'stated' | 'gap' | 'expired' | 'in progress'; proof?: string; say: string; duty?: boolean; cert?: boolean }[]
+  job_match?: { label: string; status: 'shown' | 'stated' | 'related' | 'gap' | 'expired' | 'in progress'; proof?: string; say: string; duty?: boolean; cert?: boolean; source?: string; basis?: string; story?: string; candidate?: { line: string; why?: string } | null; statementId?: string; by?: string }[]
   ask_them?: { q: string; company?: boolean }[]
   format?: string
   guide?: { company: string; confidence: string; framework: { name: string; note: string } | null; tips: string[]; watch: string } | null
@@ -67,6 +71,8 @@ type Pack = {
   noteKeys?: Record<string, string>
   job_text?: string
   posting_pay?: string | null
+  notice?: { text: string; field_match?: string; gate?: string } | null
+  field_match?: string
 }
 // The fillable things beside the questions: the intro and the two emails (lib/server/prepFills.js).
 const INTRO_KEY = '__intro__'
@@ -122,7 +128,7 @@ const postingKey = (appId: string) => `seen_prep_posting_${appId}`
 const openKey = (appId: string) => `seen_prep_open_${appId}`
 const readOpen = (appId: string): boolean => { try { return sessionStorage.getItem(openKey(appId)) === '1' } catch { return false } }
 const writeOpen = (appId: string, open: boolean) => { try { if (open) sessionStorage.setItem(openKey(appId), '1'); else sessionStorage.removeItem(openKey(appId)) } catch { /* private mode */ } }
-const stashPosting = (appId: string, text: string) => { try { if (text.trim()) localStorage.setItem(postingKey(appId), text.slice(0, 6000)); else localStorage.removeItem(postingKey(appId)) } catch { /* private mode */ } }
+const stashPosting = (appId: string, text: string) => { try { if (text.trim()) localStorage.setItem(postingKey(appId), text.slice(0, PREP_POSTING_MAX)); else localStorage.removeItem(postingKey(appId)) } catch { /* private mode */ } }
 const takePosting = (appId: string): string => { try { const v = localStorage.getItem(postingKey(appId)) || ''; return v } catch { return '' } }
 const dropPosting = (appId: string) => { try { localStorage.removeItem(postingKey(appId)) } catch { /* ignore */ } }
 
@@ -154,6 +160,10 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
   /** Saves the interview date on the application (an interview_scheduled event). */
   onSchedule: (iso: string) => void
 }) {
+  const { user } = useAuth()
+  // the person's Yes / No on a requirement ("Closest line we found") for THIS application: sent with the prep build as
+  // `confirmed` (x-integration contract), stored per user like the fit check's (swept on sign-out)
+  const confirm = useConfirmations(guest ? null : user?.id, `prep-${appId}`)
   const [data, setData] = useState<RecordData | null>(null)
   // Closed until the person opens it; remembered per application for this tab. `lead` (just reached an
   // interview) brings the one-line row into view but never opens it by itself.
@@ -246,12 +256,12 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
   const nextPath = !guest && UUID_RE.test(appId) ? `/tracker?app=${encodeURIComponent(appId)}` : '/tracker'
   const checkout = useCheckout('tracker_prep', { isLoggedIn: !guest, guestHref: () => signupHref({ intent: 'prep', company, next: nextPath }) })
 
-  const build = useCallback(async (opts: { refresh?: boolean; jobText?: string } = {}) => {
+  const build = useCallback(async (opts: { refresh?: boolean; jobText?: string; confirmed?: Confirmed[] } = {}) => {
     setState('building'); setErr('')
     try {
       const h = await aiHeaders()
-      const jobText = (opts.jobText ?? postingRef.current).trim().slice(0, 6000)
-      const r = await fetch('/api/interview-prep', { method: 'POST', headers: h, body: JSON.stringify({ action: 'build', company, role, application_id: appId, interview_at: interviewAt, job_id: jobId || '', job_text: jobText, stage, ...(opts.refresh ? { refresh: true } : {}) }) })
+      const jobText = (opts.jobText ?? postingRef.current).trim().slice(0, PREP_POSTING_MAX)
+      const r = await fetch('/api/interview-prep', { method: 'POST', headers: h, body: JSON.stringify({ action: 'build', company, role, application_id: appId, interview_at: interviewAt, job_id: jobId || '', job_text: jobText, stage, ...(opts.refresh ? { refresh: true } : {}), ...((opts.confirmed ?? confirm.confirmed).length ? { confirmed: opts.confirmed ?? confirm.confirmed } : {}) }) })
       const d = await r.json().catch(() => ({}))
       if (r.status === 409 && d.need_resume) { setState('need_resume'); return }
       if (r.status === 402) { setState('idle'); setErr('This needs Interview Prep or Pro.'); return }
@@ -265,7 +275,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
     } catch {
       setState('error'); setErr('Network error — check your connection and try again.')
     }
-  }, [appId, company, role, interviewAt, jobId, stage])
+  }, [appId, company, role, interviewAt, jobId, stage, confirm.confirmed])
 
   // Back from Stripe (or Pro already on with a stashed posting): the prep builds with the posting pasted before
   // paying — from the server stash, or this device's copy (round 3: it was lost at checkout).
@@ -289,7 +299,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
       try {
         const h = await aiHeaders()
         await Promise.race([
-          fetch('/api/interview-prep', { method: 'POST', headers: h, body: JSON.stringify({ action: 'stash', company, role, application_id: appId, job_text: text.slice(0, 6000) }), keepalive: true }),
+          fetch('/api/interview-prep', { method: 'POST', headers: h, body: JSON.stringify({ action: 'stash', company, role, application_id: appId, job_text: text.slice(0, PREP_POSTING_MAX) }), keepalive: true }),
           new Promise(res => setTimeout(res, 2500)),
         ])
       } catch { /* the device copy still carries it */ }
@@ -342,7 +352,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
   // One real question for free, so the offer is not a blind buy (round 2: "nothing to preview").
   const sample = data?.sample_question
     ? { q: data.sample_question.q, why: data.sample_question.why, company: true }
-    : data?.pay
+    : data?.pay && !pack?.posting_pay
       ? { q: 'What are your pay expectations?', why: data.pay.scope === 'market' ? `${role || 'This job'} listings at other employers on Seen pay about ${money(data.pay)} (${poss(company)} own listings don't say). Give a range you would accept.` : `${poss(company)} similar listings on Seen pay about ${money(data.pay)}. Give a range you would accept.` }
       : { q: `What do you know about ${company}?`, why: 'Name what they sell, who their customers are, and one recent thing you read about them.' }
 
@@ -381,7 +391,8 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
             {!!rec?.process?.length && (
               <p className={s.fact}>Applicants to {company} mention {processLine(rec.process)}.</p>
             )}
-            {data?.pay && (
+            {/* one pay on the card: when the posting the person gave states pay, that is the only pay shown (P2 round 4) */}
+            {data?.pay && !pack?.posting_pay && (
               <p className={s.fact}>{data.pay.scope === 'market' ? <>Pay for this job at other employers on Seen ({poss(company)} listings don&apos;t say): </> : <>Pay on {poss(company)} {data.pay.scope === 'role' ? 'similar ' : ''}listings: </>}<b>{money(data.pay)}</b> <span className={s.dim}>({data.pay.listings} listings)</span></p>
             )}
             {pickDay}
@@ -405,7 +416,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
 
           {/* PAID — the prep pack */}
           {pack ? (
-            <PackView pack={pack} company={company} fu={fu} onFill={saveFill} onRebuild={(text) => { setPostingBoth(text); void build({ refresh: true, jobText: text }) }} building={state === 'building'} />
+            <PackView pack={pack} company={company} fu={fu} onFill={saveFill} onRebuild={(text) => { setPostingBoth(text); void build({ refresh: true, jobText: text }) }} building={state === 'building'} onConfirm={guest ? undefined : (id, a, line) => { const next = confirm.answer(id, a, line); void build({ refresh: true, confirmed: next }) }} answers={confirm.answers} />
           ) : (
             <div className={s.offer}>
               <div className={s.offerTitle}>Walk in ready for {company}</div>
@@ -479,7 +490,7 @@ export default function InterviewPrep({ appId, company, role, interviewAt, isPro
   )
 }
 
-const MATCH_WORD = { shown: 'your résumé shows it', stated: 'listed, not shown in a line', gap: 'not on your résumé', expired: 'lapsed', 'in progress': 'in progress' } as const
+const MATCH_WORD: Record<string, string> = { shown: 'your résumé shows it', stated: 'listed, not shown in a line', related: 'related experience', gap: 'not on your résumé', expired: 'lapsed', 'in progress': 'in progress' }
 
 // One answer: the résumé's words as text, each [blank] as a field; the finished answer below once typed.
 // A box grows with what is typed; it starts two lines tall so the prompt inside it can be read (round 4: one-
@@ -527,12 +538,12 @@ function AnswerEditor({ a, company, values, notes, onSave, defaultOpen, title, t
   const finished = isFinished(a.answer, vals)
   const composed = composeAnswer(a.answer, vals)
   const touched = vals.some(v => v && v.trim())
-  const tag = tagText || (a.exercise ? 'Practised at a keyboard, not answered out loud' : a.company ? `${company} question${a.principle ? ` · ${a.principle}` : ''}` : a.script ? 'From your résumé’s dates and the posting' : a.frame ? `No line on your résumé fits this one yet — answer in ${n} short lines` : 'From your résumé')
+  const tag = tagText || (a.exercise ? 'Practised at a keyboard, not answered out loud' : a.company ? `${company} question${a.principle ? ` · ${a.principle}` : ''}` : a.script ? 'From your résumé’s dates and the posting' : a.frame ? `No line on your résumé fits this one yet — answer in ${n === 1 ? 'one short line' : `${n} short lines`}` : 'From your résumé')
   const save = () => { if (timer.current) clearTimeout(timer.current); flush() }
   const queue = () => { if (timer.current) clearTimeout(timer.current); timer.current = setTimeout(() => flush(), 600) }
   return (
     <details className={`${s.answer}${finished && n ? ` ${s.done}` : ''}`} open={defaultOpen}>
-      <summary>{a.company && <span className={s.chip}>{company}</span>}{title || a.q}{n > 0 && <span className={s.state}>{finished ? '✓ finished' : touched ? `${vals.filter(v => v?.trim()).length}/${n} filled` : `${n} ${n === 1 ? 'blank' : 'blanks'} to fill`}</span>}</summary>
+      <summary>{a.company && <span className={s.chip}>{company}</span>}{title || a.q}{n > 0 ? <span className={s.state}>{finished ? '✓ ready to use' : touched ? `${vals.filter(v => v?.trim()).length}/${n} filled` : `${n} ${n === 1 ? 'blank' : 'blanks'} to fill`}</span> : !a.exercise && <span className={s.state}>✓ ready to use</span>}</summary>
       <p className={s.tag}>{tag}</p>
       {a.exercise ? (
         <p className={s.prose}>{a.practice}</p>
@@ -547,7 +558,8 @@ function AnswerEditor({ a, company, values, notes, onSave, defaultOpen, title, t
         </div>
       )}
       {a.reference && <p className={s.ref}>{a.reference}</p>}
-      {a.hint && !touched && <p className={s.ref}>A line of yours that might hold this story: “{a.hint}” — if it does, tell it in the three boxes above.</p>}
+      {a.source && <p className={s.ref}>From the posting: “{a.source}”</p>}
+      {a.hint && !touched && <p className={s.ref}>A line of yours that might hold this story: “{a.hint}” — if it does, tell it in {n === 1 ? 'the box above' : n > 1 ? `the ${n} boxes above` : 'your answer'}.</p>}
       {!!notes?.length && (
         <div className={s.notes}>
           <div className={s.label}>Your words from before the rebuild</div>
@@ -568,7 +580,28 @@ function AnswerEditor({ a, company, values, notes, onSave, defaultOpen, title, t
   )
 }
 
-function PackView({ pack, company, fu, onFill, onRebuild, building }: { pack: Pack; company: string; fu: FollowUp | null | undefined; onFill: (q: string, values: string[], urgent?: boolean) => void; onRebuild: (posting: string) => void; building: boolean }) {
+// "Closest line we found" on a job-match row (shown only when the prep server sends `candidate`): the same Yes / No question
+// as the fit read. The prep API takes no answers yet, so the answer is shown as the person's own words ("You said …") and
+// never as "your résumé shows"; it is not sent anywhere.
+function PrepCandidate({ line, why, answer, onAnswer, building = false }: { line: string; why?: string; answer?: string; onAnswer?: (a: 'yes' | 'no' | null) => void; building?: boolean }) {
+  // with an answer path (`statementId` on the row) the answer is sent to the prep build as `confirmed` and the row shows what
+  // the server returns (`by: 'you'`); a Yes it did not accept leaves the question standing. Without one, the person's
+  // answer is shown as their own words only and sent nowhere.
+  const [said, setSaid] = useState<'yes' | 'no' | null>(null)
+  // while the prep rebuilds with the answer the row says so; once it is back the server's row is shown (a Yes becomes
+  // "You said …", a No takes the suggestion away). An answer the server did not accept leaves the question standing.
+  if (onAnswer && building && (answer === 'yes' || answer === 'no')) return <span className={s.why}>Rebuilding with your answer…</span>
+  if (!onAnswer && said) return <span className={s.why}>{said === 'yes' ? `You said “${line}” shows this.` : `You said “${line}” does not show this.`} <button type="button" className={s.linkBtn} onClick={() => setSaid(null)}>Change</button></span>
+  return (
+    <span className={s.why}>
+      Closest line we found: “{line}”. Does this show it?{why ? ` (${why})` : ''}{' '}
+      <button type="button" className={s.linkBtn} onClick={() => (onAnswer ? onAnswer('yes') : setSaid('yes'))}>Yes</button>{' '}
+      <button type="button" className={s.linkBtn} onClick={() => (onAnswer ? onAnswer('no') : setSaid('no'))}>No</button>
+    </span>
+  )
+}
+
+function PackView({ pack, company, fu, onFill, onRebuild, building, onConfirm, answers }: { pack: Pack; company: string; fu: FollowUp | null | undefined; onFill: (q: string, values: string[], urgent?: boolean) => void; onRebuild: (posting: string) => void; building: boolean; onConfirm?: (statementId: string, a: 'yes' | 'no' | null, line?: string) => void; answers?: Record<string, string> }) {
   const intro = pack.intro
   const fills = pack.fills || {}
   const notes = pack.notes || {}
@@ -581,6 +614,12 @@ function PackView({ pack, company, fu, onFill, onRebuild, building }: { pack: Pa
   return (
     <div className={s.pack}>
       <div className={s.offerTitle}>Your prep for {company}</div>
+      {pack.notice?.text && (
+        // a change of field or a failed hard gate is said first, plainly (the prep below is built for it)
+        <div className={s.block}>
+          <p className={s.watch}>{pack.notice.text}</p>
+        </div>
+      )}
       {pack.guide && (
         <div className={s.block}>
           <div className={s.label}>How {pack.guide.company} interviews</div>
@@ -616,7 +655,7 @@ function PackView({ pack, company, fu, onFill, onRebuild, building }: { pack: Pa
         </div>
       )}
       <div className={s.block}>
-        <div className={s.label}>Your answers · {done}/{pack.answers.filter(a => !a.exercise).length} finished</div>
+        <div className={s.label}>Your answers · {done} of {pack.answers.filter(a => !a.exercise).length} ready to use</div>
         <p className={s.dim} style={{ margin: '0 0 .5rem' }}>Every answer starts from your résumé or the posting. Type the part only you know into each blank, and the finished answer is yours — saved here, on every device.</p>
         {pack.answers.map((a, i) => (
           <AnswerEditor key={a.q} a={a} company={company} values={fills[a.q] || []} notes={notes[a.q]} onSave={(vals, urgent) => onFill(a.q, vals, urgent)} defaultOpen={i === 0} />
@@ -637,8 +676,12 @@ function PackView({ pack, company, fu, onFill, onRebuild, building }: { pack: Pa
           <ul className={s.qs}>
             {pack.job_match.map((m, i) => (
               <li key={i}>
-                <b>{m.label}</b> <span className={s.dim}>· {MATCH_WORD[m.status]}</span>
-                {m.proof ? <span className={s.why}>Your line: “{m.proof}”</span> : <span className={s.why}>{m.say}</span>}
+                <b>{m.label}</b> <span className={s.dim}>· {m.by === 'you' ? 'you said yes' : (MATCH_WORD[m.status] || m.status)}</span>
+                {m.proof && <span className={s.why}>Your line: “{m.proof}”</span>}
+                {/* the server's own "You said …" sentence when it sends one; the line the person confirmed, quoted */}
+                {m.by === 'you' && <span className={s.why}>{m.say && /^You said/.test(m.say) ? m.say : 'You said yes.'}{onConfirm && m.statementId ? <> <button type="button" className={s.linkBtn} onClick={() => onConfirm(m.statementId as string, null)}>Change</button></> : null}</span>}
+                {m.by !== 'you' && !m.proof && m.candidate?.line && <PrepCandidate building={building} line={m.candidate.line} why={m.candidate.why} answer={m.statementId ? answers?.[m.statementId] : undefined} onAnswer={onConfirm && m.statementId ? (a) => onConfirm(m.statementId as string, a, m.candidate!.line) : undefined} />}
+                {m.say && !(m.by === 'you' && /^You said/.test(m.say)) && <span className={s.why}>{m.say}</span>}
               </li>
             ))}
           </ul>

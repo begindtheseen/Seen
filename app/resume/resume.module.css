@@ -1,14 +1,26 @@
 /* /resume — page-local overrides of the shared .ai-tabs strip (app/globals.css paints the active tab green;
-   the one signal colour is the accent, and five tabs must fit a 390px screen without a page scroll). */
+   the one signal colour is the accent). Five tabs stay on ONE row: at 390 the strip scrolls sideways as a
+   segmented control instead of leaving "Export" alone on a second row (UX audit F12). */
 .tabs {
-  flex-wrap: wrap;
-  overflow: visible;
+  flex-wrap: nowrap;
+  overflow-x: auto;
   gap: var(--sp-2);
   margin-bottom: var(--sp-4);
+  scroll-snap-type: x proximity;
 }
-.tabs :global(.ai-tab) { flex: 0 1 auto; min-height: 44px; }
+.tabs :global(.ai-tab) { flex: 0 0 auto; min-height: 44px; font-family: var(--body); font-size: var(--fs-sm); scroll-snap-align: start; }
 .tabs :global(.ai-tab.active) {
   border-color: var(--accent-line);
   color: var(--accent);
   background: var(--accent-tint);
 }
+/* the job block: one paste box, the title and employer beside each other on wide screens */
+.jobFields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--sp-2); margin-top: var(--sp-3); }
+@media (max-width: 480px) { .jobFields { grid-template-columns: minmax(0, 1fr); } }
+.fieldLabel { display: block; font-size: var(--fs-sm); font-weight: 600; color: var(--text-2); margin-bottom: var(--sp-1); }
+.field { width: 100%; box-sizing: border-box; min-height: 44px; background: var(--surface-1); border: 1px solid var(--border-2); border-radius: var(--r-control); color: var(--text-1); padding: 0 var(--sp-3); font: inherit; font-size: var(--fs-body); }
+.field:focus-visible { outline: none; border-color: var(--accent); box-shadow: var(--sh-focus); }
+.signin { display: flex; gap: var(--sp-2); align-items: flex-start; padding: var(--sp-3); margin-bottom: var(--sp-4); background: var(--caution-tint); border: 1px solid var(--caution-line); border-radius: var(--r-control); color: var(--text-1); font-size: var(--fs-body); line-height: 1.5; }
+.signin svg { flex-shrink: 0; margin-top: 4px; color: var(--caution-text); }
+.signin a { color: var(--accent); font-weight: 600; }
+.readWrap { margin-bottom: var(--sp-4); }

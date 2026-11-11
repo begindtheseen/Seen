@@ -18,6 +18,7 @@ import { JOB_SEARCHES } from '../lib/server/jobSearchCatalog.js';
 import { fetchUsaJobs, usajobsCredentials } from '../lib/server/usajobs.js';
 import { pacificHour, pacificDayOfYear } from '../lib/time/pacific.js';
 import { isVercelCron } from '../lib/server/cronAuth.js';
+import { recordCronRun } from '../lib/server/cronRun.js';
 
 // Refresh a batch of registered employer-direct ATS boards straight from the source. Fail-open +
 // bounded so it never breaks the cron or exceeds the function time budget. Returns a small summary.
@@ -345,6 +346,7 @@ export default async function handler(req, res) {
       merged = mr.deleted || 0;
     }
 
+    if (isCron) await recordCronRun('refresh-jobs', failedBatches.length ? 'partial' : 'ok', `found ${allJobs.length}, upserted ${upsertedTotal}${failedBatches.length ? `, ${failedBatches.length} failed batches` : ''}`);
     return res.status(200).json({
       ok: true,
       date: new Date().toISOString(),
@@ -368,6 +370,7 @@ export default async function handler(req, res) {
   } catch (err) {
     console.error('refresh-jobs error:', err.message);
     logError('refresh-jobs', err.message, { isCron });
+    if (isCron) await recordCronRun('refresh-jobs', 'failed', err.message);
     return res.status(500).json({ error: err.message });
   }
 }

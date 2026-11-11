@@ -9,6 +9,7 @@
 // (migration 053) is the defense-in-depth boundary for direct anon-key access; the authz that
 // matters operationally is enforced here.
 
+import { checkAdmin, adminDenied } from '../lib/server/admin/auth.js';
 import { createHmac, timingSafeEqual } from 'crypto';
 import {
   normalizeClaimCompany,
@@ -212,15 +213,13 @@ async function listClaimsForUser(db, uid) {
 
 // ── Admin actions: verify session, list all claims, approve, reject ────────────
 async function adminRoute(req, res, { db, body, adminToken }) {
-  // Same verification as api/admin-stats.js: look the token up in admin_sessions, check expiry.
-  const sessRes = await db(`admin_sessions?token=eq.${encodeURIComponent(adminToken)}&limit=1`);
-  const sess = sessRes.ok ? (await sessRes.json())[0] : null;
-  if (!sess || new Date(sess.expires_at) < new Date()) {
-    return res.status(401).json({ error: 'Session expired — log in again' });
-  }
+  // THE admin-session check, shared with api/admin-stats.js (lib/server/admin/auth.js requireAdmin).
+  const check = await checkAdmin(req, { body, token: adminToken });
+  if (!check.sess) { const d = adminDenied(check.status); return res.status(d.status).json(d.body); }
+  const sess = check.sess;
 
-  // Resolve a human-readable reviewer name for the audit trail (falls back to the admin id).
-  const reviewer = await adminUsername(db, sess.admin_id);
+  // A human-readable reviewer name for the audit trail (requireAdmin resolves it; falls back to the admin id).
+  const reviewer = sess.username && sess.username !== 'admin' ? sess.username : await adminUsername(db, sess.admin_id);
 
   const action = req.method === 'GET' ? 'list' : (body.action || 'list');
 
@@ -233,19 +232,22 @@ async function adminRoute(req, res, { db, body, adminToken }) {
       `employer_company_claims?select=id,user_id,company_name,company_display_name,status,created_at,reviewed_at,reviewed_by,note` +
       `${filter}&order=created_at.desc&limit=500`,
     );
-    const claims = r.ok ? await r.json() : [];
+    // A failed read is an error answer, never "no claims".
+    if (!r.ok) return res.status(502).json({ ok: false, error: `Could not read the claims (HTTP ${r.status}).`, code: 'upstream', retryable: true });
+    const claims = await r.json().catch(() => null);
+    if (!Array.isArray(claims)) return res.status(502).json({ ok: false, error: 'Could not read the claims.', code: 'upstream', retryable: true });
     // Enrich with the employer's email (best-effort; service-key read of profiles).
     const enriched = await attachEmployerEmails(db, claims);
     const rank = { pending: 0, approved: 1, rejected: 2 };
     enriched.sort((a, b) =>
       (rank[a.status] - rank[b.status]) ||
       (Date.parse(b.created_at) || 0) - (Date.parse(a.created_at) || 0));
-    return res.status(200).json({ claims: enriched, counts: countByStatus(enriched) });
+    return res.status(200).json({ ok: true, rows: enriched, claims: enriched, counts: countByStatus(enriched) });
   }
 
   if (action === 'approve' || action === 'reject') {
     const id = String(body.id || '').trim();
-    if (!id) return res.status(400).json({ error: 'Claim id required' });
+    if (!id) return res.status(400).json({ ok: false, error: 'Claim id required', code: 'bad_request', retryable: false });
     const status = action === 'approve' ? 'approved' : 'rejected';
     const patch = {
       status,
@@ -280,10 +282,11 @@ async function adminRoute(req, res, { db, body, adminToken }) {
         if (email) await sendClaimApprovedEmail({ to: email, company: updated.company_display_name || updated.company_name, auto: false });
       } catch { /* best-effort */ }
     }
-    return res.status(200).json({ ok: true, claim: updated });
+    if (!updated) return res.status(404).json({ ok: false, error: 'No claim with that id.', code: 'not_found', retryable: false });
+    return res.status(200).json({ ok: true, changed: 1, skipped: [], message: action === 'approve' ? 'Claim approved.' : 'Claim rejected.', touched: ['claims', 'overview'], rows: [updated], claim: updated });
   }
 
-  return res.status(400).json({ error: 'Unknown admin action' });
+  return res.status(400).json({ ok: false, error: 'Unknown admin action', code: 'unknown_action', retryable: false, actions: ['list', 'approve', 'reject'] });
 }
 
 async function adminUsername(db, adminId) {

@@ -20,6 +20,7 @@ import { enqueueCompanyEnrichment } from '../lib/server/enrichmentQueue.js';
 import { rewardReport } from '../lib/server/growthRewards.js';
 import { isVercelCron } from '../lib/server/cronAuth.js';
 import { ilikeExact, ilikeContains, ilikeWords, ilikePrefix, inList } from '../lib/server/pgrest.js';
+import { withCronRecord } from '../lib/server/cronRecord.js';
 
 // Actions that existed only to call a model API — Reddit import classification and company web
 // research — were removed with the owner's decision (2026-10-26) that Seen uses no model API.
@@ -130,7 +131,7 @@ const INDUSTRY_BENCHMARKS = {
   offer_rate: 0.008,
 };
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   const _o=req.headers.origin||'';
   const _devO=!_o||_o.includes('localhost')||_o.includes('127.0.0.1');
   res.setHeader('Access-Control-Allow-Origin',(_devO||['https://seenjobs.io','https://www.seenjobs.io'].includes(_o))?(_o||'*'):'https://seenjobs.io');
@@ -1342,3 +1343,6 @@ async function handleCompanyScore(req, res, body) {
   const payload = { ok: true, no_data: true, score: null, message: `No applicant reports yet for "${name}". Be the first to report your experience.` };
   return res.json(enrichment ? { ...payload, enrichment } : payload);
 }
+
+// every Vercel cron run is recorded for Admin → System (ok / partial / failed, a short count, duration_ms)
+export default withCronRecord((req) => ((req.query && req.query.action) === 'update_tenure' ? 'reports:update_tenure' : null), handler);

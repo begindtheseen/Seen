@@ -28,9 +28,12 @@ import { ResumeDocStore, type StoredVariant } from '@/lib/stores/ResumeDocStore'
 import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import { parseResumeFile } from '@/lib/resumeUploadClient'
 import { parseResume, scoreResume, serializeToText, rewriteDoc, emptyDoc, normalizeDoc, docStats, newId, countWords } from '@/lib/resume/engine-client'
+import { rewriteKeepsMeaning } from '@/lib/resume/health/meaningGuard.js'
 import type { ResumeDoc, Health } from '@/lib/resume/types'
 import type { SavedJob } from '@/lib/types'
 import { showToast } from '@/lib/toast'
+import ParseNotice from '@/components/resume/ParseNotice'
+import { refile } from '@/components/resume/refile.js'
 
 type Tab = 'edit' | 'health' | 'tailor' | 'export'
 const HANDOFF_KEY = 'seen_studio_job'
@@ -86,7 +89,13 @@ function StudioInner() {
 
   const doc = activeId ? variantDoc : baseDoc
   const health: Health | null = useMemo(() => (doc ? scoreResume(doc) : null), [doc])
-  const fixAll = useMemo(() => (doc ? rewriteDoc(doc) : null), [doc])
+  // "Fix all" passes the same meaning guard as the Health panel: a rewrite that changes what a line says is
+  // never offered (lib/resume/health/meaningGuard.js — parse engineer's hand-off, 2026-11-10)
+  const fixAll = useMemo(() => {
+    if (!doc) return null
+    const r = rewriteDoc(doc)
+    return { ...r, log: r.log.filter((l) => l.to === l.from || rewriteKeepsMeaning(l.from, l.to).ok) }
+  }, [doc])
   // the button counts what the preview pre-selects (not punctuation, not tense-only)
   const fixAllCount = fixAll ? fixAll.log.filter((l) => l.to !== l.from && l.changes.some((c) => c.rule !== 'hygiene' && c.rule !== 'tense')).length : 0
   // "Fix N bullets": a preview with checkboxes first, then Apply, with Undo afterwards — never a
@@ -217,9 +226,9 @@ function StudioInner() {
   function undoFixes() { if (!undo) return; onChange(undo.doc); setUndo(null); showToast('Restored your original wording.') }
 
   // ── variants ──
-  function useVariant(v: ResumeDoc, meta: { role: string; company: string; jobId: string; scoreBefore: number | null; scoreAfter: number | null }) {
+  function useVariant(v: ResumeDoc, meta: { role: string; company: string; jobId: string; scoreBefore: number | null; scoreAfter: number | null; exportToken?: string; exportKey?: string }) {
     const label = [meta.role, meta.company].filter(Boolean).join(' @ ') || 'Tailored'
-    const rec: StoredVariant = { id: v.id, label, role: meta.role, company: meta.company, jobId: meta.jobId, createdAt: new Date().toISOString(), doc: v, baseHash: '', scoreBefore: meta.scoreBefore ?? undefined, scoreAfter: meta.scoreAfter ?? undefined }
+    const rec: StoredVariant = { id: v.id, label, role: meta.role, company: meta.company, jobId: meta.jobId, createdAt: new Date().toISOString(), doc: v, baseHash: '', scoreBefore: meta.scoreBefore ?? undefined, scoreAfter: meta.scoreAfter ?? undefined, ...(meta.exportToken && meta.exportKey ? { exportToken: meta.exportToken, exportKey: meta.exportKey } : {}) } as StoredVariant
     setVariants(ResumeDocStore.saveVariant(user?.id, rec)); setActiveId(v.id); setVariantDoc(v); setTab('export')
     showToast('Tailored version ready — review it, then export.')
   }
@@ -231,6 +240,8 @@ function StudioInner() {
   function removeVariant(id: string) { setVariants(ResumeDocStore.removeVariant(user?.id, id)); if (activeId === id) switchTo(null) }
 
   const active = activeId ? variants.find((v) => v.id === activeId) : null
+  // the bought version's export token (only for that version; the base résumé keeps the free rule)
+  const paidOf = (v: StoredVariant) => { const x = v as StoredVariant & { exportToken?: string; exportKey?: string }; return x.exportToken && x.exportKey ? { exportToken: x.exportToken, exportKey: x.exportKey } : null }
   const panelTab: Exclude<Tab, 'edit'> = tab === 'edit' ? 'health' : tab
   const showEditor = !narrow || tab === 'edit'
   const showPanel = !narrow || tab !== 'edit'
@@ -302,6 +313,7 @@ function StudioInner() {
 
         {mode === 'editor' && doc && (
           <>
+            {!activeId && <div style={{ marginBottom: '1rem' }}><ParseNotice doc={baseDoc} onPaste={() => setMode('paste')} onRefile={(u, answer) => { if (baseDoc) onChange(refile(baseDoc, u, answer) as unknown as ResumeDoc) }} /></div>}
             {variants.length > 0 && (
               <div className={s.variants} style={{ marginBottom: '1rem' }}>
                 <span className={s.label} style={{ margin: 0 }}>Versions</span>
@@ -333,7 +345,7 @@ function StudioInner() {
                   {panelTab === 'health' && fixPreview && fixAll && <FixPreview log={fixAll.log} onApply={applyFixes} onCancel={() => setFixPreview(false)} />}
                   {panelTab === 'health' && health && <HealthPanel health={health} doc={doc} onJump={jump} onApplyRewrite={applyRewrite} onApplyVerb={applyVerb} onFixAll={fixAllNow} fixAllCount={fixAllCount} />}
                   {panelTab === 'tailor' && <TailorPanel doc={doc} isLoggedIn={isLoggedIn} pro={pro} savedJobs={savedJobs} initialJob={initialJob} onNeed={(r) => { if (r === 'signin') { setError('Sign in to tailor your résumé (1 credit).'); router.push('/login?next=/resume/studio?tab=tailor') } else { setUpgradeFeature(undefined); setShowUpgrade(r) } }} onUseVariant={useVariant} />}
-                  {panelTab === 'export' && <ExportPanel doc={doc} pro={pro} isLoggedIn={isLoggedIn} onNeedPro={() => { setUpgradeFeature('unbranded downloads'); setShowUpgrade('pro') }} role={active?.role} />}
+                  {panelTab === 'export' && <ExportPanel doc={doc} pro={pro} isLoggedIn={isLoggedIn} onNeedPro={() => { setUpgradeFeature('unbranded downloads'); setShowUpgrade('pro') }} role={active?.role} paid={active ? paidOf(active) : null} />}
                 </div>
               )}
             </div>

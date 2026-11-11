@@ -1,0 +1,18 @@
+Junior Data Analyst
+
+About Harbor Health Plans
+Harbor Health Plans is a nonprofit health insurer serving 400,000 members across Texas.
+
+Responsibilities
+- Build and maintain dashboards in Tableau that track claims and member outcomes
+- Write SQL queries to pull and clean data from the claims warehouse
+- Present findings to operations and clinical leaders in plain language
+- Partner with the actuarial team to validate monthly reporting
+
+Requirements
+- Bachelor's degree in statistics, economics, computer science or a related field
+- Experience with SQL and a visualization tool such as Tableau or Power BI
+- Familiarity with Python or R
+- Experience with healthcare claims data is a plus
+
+Pay: $62,000 - $70,000 per year

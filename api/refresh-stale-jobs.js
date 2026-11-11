@@ -2,6 +2,9 @@
 // each row's status, shrinking the "stale jobs" KPI. This is the SCHEDULED front-end for the
 // shared engine in lib/server/staleRefresh.js (the same engine scripts/refresh-stale-jobs.mjs
 // drives from the CLI, so cron and CLI can never drift — mirrors refresh-jobs.js ↔ jobSources.js).
+// The live/dead/unknown verdict is the on-open liveness check's (lib/server/listingLiveness.js probeSource),
+// so this run can never revive a row the source says is gone, never revives on a redirect to a front door,
+// and never expires a row on a bare 404/410 (round 2, 2026-11-10).
 //
 // SAFETY: writes are OFF until STALE_REFRESH_APPLY=1 is set in the environment. Until then every
 // scheduled run is a dry-run (reads + classifies + logs what it WOULD change, zero writes), so
@@ -12,6 +15,7 @@
 import { logError } from '../lib/server/errlog.js';
 import { refreshStaleJobs } from '../lib/server/staleRefresh.js';
 import { isVercelCron } from '../lib/server/cronAuth.js';
+import { recordCronRun } from '../lib/server/cronRun.js';
 
 export default async function handler(req, res) {
   const cronSecret = process.env.CRON_SECRET;
@@ -53,10 +57,12 @@ export default async function handler(req, res) {
       concurrency: Number.isFinite(concurrency) ? concurrency : 20,
       timeoutMs: Number.isFinite(timeoutMs) ? timeoutMs : 8000,
     });
+    if (isCron) await recordCronRun('refresh-stale-jobs', 'ok', { dry_run: !apply, ...summary });
     return res.status(200).json({ ok: true, date: new Date().toISOString(), dry_run: !apply, ...summary });
   } catch (err) {
     console.error('refresh-stale-jobs error:', err.message);
     logError('refresh-stale-jobs', err.message, { isCron });
+    if (isCron) await recordCronRun('refresh-stale-jobs', 'failed', err.message);
     return res.status(500).json({ error: err.message });
   }
 }

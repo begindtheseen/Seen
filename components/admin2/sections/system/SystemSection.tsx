@@ -1,0 +1,443 @@
+'use client'
+
+// System (audit §3.1): one row per scheduled job (schedule in words, last run in California time, result,
+// next run; "No run recorded yet" where nothing records it), errors by route, database size, the feature
+// flags code actually reads, the activity log with Undo, and the revenue detail (one-time purchases only).
+import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
+import { formatPacific } from '@/lib/time/pacific'
+import Button from '@/components/ui/Button'
+import type { AdminList } from '../../contract.ts'
+import type { ActionState } from '../../core/action.ts'
+import { createAdminApi } from '../../core/api.ts'
+import { useAdminAction, useAdminJob, useAdminList, useAdminQuery, useApi, useRuntime } from '../../core/hooks.tsx'
+import { tokenStore } from '../../core/runtime.ts'
+import { saveText } from '../../core/api.ts'
+import { isUnknownAnswer } from '../listings/unknown.ts'
+import JobDone from '../listings/JobDone.tsx'
+import { useUrlFilter } from '../../core/place.ts'
+import type { SectionProps } from '../../core/sections.tsx'
+import { useShell } from '../../core/shellContext.ts'
+import type { AdminItemKind } from '../../contract.ts'
+import { FilterChips, KeyHint, SectionHeader, StatusChip } from '../../ui/bits.tsx'
+import ConfirmStep from '../../ui/ConfirmStep.tsx'
+import { List, Row } from '../../ui/List.tsx'
+import ResultLine from '../../ui/ResultLine.tsx'
+import { EmptyState, ErrorState, RefreshFailed, Skeleton } from '../../ui/states.tsx'
+import { useSectionKeys } from '../listings/sectionKeys.ts'
+import styles from '../listings/listings.module.css'
+import {
+  ACTION_FILTERS, canOpen, cronDetail, scheduleText, readSearchDemand, cronLines, cronState, cronSummary, dbSizeLine, dbSizeTone, readDbSize, dangerConsequence, flagDoes, flagEnv, flagIsOn, flagStateWords,
+  fmt, money, readActivity, readCron, readFlags, readFunnel, readRevenue, readRoutes, type ActivityRow, type CronRow, type Flag,
+} from './adapter.ts'
+
+export default function SystemSection({ active }: SectionProps) {
+  const shell = useShell()
+  const flagsUndo = useRef<(() => void) | null>(null)
+  useSectionKeys({ active, sheetOpen: shell.sheetOpen, onUndo: () => flagsUndo.current?.() })
+  return (
+    <div className={styles.wrap} data-testid="section-system">
+      <SectionHeader title="System" sub="Scheduled jobs, errors, database size, feature flags, everything admins did, and revenue." />
+      <CronsBlock />
+      <ErrorsBlock />
+      <StorageBlock />
+      <ExportBlock />
+      <SearchDemandBlock />
+      <FlagsBlock undoRef={flagsUndo} />
+      <ActivityBlock />
+      <RevenueBlock />
+    </div>
+  )
+}
+
+// ── Scheduled jobs ───────────────────────────────────────────────────────────────────────────────
+function CronsBlock() {
+  const api = useApi()
+  const q = useAdminList<CronRow>('crons', async () => {
+    const res = await api<AdminList<Record<string, unknown>>>('cron_health')
+    return res.ok ? { ...res, rows: (res.rows || []).map(readCron), next: undefined } : res
+  }, { staleMs: 60_000, idOf: (c) => c.path || c.name })
+  return (
+    <section className={styles.block} aria-labelledby="sy-crons" data-testid="sy-crons">
+      <div className={styles.blockHead}>
+        <h2 id="sy-crons" className={styles.h2}>Scheduled jobs</h2>
+        <Button variant="ghost" icon="refresh-cw" onClick={() => void q.refresh()} disabled={q.fetching}>Re-read</Button>
+      </div>
+      {q.loading ? <Skeleton rows={4} label="Reading the scheduled jobs" /> : null}
+      {q.error && !q.data ? <ErrorState what="the scheduled jobs" error={q.error} onRetry={() => void q.refresh()} retrying={q.fetching} /> : null}
+      {q.data ? (
+        <>
+          <RefreshFailed error={q.error} onRetry={() => void q.refresh()} />
+          <p className={styles.text} data-testid="sy-crons-summary">{cronSummary(q.rows)} Times are California time.</p>
+          <ul className={styles.table} aria-label="Scheduled jobs">
+            {q.rows.map((c) => {
+              const st = cronState(c)
+              const detail = cronDetail(c)
+              return (
+                <li key={c.path || c.name} className={st.tone === 'bad' ? `${styles.tr} ${styles.trBad}` : styles.tr} data-testid={`cron-${c.name}`}>
+                  <span className={styles.trName}>{c.name}<span className={styles.quiet}><br />{scheduleText(c)}</span></span>
+                  <span className={styles.trBody}>
+                    {cronLines(c).map((l) => <span key={l}>{l}</span>)}
+                    {detail ? <span className={styles.quiet}>{detail}</span> : null}
+                    {c.path === '/api/demand' ? <DemandRun /> : c.path === '/api/refresh-jobs' ? <RefreshJobsRun /> : null}
+                  </span>
+                  <span className={styles.trSide}><StatusChip tone={st.tone} label={st.word} icon={st.tone === 'neutral' ? 'circle-help' : undefined} /></span>
+                </li>
+              )
+            })}
+          </ul>
+          <p className={styles.quiet}>Only the jobs that can safely be started by hand have a Run button: refreshing demand data and refreshing listings.</p>
+        </>
+      ) : null}
+    </section>
+  )
+}
+
+/** Refresh demand data: a job action (one round), with progress in the job chip. */
+function DemandRun() {
+  const job = useAdminJob({ action: 'refresh_demand', label: 'Refreshing demand data', past: 'Refreshed', noun: 'demand rows' })
+  return (
+    <span className={styles.blockFlat}>
+      {job.job ? <JobDone job={job.job} testId="demand-done" onCancel={job.cancel} onResume={job.resume} onDismiss={job.dismiss} /> : null}
+      {!job.job || !job.running ? <span className={styles.actions}><Button variant="secondary" icon="refresh-cw" onClick={() => job.start()} data-testid="run-demand">Run now</Button></span> : null}
+    </span>
+  )
+}
+
+// Refresh listings runs on its own endpoint (up to 5 minutes; this admin's function has 60 s). One press: the
+// request is held here (the section stays mounted when the owner leaves it), and a second press is ignored.
+let refreshJobsInFlight: Promise<void> | null = null
+let refreshJobsState: ActionState = { status: 'idle', target: 'refresh-jobs' }
+const refreshJobsSubs = new Set<() => void>()
+function setRefreshJobs(s: ActionState) { refreshJobsState = s; refreshJobsSubs.forEach((f) => f()) }
+
+function refreshJobsMessage(r: Record<string, unknown>): string {
+  const n = (k: string) => (typeof r[k] === 'number' ? fmt(r[k] as number) : '?')
+  const fails = typeof r.failed_batches === 'number' && r.failed_batches > 0 ? ` · ${n('failed_batches')} batches failed to save` : ''
+  return `Listings refreshed: ${n('found')} found in ${n('searches')} searches · ${n('inserted')} new · ${n('updated')} updated${fails}.`
+}
+
+function RefreshJobsRun() {
+  const { gate, cache } = useRuntime()
+  const [, tick] = useState(0)
+  useEffect(() => { const f = () => tick((x) => x + 1); refreshJobsSubs.add(f); return () => { refreshJobsSubs.delete(f) } }, [])
+  const st = refreshJobsState
+  const start = () => {
+    if (refreshJobsInFlight) return
+    const call = createAdminApi({ endpoint: '/api/refresh-jobs', getToken: tokenStore.get, reauth: () => (tokenStore.get() ? gate.wait() : Promise.resolve(false)), defaultTimeoutMs: 310_000 })
+    setRefreshJobs({ status: 'running', target: 'refresh-jobs' })
+    refreshJobsInFlight = (async () => {
+      const res = await call<Record<string, unknown>>('refresh_jobs', {})
+      if (res.ok) setRefreshJobs({ status: 'done', target: 'refresh-jobs', result: { ...res, message: refreshJobsMessage(res as Record<string, unknown>) } })
+      else {
+        setRefreshJobs({ status: 'error', target: 'refresh-jobs', error: res })
+        // No answer is not "not done": the refresh may still be running. Re-read the scheduled jobs in a minute
+        // (refresh-jobs records its runs) instead of offering a Retry that would start a second one.
+        if (isUnknownAnswer(res)) setTimeout(() => cache.invalidate(['crons']), 60_000)
+      }
+      refreshJobsInFlight = null
+    })()
+  }
+  return (
+    <span className={styles.blockFlat} data-testid="run-refresh-jobs-wrap">
+      <ResultLine state={st} onRetry={isUnknownAnswer(st.error) ? undefined : start} onDismiss={() => setRefreshJobs({ status: 'idle', target: 'refresh-jobs' })}
+        runningText="Refreshing listings… This can take up to 5 minutes. You can leave this screen." />
+      {isUnknownAnswer(st.error) ? <span className={styles.quiet} data-testid="refresh-jobs-unknown">Checking: no answer came back, so the refresh may still be running on the server. This row is read again in a minute; dismiss the message to run it again.</span> : null}
+      {st.status === 'idle' || st.status === 'done' ? <span className={styles.actions}><Button variant="secondary" icon="refresh-cw" onClick={start} data-testid="run-refresh-jobs">Run now</Button></span> : null}
+    </span>
+  )
+}
+
+// ── Errors by route ──────────────────────────────────────────────────────────────────────────────
+type ErrRow = { id: string; endpoint: string; error_msg: string; created_at: string; ref: string | null }
+function ErrorsBlock() {
+  const api = useApi()
+  const [route, setRoute] = useUrlFilter('system', 'route', '')
+  const routes = useAdminQuery<Record<string, unknown>>('errors:routes', () => api<Record<string, unknown>>('errors_list', { limit: 1 }), { staleMs: 60_000 })
+  const byRoute = routes.data ? readRoutes(routes.data) : null
+  const list = useAdminList<ErrRow>(`errors?route=${route}`, ({ after }) => api<AdminList<ErrRow>>('errors_list', { endpoint: route || undefined, after: after || undefined, limit: 25 }), { staleMs: 60_000 })
+  const max = Math.max(1, ...(byRoute?.routes.map((r) => r.count) || [1]))
+  return (
+    <section className={styles.block} aria-labelledby="sy-errors" data-testid="sy-errors">
+      <div className={styles.blockHead}><h2 id="sy-errors" className={styles.h2}>Errors</h2></div>
+      {routes.loading ? <Skeleton rows={2} label="Counting errors" /> : null}
+      {routes.error && !routes.data ? <ErrorState what="the error counts" error={routes.error} onRetry={() => void routes.refresh()} /> : null}
+      {routes.data ? (
+        byRoute === null ? <p className={styles.quiet}>The last 24 hours could not be counted by route (too many to read, or the read failed). The list below still shows each error.</p>
+          : !byRoute.routes.length ? <p className={styles.text}>No errors in the last 24 hours.</p>
+          : (
+            <>
+              <p className={styles.text}><span className={styles.strong}>{byRoute.total === null ? 'Errors' : `${fmt(byRoute.total)} ${byRoute.total === 1 ? 'error' : 'errors'}`} in the last 24 hours</span>, by the server route that logged them. Tap a route to list only its errors.</p>
+              <ul className={styles.lines} aria-label="Errors by route">
+                {byRoute.routes.slice(0, 10).map((r) => (
+                  <li key={r.route} className={styles.barRow}>
+                    <button type="button" className={styles.linkBtn} onClick={() => setRoute(route === r.route ? '' : r.route)} aria-pressed={route === r.route}>{r.route}</button>
+                    <span className={styles.barNum}>{fmt(r.count)}</span>
+                    <span className={styles.barTrack} aria-hidden="true"><span className={styles.barFill} style={{ transform: `scaleX(${r.count / max})` }} /></span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )
+      ) : null}
+      {route ? <div className={styles.actions}><StatusChip tone="info" label={`Only ${route}`} /><Button variant="ghost" icon="x" onClick={() => setRoute('')}>Every route</Button></div> : null}
+      <List<ErrRow>
+        rows={list.rows} idOf={(e) => e.id} noun="errors" loading={list.loading} error={list.error} onRetry={() => void list.refresh()}
+        hasMore={list.hasMore} loadingMore={list.loadingMore} onLoadMore={() => void list.loadMore()} newCount={list.newCount} onShowNew={list.showNew}
+        empty={<EmptyState icon="circle-check" title={route ? `No errors logged by ${route}.` : 'No errors logged.'} />}
+        renderRow={(e) => <Row title={e.error_msg || 'No message'} sub={`${e.endpoint} · ${e.created_at ? formatPacific(e.created_at) : ''}${e.ref ? ` · ref ${e.ref}` : ''}`} />}
+      />
+    </section>
+  )
+}
+
+// ── Database size ────────────────────────────────────────────────────────────────────────────────
+function StorageBlock() {
+  const api = useApi()
+  const q = useAdminQuery<Record<string, unknown>>('db_size', () => api<Record<string, unknown>>('db_size'), { staleMs: 5 * 60_000 })
+  const d = q.data ? readDbSize(q.data) : null
+  return (
+    <section className={styles.block} aria-labelledby="sy-db" data-testid="sy-db">
+      <div className={styles.blockHead}>
+        <h2 id="sy-db" className={styles.h2}>Database size</h2>
+        {q.data ? (d ? <StatusChip tone={dbSizeTone(d)} label={d.usedPct === null ? 'Guard share unknown' : `${Math.round(d.usedPct)}% of the guard`} /> : <StatusChip tone="neutral" label="Couldn’t read" icon="circle-slash" />) : null}
+      </div>
+      {q.loading ? <Skeleton rows={1} label="Reading the database size" /> : null}
+      {q.error && !q.data ? <ErrorState what="the database size" error={q.error} onRetry={() => void q.refresh()} retrying={q.fetching} /> : null}
+      {q.data ? (
+        <>
+          <RefreshFailed error={q.error} onRetry={() => void q.refresh()} />
+          <p className={styles.text} data-testid="sy-db-line">{d ? dbSizeLine(d) : 'The database size couldn’t be read.'}{d?.asOf ? ` Read ${formatPacific(d.asOf)}.` : ''}</p>
+          <p className={styles.quiet}>Past the guard, new aggregated listings are skipped (existing ones still refresh; employer posts are allowed).</p>
+        </>
+      ) : null}
+    </section>
+  )
+}
+
+// ── Metrics export (CSV) ─────────────────────────────────────────────────────────────────────────
+function ExportBlock() {
+  const exp = useAdminAction('export_csv', { dock: false, onSettled: (res) => { const r = res as Record<string, unknown>; if (res.ok && typeof r.csv === 'string' && r.csv) saveText(r.csv, typeof r.filename === 'string' && r.filename ? r.filename : 'seen-metrics.csv', 'text/csv;charset=utf-8') } })
+  const st = exp.state()
+  const empty = st.status === 'done' && !(st.result as Record<string, unknown> | undefined)?.csv
+  return (
+    <section className={styles.block} aria-labelledby="sy-export" data-testid="sy-export">
+      <div className={styles.blockHead}><h2 id="sy-export" className={styles.h2}>Metrics export</h2></div>
+      <p className={styles.quiet}>A CSV of exact counts: accounts, Pro now, new accounts in 7 days, reports, applications, companies scored, one-time revenue in 30 days, and new accounts and reports per California day for 30 days. A count that couldn’t be read says “unreadable” in the file.</p>
+      <ResultLine state={empty ? { ...st, status: 'error', error: { ok: false, code: 'upstream', error: 'The server answered with an empty file, so nothing was saved.', retryable: true } } : st}
+        onRetry={() => exp.retry()} onDismiss={() => exp.dismiss()} runningText="Counting for the export…" />
+      <div className={styles.actions}><Button variant="secondary" icon="download" onClick={() => void exp.run({})} loading={exp.busy()} data-testid="sy-export-csv">Download metrics CSV</Button></div>
+    </section>
+  )
+}
+
+// ── Search demand (Search Console / Bing) ───────────────────────────────────────────────────────
+function SearchDemandBlock() {
+  const api = useApi()
+  const [asked, setAsked] = useState(false)
+  const q = useAdminQuery<Record<string, unknown>>('search_demand', () => api<Record<string, unknown>>('search_opportunities', {}, { timeoutMs: 45_000 }), { enabled: asked, staleMs: 10 * 60_000 })
+  const d = q.data ? readSearchDemand(q.data) : null
+  return (
+    <section className={styles.block} aria-labelledby="sy-search" data-testid="sy-search">
+      <div className={styles.blockHead}><h2 id="sy-search" className={styles.h2}>Search demand</h2></div>
+      <p className={styles.quiet}>What people searched on Google (Search Console) and Bing in the last 28 days, and queries where a Seen page sits just off the first page.</p>
+      {!asked ? <div className={styles.actions}><Button variant="secondary" icon="search" onClick={() => setAsked(true)} data-testid="sy-search-load">Read search demand</Button></div>
+        : q.loading ? <Skeleton rows={3} label="Reading search demand" />
+        : q.error && !q.data ? <ErrorState what="search demand" error={q.error} onRetry={() => void q.refresh()} retrying={q.fetching} />
+        : !d ? <ErrorState what="search demand" error="The server could not read the search data." onRetry={() => void q.refresh()} />
+        : !d.ready ? <p className={styles.text} data-testid="sy-search-notready">Search data is not stored yet{d.reason ? ` (${d.reason})` : ''}.</p>
+        : (
+          <>
+            <RefreshFailed error={q.error} onRetry={() => void q.refresh()} />
+            <p className={styles.text} data-testid="sy-search-total">
+              {d.totals ? [d.totals.impressions === null ? 'impressions couldn’t be read' : `${fmt(d.totals.impressions)} ${d.totals.impressions === 1 ? 'impression' : 'impressions'}`, d.totals.clicks === null ? 'clicks couldn’t be read' : `${fmt(d.totals.clicks)} ${d.totals.clicks === 1 ? 'click' : 'clicks'}`, d.totals.queries === null ? '' : `${fmt(d.totals.queries)} ${d.totals.queries === 1 ? 'query' : 'queries'}`].filter(Boolean).join(' · ') : ''}
+              {` · Google data to ${d.google ? formatPacific(`${d.google}T12:00:00Z`, { dateStyle: 'medium' }) : 'none'}, Bing to ${d.bing ? formatPacific(`${d.bing}T12:00:00Z`, { dateStyle: 'medium' }) : 'none'}.`}
+            </p>
+            {d.stale ? <p className={styles.quiet}><StatusChip tone="caution" label="Stale" /> The daily pull looks stopped (Google more than 5 days old, or Bing more than 14).</p> : null}
+            {d.rows.length ? (
+              <ul className={styles.lines} aria-label="Queries just off the first page">
+                {d.rows.slice(0, 15).map((r, i) => (
+                  <li key={`${r.source}-${r.query}-${i}`} className={styles.lineItem}>
+                    <span className={styles.lineMain}><span className={styles.strong}>{r.query}</span>{r.company ? ` · ${r.company}` : ''} — {r.advice}</span>
+                    <span className={styles.lineSide}>{r.source} · position {r.position === null ? '?' : r.position.toFixed(1)} · {r.impressions === null ? '?' : fmt(r.impressions)} seen · {r.clicks === null ? '?' : fmt(r.clicks)} clicked</span>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className={styles.quiet}>No query sits just off the first page.</p>}
+          </>
+        )}
+    </section>
+  )
+}
+
+// ── Feature flags ────────────────────────────────────────────────────────────────────────────────
+function FlagsBlock({ undoRef }: { undoRef: MutableRefObject<(() => void) | null> }) {
+  const api = useApi()
+  const q = useAdminQuery<Record<string, unknown>>('flags', () => api<Record<string, unknown>>('flags_list'), { staleMs: 60_000 })
+  const set = useAdminAction('set_flag', { dock: false, onSettled: (_res, args) => { setConfirm(null); setLast(String(args.flag_name)) } })
+  const [confirm, setConfirm] = useState<string | null>(null)
+  const [last, setLast] = useState<string | null>(null)
+  const view = q.data ? readFlags(q.data) : null
+  undoRef.current = last && set.state(last).result?.undo ? () => set.undo(last) : null
+  const toggle = (f: Flag, on: boolean) => { void set.run({ flag_name: f.name, status: on ? 'fully_on' : 'off', ...(f.dangerous ? { confirm: f.name } : {}) }, f.name) }
+  return (
+    <section className={styles.block} aria-labelledby="sy-flags" data-testid="sy-flags">
+      <div className={styles.blockHead}>
+        <h2 id="sy-flags" className={styles.h2}>Feature flags</h2>
+        <div className={styles.keys}><span><KeyHint keys="u" /> undo the last flag change</span></div>
+      </div>
+      <p className={styles.quiet}>Only flags some code reads. Each is on or off for everyone: the code treats any stored setting other than “off” as on.</p>
+      {q.loading ? <Skeleton rows={3} label="Reading the flags" /> : null}
+      {q.error && !view ? <ErrorState what="the feature flags" error={q.error} onRetry={() => void q.refresh()} retrying={q.fetching} /> : null}
+      {view ? (
+        <>
+          <RefreshFailed error={q.error} onRetry={() => void q.refresh()} />
+          <ul className={styles.lines} aria-label="Flags">
+            {view.flags.map((f) => {
+              const on = flagIsOn(f)
+              const env = flagEnv(f)
+              return (
+                <li key={f.name} className={`${styles.block}`} data-testid={`flag-${f.name}`}>
+                  <div className={styles.blockHead}>
+                    <span className={styles.strong}>{f.name}</span>
+                    <StatusChip tone={f.dangerous && !on ? 'bad' : on ? 'good' : 'neutral'} label={on ? 'On' : 'Off'} icon={on ? 'circle-check' : 'circle-slash'} />
+                  </div>
+                  <p className={styles.text}>{flagDoes(f)} Now: {flagStateWords(f)}.</p>
+                  <p className={styles.quiet}>
+                    Read at {f.readers.join(', ') || 'an unknown place'}.{env ? ` A server setting (${env}) overrides it when present.` : ''}
+                    {f.updated_at ? ` Last changed ${formatPacific(f.updated_at)}${f.updated_by ? ` by ${f.updated_by}` : ''}.` : ''}
+                  </p>
+                  {confirm === f.name ? (
+                    <ConfirmStep title={`Turn ${f.name} ${on ? 'off' : 'on'}?`} body={`${dangerConsequence(f, !on)} Undo is offered after.`}
+                      confirmLabel={on ? 'Turn it off' : 'Turn it on'} typeToConfirm={f.dangerous ? f.name : undefined} tone="danger" busy={set.busy(f.name)}
+                      onCancel={() => setConfirm(null)} onConfirm={() => toggle(f, !on)} />
+                  ) : (
+                    <div className={styles.actions}>
+                      <Button variant={f.dangerous && on ? 'danger' : 'secondary'} onClick={() => setConfirm(f.name)} loading={set.busy(f.name)} data-testid={`flag-toggle-${f.name}`}>
+                        {on ? 'Turn off…' : 'Turn on…'}
+                      </Button>
+                    </div>
+                  )}
+                  <ResultLine state={set.state(f.name)} onUndo={() => set.undo(f.name)} onRetry={() => set.retry(f.name)} onDismiss={() => set.dismiss(f.name)} runningText="Saving the flag…" />
+                </li>
+              )
+            })}
+          </ul>
+          {view.unread.length ? (
+            <div className={styles.blockFlat} data-testid="sy-flags-unread">
+              <h3 className={styles.h2}>Stored but read by no code</h3>
+              <p className={styles.quiet}>These rows exist in the feature flag table, but nothing reads them, so changing them would do nothing: {view.unread.join(', ')}.</p>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+    </section>
+  )
+}
+
+// ── Activity log ─────────────────────────────────────────────────────────────────────────────────
+function ActivityBlock() {
+  const api = useApi()
+  const shell = useShell()
+  const [action, setAction] = useUrlFilter('system', 'action', '')
+  const [target, setTarget] = useUrlFilter('system', 'target', '')
+  const [logins, setLogins] = useUrlFilter('system', 'logins', '')
+  const [targetTyped, setTargetTyped] = useState(target)
+  const key = `activity?a=${action}&t=${target}&l=${logins}`
+  const list = useAdminList<ActivityRow>(key, async ({ after }) => {
+    const res = await api<AdminList<Record<string, unknown>>>('activity_log', { filter_action: action || undefined, target: target || undefined, include_logins: logins === '1' || undefined, after: after || undefined, limit: 50 })
+    return res.ok ? { ...res, rows: (res.rows || []).map(readActivity) } : res
+  }, { staleMs: 20_000 })
+  return (
+    <section className={styles.block} aria-labelledby="sy-activity" data-testid="sy-activity">
+      <div className={styles.blockHead}>
+        <h2 id="sy-activity" className={styles.h2}>Activity log</h2>
+        <Button variant="ghost" icon="refresh-cw" onClick={() => void list.refresh()} disabled={list.fetching}>Re-read</Button>
+      </div>
+      <p className={styles.quiet}>Everything an admin did, newest first. A bulk decision shows as one row; its Undo covers every report in it. Undo is offered for 7 days where the change can be reversed.</p>
+      <div className={styles.filters}>
+        <label className={styles.field}><span>Action</span>
+          <select className="ui-input" value={action} onChange={(e) => setAction(e.target.value)} data-testid="act-action">
+            {ACTION_FILTERS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select></label>
+        <label className={styles.field}><span>About (kind:id, e.g. job:9a1b…)</span>
+          <input className="ui-input" value={targetTyped} onChange={(e) => setTargetTyped(e.target.value)} onBlur={() => setTarget(targetTyped.trim())}
+            onKeyDown={(e) => { if (e.key === 'Enter') setTarget(targetTyped.trim()) }} autoCapitalize="off" spellCheck={false} data-testid="act-target" /></label>
+        <label className={styles.field}><span>Sign-ins</span>
+          <select className="ui-input" value={logins} onChange={(e) => setLogins(e.target.value)} data-testid="act-logins">
+            <option value="">Hidden (the hourly automated sign-in is most of the log)</option>
+            <option value="1">Shown</option>
+          </select></label>
+      </div>
+      <List<ActivityRow>
+        rows={list.rows} idOf={(a) => a.id} noun="log entries" loading={list.loading} error={list.error} onRetry={() => void list.refresh()}
+        hasMore={list.hasMore} loadingMore={list.loadingMore} onLoadMore={() => void list.loadMore()} newCount={list.newCount} onShowNew={list.showNew}
+        empty={<EmptyState icon="list" title="Nothing logged with these filters." />}
+        renderRow={(a) => <ActivityItem a={a} onOpen={canOpen(a) ? () => shell.openItem(a.target_kind as AdminItemKind, a.target_id!) : undefined} />}
+      />
+    </section>
+  )
+}
+
+function ActivityItem({ a, onOpen }: { a: ActivityRow; onOpen?: () => void }) {
+  // An Undo runs as a job: a large one answers in rounds ("Restoring 400 of 1,200"), with progress and Cancel.
+  const job = useAdminJob({ action: 'undo', args: { audit_id: a.id }, label: `Undoing: ${a.summary}`, past: 'Put back', noun: 'rows' })
+  const [confirm, setConfirm] = useState(false)
+  return (
+    <Row testId={`act-row-${a.id}`} title={a.summary} onOpen={onOpen}
+      sub={`by ${a.admin} · ${a.at ? formatPacific(a.at) : ''}${a.target_kind && a.target_id && !onOpen ? ` · ${a.target_kind} ${a.target_id}` : ''}`}
+      actions={a.undoable && !job.job && !confirm ? <Button variant="secondary" icon="undo-2" onClick={() => setConfirm(true)} data-testid={`act-undo-${a.id}`}>Undo</Button> : undefined}
+      below={confirm && !job.job ? (
+        <ConfirmStep inline title={`Undo “${a.summary}”?`} body="Only rows that still hold what this action wrote are put back; anything changed since is left as it is and counted."
+          confirmLabel="Undo it" tone="danger" onCancel={() => setConfirm(false)} onConfirm={() => { setConfirm(false); job.start() }} />
+      ) : job.job ? <JobDone job={job.job} testId="undo-done" onCancel={job.cancel} onResume={job.resume} onDismiss={job.dismiss}
+          summary={(j) => `Put back ${fmt(j.changed)} ${j.changed === 1 ? 'row' : 'rows'}${j.rounds > 1 ? ` in ${fmt(j.rounds)} rounds` : ''}.`} /> : undefined}
+    />
+  )
+}
+
+// ── Revenue ──────────────────────────────────────────────────────────────────────────────────────
+function RevenueBlock() {
+  const api = useApi()
+  const [days, setDays] = useUrlFilter('system', 'days', '30')
+  const d = ['7', '30', '90', '365'].includes(days) ? days : '30'
+  const q = useAdminQuery<Record<string, unknown>>(`revenue?days=${d}`, () => api<Record<string, unknown>>('revenue_summary', { days: Number(d) }), { staleMs: 120_000 })
+  const [showFunnel, setShowFunnel] = useState(false)
+  const funnel = useAdminQuery<Record<string, unknown>>(`revenue:funnel?days=${d}`, () => api<Record<string, unknown>>('revenue_funnel', { days: Number(d) }, { timeoutMs: 45_000 }), { enabled: showFunnel, staleMs: 120_000 })
+  const r = q.data ? readRevenue(q.data) : null
+  const steps = useMemo(() => (funnel.data ? readFunnel(funnel.data) : []), [funnel.data])
+  return (
+    <section className={styles.block} aria-labelledby="sy-revenue" data-testid="sy-revenue">
+      <div className={styles.blockHead}><h2 id="sy-revenue" className={styles.h2}>Revenue</h2></div>
+      <FilterChips label="Window" value={d} onChange={(v) => setDays(v === '30' ? '' : v)} options={[{ value: '7', label: '7 days' }, { value: '30', label: '30 days' }, { value: '90', label: '90 days' }, { value: '365', label: '1 year' }]} />
+      {q.loading ? <Skeleton rows={2} label="Adding up purchases" /> : null}
+      {q.error && !r ? <ErrorState what="revenue" error={q.error} onRetry={() => void q.refresh()} retrying={q.fetching} /> : null}
+      {r ? (
+        <>
+          <RefreshFailed error={q.error} onRetry={() => void q.refresh()} />
+          <p className={styles.text} data-testid="sy-revenue-total"><span className={styles.strong}>{r.total === null ? 'The total couldn’t be read' : `${money(r.total)} in one-time purchases`}</span> in the last {d === '365' ? 'year' : `${d} days`}. Seen sells no subscriptions.</p>
+          <ul className={styles.lines} aria-label="Revenue by product">
+            {r.consumer.map((c) => (
+              <li key={c.sku} className={styles.lineItem}><span className={styles.lineMain}>{c.name}</span>
+                <span className={styles.lineSide}>{c.count === null ? 'couldn’t read' : `${fmt(c.count)} sold · ${c.cents === null ? '' : money(c.cents)}`}</span></li>
+            ))}
+            <li className={styles.lineItem}><span className={styles.lineMain}>Employer purchases (paid or fulfilled)</span><span className={styles.lineSide}>{r.employer === null ? 'couldn’t read' : money(r.employer)}</span></li>
+          </ul>
+          <p className={styles.quiet}>Where the numbers come from: {r.source || 'not stated by the server'}.</p>
+          <div className={styles.actions}><Button variant="ghost" icon={showFunnel ? 'chevron-down' : 'chevron-right'} onClick={() => setShowFunnel((s) => !s)} aria-expanded={showFunnel} data-testid="sy-funnel-toggle">{showFunnel ? 'Hide the funnel' : 'Show the path to a purchase'}</Button></div>
+          {showFunnel ? (
+            funnel.loading ? <Skeleton rows={4} label="Reading the funnel" />
+              : funnel.error && !funnel.data ? <ErrorState what="the funnel" error={funnel.error} onRetry={() => void funnel.refresh()} />
+              : (
+                <>
+                  <p className={styles.quiet}>Each step counts people or events in the window; “not recorded” means the event table for that step does not exist yet.</p>
+                  <ul className={styles.lines} aria-label="Funnel" data-testid="sy-funnel">
+                    {steps.map((s) => <li key={s.key} className={styles.lineItem}><span className={styles.lineMain}>{s.label}</span><span className={styles.lineSide}>{s.n === null ? 'not recorded' : fmt(s.n)}</span></li>)}
+                  </ul>
+                </>
+              )
+          ) : null}
+        </>
+      ) : null}
+    </section>
+  )
+}

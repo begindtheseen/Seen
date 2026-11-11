@@ -1,8 +1,12 @@
 'use client'
 
 import { isPostingLink } from '@/lib/postingPaste'
+import PostingInput, { PostingReadRow } from '@/components/jobs/PostingInput'
+import { readFacts } from '@/lib/postingRead.js'
+import { requirementCounts } from '@/lib/requirementList.js'
+import { needsSignIn, outOfCredits, signInHereHref, SIGNIN_EXPIRED_TEXT } from '@/lib/toolAuth.js'
 import { httpHref } from '@/lib/safeHref.js'
-import { useState, useEffect, useRef, Suspense } from 'react'
+import { useState, useEffect, useRef, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ResumeStore } from '@/lib/stores/ResumeStore'
@@ -13,14 +17,18 @@ import { _sync } from '@/lib/sync'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { parseResumeFile } from '@/lib/resumeUploadClient'
-import { countWords } from '@/lib/resume/engine-client'
+import { countWords, parseResume as parseResumeText } from '@/lib/resume/engine-client'
+import ParseNotice from '@/components/resume/ParseNotice'
 import type { SavedJob } from '@/lib/types'
 import UpgradeModal from '@/components/UpgradeModal'
 import { WELCOME_CREDITS } from '@/lib/creditRules'
 import { LOCK_NOTE, PASS_AFTER_WIN } from '@/lib/pricing'
 import { signupHref } from '@/lib/signupIntent.js'
 import dynamic from 'next/dynamic'
-import { VerdictCard, WhyYouMatch, MissingList, Checklist, PaidPlanView, type Verdict, type ConstraintRow, type PaidPlan } from '@/components/optimizer/Verdict'
+import { PaidPlanView, type Verdict, type ConstraintRow, type PaidPlan } from '@/components/optimizer/Verdict'
+import FitRead, { type FitData, type Answer, type Answers } from '@/components/optimizer/FitRead'
+import { useConfirmations, type Confirmed } from '@/components/optimizer/useConfirmations'
+import { PaidResult, BlockedResult, ResultTopLine, DownloadVersion, usePaidVersion, type AlreadyRight, type Tailored, type Charge, type Blocked, type Question } from '@/components/optimizer/PaidResult'
 import rs from './resume.module.css'
 import CreditConfirmDialog from '@/components/CreditConfirmDialog'
 import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
@@ -173,8 +181,9 @@ const kicker = (text: string, color = 'var(--dim)') => (
 )
 
 
-function scoreColor(s: number): string {
-  return s >= 70 ? 'var(--green)' : s >= 45 ? 'var(--amber)' : 'var(--red)'
+// a factor bar / grade / HumanProof figure is ink — the only fit colour is the server's band (fitBand); no client thresholds
+function scoreColor(_s: number): string {
+  return 'var(--text-2)'
 }
 
 // ── Card wrapper ──
@@ -183,13 +192,17 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
 }
 
 // ═══ FIT TAB — the diagnosis (scores, coverage, matches, company risk) ═══
-function FitView({ out, intel, jobCompany, insights }: { out: OptimizerOutput; intel: CompanyIntel | null; jobCompany: string; insights: Insights | null }) {
+function FitView({ out, intel, jobCompany, insights, answers, answerLines, onAnswer }: { out: OptimizerOutput; intel: CompanyIntel | null; jobCompany: string; insights: Insights | null; answers?: Answers; answerLines?: Record<string, string>; onAnswer?: (id: string, a: Answer | null, line?: string) => void }) {
   // Only the factors that were actually measured (an ungraded company or an unknown location is
   // not scored — lib/optimizer/explainScore.js), as plain bars.
-  const metrics = (out.explanation.contributions || []).filter(c => c.scored !== false && c.factor !== 'risk_penalty' && c.factor !== 'company_process_score')
+  // ats_coverage is left out: it counts a different keyword set from the requirement list below, and printed
+  // "100% of the job's keywords literally appear" directly above 7 requirements the résumé does not show
+  // (UX audit F4) — one list per screen, and its count is the one that is shown.
+  const metrics = (out.explanation.contributions || []).filter(c => c.scored !== false && c.factor !== 'risk_penalty' && c.factor !== 'company_process_score' && c.factor !== 'ats_coverage')
   return (
     <div style={{ animation: 'fadeUp .3s ease both' }}>
-      <Card><VerdictCard verdict={out.verdict} note={`${out.confidence_label} confidence · free`} /></Card>
+      {/* THE fit read: band, sentence, graded gates, every requirement with its state and your line (free) */}
+      <Card><FitRead data={out as unknown as FitData} note={`${out.confidence_label} confidence · free`} answers={answers} answerLines={answerLines} onAnswer={onAnswer} /></Card>
 
       {out.verdict.score != null && metrics.length > 0 && (
         <Card>
@@ -210,9 +223,6 @@ function FitView({ out, intel, jobCompany, insights }: { out: OptimizerOutput; i
         </Card>
       )}
 
-      {out.matched_requirements.length > 0 && <Card><WhyYouMatch matched={out.matched_requirements} limit={8} /></Card>}
-      {out.unsupported_requirements.length > 0 && <Card><MissingList missing={out.unsupported_requirements} limit={10} /></Card>}
-      {(out.constraints || []).some(c => c.status === 'ask') && <Card><Checklist constraints={out.constraints} /></Card>}
 
       <Card>
         {kicker('Company hiring risk')}
@@ -236,8 +246,8 @@ function FitView({ out, intel, jobCompany, insights }: { out: OptimizerOutput; i
           <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--accent)', lineHeight: 1.6 }}>
             Seen data on {jobCompany}: {Math.round((intel.ghost_rate || 0) * 100)}% ghost · {Math.round((intel.response_rate || 0) * 100)}% respond{intel.overall_score != null ? ` · grade ${Math.round(intel.overall_score)}/100` : ''}.
           </div>
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--good-text)' }}><Icon name="circle-check" size={14} /> No risk flags — clean signals for this role.</div>
+        ) : out.company_process_known === false ? null : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', fontSize: 'var(--fs-sm)', color: 'var(--good-text)' }}><Icon name="circle-check" size={14} /> No risk flags from applicant reports for this company.</div>
         )}
       </Card>
 
@@ -259,6 +269,31 @@ function FitView({ out, intel, jobCompany, insights }: { out: OptimizerOutput; i
 
 // ═══ REWRITE TAB — the PAID deliverables (plan, moves, questions, availability, summary, bullets) ═══
 function RewriteView({ out, copy, copied, onRerun, pro }: { out: PaidOptimize; copy: (t: string, k: string) => void; copied: string | null; onRerun?: () => void; pro?: boolean | null }) {
+  // the finished résumé (phase-B contract) when the answer carries it; the legacy plan otherwise
+  const x = out as PaidOptimize & { tailored?: Tailored | null; charge?: Charge | null; blocked?: Blocked | null; questions?: Question[]; charged?: boolean; balance?: number }
+  const tailored = !x.blocked && x.tailored && x.tailored.doc ? x.tailored : null
+  const { user: me } = useAuth()
+  const version = usePaidVersion(tailored, me?.id ? `${me.id}:resume:${tailored ? tailored.text?.length || 0 : 0}` : '')
+  if (x.blocked) return (
+    <div className="ai-stack" data-testid="resume-blocked">
+      <ResultTopLine charge={x.charge} charged={!!x.charged} cached={!!out.cached} pro={pro} balance={x.balance ?? null} cost={OPTIMIZE_PRICE} />
+      <BlockedResult b={x.blocked} jobsHref="/jobs" note={(x as { questions_note?: string | null }).questions_note || null} />
+    </div>
+  )
+  if (tailored) return (
+    <div className="ai-stack" data-testid="resume-version">
+      <ResultTopLine charge={x.charge || tailored.charge} charged={!!x.charged} cached={!!out.cached} pro={pro} balance={x.balance ?? null} cost={OPTIMIZE_PRICE} vis={tailored.visibility || null} />
+      <PaidResult t={tailored} questions={(x.questions || []) as Question[]} v={version} alreadyRight={(x as { already_right?: AlreadyRight | null }).already_right || null} />
+      <DownloadVersion doc={version.doc} paid={tailored} />
+      {out.application_message && (
+        <details>
+          <summary style={{ minHeight: 44, display: 'flex', alignItems: 'center', cursor: 'pointer', color: 'var(--accent)', fontWeight: 600, fontSize: 'var(--fs-sm)' }}>Message to the employer</summary>
+          <p style={{ fontSize: 'var(--fs-body)', color: 'var(--text-2)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{out.application_message}</p>
+          <button type="button" className="ui-btn ui-btn--secondary" onClick={() => copy(out.application_message || '', 'msg')}>{copied === 'msg' ? 'Copied' : 'Copy message'}</button>
+        </details>
+      )}
+    </div>
+  )
   const real = realBulletsOf(out)
   const guidance = (out.optimized_bullets || []).filter(b => isGuidance(b.original) || isGuidance(b.optimized))
   return (
@@ -426,6 +461,8 @@ function ResumePageInner() {
   const [jobCompany, setJobCompany] = useState(params?.get('company') ?? '')
   const [jobJD, setJobJD] = useState('')
   const [jobUrl, setJobUrl] = useState('')
+  // what the parser could not place in this résumé — said on screen, never silent (parse engineer hand-off)
+  const resumeDoc = useMemo(() => { try { return resumeText.trim().length >= 40 ? parseResumeText(resumeText) : null } catch { return null } }, [resumeText])
   const [background, setBackground] = useState('')
   const [companyIntel, setCompanyIntel] = useState<CompanyIntel | null>(null)
 
@@ -436,6 +473,8 @@ function ResumePageInner() {
   const [analyzed, setAnalyzed] = useState(false)
   const [tab, setTab] = useState<Tab>('fit')
   const [error, setError] = useState('')
+  // an expired session on any tool call: say so with a sign-in link back here — never the paywall (UX audit F2)
+  const [signinNeeded, setSigninNeeded] = useState(false)
   // A guest pressed a credit button: offer the free account in place of a red "Sign in" error (the Ray
   // persona read the old banner as a dead end — no sign-up link, no word about the free credits).
   const [guestGate, setGuestGate] = useState('')
@@ -654,7 +693,9 @@ function ResumePageInner() {
     if (savedId) return savedId
     const slug = (s: string) => encodeURIComponent(String(s || '').toLowerCase().trim().replace(/\s+/g, '-')).slice(0, 60)
     return `manual-${slug(jobCompany)}-${slug(jobTitle)}` || 'manual'
-  }
+  }  // per user and job (swept on sign-out); keyed like the jobId every optimize call sends
+  const confirm = useConfirmations(user?.id, jobIdFor())
+
 
   async function uploadFile(file: File) {
     try {
@@ -707,8 +748,22 @@ function ResumePageInner() {
 
   // What every optimize call sends about the posting (the source lets the server tell an Adzuna
   // teaser from a posting; an edited description is the person's own pasted posting).
-  function postingBody() {
-    return jobSource ? { jobDescription: jobJD, jobSource, jobId: jobIdFor() } : { jobDescription: jobJD, postingPasted: !!jobJD.trim(), jobId: jobIdFor() }
+  function postingBody(conf: Confirmed[] = confirm.confirmed) {
+    // the person's Yes / No answers ride with every call, the way the Optimize sheet sends them (x-integration "Confirmations")
+    const c = conf.length ? { confirmed: conf } : {}
+    return jobSource ? { jobDescription: jobJD, jobSource, jobId: jobIdFor(), ...c } : { jobDescription: jobJD, postingPasted: !!jobJD.trim(), jobId: jobIdFor(), ...c }
+  }
+
+  // An answer is sent and the free check re-asked IN PLACE: no loading state, no scroll jump; the rows show what the
+  // server sends back (a changed statement comes back `by: 'you'` and reads "You said …").
+  async function answerAndReask(id: string, a: Answer | null, line?: string) {
+    const next = confirm.answer(id, a, line)
+    if (a === 'skip') return
+    try {
+      const res = await fetch('/api/optimizer', { method: 'POST', headers: await aiHeaders(), body: JSON.stringify({ action: 'optimize', resumeText, jobTitle, company: jobCompany, ...postingBody(next), remoteOk: /remote/i.test(jobJD) }) })
+      const data = await res.json().catch(() => null)
+      if (res.ok && data && !data.error) setFitOut(data as OptimizerOutput)
+    } catch { /* the rows keep the last answer the server gave */ }
   }
 
   // FREE: the diagnosis — the one verdict, matched/missing, the checklist.
@@ -721,6 +776,7 @@ function ResumePageInner() {
       })
       if (res.status === 403) { setFitState('disabled'); return false }
       const data = await res.json().catch(() => ({}))
+      if (needsSignIn(res.status, data)) { setSigninNeeded(true); setFitState('idle'); return false }
       if (res.status === 422 && data.error === 'preview_only') { setPreviewLink(httpHref((data as { apply_url?: string | null }).apply_url) || ''); setFitState('preview'); setShowManual(true); return false }
       if (!res.ok || data.error) { setFitErrRef(data?.ref || ''); setFitState('error'); return false }
       setFitOut(data as OptimizerOutput); setFitState('done')
@@ -734,6 +790,7 @@ function ResumePageInner() {
     try {
       const res = await fetch('/api/resume', { method: 'POST', headers: await aiHeaders(), body: JSON.stringify({ tool: 'optimize', probe: true, resume: resumeText, job: jobTitle, company: jobCompany, ...postingBody() }) })
       const data = await res.json().catch(() => ({})) as PaidOptimize & { error?: string; message?: string }
+      if (needsSignIn(res.status, data)) { setSigninNeeded(true); setPaidState('idle'); return }
       if (data.error === 'preview_only') { setPaidState('preview'); return }
       if (data.error === 'no_requirements') { setPaidNote(data.message || ''); setPaidState('no_requirements'); return }
       if (res.ok && data.cached) { setPaid(data); setPaidState('done'); return }
@@ -752,7 +809,8 @@ function ResumePageInner() {
     try {
       const res = await fetch('/api/resume', { method: 'POST', headers: await aiHeaders(), body: JSON.stringify({ tool: 'optimize', resume: resumeText, job: jobTitle, company: jobCompany, ...postingBody(), ...(fresh ? { fresh: true } : {}) }) })
       const data = await res.json().catch(() => ({})) as PaidOptimize & { error?: string; message?: string; credits_required?: boolean; pro_required?: boolean }
-      if (res.status === 402 || data.credits_required) { setUpgradeReason('credits'); setUpgradeFeature(undefined); setShowUpgrade(true); setPaidState('idle'); return }
+      if (needsSignIn(res.status, data)) { setSigninNeeded(true); setPaidState('idle'); return }
+      if (outOfCredits(res.status, data)) { setUpgradeReason('credits'); setUpgradeFeature(undefined); setShowUpgrade(true); setPaidState('idle'); return }
       if (data.error === 'preview_only') { setPaidState('preview'); return }
       if (data.error === 'no_requirements') { setPaidNote(data.message || ''); setPaidState('no_requirements'); return }
       if (!res.ok || data.error) { setPaidState('error'); return }
@@ -797,6 +855,7 @@ function ResumePageInner() {
       })
       if (res.status === 403) { setHpState('error'); return }
       const data = await res.json().catch(() => ({}))
+      if (needsSignIn(res.status, data)) { setSigninNeeded(true); setHpState('idle'); return }
       if ((res.status === 402 || data.locked) && (data.pro_required || data.credits_required)) { setHpState('locked'); return }
       if (!res.ok || data.error || !data.package) { setHpState('error'); return }
       window.dispatchEvent(new Event('seen:credits-updated'))
@@ -817,6 +876,7 @@ function ResumePageInner() {
       const data = await res.json().catch(() => ({})) as { credits_required?: boolean; error?: string; message?: string } & CombinedResult
       // a posting that states no requirements: nothing to build on, nothing charged
       if (res.status === 422 && data.error === 'no_requirements') { setError(data.message || "This listing doesn't state what it requires — no credit used."); setAdvState('idle'); return }
+      if (isLoggedIn && needsSignIn(res.status, data)) { setSigninNeeded(true); setAdvState('idle'); return }
       if (data.credits_required) {
         if (isLoggedIn) { setUpgradeReason('credits'); setUpgradeFeature(undefined); setShowUpgrade(true); setAdvState('idle') }
         else { setGuestGate('your application strategy'); setAdvState('idle') }
@@ -867,7 +927,8 @@ function ResumePageInner() {
         // Signed-out callers send no token and get the free-tier "seenjobs.io" footer.
         method: 'POST', headers: await aiHeaders(),
         body: JSON.stringify({
-          action: 'download_resume', resume: resumeText, job: jobTitle, company: jobCompany, jobDescription: jobJD, template: pdfTemplate,
+          // no job title is sent: the PDF never prints a title the person did not hold under their name (UX audit F1)
+          action: 'download_resume', resume: resumeText, template: pdfTemplate,
           // the résumé only — Seen's optimizer notes (fit score, bullets to review, details to
           // confirm) stay on screen and in the email body, never in the PDF a recruiter gets
         }),
@@ -877,7 +938,8 @@ function ResumePageInner() {
       const cleanName = (resumeText.split(/\r?\n/).map(l => l.trim()).find(Boolean) || '').replace(/[^\w .'-]/g, '').trim()
       const cleanRole = jobTitle.replace(/[^\w .,'/&-]/g, '').trim()
       const looksLikeName = /^[A-Z][\w.'-]*(\s+[A-Z][\w.'-]*){1,3}$/.test(cleanName)
-      const fileName = looksLikeName && cleanRole ? `${cleanName} — ${cleanRole} Resume.pdf` : looksLikeName ? `${cleanName} — Resume.pdf` : cleanRole ? `${cleanRole} Resume.pdf` : 'Seen Resume.pdf'
+      void cleanRole
+      const fileName = looksLikeName ? `${cleanName} — Resume.pdf` : 'Resume.pdf'
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a'); a.href = url; a.download = fileName; document.body.appendChild(a); a.click(); a.remove()
       setTimeout(() => URL.revokeObjectURL(url), 10000)
@@ -964,6 +1026,9 @@ function ResumePageInner() {
           </div>
         )}
 
+        {signinNeeded && (
+          <p className={rs.signin} role="alert" data-testid="resume-signin"><Icon name="lock" size={16} /><span>{SIGNIN_EXPIRED_TEXT} <a href={signInHereHref()}>Sign in again</a></span></p>
+        )}
         {error && (
           <div style={{ background: 'var(--rdim)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '.75rem 1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-72)', color: 'var(--red)', marginBottom: '1rem', overflowWrap: 'anywhere' }}>{error}</div>
         )}
@@ -994,6 +1059,7 @@ function ResumePageInner() {
           {/* Left: inputs */}
           <div>
             <ResumePicker list={resumeList} selectedId={resumeId} onPick={r => { void pickResume(r) }} disabled={fitState === 'loading'} note={analyzed ? 'Switching re-checks your fit · free' : undefined} />
+            {resumeDoc && <div style={{ margin: '.5rem 0' }}><ParseNotice doc={resumeDoc} /></div>}
             <ResumeInput resumeText={resumeText} setResumeText={setResumeText} resumeMeta={resumeMeta} onUpload={handleUpload} onFileDrop={uploadFile} onClear={() => { void clearResume() }} managed={pickerMode(resumeList) === 'select'} />
 
             <div style={{ marginTop: '1rem' }}>
@@ -1007,37 +1073,29 @@ function ResumePageInner() {
                 <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--muted)', marginBottom: '.5rem', lineHeight: 1.6 }}>No saved jobs yet — save jobs from search, or enter the details below.</div>
               )}
 
-              {savedId && !showManual && (
-                <div style={{ background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', borderRadius: 8, padding: '.5rem .75rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-66)', color: 'var(--text-1)', marginBottom: '.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.5rem' }}>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{jobTitle}{jobCompany ? ' · ' + jobCompany : ''}</span>
-                  <button onClick={() => setShowManual(true)} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', cursor: 'pointer', textDecoration: 'underline', flexShrink: 0, minHeight: 44 }}>edit</button>
-                </div>
-              )}
-
               {companyIntel && (
-                <div style={{ background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 8, padding: '.5rem .75rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', color: 'var(--accent)', marginBottom: '.5rem', lineHeight: 1.6, overflowWrap: 'anywhere' }}>
+                <div style={{ background: 'var(--info-tint)', border: '1px solid var(--info-line)', borderRadius: 'var(--r-control)', padding: '.5rem .75rem', fontSize: 'var(--fs-sm)', color: 'var(--text-2)', marginBottom: '.5rem', lineHeight: 1.6, overflowWrap: 'anywhere' }}>
                   Seen data on {jobCompany}: {Math.round((companyIntel.ghost_rate || 0) * 100)}% ghost · {Math.round((companyIntel.response_rate || 0) * 100)}% respond{companyIntel.overall_score != null ? ` · grade ${Math.round(companyIntel.overall_score)}/100` : ''}.
                 </div>
               )}
 
-              <button onClick={() => setShowManual(v => !v)} style={{ background: 'none', border: '1px solid var(--line2)', color: 'var(--dim)', borderRadius: 6, padding: '.5rem .75rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', cursor: 'pointer', marginBottom: (showManual || savedJobs.length === 0) ? '.75rem' : '1rem' }}>
-                {showManual ? <><Icon name="arrow-up" size={14} /> Hide manual entry</> : <><Icon name="pencil" size={14} /> Enter job info manually</>}
-              </button>
-
-              {(showManual || savedJobs.length === 0) && (
+              {/* ONE box for the posting — its link or its text (UX audit F8). The old separate "Job URL" field was
+                  never read for the posting; a link pasted here is. */}
+              <PostingInput value={jobJD} onChange={t => { setJobJD(t); setJobSource(null); setJobUrl(isPostingLink(t) ? t.trim() : ''); if (savedId) setSavedId('') }} testId="resume-posting" rows={4} />
+              <div className={rs.jobFields}>
                 <div>
-                  {label('Job title')}
-                  <input autoComplete="off" type="text" placeholder="e.g. Cashier" value={jobTitle} onChange={e => setJobTitle(e.target.value)} style={inputStyle} />
-                  {label('Company')}
-                  <input autoComplete="off" type="text" placeholder="e.g. Target" value={jobCompany} onChange={e => setJobCompany(e.target.value)} onBlur={() => fetchIntel(jobCompany)} style={inputStyle} />
-                  {label('Job URL (optional)')}
-                  <input autoComplete="off" type="url" placeholder="https://…" value={jobUrl} onChange={e => setJobUrl(e.target.value)} style={inputStyle} />
-                  {label('Job description')}
-                  <textarea autoComplete="off" placeholder="Paste the job description, or its link..." value={jobJD} onChange={e => { setJobJD(e.target.value); setJobSource(null) }} rows={4} style={{ ...areaStyle, marginBottom: '.75rem' }} />
-                  {label('Your background (for Strategy) — optional')}
-                  <textarea autoComplete="off" placeholder="What draws you to this role? Any unique experience?" value={background} onChange={e => setBackground(e.target.value)} rows={3} style={{ ...areaStyle, marginBottom: '.75rem' }} />
+                  <label className={rs.fieldLabel} htmlFor="rs-title">Job title</label>
+                  <input id="rs-title" className={rs.field} autoComplete="off" type="text" placeholder="e.g. Cashier" value={jobTitle} onChange={e => setJobTitle(e.target.value)} />
                 </div>
-              )}
+                <div>
+                  <label className={rs.fieldLabel} htmlFor="rs-company">Employer</label>
+                  <input id="rs-company" className={rs.field} autoComplete="off" type="text" placeholder="e.g. Target" value={jobCompany} onChange={e => setJobCompany(e.target.value)} onBlur={() => fetchIntel(jobCompany)} />
+                </div>
+              </div>
+              <details style={{ margin: '.75rem 0' }}>
+                <summary style={{ minHeight: 44, display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--accent)' }}>Your background, for Strategy (optional)</summary>
+                <textarea autoComplete="off" placeholder="What draws you to this role? Any unique experience?" value={background} onChange={e => setBackground(e.target.value)} rows={3} style={{ ...areaStyle, marginBottom: '.75rem' }} />
+              </details>
 
               <button style={{ ...btnPrimary, opacity: fitState === 'loading' ? 0.6 : 1, cursor: fitState === 'loading' ? 'not-allowed' : 'pointer' }} onClick={analyze} disabled={fitState === 'loading'}>
                 {fitState === 'loading' ? 'Analyzing…' : analyzed ? 'Re-analyze →' : 'Analyze my application →'}
@@ -1063,6 +1121,14 @@ function ResumePageInner() {
               </>
             ) : (
               <>
+                {fitState === 'done' && fitOut && (
+                  <div className={rs.readWrap}>
+                    {/* what Seen read, before any score (UX audit F8) — the title and employer it scored under are the fields above */}
+                    <PostingReadRow read={savedId || !jobJD.trim()
+                      ? { title: jobTitle, company: jobCompany, source: savedId ? 'from your saved listing' : 'the job title only — no posting text', requirements: requirementCounts({ matched: fitOut.matched_requirements, missing: fitOut.unsupported_requirements }).total }
+                      : readFacts({ pasted: jobJD, server: isPostingLink(jobJD) ? { title: jobTitle, company: jobCompany } : null, job: { title: jobTitle, company: jobCompany }, requirements: (() => { const rc = (fitOut as { requirement_count?: number }).requirement_count ?? fitOut.verdict?.requirement_count; return typeof rc === 'number' ? rc : null })() })} />
+                  </div>
+                )}
                 <div className={`ai-tabs ${rs.tabs}`} role="tablist">
                   {tabs.map(t => (
                     <button key={t.id} role="tab" aria-selected={tab === t.id} className={`ai-tab${tab === t.id ? ' active' : ''}`} onClick={() => { selectTab(t.id); setError('') }}>{t.label}</button>
@@ -1075,7 +1141,7 @@ function ResumePageInner() {
                   : fitState === 'disabled' ? <ResultEmpty icon="circle-slash" text={'SeenFit is temporarily unavailable.'} />
                   : fitState === 'error' ? <div><ResultEmpty icon="triangle-alert" text={'Could not score your fit. Try again.'} />{fitErrRef && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', color: 'var(--dim)', marginTop: '.25rem' }}>Error ref: {fitErrRef} — share this if it keeps happening.</div>}<button onClick={() => runFit()} style={{ ...btnPrimary, marginTop: '.5rem' }}>Retry</button></div>
                   : fitState === 'preview' ? <ResultEmpty icon="file-text" text={previewLink ? 'Seen could only read a summary of this listing, and its page would not open from here. Open the listing, copy the posting, and paste it into the job description box.' : 'This listing only has a summary. Paste the full posting into the job description box to optimize for it.'} link={previewLink ? { href: previewLink, label: 'Open the listing ↗' } : undefined} />
-                  : fitOut ? <FitView out={fitOut} intel={companyIntel} jobCompany={jobCompany} insights={insights} /> : null
+                  : fitOut ? <FitView out={fitOut} intel={companyIntel} jobCompany={jobCompany} insights={insights} answers={confirm.answers} answerLines={confirm.lines} onAnswer={(id, a, line) => { void answerAndReask(id, a, line) }} /> : null
                 )}
 
                 {/* REWRITE — the paid plan (a strict superset of the free Fit tab) */}
