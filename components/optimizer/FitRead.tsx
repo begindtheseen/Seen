@@ -214,14 +214,16 @@ export default function FitRead({ data, note, compact = false, brief = false, an
   for (const r of asks) { panelIds.current.add(r.id); if (!panelOrder.current.has(r.id)) panelOrder.current.set(r.id, panelOrder.current.size) }
   const answered = asks.filter((r) => answers?.[r.id]).length
   const rowOfGate = (g: (typeof gates)[number]) => (g.statementId ? (allRows.find((r) => r.id === g.statementId) || null) : null)
-  const gateList = (list: typeof gates) => list.length > 0 && (
+  // the claim control sits on a gate only on the first screen, where the gate stands in for its statement row; under
+  // "Show all" the statement's own row carries it (one control per statement)
+  const gateList = (list: typeof gates, withClaim = false) => list.length > 0 && (
     <div className={s.group} data-group="gates">
       <p className={s.gHead}><span className={s.gLabel}>What they count</span></p>
       <ul className={s.denseList}>
         {list.map((g, i) => {
           const gr = rowOfGate(g)
           const sid = g.statementId || ''
-          const canClaim = !!gr && !!gr.claim && !!answerWithAnchor && !answers?.[sid]
+          const canClaim = withClaim && !!gr && !!gr.claim && !!answerWithAnchor && !answers?.[sid]
           return (
             <li key={i} className={s.dense} data-state={g.state} data-testid="fit-gate" data-id={sid || undefined}>
               <p className={s.gateText}><StateMark state={(g.claimed ? 'said' : g.state) as State} />{' '}{g.label ? <><span className={s.gateLabel}>{g.label}</span> — </> : null}{g.text}{g.caps ? <span className={s.tag}> · this decides the application</span> : null}</p>
@@ -271,7 +273,7 @@ export default function FitRead({ data, note, compact = false, brief = false, an
   const topShown = nsIds ? [...top.filter((r) => !nsIds.includes(r.id)), ...(nsOpen ? top.filter((r) => nsIds.includes(r.id)) : [])] : top
   const lead = (
     <>
-      {(open ? gates.length > 0 : leadGates.length > 0) && (<div ref={(el) => { if (el && !answeredAny) blockHeights.current.set('gates', el.offsetHeight) }} style={answeredAny && blockHeights.current.get('gates') ? { minHeight: blockHeights.current.get('gates') } : undefined}>{open ? gatesBlock : gateList(leadGates)}</div>)}
+      {(open ? gates.length > 0 : leadGates.length > 0) && (<div ref={(el) => { if (el && !answeredAny) blockHeights.current.set('gates', el.offsetHeight) }} style={answeredAny && blockHeights.current.get('gates') ? { minHeight: blockHeights.current.get('gates') } : undefined}>{open ? gatesBlock : gateList(leadGates, true)}</div>)}
       {model && top.length > 0 && !open && (
         <div className={s.group} data-group="top">
           <p className={s.gHead}><span className={s.gLabel}>What matters most</span></p>
