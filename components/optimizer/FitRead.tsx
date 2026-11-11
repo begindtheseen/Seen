@@ -68,7 +68,7 @@ function StatementRow({ r, answer, answerLine, onAnswer, quoted, dense = false, 
   // until then a Yes leaves the question standing (the screen never claims what the server did not accept). A No on a
   // close line takes the question away: the row is then a plain "not on your résumé".
   // on the first screen (dense) the close-line question is asked in the questions panel below, not inline
-  const askCandidate = !!r.candidate && !r.byYou && answer !== 'no' && !dense
+  const askCandidate = !!r.candidate && !r.byYou && answer !== 'no' && answer !== 'settle' && answer !== 'claim' && !dense
   // "I've done this" on a line the reading calls not shown or partly — never a years ask, never a line already answered
   const canClaim = !!r.claim && !!onAnswer && !answer && !noClaim
   // "That's right" (the partial reading is right) only where the close-line question already shows
@@ -79,7 +79,7 @@ function StatementRow({ r, answer, answerLine, onAnswer, quoted, dense = false, 
       {!dense && <StateMark state={mark} />}
       <p className={s.text}>{dense && <><StateMark state={mark} />{' '}</>}{r.state === 'ask' ? r.question : r.text}{r.preferred && r.state !== 'ask' ? <span className={s.tag}> · preferred</span> : null}</p>
       {r.byYou && !saidBelow && (
-        <p className={s.said} data-testid="fit-said">
+        <p className={s.said} data-testid="fit-said" data-landing>
           <span>{r.claimed ? (r.claimWhy || CLAIM_FALLBACK) : r.state === 'not_shown' ? `You said no to: “${r.text}”` : (answerLine || r.candidate?.line) ? `You said “${clip(answerLine || r.candidate?.line || '', 160)}” shows it.` : `You said yes to: “${r.text}”`}</span>
           {onAnswer && <button type="button" className={s.change} onClick={() => onAnswer(r.id, null)}>Change</button>}
         </p>
@@ -91,27 +91,27 @@ function StatementRow({ r, answer, answerLine, onAnswer, quoted, dense = false, 
         : r.missing.map((m, i) => <p key={i} className={s.note}>{m}</p>))}
       {r.state === 'partly' && !r.missing.length && <p className={s.note}>{partlySentence(r)}</p>}
       {askCandidate && (
-        <div className={s.candidate} data-testid="fit-candidate">
+        <div className={s.candidate} data-testid="fit-candidate" data-landing>
           <p className={dense ? `${s.quote} ${s.clamp}` : s.quote}>Closest line we found: “{clip(r.candidate!.line, 200)}”{onAnswer ? '. Does this show it?' : '.'}</p>
           {r.candidate!.why && !dense && <p className={s.note}>{r.candidate!.why}</p>}
           {onAnswer && <YesNo onYes={() => onAnswer(r.id, 'yes', r.candidate!.line)} onNo={() => onAnswer(r.id, 'no', r.candidate!.line)} />}
         </div>
       )}
       {canClaim && (
-        <div className={s.claimRow}>
+        <div className={s.claimRow} data-landing>
           <ClaimButton word={r.claim!} onClick={() => onAnswer!(r.id, 'claim')} />
           {canSettle && <button type="button" className={s.claim} onClick={() => onAnswer!(r.id, 'settle')} data-testid="fit-settle">That&apos;s right</button>}
         </div>
       )}
       {r.settled && !r.byYou && (
-        <p className={s.said} data-testid="fit-settled"><span>You said that&apos;s right — your résumé shows part of this.</span>{onAnswer && <button type="button" className={s.change} onClick={() => onAnswer(r.id, null)}>Change</button>}</p>
+        <p className={s.said} data-testid="fit-settled" data-landing><span>You said that&apos;s right — your résumé shows part of this.</span>{onAnswer && <button type="button" className={s.change} onClick={() => onAnswer(r.id, null)}>Change</button>}</p>
       )}
       {!r.byYou && answer === 'no' && (r.candidate || answerLine) && (
-        <p className={s.note} data-testid="fit-candidate-no">Not on your résumé — you said “{clip((r.candidate?.line || answerLine || ''), 80)}” does not show it.{onAnswer && <> <button type="button" className={s.change} onClick={() => onAnswer(r.id, null)}>Change</button></>}</p>
+        <p className={s.note} data-testid="fit-candidate-no" data-landing>Not on your résumé — you said “{clip((r.candidate?.line || answerLine || ''), 80)}” does not show it.{onAnswer && <> <button type="button" className={s.change} onClick={() => onAnswer(r.id, null)}>Change</button></>}</p>
       )}
       {r.state === 'ask' && !r.byYou && onAnswer && (answer === 'skip'
-        ? <p className={s.said}><span>You skipped this one</span><button type="button" className={s.change} onClick={() => onAnswer(r.id, null)}>Change</button></p>
-        : <YesNo onYes={() => onAnswer(r.id, 'yes')} onNo={() => onAnswer(r.id, 'no')} onSkip={() => onAnswer(r.id, 'skip')} />)}
+        ? <p className={s.said} data-landing><span>You skipped this one</span><button type="button" className={s.change} onClick={() => onAnswer(r.id, null)}>Change</button></p>
+        : <div data-landing><YesNo onYes={() => onAnswer(r.id, 'yes')} onNo={() => onAnswer(r.id, 'no')} onSkip={() => onAnswer(r.id, 'skip')} /></div>)}
     </li>
   )
 }
@@ -136,7 +136,7 @@ function Group({ g, answers, answerLines, onAnswer }: { g: { key: string; rows: 
  * @param brief   blocked: band only (the blocked card says why)
  * @param answers / onAnswer  the person's Yes / No / Skip on what only they can say (kept by the caller)
  */
-export default function FitRead({ data, note, compact = false, brief = false, answers, answerLines, onAnswer, paste }: { data: FitData; note?: string; compact?: boolean; brief?: boolean; answers?: Answers; answerLines?: Record<string, string>; onAnswer?: OnAnswer; paste?: ReactNode }) {
+export default function FitRead({ data, note, compact = false, brief = false, answers, answerLines, onAnswer, paste, budget }: { data: FitData; note?: string; compact?: boolean; brief?: boolean; answers?: Answers; answerLines?: Record<string, string>; onAnswer?: OnAnswer; paste?: ReactNode; budget?: number }) {
   const [open, setOpen] = useState(false)
   const [asking, setAsking] = useState(false)
   // every row that has been in the questions panel stays there for this visit — answered or not — so an answer never
@@ -153,24 +153,51 @@ export default function FitRead({ data, note, compact = false, brief = false, an
   const blockHeights = useRef<Map<string, number>>(new Map())
   // scroll anchor: the row the person just answered stays exactly where their finger was, whatever the server re-words
   // above it (the verdict sentence can grow) — measured before the answer, corrected right after the new reading paints
-  const anchor = useRef<{ id: string; top: number } | null>(null)
+  // Round 7: the anchor is the CONTROL the person tapped — what replaces it in the row (the "You said …" line with Change,
+  // or the buttons again after Change; every such block is marked `data-landing`) lands where their finger was
+  const anchor = useRef<{ id: string; top: number; control: boolean } | null>(null)
+  const tapTop = useRef<number | null>(null)
+  // `budget` (screens of the scroll it sits in): when the first list would push what follows past it, the not-shown rows
+  // fold into one "Show all N" line — decided once, before any answer, from the rendered height (nothing is removed:
+  // opened, they appear in place of the line, below what is already on screen)
+  const [nsIds, setNsIds] = useState<string[] | null>(null)
+  const [nsOpen, setNsOpen] = useState(false)
+  const budgetDecided = useRef(false)
   const sectionRef = useRef<HTMLElement | null>(null)
+  const rowEl = (id: string) => sectionRef.current?.querySelector(`[data-testid=fit-row][data-id="${CSS.escape(id)}"][data-panel="1"]`) || sectionRef.current?.querySelector(`:is([data-testid=fit-row],[data-testid=fit-gate])[data-id="${CSS.escape(id)}"]`) || null
   const answerWithAnchor: OnAnswer | undefined = onAnswer ? (id, a, line) => {
-    const el = sectionRef.current?.querySelector(`[data-testid=fit-row][data-id="${CSS.escape(id)}"][data-panel="1"]`) || sectionRef.current?.querySelector(`:is([data-testid=fit-row],[data-testid=fit-gate])[data-id="${CSS.escape(id)}"]`)
-    if (el) anchor.current = { id, top: el.getBoundingClientRect().top }
+    const el = rowEl(id)
+    if (tapTop.current != null) anchor.current = { id, top: tapTop.current, control: true }
+    else if (el) anchor.current = { id, top: el.getBoundingClientRect().top, control: false }
+    tapTop.current = null
     onAnswer(id, a, line)
   } : undefined
   useLayoutEffect(() => {
     const a = anchor.current
     if (!a || !sectionRef.current) return
-    const el = sectionRef.current.querySelector(`[data-testid=fit-row][data-id="${CSS.escape(a.id)}"][data-panel="1"]`) || sectionRef.current.querySelector(`:is([data-testid=fit-row],[data-testid=fit-gate])[data-id="${CSS.escape(a.id)}"]`)
+    const el = rowEl(a.id)
     if (!el) return
-    const delta = el.getBoundingClientRect().top - a.top
+    // until the server's answer paints, the row may hold no landing block yet: wait for it rather than guess
+    const target = a.control ? el.querySelector('[data-landing]') : el
+    if (!target) return
+    const delta = target.getBoundingClientRect().top - a.top
     if (Math.abs(delta) < 1) return
     let sc: HTMLElement | null = el.parentElement
     while (sc && !/(auto|scroll)/.test(getComputedStyle(sc).overflowY)) sc = sc.parentElement
     if (sc) sc.scrollTop += delta; else window.scrollBy(0, delta)
-  }, [data])
+  }, [data, answers]) // eslint-disable-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => {
+    if (!budget || compact || brief || budgetDecided.current || !sectionRef.current) return
+    if (Object.keys(answers || {}).length) { budgetDecided.current = true; return }
+    const ids = [...sectionRef.current.querySelectorAll('[data-group="top"] [data-testid=fit-row][data-state="not_shown"]')].map((e) => e.getAttribute('data-id') || '').filter(Boolean)
+    if (!ids.length) return
+    budgetDecided.current = true
+    let sc: HTMLElement | null = sectionRef.current.parentElement
+    while (sc && !/(auto|scroll)/.test(getComputedStyle(sc).overflowY)) sc = sc.parentElement
+    const h = sc ? sc.clientHeight : window.innerHeight
+    const bottom = sc ? sectionRef.current.getBoundingClientRect().bottom - sc.getBoundingClientRect().top + sc.scrollTop : sectionRef.current.getBoundingClientRect().bottom + window.scrollY
+    if (bottom > budget * h && ids.length >= 2) setNsIds(ids)
+  }, [data]) // eslint-disable-line react-hooks/exhaustive-deps
   const v = data.verdict || null
   const diff = differentField(data.field_match || null)
   const model = fitGroups(data)
@@ -198,8 +225,8 @@ export default function FitRead({ data, note, compact = false, brief = false, an
           return (
             <li key={i} className={s.dense} data-state={g.state} data-testid="fit-gate" data-id={sid || undefined}>
               <p className={s.gateText}><StateMark state={(g.claimed ? 'said' : g.state) as State} />{' '}{g.label ? <><span className={s.gateLabel}>{g.label}</span> — </> : null}{g.text}{g.caps ? <span className={s.tag}> · this decides the application</span> : null}</p>
-              {canClaim && <div className={s.claimRow}><ClaimButton word={gr!.claim!} onClick={() => answerWithAnchor!(sid, 'claim')} /></div>}
-              {g.claimed && answerWithAnchor && sid && answers?.[sid] === 'claim' && <p className={s.said}><span /><button type="button" className={s.change} onClick={() => answerWithAnchor(sid, null)} data-testid="fit-gate-change">Change</button></p>}
+              {canClaim && <div className={s.claimRow} data-landing><ClaimButton word={gr!.claim!} onClick={() => answerWithAnchor!(sid, 'claim')} /></div>}
+              {g.claimed && answerWithAnchor && sid && answers?.[sid] === 'claim' && <p className={s.said} data-landing><span /><button type="button" className={s.change} onClick={() => answerWithAnchor(sid, null)} data-testid="fit-gate-change">Change</button></p>}
             </li>
           )
         })}
@@ -240,13 +267,22 @@ export default function FitRead({ data, note, compact = false, brief = false, an
   const byIdRow = new Map(allRows.map((r) => [r.id, r]))
   const top = answeredAny ? frozenTop.current.map((id) => byIdRow.get(id)).filter((r): r is Row => !!r) : computedTop
   const quoted = new Set<string>()
+  const folded = nsIds && !nsOpen ? top.filter((r) => nsIds.includes(r.id)) : []
+  const topShown = nsIds ? [...top.filter((r) => !nsIds.includes(r.id)), ...(nsOpen ? top.filter((r) => nsIds.includes(r.id)) : [])] : top
   const lead = (
     <>
       {(open ? gates.length > 0 : leadGates.length > 0) && (<div ref={(el) => { if (el && !answeredAny) blockHeights.current.set('gates', el.offsetHeight) }} style={answeredAny && blockHeights.current.get('gates') ? { minHeight: blockHeights.current.get('gates') } : undefined}>{open ? gatesBlock : gateList(leadGates)}</div>)}
       {model && top.length > 0 && !open && (
         <div className={s.group} data-group="top">
           <p className={s.gHead}><span className={s.gLabel}>What matters most</span></p>
-          <ul className={s.denseList}>{top.map((r) => <StatementRow key={r.id} r={r} quoted={quoted} dense noClaim={panelIds.current.has(r.id)} answer={answers?.[r.id]} answerLine={answerLines?.[r.id]} onAnswer={answerWithAnchor} saidBelow={asking && panelIds.current.has(r.id)} rowRef={(el) => { if (el && !answeredAny) rowHeights.current.set(r.id, el.offsetHeight) }} minH={answeredAny ? rowHeights.current.get(r.id) : undefined} />)}</ul>
+          <ul className={s.denseList}>
+            {topShown.map((r) => <StatementRow key={r.id} r={r} quoted={quoted} dense noClaim={panelIds.current.has(r.id)} answer={answers?.[r.id]} answerLine={answerLines?.[r.id]} onAnswer={answerWithAnchor} saidBelow={asking && panelIds.current.has(r.id)} rowRef={(el) => { if (el && !answeredAny && !nsIds) rowHeights.current.set(r.id, el.offsetHeight) }} minH={answeredAny ? rowHeights.current.get(r.id) : undefined} />)}
+            {folded.length > 0 && (
+              <li className={s.dense} data-testid="fit-folded">
+                <button type="button" className={s.more} onClick={() => setNsOpen(true)}>{folded.length} more not on your résumé — Show all {folded.length}</button>
+              </li>
+            )}
+          </ul>
         </div>
       )}
       {model && asks.length > 0 && !open && onAnswer && (
@@ -269,7 +305,8 @@ export default function FitRead({ data, note, compact = false, brief = false, an
     </>
   )
   return (
-    <section ref={sectionRef} className={s.fit} data-testid="fit-read" aria-label="Your fit for this job">
+    <section ref={sectionRef} className={s.fit} data-testid="fit-read" aria-label="Your fit for this job"
+      onClickCapture={(e) => { const b = (e.target as HTMLElement).closest('button'); tapTop.current = b && b.closest('[data-testid=fit-row],[data-testid=fit-gate]') ? b.getBoundingClientRect().top : null }}>
       <div className={s.head} ref={(el) => { if (el && !answeredAny) blockHeights.current.set('head', el.offsetHeight) }} style={answeredAny && blockHeights.current.get('head') ? { minHeight: blockHeights.current.get('head') } : undefined}>
         {v?.gate && !diff && !brief && <p className={s.gate}><Icon name="triangle-alert" size={16} label="Gate" /><span>{v.gate}</span></p>}
         <p className={s.band}>

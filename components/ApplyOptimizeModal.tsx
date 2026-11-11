@@ -630,7 +630,7 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
                 : <>
                     {diag
                       ? <>
-                          <FitRead data={diag} note="free" answers={answers} answerLines={stored.lines} onAnswer={onAnswer}
+                          <FitRead data={diag} note="free" answers={answers} answerLines={stored.lines} onAnswer={onAnswer} budget={1.4}
                             paste={<details className={s.disclose} data-testid="flat-paste"><summary>Paste the posting with its line breaks</summary><PostingInput onSubmit={submitPosting} submitLabel="Check my fit · free" /></details>} />
                           {!diag.statements?.length && <Checklist constraints={diag.constraints} />}
                         </>
