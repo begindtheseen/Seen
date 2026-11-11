@@ -11,7 +11,7 @@ import { words } from '../../lib/text/morph.js';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SRC = join(HERE, 'trade-talk.txt');
 const OUT = join(HERE, '..', '..', 'lib', 'text', 'data', 'tradeTalk.json');
-export const FIELDS = ['food', 'retail', 'warehouse', 'healthcare', 'nursing', 'trades', 'office', 'support', 'sales', 'k12', 'itsupport', 'software', 'accounting', 'construction', 'security', 'military'];
+export const FIELDS = ['food', 'retail', 'warehouse', 'healthcare', 'nursing', 'trades', 'office', 'support', 'sales', 'k12', 'itsupport', 'software', 'accounting', 'construction', 'security', 'military', 'general'];
 
 const norm = (/** @type {string} */ s) => words(s).join(' ');
 
@@ -52,7 +52,7 @@ export function build(text = readFileSync(SRC, 'utf8')) {
       source: 'Seen trade-talk table, hand-reviewed (scripts/text/trade-talk.txt); vocabulary informed by O*NET 31.0 task and tool text (USDOL/ETA, CC BY 4.0) and real job postings',
       retrieved: '2026-11-10',
       licence: 'Seen original compilation; O*NET-derived vocabulary under CC BY 4.0 (attribution on /methods)',
-      format: 'f = field keys; g = [[fieldIndexes, kind ("=" equivalents | ">" instance ⇒ class), members (equivalents, or instances), classMembers (">" only)]]; members are lower-case word sequences',
+      format: 'f = field keys ("general" holds in every field); g = [[fieldIndexes, kind ("=" equivalents | ">" instance ⇒ class), members (equivalents, or instances), classMembers (">" only)]]; members are lower-case word sequences',
       build: 'scripts/text/build-trade-talk.mjs',
     },
     f: FIELDS,

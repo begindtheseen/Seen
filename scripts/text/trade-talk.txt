@@ -783,3 +783,27 @@
 = battle rhythm, operating cadence, meeting cadence
 = commo, communications equipment, radios
 = lmtv, fmtv, hmmwv, humvee, tactical vehicles
+
+# Everyday noun equals (round 5): the plain words a résumé and a posting use for the same thing in any line of work.
+# "general" groups hold in every field; field-scoped ones only where the reading holds.
+@field general
+= new hire, new team member, new associate, new staff, new staff member, new employee, newly hired employee, new crew member, new teammate, new recruit, new starter, incoming hire, new worker
+= sales goal, sales target, sales quota, sales plan, sales number, sales objective, revenue target, revenue goal, sales budget
+= csat, customer satisfaction score, csat score
+= nps, net promoter score, nps score
+> csat, customer satisfaction score, csat score, nps, net promoter score, nps score, osat, guest satisfaction score, customer survey score, guest survey score => customer feedback score, customer feedback scores, survey score, customer satisfaction, customer satisfaction rating, guest feedback score, customer survey results, customer feedback rating
+= direct report, team member reporting to me, people reporting to me
+= work area, workstation, work station
+= productivity standard, productivity goal, productivity target, production standard, production goal, rate goal, units per hour goal, uph goal
+
+@field sales,retail
+= quota, plan, sales plan, target, number, numbers, goal, sales goal
+
+@field retail
+= sales floor, selling floor, the floor, floor, store floor, retail floor
+
+@field warehouse,trades
+= floor, shop floor, production floor, plant floor, warehouse floor, operations floor
+
+@field food,retail,warehouse,security,healthcare,nursing
+= shift, crew, team on shift, shift team, shift crew, on-shift team, crew on shift
