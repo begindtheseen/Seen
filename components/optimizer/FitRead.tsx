@@ -197,7 +197,7 @@ export default function FitRead({ data, note, compact = false, brief = false, an
           const canClaim = !!gr && !!gr.claim && !!answerWithAnchor && !answers?.[sid]
           return (
             <li key={i} className={s.dense} data-state={g.state} data-testid="fit-gate" data-id={sid || undefined}>
-              <p className={s.gateText}><StateMark state={(g.claimed ? 'said' : g.state) as State} />{' '}{g.text}{g.caps ? <span className={s.tag}> · this decides the application</span> : null}</p>
+              <p className={s.gateText}><StateMark state={(g.claimed ? 'said' : g.state) as State} />{' '}{g.label ? <><span className={s.gateLabel}>{g.label}</span> — </> : null}{g.text}{g.caps ? <span className={s.tag}> · this decides the application</span> : null}</p>
               {canClaim && <div className={s.claimRow}><ClaimButton word={gr!.claim!} onClick={() => answerWithAnchor!(sid, 'claim')} /></div>}
               {g.claimed && answerWithAnchor && sid && answers?.[sid] === 'claim' && <p className={s.said}><span /><button type="button" className={s.change} onClick={() => answerWithAnchor(sid, null)} data-testid="fit-gate-change">Change</button></p>}
             </li>

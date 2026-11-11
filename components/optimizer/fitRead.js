@@ -184,7 +184,10 @@ export function gateRows(constraints) {
     if (!text || seen.has(head)) continue;
     seen.add(head);
     const state = GRADE_STATE[c.grade] || (c.status === 'met' ? 'shown' : c.status === 'ask' ? 'ask' : c.status === 'partial' ? 'partly' : 'not_shown');
-    out.push({ kind: String(c.kind), text, state, caps: !!c.caps, quote: clean(c.posting_quote), preferred: c.importance === 'preferred', statementId: c.statementId || null, claimed: c.claimed === true });
+    out.push({ kind: String(c.kind), text, state, caps: !!c.caps, quote: clean(c.posting_quote), preferred: c.importance === 'preferred', statementId: c.statementId || null, claimed: c.claimed === true,
+      // what the gate is about, by the server's own label — printed before a sentence that does not name it ("Not on your
+      // résumé. It is a plus, not a requirement." says nothing of the ServSafe certification it grades)
+      label: clean(c.label) && !text.toLowerCase().includes(clean(c.label).toLowerCase().slice(0, 14)) ? clean(c.label).replace(/[.;:,]+$/, '').replace(/^(?:an?|the)\s+/i, '').replace(/^./, (x) => x.toUpperCase()) : '' });
   }
   // a gate that stops the application first, then what is short, then what is met
   const rank = (r) => (r.caps ? 0 : r.state === 'not_shown' ? 1 : r.state === 'partly' ? 2 : r.state === 'ask' ? 3 : 4);

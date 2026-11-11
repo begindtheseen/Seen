@@ -112,3 +112,35 @@ test('a close line the judge could not prove is carried as a candidate; an answe
   assert.deepEqual(rows.q.missing, ['not shown: putting away inventory'], 'missing is printed as written')
   assert.equal(rows.r.byYou, true)
 })
+
+// Claims (x-integration "Claims", round 7): the control is offered on a not-shown / partly line only, never on a years ask,
+// and a claimed row is printed in the server's own words — no résumé line. Pinned on the director's gold pair.
+test('claims: offered on not-shown / partly lines (done / hold), never a years row; a claimed row carries the server\'s why and no line', async () => {
+  const fs2 = await import('node:fs')
+  const G = new URL('../../lib/fixtures/crosstool/gold-shift-lead/', import.meta.url)
+  const names = fs2.readdirSync(G)
+  const resume = fs2.readFileSync(new URL(names.find((n) => /resume/i.test(n)), G), 'utf8')
+  const posting = fs2.readFileSync(new URL(names.find((n) => /posting/i.test(n)), G), 'utf8')
+  const input = { resumeText: resume, jobDescription: posting, jobTitle: 'Shift Lead', company: 'Copper Kettle Kitchen' }
+  const out = runOptimizer(input)
+  const rows = fitGroups(out).groups.flatMap((g) => g.rows)
+  for (const r of rows) {
+    if (r.claim) assert.ok(r.state === 'not_shown' || r.state === 'partly', `${r.text}: offered on ${r.state}`)
+    if (/\b\d+\+?\s*years?\b/i.test(r.text)) assert.equal(r.claim, null, `a years row is never claimable: ${r.text}`)
+  }
+  const step = rows.find((r) => /step in on any station/i.test(r.text))
+  const serv = rows.find((r) => /servsafe manager/i.test(r.text))
+  assert.equal(step.claim, 'done')
+  assert.equal(serv.claim, 'hold')
+  const after = runOptimizer({ ...input, confirmed: [{ statementId: step.id, answer: 'yes', claim: true }, { statementId: serv.id, answer: 'yes', claim: true }] })
+  const rows2 = fitGroups(after).groups.flatMap((g) => g.rows)
+  for (const id of [step.id, serv.id]) {
+    const r = rows2.find((x) => x.id === id)
+    assert.ok(r.byYou && r.claimed, JSON.stringify(r))
+    assert.equal(r.line, '', 'a claimed row never quotes a résumé line')
+    assert.match(r.claimWhy, /^You said you (?:have done|hold) this/)
+    assert.equal(r.claim, null, 'no second claim control on a claimed row')
+  }
+  // un-claiming: the reading returns exactly to what it was
+  assert.deepEqual(fitGroups(runOptimizer(input)), fitGroups(out))
+})

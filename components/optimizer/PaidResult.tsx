@@ -195,7 +195,7 @@ export function QuestionCard({ qn, io }: { qn: Question; io: QuestionIO }) {
       {io.added ? (
         <>
           <p className={s.after}>{io.added}</p>
-          <p className={s.why}>Added to your version{kind === 'number' ? ' in place of the line it completes' : ''}.</p>
+          <p className={s.why}>Added to your version{kind === 'number' ? ' in place of the line it completes' : picked ? ` under ${[picked.title, picked.company].filter(Boolean).join(' · ')}` : ''}.</p>
           <div><button type="button" className={s.toggle} onClick={io.remove}>Take it out</button></div>
         </>
       ) : (
