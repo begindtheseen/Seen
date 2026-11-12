@@ -50,6 +50,8 @@ import { computeListingFreshness } from '../lib/server/listingFreshness.js';
 import { listingSignals } from '../lib/server/listingSignals.js';
 import { geocodeLocation, haversineMiles, milesToKm, hasUsableCoords, boundingBox } from '../lib/server/geo.js';
 import { findResumeMatches } from '../lib/server/resumeMatches.js';
+import { serviceDb, readRecentApplications } from '../lib/server/jobKeys.js';
+import { hasRailCache, readRailCache, writeRailCache, railSignature, railCacheState } from '../lib/server/railCache.js';
 import { geocodePlace, placesWithin } from '../lib/geo/usPlaces.js';
 import { placeListing, withinRadius, inState as geoInState, placeSearch, RADIUS_OPTIONS, stateName, isNonUsLocation } from '../lib/geo/radius.js';
 import { readAreaRows, rankArea, pageArea } from '../lib/server/areaSearch.js';
@@ -1075,63 +1077,100 @@ async function handleRecommended(req, res, _body) {
   const user_id = await _resolveUid(req);
   if (!user_id) return res.status(401).json({ error: 'Auth required', jobs: [] });
 
+  // Instant answers (lib/server/railCache.js): the person's kept rail, when it still describes their résumé, city and
+  // recent applications, is answered in one round trip; an old one is answered and rebuilt after the response.
+  const db = serviceDb(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+  try {
+    if (await hasRailCache(db)) {
+      const uid = encodeURIComponent(user_id);
+      const [profRows, apps, cached] = await Promise.all([
+        db(`profiles?id=eq.${uid}&select=resume_updated_at,city&limit=1`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+        readRecentApplications(db, user_id),
+        readRailCache(db, user_id),
+      ]);
+      const prof = Array.isArray(profRows) ? profRows[0] : null;
+      if (prof) {
+        const sig = railSignature({ resumeUpdatedAt: prof.resume_updated_at, city: prof.city, applications: apps || [] });
+        const state = railCacheState(cached, sig);
+        if (state !== 'rebuild') {
+          if (state === 'stale' && !_railRefreshing.has(user_id)) {
+            _railRefreshing.add(user_id);
+            waitUntil(buildRail(SUPABASE_URL, SUPABASE_SERVICE_KEY, user_id)
+              .then((out) => (out.keep ? writeRailCache(db, user_id, out.body, sig) : null))
+              .catch((e) => logError('jobs/recommended-refresh', e.message, { user_id }))
+              .finally(() => _railRefreshing.delete(user_id)));
+          }
+          return res.status(200).json({ ...cached.payload, cached_at: new Date(cached.builtAt).toISOString() });
+        }
+        const out = await buildRail(SUPABASE_URL, SUPABASE_SERVICE_KEY, user_id);
+        if (out.keep) waitUntil(writeRailCache(db, user_id, out.body, sig));
+        return res.status(200).json(out.body);
+      }
+    }
+    const out = await buildRail(SUPABASE_URL, SUPABASE_SERVICE_KEY, user_id);
+    return res.status(200).json(out.body);
+  } catch (e) {
+    logError('jobs/recommended', e.message, { user_id });
+    return res.status(500).json({ error: e.message, jobs: [] });
+  }
+}
+const _railRefreshing = new Set(); // one background rebuild per person per instance
+
+/** The rail computed now: { body, keep } (keep = may be stored as this person's kept answer). */
+async function buildRail(SUPABASE_URL, SUPABASE_SERVICE_KEY, user_id) {
   const dbHeaders = {
     apikey: SUPABASE_SERVICE_KEY,
     Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
     'Content-Type': 'application/json',
   };
-
-  try {
-    const m = await findResumeMatches({ supabaseUrl: SUPABASE_URL, serviceKey: SUPABASE_SERVICE_KEY, userId: user_id });
-    const hasResume = m.hasResume;
-    const heal = m.heal;
-    // The current title nothing could place ("unknown is not a direction"): the screen says so and offers a search.
-    const nd = m.keys && m.keys.no_direction ? { title: String(m.keys.no_direction.title || '').slice(0, 120), company: m.keys.no_direction.company ? String(m.keys.no_direction.company).slice(0, 120) : null } : null;
-    if (m.reason) {
-      if (heal) await heal;
-      return res.status(200).json({ ok: true, jobs: [], skills: [], has_resume: hasResume, city: m.city || null, city_source: m.citySource || null, reason: m.reason, no_direction: nd });
-    }
-    const { ranked, city, citySource } = m;
-
-    // A summary row is shown only for the person's own job, labelled — and never when its source has closed:
-    // up to 4 of them get the drawer's liveness check (lib/server/listingLiveness.js: answered from the row when
-    // it was checked in the last 24 h, else one paced request, 3 s cap, cached; a closed one is marked expired).
-    const pool = ranked.slice(0, 12);
-    const liveDb = (path, opts = {}) => fetch(`${SUPABASE_URL}/rest/v1/${path}`, { ...opts, headers: { ...dbHeaders, ...(opts.headers || {}) } });
-    let checks = 0;
-    const live = await Promise.all(pool.map((j) => (j._summaryOnly && checkableId(j.id) && checks++ < 4
-      ? checkLiveness({ jobId: j.id, db: liveDb, timeoutMs: 3000 }).catch(() => null)
-      : null)));
-    const shown = pool.filter((j, i) => live[i]?.state !== 'gone');
-    const names = await loadTenantNames(SUPABASE_URL, dbHeaders);
-    const jobs = shown.slice(0, 8).map(j => withTenantName({
-      id: j.id,
-      title: j.title,
-      company: j.company,
-      ats_tenant: j.ats_tenant || null,
-      location: j.location,
-      salary: honestSalary(j),
-      apply_url: j.apply_url,
-      description: j.description,
-      type: j.type || 'Full-time',
-      level: inferLevel(j.title || ''),
-      source: j.source || 'Seen',
-      match_reason: j._reason,
-      // the checks behind the sentence (field, licences, years, limits, level) — each one passed
-      match_checks: Array.isArray(j._checks) ? j._checks : undefined,
-      match_basis: j._basis,
-      summary_only: !!j._summaryOnly,
-      miles: Number.isFinite(j._miles) ? j._miles : null,
-      remote: !!j._remote,
-      ...scoreRow(j),
-    }, names));
-
-    if (heal) await heal; // rebuilt keys land before the function returns
-    return res.status(200).json({ ok: true, jobs, skills: [], seniority: null, function: null, has_resume: hasResume, city, city_source: citySource, matched_total: ranked.length, reason: jobs.length ? null : (nd ? 'no_direction' : 'no_matches'), no_direction: nd });
-  } catch (e) {
-    logError('jobs/recommended', e.message, { user_id });
-    return res.status(500).json({ error: e.message, jobs: [] });
+  const m = await findResumeMatches({ supabaseUrl: SUPABASE_URL, serviceKey: SUPABASE_SERVICE_KEY, userId: user_id });
+  // a partial or unreadable answer is shown but never kept: the next request computes again
+  const keep = !m.partial && m.reason !== 'unavailable';
+  const hasResume = m.hasResume;
+  const heal = m.heal;
+  // The current title nothing could place ("unknown is not a direction"): the screen says so and offers a search.
+  const nd = m.keys && m.keys.no_direction ? { title: String(m.keys.no_direction.title || '').slice(0, 120), company: m.keys.no_direction.company ? String(m.keys.no_direction.company).slice(0, 120) : null } : null;
+  if (m.reason) {
+    if (heal) await heal;
+    return { body: { ok: true, jobs: [], skills: [], has_resume: hasResume, city: m.city || null, city_source: m.citySource || null, reason: m.reason, no_direction: nd }, keep };
   }
+  const { ranked, city, citySource } = m;
+
+  // A summary row is shown only for the person's own job, labelled — and never when its source has closed:
+  // up to 4 of them get the drawer's liveness check (lib/server/listingLiveness.js: answered from the row when
+  // it was checked in the last 24 h, else one paced request, 3 s cap, cached; a closed one is marked expired).
+  const pool = ranked.slice(0, 12);
+  const liveDb = (path, opts = {}) => fetch(`${SUPABASE_URL}/rest/v1/${path}`, { ...opts, headers: { ...dbHeaders, ...(opts.headers || {}) } });
+  let checks = 0;
+  const live = await Promise.all(pool.map((j) => (j._summaryOnly && checkableId(j.id) && checks++ < 4
+    ? checkLiveness({ jobId: j.id, db: liveDb, timeoutMs: 3000 }).catch(() => null)
+    : null)));
+  const shown = pool.filter((j, i) => live[i]?.state !== 'gone');
+  const names = await loadTenantNames(SUPABASE_URL, dbHeaders);
+  const jobs = shown.slice(0, 8).map(j => withTenantName({
+    id: j.id,
+    title: j.title,
+    company: j.company,
+    ats_tenant: j.ats_tenant || null,
+    location: j.location,
+    salary: honestSalary(j),
+    apply_url: j.apply_url,
+    description: j.description,
+    type: j.type || 'Full-time',
+    level: inferLevel(j.title || ''),
+    source: j.source || 'Seen',
+    match_reason: j._reason,
+    // the checks behind the sentence (field, licences, years, limits, level) — each one passed
+    match_checks: Array.isArray(j._checks) ? j._checks : undefined,
+    match_basis: j._basis,
+    summary_only: !!j._summaryOnly,
+    miles: Number.isFinite(j._miles) ? j._miles : null,
+    remote: !!j._remote,
+    ...scoreRow(j),
+  }, names));
+
+  if (heal) await heal; // rebuilt keys land before the function returns
+  return { body: { ok: true, jobs, skills: [], seniority: null, function: null, has_resume: hasResume, city, city_source: citySource, matched_total: ranked.length, partial: !!m.partial, reason: jobs.length ? null : (nd ? 'no_direction' : 'no_matches'), no_direction: nd }, keep };
 }
 
 // ── Area search: a place and no title ────────────────────────────────────────────────────────

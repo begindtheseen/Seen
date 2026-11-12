@@ -90,6 +90,38 @@ Editor — comments stripped, one block per migration, and say which to run firs
   Not handled: LinkedIn/Indeed/SAP-jobs pages (datacenter walls; the r.jina.ai rung is untestable from the sandbox),
   Workday tenants answering 403, non-English postings.
 
+## Session 2026-11-12: production incident — one signed-in page load stalled the database (PR #393, same branch)
+- **Seen in production logs (Vercel, after #392 deployed):** two episodes (2026-11-11 09:33 and 15:46 UTC), one user each
+  time: every `/api/jobs` call timed out at 60 s and that user's `/api/user-sync` calls at 15 s; even the rate-limit
+  call to Supabase was aborted. Nothing else ran in those windows — the user's own `/jobs` load caused it.
+- **Cause 1, the matched-jobs rail's read (`lib/server/resumeMatches.js`):** it sent 14–30 reads AT ONCE per load, each
+  OR-ing up to 77 `ilike` terms (the planner drops the trigram index past ~12 — measured in areaSearch.js) and pulling
+  `description` for up to 1,000 rows, with no timeout. A few reloads ≈ 100 such queries. Now `readRailCandidates`:
+  the area through `readAreaRows` (the place search's reader: ≤4 reads in flight per instance via the shared
+  `queuedRead` limiter, ≤15 terms a read, light columns, 5-minute per-instance cache — the rail can lag new listings by
+  up to 5 min), the person's own city word, one US-remote read, title words judged IN MEMORY, then full rows by id
+  (`id=in.(…)`, 200 at a time). `serviceDb` calls time out at 12 s. Rule: no read of `jobs` from a request path may OR
+  more than ~15 patterns, select `description` outside a by-id fetch, or skip the shared limiter.
+- **Cause 2, CPU:** one rail request cost ~35–43 s of CPU (profiled with `node --cpu-prof`): `matchListing` ran the
+  WHOLE posting reader (`statedMinimums` → `extractJobFacts`) on nearly every listing in the radius, just to test for
+  "retail or restaurant experience". Now gated by the same phrase on the raw text (`ALT_FIELDS_RE`) and by a unit of
+  time (`DURATION_RE`); `aliasEntriesFor` (lib/optimizer/lineProof.js) re-normalised every alias name per call — now an
+  index built once + memo. The rail also stops matching at 18 s (email 60 s) and says `partial`. Result: 3.5–5× less
+  CPU, ≤4 reads in flight; the fit check itself is 1.9× faster for every tool.
+- **Proof of no behaviour change:** matcher 0 differences over 30,688 answers (16 résumés × 959 postings × 2 modes);
+  `statedMinimums` 0 differences over 1,280 postings; `runOptimizer` byte-identical over 960 pairs; matched-jobs scores
+  identical to the merged tree on all five people sets; `resumeMatches.readFinds.test.mjs` (every listing the rule
+  accepts is read) passes — its fake now uses uuid ids and understands `in.` and id ranges like PostgREST.
+- **Found on the way — place search bug from #392:** `areaTextPatterns` read places by their OFFICIAL Census name only,
+  so "Boise City", "Nashville-Davidson", "Indianapolis city", "Louisville/Jefferson County", "Urban Honolulu" and the
+  Massachusetts "… Town" names never matched listings written "Boise, ID", "Nashville, TN"… without coordinates. Now
+  each place carries `alt` (the data's aliases + `everydayBare`), each name judged for ambiguity on its own; names the
+  kind word belongs to ("Jersey City", "Carson City", "Charles Town", "Oklahoma City") are never shortened.
+- **Harness:** the Supabase Management API token in the cloud env answers 401, so `pg_stat_statements` is unreadable —
+  the cause was found from Vercel runtime logs + a CPU profile of the real code against a fake PostgREST
+  (`scratchpad/bench-rail.mjs`). A worktree of the merged tree (`git worktree add … origin/next-migration`) is the
+  baseline for every before/after comparison.
+
 ## Session 2026-11-10/11: the tools program — one fit engine, claims, matched jobs, admin rebuilt (PR #392, same branch)
 - **Owner mandate:** "focus purely on our tools like the optimizer… undeniably blown away"; matched-job emails must be
   "spot on" (a security listing asking 3 years went to someone who never worked security); search by place alone; admin

@@ -34,8 +34,9 @@ const FULL = `${'Park and retrieve guest vehicles at a busy hotel entrance and k
 const jobRow = (i, extra = {}) => ({ id: `00000000-0000-0000-0000-00000000000${i}`, title: `Valet Attendant ${i}`, company: `Hotel ${i}`, location: 'Temecula, CA', salary: null, apply_url: `https://example.com/${i}`, description: FULL, type: 'Full-time', level: 'Entry level', source: 'Seen', score: 60, waste_score: 20, expires_at: FUTURE, lat: null, lng: null, created_at: new Date().toISOString(), availability_status: 'active', ...extra });
 
 let state;
-const fresh = () => ({ resumeText: RESUME, city: 'Temecula, CA', profileOk: true, column: true, storedKeys: null, apps: [], jobsRows: [jobRow(1), jobRow(2), jobRow(3)] });
-beforeEach(async () => { state = fresh(); (await import('../lib/server/jobKeys.js'))._resetJobKeysProbe(); });
+const fresh = () => ({ resumeText: RESUME, city: 'Temecula, CA', profileOk: true, column: true, storedKeys: null, apps: [], jobsRows: [jobRow(1), jobRow(2), jobRow(3)], cacheTable: false, cacheRow: null, resumeUpdatedAt: '2026-10-19T00:00:00Z' });
+// the area read is cached per instance for 5 minutes (lib/server/areaSearch.js): each test starts with its own table
+beforeEach(async () => { state = fresh(); (await import('../lib/server/jobKeys.js'))._resetJobKeysProbe(); (await import('../lib/server/areaSearch.js'))._clearAreaCache(); (await import('../lib/server/railCache.js'))._resetRailCacheProbe(); });
 
 let calls = [];
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'Content-Type': 'application/json' } });
@@ -45,16 +46,25 @@ globalThis.fetch = async (url, opts = {}) => {
   calls.push({ u, method, body: opts.body ? JSON.parse(opts.body) : null });
   if (u.includes('/auth/v1/user')) return json({ id: UID });
   if (/adzuna|greenhouse|lever|ashby/i.test(u)) return json({ results: [] });
+  if (u.includes('/rest/v1/matched_jobs_cache')) {
+    if (!state.cacheTable) return json({ code: 'PGRST205', message: 'Could not find the table public.matched_jobs_cache' }, 404);
+    if (method === 'POST') { state.cacheRow = JSON.parse(opts.body); return new Response('', { status: 201 }); }
+    if (u.includes('limit=0')) return json([]);
+    return json(state.cacheRow ? [state.cacheRow] : []);
+  }
   if (u.includes('/rest/v1/profiles')) {
     if (method === 'PATCH') { state.storedKeys = JSON.parse(opts.body).job_keys; return new Response('', { status: 204 }); }
     if (u.includes('select=job_keys&limit=1')) return state.column ? json([{ job_keys: null }]) : json({ code: '42703', message: 'column profiles.job_keys does not exist' }, 400);
     if (!state.profileOk) return json({ message: 'boom' }, 500);
-    return json([{ resume_text: state.resumeText, resume_updated_at: '2026-10-19T00:00:00Z', city: state.city, ...(state.column ? { job_keys: state.storedKeys } : {}) }]);
+    return json([{ resume_text: state.resumeText, resume_updated_at: state.resumeUpdatedAt, city: state.city, ...(state.column ? { job_keys: state.storedKeys } : {}) }]);
   }
   if (u.includes('/rest/v1/applications') || u.includes('/rest/v1/seen_applications')) return json(u.includes('seen_applications') ? [] : state.apps);
   if (u.includes('/rest/v1/jobs')) {
-    const t = decodeURIComponent((u.match(/title=ilike\.\*([^&*]+)\*/) || [])[1] || '').toLowerCase();
-    return json(state.jobsRows.filter((j) => j.title.toLowerCase().includes(t)));
+    const q = decodeURIComponent(u);
+    const ids = (q.match(/[?&]id=in\.\(([^)]*)\)/) || [])[1];
+    if (ids) { const want = new Set(ids.split(',')); return json(state.jobsRows.filter((j) => want.has(j.id))); }
+    const t = (q.match(/title=ilike\.\*([^&*]+)\*/) || [])[1];
+    return json(state.jobsRows.filter((j) => !t || j.title.toLowerCase().includes(t.toLowerCase())));
   }
   if (u.includes('geocode_cache')) return json([]);
   return json([]);
@@ -81,7 +91,13 @@ test('résumé on file, no keys yet → builds them, writes profiles.job_keys, s
   assert.equal(w.length, 1, 'one write of the rebuilt keys');
   assert.ok(w[0].body.job_keys.occupations.some((o) => o.occupation === 'valet'));
   assert.ok(w[0].body.job_keys_updated_at);
-  assert.ok(jobReads().some((c) => /title\.ilike\.\*valet/i.test(decodeURIComponent(c.u))), 'listings read by the résumé\'s real field');
+  // The read can never hurt the database (production, 2026-11-11: 14–30 reads at once, 77-term ORs, 1,000 descriptions
+  // each, stalled it for a minute): the area is read in small throttled pieces, the résumé's field is judged in
+  // memory, and only the shortlist is fetched in full, by id.
+  const terms = (c) => (decodeURIComponent(c.u).match(/\.ilike\./g) || []).length;
+  assert.ok(jobReads().every((c) => terms(c) <= 15), `no read ORs more than 15 patterns: ${Math.max(...jobReads().map(terms))}`);
+  assert.ok(jobReads().filter((c) => /select=[^&]*description/.test(c.u)).every((c) => /[?&]id=in\./.test(c.u)), 'only the by-id reads carry the posting text');
+  assert.ok(jobReads().some((c) => /[?&]id=in\./.test(c.u)), 'the shortlist is fetched by id');
   assert.ok(jobReads().some((c) => /temecula/i.test(decodeURIComponent(c.u))), 'the local reads are scoped to the profile city');
   assert.ok(!calls.some((c) => c.u.includes('resume_skills')), 'the old cache (missing in prod) is never read');
 });
@@ -249,4 +265,43 @@ test('a current title nothing can place → no_direction with that title, no old
   assert.deepEqual(r.body.no_direction, { title: 'World Builder III', company: 'Zentrix Labs' }, JSON.stringify(r.body));
   assert.ok(!r.body.jobs.some((j) => /valet/i.test(j.title)), 'the older valet field is not promoted');
   if (!r.body.jobs.length) assert.equal(r.body.reason, 'no_direction');
+});
+
+// Instant answers (lib/server/railCache.js): the kept rail is answered in one round trip while it still describes
+// the person's résumé, city and recent applications.
+test('kept rail: the second request answers from the kept copy without reading listings; a new résumé or application rebuilds it', async () => {
+  state.cacheTable = true;
+  const first = await call();
+  assert.equal(first.body.jobs.length, 3);
+  await new Promise((r) => setTimeout(r, 20)); // the kept copy is written after the response
+  assert.ok(state.cacheRow && state.cacheRow.payload && state.cacheRow.payload.jobs.length === 3, 'the answer was kept');
+
+  const second = await call();
+  assert.equal(second.body.jobs.length, 3);
+  assert.ok(second.body.cached_at, 'answered from the kept copy');
+  assert.equal(jobReads().length, 0, 'no listing was read');
+
+  state.resumeUpdatedAt = '2026-11-12T09:00:00Z'; // the résumé was saved again
+  const third = await call();
+  assert.ok(!third.body.cached_at, 'a new résumé is never answered from the old copy');
+  assert.ok(jobReads().length > 0);
+
+  await new Promise((r) => setTimeout(r, 20));
+  state.apps = [{ job_id: null, company_name: 'Hotel 1', role: 'Valet Attendant 1', applied_at: '2026-11-12T10:00:00Z', created_at: '2026-11-12T10:00:00Z' }];
+  const fourth = await call();
+  assert.ok(!fourth.body.cached_at, 'a new application rebuilds the rail');
+});
+
+test('kept rail: a partial answer is shown but never kept', async () => {
+  state.cacheTable = true;
+  state.jobsRows = [];
+  await call();
+  await new Promise((r) => setTimeout(r, 20));
+  // an empty-but-complete answer may be kept; what must never be kept is an "unavailable" one
+  state.profileOk = false;
+  state.cacheRow = null;
+  const res = await call();
+  assert.notEqual(res.code, 500);
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(state.cacheRow, null, 'nothing kept when the profile could not be read');
 });
