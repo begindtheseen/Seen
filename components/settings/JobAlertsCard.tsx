@@ -10,6 +10,8 @@ import { _syncRaw } from '@/lib/sync'
 import { describeAlert, MAX_ALERTS, ALERT_RADII, DEFAULT_MILES } from '@/lib/server/jobAlerts.js'
 import { MAX_PER_DAY } from '@/lib/server/jobMatchEmails.js'
 import p from '@/app/profile/profile.module.css'
+import LocationInput from '@/components/ui/LocationInput'
+import { resolvePlaceText } from '@/lib/geo/placesClient'
 import s from './JobAlertsCard.module.css'
 
 type Mode = 'resume' | 'alerts' | 'off'
@@ -84,8 +86,10 @@ export default function JobAlertsCard({ id = 'alerts', onReady }: { id?: string;
 
   async function save() {
     // Rows left completely empty are dropped rather than refused.
-    const keep = drafts.filter((d) => d.keywords.trim() || (!d.remote && d.place.trim()))
+    let keep = drafts.filter((d) => d.keywords.trim() || (!d.remote && d.place.trim()))
     setSaving(true); setMsg(null); setFieldErr(null)
+    // A place typed and saved without leaving its box is put in its fixed form first ("boise id" → "Boise, ID").
+    keep = await Promise.all(keep.map(async (d) => (d.remote || !d.place.trim() ? d : { ...d, place: await resolvePlaceText(d.place) })))
     const r = await _syncRaw('job_alerts_save', { mode, alerts: keep.map(wire) })
     setSaving(false)
     const d = r.body as (Prefs | { ready: false } | { error?: string; index?: number | null; field?: string | null } | null)
@@ -159,8 +163,11 @@ export default function JobAlertsCard({ id = 'alerts', onReady }: { id?: string;
                   <div className={s.where}>
                     <div className={p.field}>
                       <label className={p.label} htmlFor={plId}>City and state, or ZIP</label>
-                      <input id={plId} className={p.input} type="text" autoComplete="off" maxLength={80} value={d.place}
-                        onChange={(e) => edit(i, { place: e.target.value })} placeholder="e.g. Phoenix, AZ or 85004"
+                      {/* The place field: suggestions as you type, settles on "City, ST" (remote has its own box above; an
+                          alert needs a place a distance can be measured from, so no whole states either). */}
+                      <LocationInput id={plId} className={p.input} maxLength={80} value={d.place}
+                        onChange={(v) => edit(i, { place: v })} placeholder="e.g. Phoenix, AZ or 85004"
+                        allowRemote={false} allowState={false}
                         aria-invalid={err?.field === 'place' || undefined} />
                     </div>
                     <div className={p.field}>

@@ -20,6 +20,8 @@ import DangerConfirmDialog from '@/components/DangerConfirmDialog'
 import DeleteAccountDialog from '@/components/profile/DeleteAccountDialog'
 import { PROFILE_LIMITS, clampProfileField } from '@/lib/profileLimits.js'
 import { loginHref } from '@/lib/safeHref.js'
+import LocationInput from '@/components/ui/LocationInput'
+import { resolvePlaceText } from '@/lib/geo/placesClient'
 import styles from './profile.module.css'
 import { formatPacific } from '@/lib/time/pacific.js'
 import { FREE_DAILY_CREDITS, CREDIT_RESET_LABEL, RESUME_PARSE_COST } from '@/lib/creditRules'
@@ -225,11 +227,12 @@ export default function ProfilePage() {
     // Trim + cap (lib/profileLimits.js, the server applies the same) and refuse a blank name instead
     // of saving one: signup requires a name and the dashboard greets by it (audit 2026-10-24, P1).
     const cleanName = clampProfileField('name', name)
-    const cleanCity = clampProfileField('city', city)
     // A blank name (the email-prefix placeholder is shown as none) must not block saving the city or level
     // (round 4: "Use Phoenix, AZ" → Save changes sent nothing). The name is sent only when there is one.
     setSaving(true)
     setSaveMsg('')
+    // A city typed and saved without leaving the box is put in its fixed form first ("boise id" → "Boise, ID").
+    const cleanCity = clampProfileField('city', await resolvePlaceText(city))
     const result = await _sync('save_profile', { profile: { ...(cleanName ? { name: cleanName } : {}), city: cleanCity, experience } }) as { ok?: boolean; error?: string } | null
     if (!result || result.ok === false) {
       setSaveMsg(result?.error || 'Save failed — please try again.')
@@ -411,15 +414,17 @@ export default function ProfilePage() {
                 <div className={styles.field}>
                   <label className={styles.label} htmlFor="pf-city">Your city</label>
                   {loaded ? (
-                    <input
+                    // The place field: suggestions as you type, settles on "City, ST". It never writes on its own, so
+                    // the form is clean on load (a résumé city stays the suggestion button below).
+                    <LocationInput
                       id="pf-city"
                       maxLength={PROFILE_LIMITS.city}
                       className={styles.input}
-                      type="text"
-                      autoComplete="off"
                       value={city}
-                      onChange={e => onCityInput(e.target.value)}
+                      onChange={onCityInput}
                       placeholder="e.g. Los Angeles, CA"
+                      allowRemote={false}
+                      allowState={false}
                     />
                   ) : <div className={styles.skeleton} />}
                   <div className={styles.hint}>

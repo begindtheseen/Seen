@@ -7,9 +7,10 @@ import { RESUME_OPTIMIZE_COST } from '../lib/server/creditRules.js';
 import { postingTextForReader } from '../lib/server/jobInsights.js';
 import { readPosting } from '../lib/server/postingRead.js';
 import { createHash } from 'crypto';
-import { paidExportToken, paidExportAllowed } from '../lib/server/paidExport.js';
+import { paidExportToken, paidExportAllowed, verifyPaidExport } from '../lib/server/paidExport.js';
 import { optimizeCacheKey, readCachedOptimize, writeCachedOptimize } from '../lib/server/optimizeCache.js';
-import { buildPaidOptimize, unoptimizableListing } from '../lib/server/optimizePackage.js';
+import { buildPaidOptimize, unoptimizableListing, variantExhausted } from '../lib/server/optimizePackage.js';
+import { MAX_VARIANTS } from '../lib/resume/tailor/variants.js';
 import { runAdvantage, requirementsStated, extractEmployment, extractCareerSignal, buildResumeDocument, resumeFileName } from '../lib/server/resumeAnalysis.js';
 import { scannerFromSeenFit } from '../lib/server/seenfitCompat.js';
 import { extractUploadText } from '../lib/server/resumeUpload.js';
@@ -620,6 +621,21 @@ async function handleOptimizeTool(req, res, body) {
     // older engine is never served (Tasha got a pre-fix "(1,800 subscribers)." summary, 2026-10-25).
     // `fresh: true` (the "Re-run" button) skips the cache.
     const key = optimizeCacheKey({ uid: authed.uid, jobId, jobDescription, resume, confirmed: body.confirmed });
+    // Re-optimize (`variant: k`, 1…MAX_VARIANTS): another honest version of a result ALREADY paid for — the request must
+    // carry the export token the paid build issued for this user and this exact key (same posting, résumé and answers).
+    // Never charged, never cached, never a gate call; a free (no-gain) result has no token and gets no variants.
+    // The token is checked on every request, whatever it asks for: it is signed for this user and the key computed HERE
+    // from this request's posting, résumé and answers, so a token from another posting, résumé or person never verifies.
+    const paidForThisKey = verifyPaidExport(authed.uid, body.exportToken, key);
+    if (body.variant != null) {
+      const vk = Math.floor(Number(body.variant));
+      if (!(vk >= 1 && vk <= MAX_VARIANTS)) return res.status(400).json({ error: 'variant_out_of_range', max: MAX_VARIANTS, charged: false });
+      if (!paidForThisKey) return res.status(403).json({ error: 'variant_needs_paid', message: 'Another version is part of a paid build for this posting. Build this version first.', charged: false });
+      const r = buildPaidOptimize({ resume, resumeIsCanonical: true, original, jobDescription, job, company, pro: false, jobId, taxonomy, fit, posting, variant: vk });
+      if (r.variant_exhausted || !r.tailored || r.tailored.untouched || r.blocked) return res.status(200).json({ ...variantExhausted(vk), cached: false, charged: false });
+      r.tailored.export_token = paidExportToken(authed.uid, key); r.tailored.export_key = key;
+      return res.status(200).json({ ...r, variant: vk, max_variants: MAX_VARIANTS, cached: false, charged: false });
+    }
     const hit = body.fresh ? null : await readCachedOptimize(authed.uid, key);
     if (hit) {
       const paidBefore = !hit.output.no_gain;

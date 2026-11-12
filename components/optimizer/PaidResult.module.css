@@ -85,3 +85,10 @@
 .problem { display: flex; gap: var(--sp-1); align-items: flex-start; margin: 0; font-size: var(--fs-sm); color: var(--text-2); line-height: var(--lh-body); overflow-wrap: anywhere; }
 .problem svg { flex-shrink: 0; margin-top: 2px; color: var(--caution-text); }
 .problem b { font-weight: 600; color: var(--caution-text); }
+
+/* the download block (/resume) and the versions bar (re-optimize) */
+.download { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
+.versions { display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-4); background: var(--surface-1); border: 1px solid var(--border-2); border-radius: var(--r-card); min-width: 0; }
+.retry { min-height: 44px; padding: 0 var(--sp-1); background: none; border: 0; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
+.retry:hover { text-decoration: underline; }
+.retry:focus-visible { outline: none; box-shadow: var(--sh-focus); }

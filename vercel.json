@@ -147,6 +147,10 @@
     "api/optimize.js": {
       "maxDuration": 30,
       "includeFiles": "{lib/geo/data/**,lib/occupations/data/**,lib/text/data/**}"
+    },
+    "api/places.js": {
+      "maxDuration": 10,
+      "includeFiles": "lib/geo/data/**"
     }
   },
   "crons": [

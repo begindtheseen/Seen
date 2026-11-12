@@ -24,6 +24,8 @@ import { isMatch } from '@/lib/server/jobPriority.js'
 import Button from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Badge'
 import Icon from '@/components/ui/Icon'
+import LocationInput from '@/components/ui/LocationInput'
+import { resolvePlaceText } from '@/lib/geo/placesClient'
 import j from './jobs.module.css'
 import { useUrlPlace, useScrollMemory, afterPendingBack } from '@/lib/nav/urlState'
 import { JobCache } from '@/lib/stores/JobCache'
@@ -96,9 +98,10 @@ export default function JobsPage() {
   // When the checkpoint is opened AFTER the user already confirmed applying (the Apply &
   // Optimize funnel), it should record the application immediately rather than re-ask.
   const [checkpointAuto, setCheckpointAuto] = useState(false)
-  // No autofill (owner 2026-10-24: "I hate the autofill… gets in the way"): no lists under the boxes and
+  // No autofill on the title box (owner 2026-10-24: "I hate the autofill… gets in the way"): no list under it and
   // no searching while typing. A search runs on Enter or the Search button. When the search that RAN
-  // names a company, its card shows above the results.
+  // names a company, its card shows above the results. The PLACE box is the exception the owner asked for
+  // (2026-11-12: "Location needs an auto filler … a fixed format") — components/ui/LocationInput.
   const coSuggs = useCompanySuggestions(status === 'done' ? committedQuery : '')
 
   function handleSaveToggle() {
@@ -130,10 +133,19 @@ export default function JobsPage() {
   // open until a search runs.
   const [whereOpen, setWhereOpen] = useState(false)
   const locRef = useRef<HTMLInputElement>(null)
-  function runSearch() {
+  // `loc`: the place field's settled value when Enter was pressed in it (the state update has not landed yet).
+  // From the Search button / the title box, a typed place is put in its fixed form first ("boise id" → "Boise, ID");
+  // the answer is usually already in the tab's cache from typing, and a slow one never holds the search (400 ms).
+  async function runSearch(loc?: string) {
     setWhereOpen(false)
     try { (document.activeElement as HTMLElement | null)?.blur?.() } catch { /* ignore */ }
-    searchJobs()
+    let where = loc
+    if (where === undefined && location.trim()) {
+      where = await resolvePlaceText(location, 400)
+      if (where !== location) setLocation(where)
+    }
+    if (where !== undefined) searchJobs(undefined, where)
+    else searchJobs()
   }
   function openWhere() {
     setWhereOpen(true)
@@ -191,10 +203,10 @@ export default function JobsPage() {
               enterKeyHint="search"
               onChange={e => setQuery(e.target.value)}
               onFocus={() => { if (searched) setWhereOpen(true) }}
-              onKeyDown={e => { if (e.key === 'Enter') runSearch() }}
+              onKeyDown={e => { if (e.key === 'Enter') void runSearch() }}
             />
             {/* Compact (phone, after a search): the one-line bar's own Search button. */}
-            <button type="button" className={bar.goIcon} onClick={runSearch} disabled={status === 'loading'} aria-label="Search">
+            <button type="button" className={bar.goIcon} onClick={() => { void runSearch() }} disabled={status === 'loading'} aria-label="Search">
               <Icon name="search" size={18} />
             </button>
             </div>
@@ -208,8 +220,9 @@ export default function JobsPage() {
             <div className={bar.row} onPointerDownCapture={() => { if (searched) setWhereOpen(true) }}>
               <div className={bar.loc}>
                 <label htmlFor="jobs-location" className="sr-only">Where — city, state or ZIP code</label>
-                <input
-                  type="text"
+                {/* The place field (components/ui/LocationInput): suggestions as you type, and the box ends up
+                    holding "City, ST" / a state / "Remote" — the search still sends one location string. */}
+                <LocationInput
                   id="jobs-location"
                   ref={locRef}
                   className={`${bar.input} ${bar.locInput}`}
@@ -217,13 +230,10 @@ export default function JobsPage() {
                   inputMode="text"
                   value={location}
                   name="seen-job-location"
-                  autoComplete="off"
-                  autoCorrect="off"
-                  spellCheck={false}
                   enterKeyHint="search"
-                  onChange={e => setLocation(e.target.value)}
+                  onChange={setLocation}
+                  onCommit={(v, how) => { if (how === 'enter') void runSearch(v) }}
                   onFocus={() => { if (searched) setWhereOpen(true) }}
-                  onKeyDown={e => { if (e.key === 'Enter') runSearch() }}
                 />
                 <button
                   type="button"
@@ -263,7 +273,7 @@ export default function JobsPage() {
               <button
                 type="button"
                 className={bar.go}
-                onClick={runSearch}
+                onClick={() => { void runSearch() }}
                 disabled={status === 'loading'}
               >
                 {status === 'loading' ? 'Searching…' : 'Search'}
