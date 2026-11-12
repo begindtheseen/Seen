@@ -846,8 +846,8 @@ export default async function handler(req, res) {
         // The larger caps are asked first so the smaller identical ones reuse them.
         const titleP = Promise.all(searchTerms.map(term => read(`title=ilike.*${encodeURIComponent(orLiteral(term))}*`, TITLE_POOL)));
         const stampP = Promise.all(searchTerms.map(term => read(`search_query=ilike.*${encodeURIComponent(orLiteral(term))}*`, poolLimit)));
-        const [[kwRows, coRows], titleRows, stampRows] = await Promise.all([Promise.all([
-          t3filter ? read(t3filter, poolLimit) : Promise.resolve([]),
+        const [[kwEvery, coRows], titleRows, stampRows] = await Promise.all([Promise.all([
+          t3filter ? read(t3filter.every, poolLimit) : Promise.resolve([]),
           read(`company=ilike.${ilikeContains(qNorm)}`, poolLimit),
         ]),
           // The TITLE reads: what a search is a match for. Deep enough that a specific query reads every
@@ -861,36 +861,48 @@ export default async function handler(req, res) {
 
         poolFull = titleRows.some((arr) => Array.isArray(arr) && arr.length >= TITLE_POOL) || stampRows.some((arr) => Array.isArray(arr) && arr.length >= poolLimit);
         fit = await fitP;
+        const hasQuery = tokenize(relevanceQuery).length > 0;
+        const remoteRead = new WeakSet(); // rows whose posting the remote reading already asked for (once per request)
         // Pool everything, dedup, then keep only listings RELATED to the query (filterAndRank's filter — it
         // reads no posting), inside the searched area, and not Seen's own seed rows or non-US places.
-        const pool = [], seen = new Set();
-        for (const arr of [coRows, ...termRows, kwRows]) {
-          for (const row of (Array.isArray(arr) ? arr : [])) {
-            const key = row.id ?? `${(row.title||'').toLowerCase()}|${(row.company||'').toLowerCase()}|${(row.location||'').toLowerCase()}`;
-            if (seen.has(key)) continue;
-            seen.add(key);
-            pool.push(row);
+        const keptFrom = async (lists) => {
+          const pool = [], seen = new Set();
+          for (const arr of lists) {
+            for (const row of (Array.isArray(arr) ? arr : [])) {
+              const key = row.id ?? `${(row.title||'').toLowerCase()}|${(row.company||'').toLowerCase()}|${(row.location||'').toLowerCase()}`;
+              if (seen.has(key)) continue;
+              seen.add(key);
+              pool.push(row);
+            }
           }
-        }
-        // Filtering before ranking keeps the same order: the ranking is a stable sort and every filter here keeps
-        // its input order (previously: rank the pool, then filter).
-        const hasQuery = tokenize(relevanceQuery).length > 0;
-        let items = pool
-          .map((j, idx) => ({ j, idx }))
-          .filter((x) => !hasQuery || isRelevant(x.j, relevanceQuery, { synonyms, canonical }));
-        for (const x of items) x.ui = toUiRow(x.j, loc);
-        // A Remote search reads a posting's first lines for "fully remote", "work from home"… (isRemoteListing):
-        // a row whose location/type does not say remote has its posting read when it mentions one of those words.
-        if (isRemote) {
-          const unsure = items.filter((x) => !/\bremote\b|\bwork from home\b|\banywhere\b/i.test(`${x.ui.location || ''} ${x.ui.type || ''}`));
-          if (unsure.length) {
-            await hydrateDescriptions(SUPABASE_URL, dbHeaders, unsure.map((x) => x.j), { remoteWords: true });
+          // Filtering before ranking keeps the same order: the ranking is a stable sort and every filter here keeps
+          // its input order (previously: rank the pool, then filter).
+          let items = pool
+            .map((j, idx) => ({ j, idx }))
+            .filter((x) => !hasQuery || isRelevant(x.j, relevanceQuery, { synonyms, canonical }));
+          for (const x of items) x.ui = toUiRow(x.j, loc);
+          // A Remote search reads a posting's first lines for "fully remote", "work from home"… (isRemoteListing):
+          // a row whose location/type does not say remote has its posting read when it mentions one of those words.
+          if (isRemote) {
+            const unsure = items.filter((x) => !/\bremote\b|\bwork from home\b|\banywhere\b/i.test(`${x.ui.location || ''} ${x.ui.type || ''}`));
+            const ask = unsure.filter((x) => !remoteRead.has(x.j));
+            if (ask.length) {
+              for (const x of ask) remoteRead.add(x.j);
+              await hydrateDescriptions(SUPABASE_URL, dbHeaders, ask.map((x) => x.j), { remoteWords: true });
+            }
             for (const x of unsure) if (x.j.description !== undefined) x.ui = toUiRow(x.j, loc);
           }
-        }
-        items = items.filter((x) => nearSearch(x.ui));
-        seedsDropped += items.filter((x) => isSeedListing(x.ui)).length;
-        const kept = items.filter((x) => !isSeedListing(x.ui) && !isNonUsLocation(x.ui.location) && !titleNamesNonUs(x.ui.title));
+          items = items.filter((x) => nearSearch(x.ui));
+          const seeds = items.filter((x) => isSeedListing(x.ui)).length;
+          return { seeds, kept: items.filter((x) => !isSeedListing(x.ui) && !isNonUsLocation(x.ui.location) && !titleNamesNonUs(x.ui.title)) };
+        };
+        let { kept, seeds } = await keptFrom([coRows, ...termRows, kwEvery]);
+        // A THIN search (fewer related listings than a full answer) also reads the phrase-or-any-word fallback — what
+        // fills "registered nurse" with LVN and nurse-practitioner roles nearby. A search with enough listings never
+        // reads it: with a common word ("engineer", "manager") it is the slowest read of all (production 2026-11-12:
+        // past its 6 s limit on every "software engineer" search, which made the results depend on whether it finished).
+        if (t3filter && t3filter.any && kept.length < TARGET) ({ kept, seeds } = await keptFrom([coRows, ...termRows, kwEvery, await read(t3filter.any, poolLimit)]));
+        seedsDropped += seeds;
         // The ranked matches: the rows a page can show in their exact order, then the rest (counted only).
         const rank = async (list) => (await exactTop(list, isRemote ? PAGE * 5 : PAGE, {
           query: relevanceQuery, synonyms, canonical, fit,
@@ -1220,20 +1232,24 @@ function buildFallbackFilter(q) {
 
   if (!words.length) return null;
 
-  const conditions = [];
-  // Full phrase match first (most specific — catches "machine learning engineer" as a unit)
-  if (words.length > 1) conditions.push(`title.ilike.*${words.join(' ')}*`);
-
-  // Individual word matches (OR — any word is a useful signal)
-  for (const w of words) {
-    conditions.push(COMPANIES.has(w) ? `company.ilike.*${w}*` : `title.ilike.*${w}*`);
-  }
+  // EVERY word, in any order ("Software Development Engineer" for "software engineer"). Before 2026-11-12 this was
+  // "the phrase OR any one word": with the read ordered by score, a common word ("engineer", "manager") filled it with
+  // the table's best-scored titles carrying that word ("Product Manager" for "store manager"), which the relevance
+  // filter then dropped — and the read was the slowest in the search (production: past its 6 s limit on every
+  // "software engineer" search; 8.7 s cold vs 3.2 s for every word, 2.2 s vs 0.7 s warm).
+  const conditions = words.map((w) => (COMPANIES.has(w) ? `company.ilike.*${w}*` : `title.ilike.*${w}*`));
 
   if (conditions.length === 1) {
     const [col, op, val] = conditions[0].split('.');
-    return `${col}=${op}.${val}`;
+    return { every: `${col}=${op}.${val}`, any: null };
   }
-  return `or=${encodeURIComponent(`(${conditions.join(',')})`)}`;
+  // `any` (the phrase OR any one word) is still read for a THIN search: it is what fills "registered nurse" with
+  // LVN and nurse-practitioner roles nearby (60 rows instead of 17). A search whose title reads came back full never
+  // needs it (its page is ranked from those) and never waits on it.
+  return {
+    every: `and=${encodeURIComponent(`(${conditions.join(',')})`)}`,
+    any: `or=${encodeURIComponent(`(${[`title.ilike.*${words.join(' ')}*`, ...conditions].join(',')})`)}`,
+  };
 }
 
 // The ONE employer-name key for the company page's listing reads (company_jobs, listing_signals):

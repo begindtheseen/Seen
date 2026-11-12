@@ -76,7 +76,7 @@ globalThis.fetch = async (url) => {
     let rows = CORPUS;
     for (const [k, v] of u.searchParams) {
       if (['select', 'limit', 'order', 'offset'].includes(k)) continue;
-      if (k === 'or') rows = rows.filter(cond(`or${v}`));
+      if (k === 'or' || k === 'and') rows = rows.filter(cond(`${k}${v}`));
       else rows = rows.filter(cond(`${k}.${v}`));
     }
     const order = u.searchParams.get('order');
