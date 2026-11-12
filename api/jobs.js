@@ -5,7 +5,7 @@ import { applyRateLimit, rateLimit, rateLimitGlobal, resolveRateBucket, setCORS 
 import { jobsReadFromQuery, setPublicCache } from '../lib/server/publicRead.js';
 import { logError } from '../lib/server/errlog.js';
 import { checkLiveness, checkableId } from '../lib/server/listingLiveness.js';
-import { filterAndRank, relevanceScore, isTitleRelated, sortByProximity, locationDbTerm, expandQueryTerms, parseLocation, locationScore, searchFitFromSignal, tokenize, isRelevant } from './_utils/jobRelevance.js';
+import { filterAndRank, relevanceScore, isTitleRelated, locationDbTerm, expandQueryTerms, parseLocation, locationScore, searchFitFromSignal, tokenize, isRelevant } from './_utils/jobRelevance.js';
 import { sortByPriority, companyMatchesQuery, queryNamesCompany, isSeedListing } from '../lib/server/jobPriority.js';
 import { waitUntil } from '@vercel/functions';
 import { aggregateForQuery, inferLevel, wasRecentlyPulled, recordPull } from '../lib/server/jobSources.js';
