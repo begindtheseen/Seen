@@ -16,6 +16,8 @@
   align-items: center;
   text-align: center;
 }
+/* While the search has focus its place suggestions float over the workspace preview below (both sections are z 2). */
+.hero:focus-within { z-index: 3; }
 
 .eyebrow {
   display: inline-flex;
@@ -90,6 +92,9 @@
   transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
 .search:focus-within {
+  /* The place field's suggestion list floats out of the form: keep it above the chips and preview below. */
+  position: relative;
+  z-index: 3;
   border-color: var(--accent);
   box-shadow: var(--sh-overlay), var(--sh-focus);
 }

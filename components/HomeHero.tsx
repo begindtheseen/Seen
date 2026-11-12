@@ -8,6 +8,8 @@ import { isGradeableScore } from '@/lib/gradeGate'
 import { homeSearchRoute, type ResolveCandidate } from '@/lib/searchRoute'
 import KineticText from '@/components/motion/KineticText'
 import WorkspacePreview, { type ProofScore } from '@/components/home/WorkspacePreview'
+import LocationInput from '@/components/ui/LocationInput'
+import { resolvePlaceText } from '@/lib/geo/placesClient'
 import styles from './HomeHero.module.css'
 
 
@@ -88,11 +90,17 @@ export default function HomeHero() {
   }, [query, lookup])
   const [routing, setRouting] = useState(false)
 
-  const doSearch = useCallback(async () => {
+  // `loc`: the place field's settled value when Enter was pressed in it; otherwise a typed place is put in its fixed
+  // form first ("boise id" → "Boise, ID" — usually already cached from typing; never waits more than 400 ms).
+  const doSearch = useCallback(async (loc?: string) => {
     const q = query.trim()
-    const l = location.trim()
+    let l = (loc ?? location).trim()
     if (!q && !l) return
     setRouting(true)
+    if (loc === undefined && l) {
+      const fixed = await resolvePlaceText(l, 400)
+      if (fixed !== l) { l = fixed; setLocation(fixed) }
+    }
     const candidates = q ? await lookup(q) : []
     const route = homeSearchRoute(q, l, candidates)
     if (!route) { setRouting(false); return }
@@ -172,18 +180,20 @@ export default function HomeHero() {
               aria-label="Company or job title"
             />
           </label>
-          <label className={styles.field}>
+          <div className={styles.field}>
             <PinIcon />
-            <input
+            {/* The place field: suggestions as you type, settles on "City, ST" / a state / "Remote". */}
+            <LocationInput
+              id="home-location"
               className={styles.input}
-              type="text"
               placeholder="City or remote"
-              autoComplete="off"
               value={location}
-              onChange={e => setLocation(e.target.value)}
+              onChange={setLocation}
+              onCommit={(v, how) => { if (how === 'enter') void doSearch(v) }}
               aria-label="City or remote"
+              enterKeyHint="search"
             />
-          </label>
+          </div>
           <button className={`${styles.go}`} type="submit" disabled={routing}>{routing ? 'Searching…' : 'Search'}</button>
         </form>
 
