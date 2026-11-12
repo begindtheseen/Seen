@@ -90,6 +90,33 @@ Editor — comments stripped, one block per migration, and say which to run firs
   Not handled: LinkedIn/Indeed/SAP-jobs pages (datacenter walls; the r.jina.ai rung is untestable from the sandbox),
   Workday tenants answering 403, non-English postings.
 
+## Session 2026-11-12 B: "make everything lightning fast" — PRs #394, #395 (same branch)
+- **Owner:** settings save slow then fails; location needs an auto-filler with one fixed format; matched jobs take
+  forever; "make everything lightning fast"; Optimize "Download this version" must save the .docx (View it below),
+  offer re-optimize, and say why each job stays.
+- **#394 (dc0836d, live):** `components/ui/LocationInput` + `GET /api/places?q=|resolve=` (local Census places, no DB;
+  verified live: "phoe" → "Phoenix, AZ", "boise id" → "Boise, ID") on job search, homepage, Settings city, alerts.
+  Optimizer: prefetched one-tap .docx, View it / PDF links, re-optimize ≤3 variants (free for a paid build, guarded
+  by `verifyPaidExport` against the SERVER-computed key — a client-sent key in the guard was CodeQL "user-controlled
+  bypass"; the token is now verified on every optimize request before branching), per-role reasons (roleReasons.js).
+- **#395 (84e42bd, live, 0 runtime errors after deploy):** search pool reads never select `description` (exactTop
+  fetches postings by id only for rows that can reach the page); radius ORs split at 15 patterns; search reads have
+  their own 16-in-flight limiter + 6 s timeout; user-sync/job-insights 6 s deadlines + 503 "took too long";
+  `sessionStillValidCached` (30 s per token — "Sign out of all devices" reaches other devices within 30 s, owner
+  told); load_profile names its columns (never job_keys); Settings save 8 s + Retry; `lib/sync.ts` 12 s client
+  deadline; GPS place → "City, ST".
+- **The slow search was ONE read, found on production data** (handler run locally against prod with every write
+  refused + per-call timing; the CPU profile was idle): `buildFallbackFilter`'s "phrase OR any one word" matches most
+  of `jobs` on a common word and ran past its limit on every "software engineer" search (results then depended on
+  whether it finished). Now `{ every: and=(all words), any: or=(…) }` — `every` beside the other reads, `any` only
+  when the ranked pool is thin (`kept.length < TARGET`). 7 prod searches vs the old code with that read allowed to
+  finish: 6 identical, 1.1–5× faster. Live after deploy: remote "software engineer" 11.9 s → 5.9 s cold / 1.1 s warm.
+  Rule: a PostgREST OR over single common words, ordered by score, is a table scan — never on a request path.
+- **Still slow, owner's call:** cold reads of `jobs` (3–5 s for a title read that takes 0.3 s warm) — heavy dead
+  space when last measured (Oct); `VACUUM` not run. Matched-jobs instant cache needs the `matched_jobs_cache` SQL.
+- **Harness:** CodeQL ConditionalBypass did NOT reproduce locally (bundle 2.27.4) — fix by structure, push, read the
+  check; FileAccessToHttp did (source: bundled `us-zip-places.json` → the jobs fetch wrapper; left for the owner).
+
 ## Session 2026-11-12: production incident — one signed-in page load stalled the database (PR #393, same branch)
 - **Seen in production logs (Vercel, after #392 deployed):** two episodes (2026-11-11 09:33 and 15:46 UTC), one user each
   time: every `/api/jobs` call timed out at 60 s and that user's `/api/user-sync` calls at 15 s; even the rate-limit
