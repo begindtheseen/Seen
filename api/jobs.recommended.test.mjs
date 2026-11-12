@@ -35,7 +35,8 @@ const jobRow = (i, extra = {}) => ({ id: `00000000-0000-0000-0000-00000000000${i
 
 let state;
 const fresh = () => ({ resumeText: RESUME, city: 'Temecula, CA', profileOk: true, column: true, storedKeys: null, apps: [], jobsRows: [jobRow(1), jobRow(2), jobRow(3)] });
-beforeEach(async () => { state = fresh(); (await import('../lib/server/jobKeys.js'))._resetJobKeysProbe(); });
+// the area read is cached per instance for 5 minutes (lib/server/areaSearch.js): each test starts with its own table
+beforeEach(async () => { state = fresh(); (await import('../lib/server/jobKeys.js'))._resetJobKeysProbe(); (await import('../lib/server/areaSearch.js'))._clearAreaCache(); });
 
 let calls = [];
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'Content-Type': 'application/json' } });
@@ -53,8 +54,11 @@ globalThis.fetch = async (url, opts = {}) => {
   }
   if (u.includes('/rest/v1/applications') || u.includes('/rest/v1/seen_applications')) return json(u.includes('seen_applications') ? [] : state.apps);
   if (u.includes('/rest/v1/jobs')) {
-    const t = decodeURIComponent((u.match(/title=ilike\.\*([^&*]+)\*/) || [])[1] || '').toLowerCase();
-    return json(state.jobsRows.filter((j) => j.title.toLowerCase().includes(t)));
+    const q = decodeURIComponent(u);
+    const ids = (q.match(/[?&]id=in\.\(([^)]*)\)/) || [])[1];
+    if (ids) { const want = new Set(ids.split(',')); return json(state.jobsRows.filter((j) => want.has(j.id))); }
+    const t = (q.match(/title=ilike\.\*([^&*]+)\*/) || [])[1];
+    return json(state.jobsRows.filter((j) => !t || j.title.toLowerCase().includes(t.toLowerCase())));
   }
   if (u.includes('geocode_cache')) return json([]);
   return json([]);
@@ -81,7 +85,13 @@ test('résumé on file, no keys yet → builds them, writes profiles.job_keys, s
   assert.equal(w.length, 1, 'one write of the rebuilt keys');
   assert.ok(w[0].body.job_keys.occupations.some((o) => o.occupation === 'valet'));
   assert.ok(w[0].body.job_keys_updated_at);
-  assert.ok(jobReads().some((c) => /title\.ilike\.\*valet/i.test(decodeURIComponent(c.u))), 'listings read by the résumé\'s real field');
+  // The read can never hurt the database (production, 2026-11-11: 14–30 reads at once, 77-term ORs, 1,000 descriptions
+  // each, stalled it for a minute): the area is read in small throttled pieces, the résumé's field is judged in
+  // memory, and only the shortlist is fetched in full, by id.
+  const terms = (c) => (decodeURIComponent(c.u).match(/\.ilike\./g) || []).length;
+  assert.ok(jobReads().every((c) => terms(c) <= 15), `no read ORs more than 15 patterns: ${Math.max(...jobReads().map(terms))}`);
+  assert.ok(jobReads().filter((c) => /select=[^&]*description/.test(c.u)).every((c) => /[?&]id=in\./.test(c.u)), 'only the by-id reads carry the posting text');
+  assert.ok(jobReads().some((c) => /[?&]id=in\./.test(c.u)), 'the shortlist is fetched by id');
   assert.ok(jobReads().some((c) => /temecula/i.test(decodeURIComponent(c.u))), 'the local reads are scoped to the profile city');
   assert.ok(!calls.some((c) => c.u.includes('resume_skills')), 'the old cache (missing in prod) is never read');
 });

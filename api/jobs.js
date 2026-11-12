@@ -1127,7 +1127,7 @@ async function handleRecommended(req, res, _body) {
     }, names));
 
     if (heal) await heal; // rebuilt keys land before the function returns
-    return res.status(200).json({ ok: true, jobs, skills: [], seniority: null, function: null, has_resume: hasResume, city, city_source: citySource, matched_total: ranked.length, reason: jobs.length ? null : (nd ? 'no_direction' : 'no_matches'), no_direction: nd });
+    return res.status(200).json({ ok: true, jobs, skills: [], seniority: null, function: null, has_resume: hasResume, city, city_source: citySource, matched_total: ranked.length, partial: !!m.partial, reason: jobs.length ? null : (nd ? 'no_direction' : 'no_matches'), no_direction: nd });
   } catch (e) {
     logError('jobs/recommended', e.message, { user_id });
     return res.status(500).json({ error: e.message, jobs: [] });
