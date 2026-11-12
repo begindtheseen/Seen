@@ -627,7 +627,9 @@ async function handleOptimizeTool(req, res, body) {
     if (body.variant != null) {
       const vk = Math.floor(Number(body.variant));
       if (!(vk >= 1 && vk <= MAX_VARIANTS)) return res.status(400).json({ error: 'variant_out_of_range', max: MAX_VARIANTS, charged: false });
-      if (!(body.exportKey === key && verifyPaidExport(authed.uid, body.exportToken, key))) return res.status(403).json({ error: 'variant_needs_paid', message: 'Another version is part of a paid build for this posting. Build this version first.', charged: false });
+      // the token is signed for this user and the key computed HERE from this request's posting, résumé and answers,
+      // so a token from another posting, résumé or person never verifies (no value the client sends is compared)
+      if (!verifyPaidExport(authed.uid, body.exportToken, key)) return res.status(403).json({ error: 'variant_needs_paid', message: 'Another version is part of a paid build for this posting. Build this version first.', charged: false });
       const r = buildPaidOptimize({ resume, resumeIsCanonical: true, original, jobDescription, job, company, pro: false, jobId, taxonomy, fit, posting, variant: vk });
       if (r.variant_exhausted || !r.tailored || r.tailored.untouched || r.blocked) return res.status(200).json({ ...variantExhausted(vk), cached: false, charged: false });
       r.tailored.export_token = paidExportToken(authed.uid, key); r.tailored.export_key = key;
