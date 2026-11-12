@@ -84,14 +84,33 @@ function _norm(s) {
   return String(s || '').toLowerCase().replace(/[^a-z0-9+#.\s]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 // Whole-word phrase containment: does `needle` appear as a full token-run inside `hay`?
+// The pattern for a needle is built once (a search ranks hundreds of rows with the same few needles; building a
+// RegExp per row was most of a search's CPU — profiled 2026-11-12).
+const _phraseRe = new Map();
 function _phraseIn(hay, needle) {
   if (!hay || !needle) return false;
-  return new RegExp(`(^|\\s)${needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$)`).test(hay);
+  let re = _phraseRe.get(needle);
+  if (!re) {
+    re = new RegExp(`(^|\\s)${needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$)`);
+    if (_phraseRe.size > 2000) _phraseRe.clear();
+    _phraseRe.set(needle, re);
+  }
+  return re.test(hay);
 }
 // The curated family a query belongs to (or null). Exact member match first, then whole-word
 // containment either direction for queries ≥4 chars (so "warehouse" hits "warehouse associate"
 // and "asset protection specialist" hits "asset protection").
+// A pure function of the query over a constant table, asked once per row ranked: remembered per query.
+const _familyMemo = new Map();
 function _familyFor(query) {
+  const key = String(query ?? '');
+  if (_familyMemo.has(key)) return _familyMemo.get(key);
+  const fam = _familyForUncached(query);
+  if (_familyMemo.size > 2000) _familyMemo.clear();
+  _familyMemo.set(key, fam);
+  return fam;
+}
+function _familyForUncached(query) {
   const qn = _norm(query);
   if (!qn) return null;
   for (const fam of ROLE_FAMILIES) if (fam.includes(qn)) return fam;
@@ -183,10 +202,17 @@ export function effectiveSynonyms(query, extra = []) {
 
 // True iff a synonym appears in the title as a real token/phrase (word-boundary for a
 // single word so "cannabis" doesn't match inside another word; substring for a phrase).
+const _synRe = new Map();
 function titleHasSynonym(title, syn) {
   if (!syn) return false;
   if (syn.includes(' ')) return title.includes(syn);
-  return new RegExp(`(^|[^a-z0-9])${syn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-z0-9]|$)`).test(title);
+  let re = _synRe.get(syn);
+  if (!re) {
+    re = new RegExp(`(^|[^a-z0-9])${syn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-z0-9]|$)`);
+    if (_synRe.size > 2000) _synRe.clear();
+    _synRe.set(syn, re);
+  }
+  return re.test(title);
 }
 
 // A query TOKEN is in the title only as a whole word (plural / -ing / -er / -ed forms allowed):

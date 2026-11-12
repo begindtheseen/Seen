@@ -21,6 +21,15 @@ import { isReadableResume } from '../lib/server/resumeReadability.js';
 import { JOB_INSIGHTS_VERSION } from '../lib/jobInsightsVersion.js';
 import { createHash } from 'node:crypto';
 
+// Every outbound call made from this module has a deadline (production 2026-11-11: one call ran into the 20 s
+// function limit while the database was stalled). A call that names its own signal keeps it.
+const OUTBOUND_TIMEOUT_MS = 6000;
+const fetch = (url, opts = {}) => globalThis.fetch(url, opts && opts.signal ? opts : { ...(opts || {}), signal: AbortSignal.timeout(OUTBOUND_TIMEOUT_MS) });
+const withTimeout = (p, ms, fallback) => new Promise((resolve) => {
+  const t = setTimeout(() => resolve(fallback), ms);
+  Promise.resolve(p).then((v) => { clearTimeout(t); resolve(v); }, () => { clearTimeout(t); resolve(fallback); });
+});
+
 // The posting text an insight was built from, as a short stable key (whitespace-insensitive).
 export function hashText(text) {
   return createHash('sha256').update(String(text || '').replace(/\s+/g, ' ').trim()).digest('hex').slice(0, 16);
@@ -48,7 +57,20 @@ async function readOwnResume(req, SUPABASE_URL, SERVICE_KEY) {
   } catch { return ''; }
 }
 
+// Anything thrown below — a database call past its deadline above all — is answered at once, honestly, never at the
+// platform's 20 s limit.
 export default async function handler(req, res) {
+  try {
+    return await jobInsights(req, res);
+  } catch (e) {
+    const timedOut = e && (e.name === 'TimeoutError' || e.name === 'AbortError');
+    console.error('job-insights %s: %s', timedOut ? 'timeout' : 'error', String((e && e.message) || e).replace(/\n|\r/g, ' ').replace(/[^\x20-\x7e]/g, '').slice(0, 200));
+    if (res.headersSent) return;
+    return res.status(timedOut ? 503 : 500).json({ error: timedOut ? 'That took too long — try again.' : 'Something went wrong — try again.', cost: 0, charged: false });
+  }
+}
+
+async function jobInsights(req, res) {
   const _o = req.headers.origin || '';
   res.setHeader('Access-Control-Allow-Origin', !_o || _o.includes('localhost') || ['https://seenjobs.io','https://www.seenjobs.io'].includes(_o) ? (_o || '*') : 'https://seenjobs.io');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -67,7 +89,7 @@ export default async function handler(req, res) {
   // A pasted link is read as its posting (any career site or board — lib/server/fullPosting.js).
   const link = postingLink(jobDescription);
   if (link) {
-    const got = await readPostingLink(link).catch(() => null);
+    const got = await withTimeout(readPostingLink(link), 12_000, null);
     if (got && got.ok) jobDescription = got.description;
     else return res.status(200).json({ what_they_want: [], hidden_requirements: [], insider_tip: '', description_summary: '', _src: 'empty', link_failed: true, reason: got?.reason || 'unreachable', cost: 0, charged: false });
   }
@@ -100,7 +122,13 @@ export default async function handler(req, res) {
   // The signed-in person's default résumé, read in parallel with the build and the cache read (the same
   // profiles.resume_text mirror the other tools read). Guests, no readable résumé or a failed read → ''.
   const ownResume = readable ? readOwnResume(req, SUPABASE_URL, SUPABASE_SERVICE_KEY) : Promise.resolve('');
-  const taxonomy = readable ? await loadSkillTaxonomy().catch(() => null) : null;
+  // The shared cache row is asked for NOW, so its round trip overlaps the build below (it used to start after it).
+  const cacheRead = cacheKey && SUPABASE_URL && SUPABASE_SERVICE_KEY
+    ? fetch(`${SUPABASE_URL}/rest/v1/job_insights?job_id=eq.${encodeURIComponent(cacheKey)}&expires_at=gt.${new Date().toISOString()}&limit=1`, { headers: dbHeaders })
+      .then(async (r) => ({ ok: r.ok, rows: r.ok ? await r.json() : null }))
+      .catch((e) => ({ ok: false, error: e }))
+    : null;
+  const taxonomy = readable ? await loadSkillTaxonomy({ fetchImpl: fetch }).catch(() => null) : null;
   // THE SHARED BUILD: no résumé, ever — this is what the job_insights row (shared by every visitor) stores
   const parsed = readable
     ? buildJobInsights({ title: job, company, description: jobDescription, needsSummary: true, taxonomy })
@@ -119,14 +147,12 @@ export default async function handler(req, res) {
   const unreadBody = (p) => ({ ...p, what_they_want: [], _src: 'unread', cost: 0, charged: false,
     message: `${p.posting_note || "This listing doesn't state what it requires."} No credit used — if the employer's site has the full posting, paste it to analyze that.` });
 
-  if (cacheKey && SUPABASE_URL && SUPABASE_SERVICE_KEY) {
+  if (cacheRead) {
     try {
-      const checkRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/job_insights?job_id=eq.${encodeURIComponent(cacheKey)}&expires_at=gt.${new Date().toISOString()}&limit=1`,
-        { headers: dbHeaders }
-      );
+      const checkRes = await cacheRead;
+      if (checkRes.error) throw checkRes.error;
       if (checkRes.ok) {
-        const rows = await checkRes.json();
+        const rows = checkRes.rows;
         const list = Array.isArray(rows) ? rows : [];
         const row = list.find(r => r.job_id === cacheKey) || null;
         // a row that holds no read is never served as one

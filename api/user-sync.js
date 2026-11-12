@@ -2,7 +2,7 @@
 // The client sends its Supabase access token; we validate it here, then use the
 // service key to talk to the DB. No RLS policies required on the client side.
 
-import { resolveUid, sessionStillValid } from '../lib/server/supabaseJwt.js';
+import { resolveUid, sessionStillValidCached } from '../lib/server/supabaseJwt.js';
 import { rateLimit } from '../lib/server/ratelimit.js';
 import { broadcastActivity } from '../lib/server/realtime.js';
 import { buildOpportunities } from './_utils/opportunityEngine.js';
@@ -29,13 +29,37 @@ import { PROFILE_LIMITS, PROFILE_NAME_REQUIRED } from '../lib/profileLimits.js';
 import { cleanMode, cleanAlertsInput, prefsFromRow, isRemotePlace, MAX_ALERTS, ALERT_RADII } from '../lib/server/jobAlerts.js';
 import { sanitizeEvents, clientApplicationId, casWindow, timelineAnomalies, naturalKeyQuery, isMissingColumn, cleanText, COMPANY_MAX, ROLE_MAX, CITY_MAX, PLATFORM_MAX } from '../lib/server/trackerWrites.js';
 
+// Every outbound call made from this module has a deadline (production 2026-11-11: with the database stalled, a
+// call waited on a fetch with no timeout until the 15 s function limit, and Settings spun for 15 s before it
+// failed). A call that names its own signal keeps it. A timed-out call throws a TimeoutError, which the handler
+// below answers as 503 "took too long — try again" in seconds, never at the function limit.
+const OUTBOUND_TIMEOUT_MS = 6000;
+const fetch = (url, opts = {}) => globalThis.fetch(url, opts && opts.signal ? opts : { ...(opts || {}), signal: AbortSignal.timeout(OUTBOUND_TIMEOUT_MS) });
+
 // Does applications.client_id exist yet (migration 20261024130000)? Probed on use; a "no" is
 // re-checked every 10 minutes so an applied migration is picked up without a redeploy.
 let clientIdColumn = { ok: null, at: 0 };
 
+const PROFILE_CLIENT_COLUMNS = 'id,name,email,type,account_type,city,industry,experience,survey_completed,onboarding_survey,resume_text,resume_file_name,resume_word_count,resume_updated_at';
+const PROFILE_SERVER_ONLY = ['job_keys', 'job_keys_updated_at'];
+let profileColumnsOk = { ok: null, at: 0 };
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// One answer for anything thrown below — above all a database call past its deadline — so the person gets a clear
+// error at once instead of the platform's 500 after the 15 s limit.
 export default async function handler(req, res) {
+  try {
+    return await userSync(req, res);
+  } catch (e) {
+    const timedOut = e && (e.name === 'TimeoutError' || e.name === 'AbortError');
+    console.error('[user-sync] %s: %s', timedOut ? 'timeout' : 'error', String((e && e.message) || e).replace(/\n|\r/g, ' ').replace(/[^\x20-\x7e]/g, '').slice(0, 200));
+    if (res.headersSent) return;
+    return res.status(timedOut ? 503 : 500).json({ ok: false, error: timedOut ? 'That took too long — try again.' : 'Something went wrong — try again.', timeout: timedOut || undefined });
+  }
+}
+
+async function userSync(req, res) {
   const _o=req.headers.origin||'';
   const _devO=!_o||_o.includes('localhost')||_o.includes('127.0.0.1');
   res.setHeader('Access-Control-Allow-Origin',(_devO||['https://seenjobs.io','https://www.seenjobs.io'].includes(_o))?(_o||'*'):'https://seenjobs.io');
@@ -58,16 +82,47 @@ export default async function handler(req, res) {
   //  - the signature, verified locally (HS256 secret, else the project's ES256 JWKS cached in the warm
   //    function) — a forged or expired token never costs a network call;
   //  - "does this session still exist?" from the auth server, so "Sign out of all devices" ends the
-  //    other devices' access at once, not when their hour-long access token expires.
+  //    other devices' access within 30 s (the answer is kept that long per token), not when their
+  //    hour-long access token expires;
+  //  - for a write, the per-user write limit (below).
   // Before 2026-10-24 these were three SERIAL trips (rate limit → /auth/v1/user with no timeout → DB),
   // and an auth hiccup hung the whole call to the 15 s limit (the audit's 504s on trivial reads).
   const authOpts = { supabaseUrl: SUPABASE_URL, serviceKey: SERVICE_KEY };
+  let body = req.body;
+  if (typeof body === 'string') { try { body = JSON.parse(body); } catch(e) { body = {}; } }
+  const { action } = body || {};
+
+  // Rate-limit mutating actions per user as well (not reads — those are cheap DB fetches). Since 2026-11-12 this
+  // runs IN the first hop, as soon as the signature names the user (a local check), instead of as a second serial
+  // round trip after it; same key, same 300/hour cap, same fail-open on a limiter error, now with the 350 ms limit
+  // the IP gate has (it had no timeout: during the 2026-11-11 stall a save waited on it until the 15 s limit).
+  const WRITE_ACTIONS = new Set(['claim_referral','record_attribution','add_application','update_application','remove_application','save_job','unsave_job','save_profile','save_resume','delete_account','submit_resume_survey','report_job_availability','job_alerts_save']);
+  const isWrite = WRITE_ACTIONS.has(action) || RESUME_WRITE_ACTIONS.has(action);
+  const userWriteLimit = async (uidForLimit) => {
+    const windowHour = Math.floor(Date.now() / 3_600_000);
+    try {
+      const rlRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/increment_rate_limit`, {
+        method: 'POST',
+        headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ p_key: `${uidForLimit}:user-sync:${windowHour}`, p_ttl_seconds: 3600 }),
+        signal: AbortSignal.timeout(350),
+      });
+      if (!rlRes.ok) return true;
+      const count = await rlRes.json();
+      return !(count > 300);
+    } catch (_) { return true; /* fail open */ }
+  };
+
   const whoP = resolveUid(token, authOpts);
-  const aliveP = whoP.then((w) => (w && w.via !== 'auth_api' ? sessionStillValid(token, authOpts) : true));
-  const [{ allowed: ipOk }, who, alive] = await Promise.all([rateLimit(req, 'user-sync'), whoP, aliveP]);
+  // "Does this session still exist?" — asked of the auth server, the answer shared by the calls of one page load
+  // and kept 30 s (lib/server/supabaseJwt.js sessionStillValidCached says what that costs).
+  const aliveP = whoP.then((w) => (w && w.via !== 'auth_api' ? sessionStillValidCached(token, authOpts) : true));
+  const userOkP = isWrite ? whoP.then((w) => (w ? userWriteLimit(w.uid) : true)) : Promise.resolve(true);
+  const [{ allowed: ipOk }, who, alive, userOk] = await Promise.all([rateLimit(req, 'user-sync'), whoP, aliveP, userOkP]);
   if (!ipOk) return res.status(429).json({ error: 'Too many requests — slow down.' });
   if (!who) return res.status(401).json({ error: 'Invalid token' });
   if (alive === false) return res.status(401).json({ error: 'Session ended — sign in again.' });
+  if (!userOk) return res.status(429).json({ error: 'Too many requests — slow down.' });
   const uid = who.uid;
 
   // ── All DB calls use service key — bypasses RLS ─────────────────────────────
@@ -82,28 +137,7 @@ export default async function handler(req, res) {
     },
   });
 
-  let body = req.body;
-  if (typeof body === 'string') { try { body = JSON.parse(body); } catch(e) { body = {}; } }
-  const { action } = body || {};
   console.log(`[user-sync] action=${action} uid=${uid} auth=${who.via}`);
-
-  // Rate-limit mutating actions per user (not reads — those are cheap DB fetches)
-  const WRITE_ACTIONS = new Set(['claim_referral','record_attribution','add_application','update_application','remove_application','save_job','unsave_job','save_profile','save_resume','delete_account','submit_resume_survey','report_job_availability','job_alerts_save']);
-  if (WRITE_ACTIONS.has(action) || RESUME_WRITE_ACTIONS.has(action)) {
-    const windowHour = Math.floor(Date.now() / 3_600_000);
-    const rlKey = `${uid}:user-sync:${windowHour}`;
-    try {
-      const rlRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/increment_rate_limit`, {
-        method: 'POST',
-        headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ p_key: rlKey, p_ttl_seconds: 3600 }),
-      });
-      if (rlRes.ok) {
-        const count = await rlRes.json();
-        if (count > 300) return res.status(429).json({ error: 'Too many requests — slow down.' });
-      }
-    } catch(_) { /* fail open */ }
-  }
 
   // ── SAVED RÉSUMÉS (lib/server/resumes.js) — list / get / create / rename / delete / set_default ──
   // Free keeps MAX_RESUMES_FREE, Pro MAX_RESUMES_PRO; the default is mirrored into profiles.resume_text.
@@ -471,10 +505,20 @@ export default async function handler(req, res) {
   }
 
   // ── LOAD PROFILE ────────────────────────────────────────────────────────────
+  // The columns a client reads (lib/auth.tsx profile context, Settings, ResumeStore, the Optimize sheet) — never
+  // the server-only ones (job_keys, the matched-jobs profile, is a large jsonb). Before 2026-11-12 this was
+  // select=* and several calls a page load carried every column. A deployment missing one of these columns
+  // answers 400 once; the instance then reads * and drops the server-only keys (re-probed every 10 minutes).
   if (action === 'load_profile') {
-    const r = await db(`profiles?id=eq.${uid}&limit=1`);
+    const fresh = profileColumnsOk.ok !== false || Date.now() - profileColumnsOk.at > 600_000;
+    let r = fresh ? await db(`profiles?id=eq.${uid}&select=${PROFILE_CLIENT_COLUMNS}&limit=1`) : null;
+    if (r && r.status === 400) { profileColumnsOk = { ok: false, at: Date.now() }; r = null; }
+    else if (r) profileColumnsOk = { ok: true, at: Date.now() };
+    if (!r) r = await db(`profiles?id=eq.${uid}&limit=1`);
     const rows = r.ok ? await r.json() : [];
-    return res.status(200).json({ profile: rows[0] || null });
+    const row = rows[0] || null;
+    if (row) for (const k of PROFILE_SERVER_ONLY) delete row[k];
+    return res.status(200).json({ profile: row });
   }
 
   // ── SAVE PROFILE ────────────────────────────────────────────────────────────

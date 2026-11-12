@@ -132,7 +132,9 @@ test('every pool read is ordered and the title read is capped apart from the pro
   const stamp = pool.find((u) => /[?&]search_query=ilike\.\*team lead\*/.test(u));
   assert.ok(title && stamp, pool.join('\n'));
   assert.match(title, /limit=200\b/);
-  assert.ok(!/search_query/.test(title) && !/[?&]title=/.test(stamp), 'the two reads are separate');
+  // (every read now names its columns, search_query among them, so the FILTER is what is checked)
+  assert.ok(!/[?&]search_query=/.test(title) && !/[?&]title=/.test(stamp), 'the two reads are separate');
+  for (const u of pool) assert.ok(/[?&]select=/.test(u) && !/description/.test(u.split('select=')[1] || ''), `a pool read never selects the posting: ${u}`);
   // Two loads of one URL agree row for row.
   const x = await call({ query: 'team lead', location: 'Phoenix', radius: '25', db_only: true });
   const y = await call({ query: 'team lead', location: 'Phoenix', radius: '25', db_only: true });

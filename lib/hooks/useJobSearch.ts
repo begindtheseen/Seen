@@ -14,6 +14,7 @@ import { searchQueryString, readSearchQuery } from '@/lib/jobs/searchUrl.js'
 import { replaceSearchKeepingPlaces } from '@/lib/nav/urlState'
 import { radiusNotice, leadIds } from '@/lib/jobs/radiusNotice.js'
 import { matchesNiche } from '@/lib/jobs/jobFilters.js'
+import { resolvePlaceText } from '@/lib/geo/placesClient'
 
 // In-memory search cache: `${query}|${location}|${radius}` → the page as it was shown (rows, whether
 // the server has more, and the honest note/label it carried), so a repeat of the same search — Enter
@@ -91,6 +92,8 @@ function cachedSearch(key: string): CachedSearch | undefined {
 }
 // A repeat inside this window is answered from the cache alone (no background refresh).
 const FRESH_MS = 30 * 1000
+// The longest a title search waits for its answer (the server bounds its own reads; this bounds the network too).
+const SEARCH_DEADLINE_MS = 20_000
 
 // ── Sticky search location (Indeed-style) ────────────────────────────────────────────────
 // A location the user chose or searched persists across reloads/navigation so GPS/auto-fill
@@ -581,7 +584,9 @@ export function useJobSearch() {
       const geo = await r.json() as { address: Record<string, string> }
       const city = geo.address.city || geo.address.town || geo.address.village || geo.address.county || ''
       const state = geo.address.state || ''
-      const loc = city && state ? `${city}, ${state}` : city || state
+      const rawLoc = city && state ? `${city}, ${state}` : city || state
+      // Every place field holds one form, "City, ST": Nominatim's "Phoenix, Arizona" is put in it (unresolved → as is).
+      const loc = rawLoc ? await resolvePlaceText(rawLoc) : ''
       if (loc) {
         // A resolved GPS location IS an explicit "set" — persist it (via the wrapper) so it
         // survives reloads and GPS won't re-fire over it next visit.
@@ -657,7 +662,9 @@ export function useJobSearch() {
     if (topupTimerRef.current) { clearTimeout(topupTimerRef.current); topupTimerRef.current = null }
     setNotice(null)
 
-    const CACHE_TTL = 5 * 60 * 1000 // 5 min
+    // A repeat of a search seen in the last 30 min shows its rows at once while the fresh answer loads
+    // (was 5 min; past that the page went blank to "Searching..." for a search it had just shown).
+    const CACHE_TTL = RESTORE_MS
     if (cached && Date.now() - cached.ts < CACHE_TTL) {
       // Serve cached results immediately, then silently refresh in background
       showCached(cached, true)
@@ -680,10 +687,15 @@ export function useJobSearch() {
 
     // One automatic retry on a transient failure (cold start, flaky network) before
     // ever showing an error — a single blip should never surface as "Search failed".
+    // A search that has not answered in SEARCH_DEADLINE_MS is a failure the person can retry — never a spinner
+    // that waits for the server's 60 s limit.
+    let timedOut = false
     for (let attempt = 0; ; attempt++) {
+      let deadline: ReturnType<typeof setTimeout> | null = null
       try {
         const ctrl = new AbortController()
         abortRef.current = ctrl
+        deadline = setTimeout(() => { timedOut = true; ctrl.abort() }, SEARCH_DEADLINE_MS)
         const res = await fetch('/api/jobs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}) },
@@ -691,6 +703,7 @@ export function useJobSearch() {
           signal: ctrl.signal,
         })
         if (res.status === 429) {
+          clearTimeout(deadline)
           // The abuse ceiling (not a normal condition since search became tiered). Say what
           // it is instead of a generic failure — and don't burn the retry on it.
           done()
@@ -701,6 +714,7 @@ export function useJobSearch() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         type SearchResponse = { jobs?: unknown[]; results?: unknown[]; widened?: boolean; fallback?: 'outside_radius' | 'unrelated' | 'remote_thin' | null; radius?: number | null; location?: string; topup?: string | null; in_radius?: number | null; has_more?: boolean }
         const data = await res.json() as SearchResponse
+        clearTimeout(deadline)
         if (seq !== searchSeqRef.current) return // a newer search took over
         done()
         const raw: Job[] = toJobs(data.jobs || data.results || [], loc)
@@ -768,11 +782,19 @@ export function useJobSearch() {
         }
         return
       } catch (err) {
-        if ((err as Error).name === 'AbortError') return // superseded by a newer search
-        if (attempt < 1) { await new Promise(r => setTimeout(r, 1200)); continue }
+        if (deadline) clearTimeout(deadline)
+        if ((err as Error).name === 'AbortError' && !timedOut) return // superseded by a newer search
+        if (attempt < 1 && !timedOut) { await new Promise(r => setTimeout(r, 1200)); continue }
         done()
+        if (seq !== searchSeqRef.current) return
+        if (cached) {
+          // The earlier rows are on screen: keep them, and say the refresh did not come.
+          setStatus('done')
+          setStatusMsg(`${cached.jobs.length} result${cached.jobs.length !== 1 ? 's' : ''} from earlier — couldn’t refresh, try again`)
+          return
+        }
         setStatus('error')
-        setStatusMsg('Search failed. Please try again.')
+        setStatusMsg(timedOut ? 'Search is taking too long — please try again.' : 'Search failed. Please try again.')
         return
       }
     }
