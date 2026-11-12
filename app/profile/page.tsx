@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
-import { _sync } from '@/lib/sync'
+import { _sync, _syncRaw } from '@/lib/sync'
 import { markIntentionalSignOut } from '@/lib/sessionExpired'
 import { offerLine } from '@/lib/pricing'
 import { aiHeaders } from '@/lib/aiHeaders'
@@ -61,6 +61,7 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
   const [saveMsgOk, setSaveMsgOk] = useState(false)
+  const [saveFailed, setSaveFailed] = useState(false) // the last save did not land: the bar says so and offers Retry
   const [isPro, setIsPro] = useState(false)
   const [portalLoading, setPortalLoading] = useState(false)
   const [sub, setSub] = useState<{ status: string; cancel_at_period_end: boolean; current_period_end: number | null; amount: number | null; interval: string | null } | null>(null)
@@ -233,13 +234,22 @@ export default function ProfilePage() {
     setSaveMsg('')
     // A city typed and saved without leaving the box is put in its fixed form first ("boise id" → "Boise, ID").
     const cleanCity = clampProfileField('city', await resolvePlaceText(city))
-    const result = await _sync('save_profile', { profile: { ...(cleanName ? { name: cleanName } : {}), city: cleanCity, experience } }) as { ok?: boolean; error?: string } | null
-    if (!result || result.ok === false) {
-      setSaveMsg(result?.error || 'Save failed — please try again.')
+    // Never a 15 s spinner: an answer that has not come in 8 s is a failure the person can retry (the save is an
+    // upsert, so a late success and a retry land the same row). The server answers its own timeouts in seconds.
+    const SAVE_DEADLINE_MS = 8000
+    const sent = _syncRaw('save_profile', { profile: { ...(cleanName ? { name: cleanName } : {}), city: cleanCity, experience } })
+    const r = await Promise.race([sent, new Promise<null>((res) => setTimeout(() => res(null), SAVE_DEADLINE_MS))])
+    const result = (r && r.ok ? r.body : r ? r.body : null) as { ok?: boolean; error?: string } | null
+    if (!r || !r.ok || !result || result.ok === false) {
+      setSaveMsg(!r ? 'Saving is taking too long — check your connection and tap Retry.'
+        : r.status === 0 ? 'Couldn’t reach Seen — check your connection and tap Retry.'
+        : result?.error || 'Save failed — tap Retry.')
       setSaveMsgOk(false)
+      setSaveFailed(true)
       setSaving(false)
       return
     }
+    setSaveFailed(false)
     // Per-user cache (no cross-user bleed) so the saved values render instantly next time.
     writeProfileCache(user?.id, { name: cleanName, city: cleanCity, experience })
     setName(cleanName); setCity(cleanCity)
@@ -356,7 +366,7 @@ export default function ProfilePage() {
 
   const initial = (name || user?.email || 'S').trim().charAt(0).toUpperCase()
   const lvl: Record<string, string> = { entry: 'Entry level', mid: 'Mid level', senior: 'Senior', lead: 'Lead / Staff' }
-  const discard = () => { touched.current = { name: false, city: false, experience: false }; setName(initName); setCity(initCity); setExperience(initExperience); setSaveMsg('') }
+  const discard = () => { touched.current = { name: false, city: false, experience: false }; setName(initName); setCity(initCity); setExperience(initExperience); setSaveMsg(''); setSaveFailed(false) }
 
   return (
     <div className="page-full">
@@ -658,9 +668,9 @@ export default function ProfilePage() {
         {/* ── Unsaved changes: floats in the moment a field differs from what's saved ── */}
         {isDirty && (
           <div className={styles.saveBar} role="status">
-            <span className={styles.saveT}><b>Unsaved changes</b> · name, city or level</span>
+            <span className={styles.saveT}>{saveFailed && !saving ? <><b>Not saved</b> · {saveMsg}</> : <><b>Unsaved changes</b> · name, city or level</>}</span>
             <button type="button" className={styles.ghost} onClick={discard} disabled={saving}>Discard</button>
-            <button type="button" className={styles.primary} onClick={saveProfile} disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</button>
+            <button type="button" className={styles.primary} onClick={saveProfile} disabled={saving}>{saving ? 'Saving…' : saveFailed ? 'Retry' : 'Save changes'}</button>
           </div>
         )}
       </div>

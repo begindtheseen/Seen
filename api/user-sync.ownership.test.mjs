@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { PROFILE_LIMITS, PROFILE_NAME_REQUIRED } from '../lib/profileLimits.js';
 import { resetTablesReady } from '../lib/server/inbox/store.js';
+import { resetSessionCache, SESSION_CACHE_MS } from '../lib/server/supabaseJwt.js';
 
 process.env.SUPABASE_URL = 'https://db.test';
 process.env.SUPABASE_SERVICE_KEY = 'service';
@@ -27,7 +28,9 @@ const head = b64({ alg: 'HS256', typ: 'JWT' });
 const pay = b64({ sub: UID, exp: Math.floor(Date.now() / 1000) + 3600 });
 const TOKEN = `${head}.${pay}.${createHmac('sha256', 'jwt-secret').update(`${head}.${pay}`).digest('base64url')}`;
 
-function install({ sessionAlive = true, hopMs = 0 } = {}) {
+function install({ sessionAlive = true, hopMs = 0, keepSessionCache = false } = {}) {
+  // The session answer is kept 30 s per token (lib/server/supabaseJwt.js); each install is a new window.
+  if (!keepSessionCache) resetSessionCache();
   const t = {
     applications: [
       { id: MINE, user_id: UID, company_name: 'Walmart', role: 'Cashier', status: 'active', stage: 'Applied', events: [] },
@@ -196,6 +199,22 @@ test('H2 + C1: the session check runs BESIDE the rate-limit RPC (one hop), and a
   const gone = await call({ action: 'load' });
   assert.equal(gone.status, 401);
   assert.ok(!c2.some((c) => c.startsWith('GET /rest/v1/applications')), 'no data read for a revoked session');
+});
+
+test('the session answer is shared by one page load and kept 30 s: a revocation lands within that window', async () => {
+  const { calls } = install({ hopMs: 10 });
+  const rs = await Promise.all([call({ action: 'load_profile' }), call({ action: 'load' }), call({ action: 'get_credits' })]);
+  assert.deepEqual(rs.map((r) => r.status), [200, 200, 200]);
+  assert.equal(calls.filter((c) => c === 'GET /auth/v1/user').length, 1, 'three calls at once ask the auth server once');
+  // "Sign out of all devices" elsewhere: inside the window the kept answer stands; past it the call is refused.
+  install({ sessionAlive: false, keepSessionCache: true });
+  assert.equal((await call({ action: 'load_profile' })).status, 200, 'within 30 s');
+  const realNow = Date.now;
+  Date.now = () => realNow() + SESSION_CACHE_MS + 1000;
+  try {
+    assert.equal((await call({ action: 'load_profile' })).status, 401, 'after 30 s the revocation holds');
+  } finally { Date.now = realNow; }
+  assert.equal(SESSION_CACHE_MS, 30_000);
 });
 
 test('H2: an auth server that does not answer never hangs the call (signature already verified → served)', async () => {

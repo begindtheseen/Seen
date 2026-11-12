@@ -43,6 +43,11 @@ export async function _syncRaw(action: string, payload: Record<string, unknown> 
   return p
 }
 
+// The longest any button waits on an account call. The server bounds each of its own calls at 6 s and answers its
+// timeouts as a 503 in seconds; this bounds the network as well, so nothing spins to the 15 s function limit.
+// A call cut off here reads as status 0 (nothing confirmed), exactly like a dropped connection.
+export const SYNC_DEADLINE_MS = 12_000
+
 async function request(action: string, payload: Record<string, unknown>): Promise<SyncResult> {
   const token = await getToken()
   if (!token) {
@@ -54,6 +59,7 @@ async function request(action: string, payload: Record<string, unknown>): Promis
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ action, ...payload }),
+      signal: AbortSignal.timeout(SYNC_DEADLINE_MS),
     })
     const text = await r.text().catch(() => '')
     let body: unknown = null
@@ -70,7 +76,8 @@ async function request(action: string, payload: Record<string, unknown>): Promis
     }
     return { ok: r.ok, status: r.status, body }
   } catch (e) {
-    console.error(`[sync] ${action} network error:`, (e as Error).message)
+    const err = e as Error
+    console.error(`[sync] ${action} ${err.name === 'TimeoutError' ? 'timed out' : 'network error'}:`, err.message)
     return { ok: false, status: 0, body: null }
   }
 }
