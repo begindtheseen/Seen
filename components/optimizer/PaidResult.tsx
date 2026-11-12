@@ -12,13 +12,14 @@
 //  - BlockedResult: a different field / a failed hard gate — no changes, no questions, no message
 //  - PaidOffer + BuildSteps: what a credit will do for THIS job, from the probe's counts
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Icon from '@/components/ui/Icon'
 import Button from '@/components/ui/Button'
 import DocPage from '@/components/resume/DocPage'
 import { composeAnswer } from '@/lib/resume/engine-client'
 import type { ResumeDoc } from '@/lib/resume/types'
 import { applyToggles, isToggleable, defaultOn, promptFor, questionKind, blankLine } from './applyChanges.js'
+import { resumeFileName } from '@/lib/resume/downloadName.js'
 import s from './PaidResult.module.css'
 
 // ── server shapes (lib/resume/tailor/paid.js §1 of reports/t3-paid.md) ──
@@ -33,7 +34,9 @@ export interface Change {
 export interface Charge { charge: boolean; reason: string; sentence: string | null; headline?: string | null; detail?: string | null }
 export interface Blocked { reason: string; sentence: string; what_would_change_it?: string[]; carries_over?: { requirement: string; line: string }[] }
 export interface Question { id: string; kind: string; heading?: string; needs_role?: boolean; roles?: { itemId: string; title?: string; company?: string }[]; answerKind?: string | null; label?: string; facet?: string; question: string; unit?: string; requirement?: string | null; statement?: string | null; answer_kind?: string | null; term?: string; itemId?: string; role?: string; company?: string; template?: string; why?: string; bulletId?: string; line?: string; slot?: string }
-export interface Tailored { doc: ResumeDoc; text?: string; changes: Change[]; kept_as_is?: string | null; visibility?: { of: number; before: number; after: number }; charge?: Charge; score_before?: number | null; score_after?: number | null; export_token?: string | null; export_key?: string | null }
+/** Why one job is on the page (lib/resume/tailor/roleReasons.js): what the version does with it, in one sentence. */
+export interface RoleReason { itemId: string; title: string; company: string; decision: 'full' | 'trimmed' | 'condensed' | 'dropped'; shown: number; of: number; labels: string[]; sentence: string }
+export interface Tailored { doc: ResumeDoc; text?: string; changes: Change[]; kept_as_is?: string | null; visibility?: { of: number; before: number; after: number }; charge?: Charge; score_before?: number | null; score_after?: number | null; export_token?: string | null; export_key?: string | null; roles?: RoleReason[]; variant?: { index: number; moves: string[]; of: number } | null }
 export interface ChangeCounts { reorder?: number; summary?: number; skills?: number; rewrites?: number; proposals?: number; questions?: number; availability?: number; formatting?: number }
 
 const SUB_ORDER = ['summary', 'reorder', 'skills', 'rewrite', 'cut', 'heading', 'format']
@@ -292,6 +295,25 @@ export function AlreadyRightBlock({ a }: { a?: AlreadyRight | null }) {
   )
 }
 
+/** Why each job is on the page — one sentence per role from the version's own decisions (never a skill it does not show). */
+export function RoleReasons({ roles }: { roles?: RoleReason[] | null }) {
+  if (!roles || !roles.length) return null
+  return (
+    <section className={s.section} aria-label="Why each job is on it" data-testid="role-reasons">
+      <h3 className={s.h3}>Why each job is on it</h3>
+      <ul className={s.list}>
+        {roles.map((r) => (
+          <li key={r.itemId} className={s.card} data-decision={r.decision} data-testid="role-reason">
+            <p className={s.kind}>{[r.title, r.company].filter(Boolean).join(' · ')}</p>
+            {/* the sentence opens with what the page does with the job ("Kept in full: …", "Condensed to one line …") */}
+            <p className={s.why}>{r.sentence}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
 /** The changes the person can read, accept and undo — most substantive first, the re-typesetting last. */
 export function ChangeList({ t, v, readOnly = false }: { t: Tailored; v: PaidVersion; readOnly?: boolean }) {
   const changes = [...(t.changes || [])].sort((a, b) => SUB_ORDER.indexOf(a.type) - SUB_ORDER.indexOf(b.type))
@@ -311,11 +333,12 @@ export function QuestionList({ questions, v }: { questions: Question[]; v: PaidV
 }
 
 /** The top line: what the credit bought (the server's own measure) and the charge truth. */
-export function ResultTopLine({ charge, charged, cached, pro, balance, cost, vis }: { charge?: Charge | null; charged?: boolean; cached?: boolean; pro?: boolean | null; balance?: number | null; cost: string; vis?: { of: number; before: number; after: number } | null }) {
+export function ResultTopLine({ charge, charged, cached, pro, balance, cost, vis, variant = false }: { charge?: Charge | null; charged?: boolean; cached?: boolean; pro?: boolean | null; balance?: number | null; cost: string; vis?: { of: number; before: number; after: number } | null; variant?: boolean }) {
   // the result's headline number: ONE figure pair from the first-read planner (now / of), with "before" beside it —
   // shown only when the credit bought it; a free result leads with the server's reason sentence instead
   const fig = charge?.charge && vis && vis.of > 0 && vis.after > vis.before ? vis : null
-  const truth = cached ? 'Already built for this job — no credit used'
+  const truth = variant ? 'Another version of the build you paid for — no extra credit'
+    : cached ? 'Already built for this job — no credit used'
     : charged && pro !== true ? `${cost} used${balance != null ? ` · ${balance} left` : ''}`
     : pro === true && charge?.charge ? 'Included with Pro'
     : 'No credit used'
@@ -351,6 +374,7 @@ export function PaidResult({ t, questions, v, defaultView, alreadyRight }: { t: 
       {view === 'changes'
         ? <>
             <ChangeList t={t} v={v} />
+            <RoleReasons roles={t.roles} />
             <QuestionList questions={questions} v={v} />
           </>
         : v.doc && <>
@@ -451,29 +475,120 @@ export function paidExportFields(t?: PaidExport | null): { exportToken?: string;
   return t && t.export_token && t.export_key ? { exportToken: t.export_token, exportKey: t.export_key } : {}
 }
 
-/** Download the person's CURRENT version (accepted changes only) through the Studio export — never the upload. */
-export function DownloadVersion({ doc, paid }: { doc: ResumeDoc | null; paid?: PaidExport | null }) {
-  const [state, setState] = useState<'idle' | 'busy' | 'failed'>('idle')
-  if (!doc) return null
-  const name = (() => { const n = String(doc.basics?.name || '').replace(/[^\w .'-]/g, '').trim(); return /^[A-Za-z][\w.'-]*(\s+[A-Za-z][\w.'-]*){1,3}$/.test(n) ? `${n} - Resume` : 'Resume' })()
-  async function get(format: 'pdf' | 'docx') {
-    setState('busy')
-    try {
-      const { aiHeaders } = await import('@/lib/aiHeaders')
-      const res = await fetch('/api/resume', { method: 'POST', headers: await aiHeaders(), body: JSON.stringify({ action: 'export', doc, format, ...paidExportFields(paid) }) })
-      if (!res.ok) { setState('failed'); return }
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a'); a.href = url; a.download = `${name}.${format}`
-      document.body.appendChild(a); a.click(); a.remove()
-      setTimeout(() => URL.revokeObjectURL(url), 10000)
-      setState('idle')
-    } catch { setState('failed') }
+type FileState = 'idle' | 'building' | 'failed'
+function saveBlob(blob: Blob, name: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = name; a.rel = 'noopener'
+  document.body.appendChild(a); a.click(); a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 60_000)
+}
+
+/**
+ * The files of the person's CURRENT version (accepted changes only), made through the Studio export — never the upload.
+ * Both are prepared in the background as soon as the version is on screen (and again once a toggle settles), so the tap
+ * only saves a Blob that is already there: "Download this version" saves the Word file, "View it" opens the PDF in a new
+ * tab, "PDF" saves it. A tap before the file is ready waits on the same request (one per file per version).
+ */
+export function useVersionFiles(doc: ResumeDoc | null, paid: PaidExport | null | undefined, { jobTitle = '', enabled = true }: { jobTitle?: string; enabled?: boolean } = {}) {
+  const key = doc ? `${JSON.stringify(doc)}|${paid?.export_token || ''}` : ''
+  const [files, setFiles] = useState<{ key: string; docx?: Blob; pdf?: Blob }>({ key: '' })
+  const [state, setState] = useState<Record<'docx' | 'pdf', FileState>>({ docx: 'idle', pdf: 'idle' })
+  const inflight = useRef<Record<string, Promise<Blob | null>>>({})
+  const docRef = useRef(doc); docRef.current = doc
+  const paidRef = useRef(paid); paidRef.current = paid
+  const build = useCallback((format: 'docx' | 'pdf'): Promise<Blob | null> => {
+    const k = `${format}:${key}`
+    const running = inflight.current[k]
+    if (running) return running
+    const d = docRef.current
+    if (!d) return Promise.resolve(null)
+    const p = (async () => {
+      try {
+        const { aiHeaders } = await import('@/lib/aiHeaders')
+        const res = await fetch('/api/resume', { method: 'POST', headers: await aiHeaders(), body: JSON.stringify({ action: 'export', doc: d, format, ...paidExportFields(paidRef.current) }) })
+        return res.ok ? await res.blob() : null
+      } catch { return null }
+    })()
+    inflight.current[k] = p
+    void p.then((b) => {
+      if (!b) { delete inflight.current[k]; return }
+      setFiles((f) => (f.key === key ? { ...f, [format]: b } : { key, [format]: b }))
+    })
+    return p
+  }, [key])
+  // prepare both files once the version settles (a toggle re-prepares after a short pause)
+  useEffect(() => {
+    if (!enabled || !key) return
+    setState({ docx: 'idle', pdf: 'idle' })
+    const t = setTimeout(() => { void build('docx').then(() => build('pdf')) }, 250)
+    return () => clearTimeout(t)
+  }, [enabled, key, build])
+  const name = (ext: 'docx' | 'pdf') => resumeFileName(doc?.basics?.name, jobTitle, ext)
+  const ready = (format: 'docx' | 'pdf') => (files.key === key ? files[format] : undefined)
+  async function save(format: 'docx' | 'pdf') {
+    const have = ready(format)
+    if (have) { saveBlob(have, name(format)); setState((x) => ({ ...x, [format]: 'idle' })); return }
+    setState((x) => ({ ...x, [format]: 'building' }))
+    const b = await build(format)
+    if (b) { saveBlob(b, name(format)); setState((x) => ({ ...x, [format]: 'idle' })) } else setState((x) => ({ ...x, [format]: 'failed' }))
   }
+  async function view() {
+    const have = ready('pdf')
+    if (have) { window.open(URL.createObjectURL(have), '_blank', 'noopener'); return }
+    // the tab opens inside the tap (a popup blocker allows it); the file goes into it when it arrives
+    const w = window.open('', '_blank')
+    setState((x) => ({ ...x, pdf: 'building' }))
+    const b = await build('pdf')
+    if (b && w) { w.location.href = URL.createObjectURL(b); setState((x) => ({ ...x, pdf: 'idle' })) } else if (b) { saveBlob(b, name('pdf')); setState((x) => ({ ...x, pdf: 'idle' })) } else { if (w) w.close(); setState((x) => ({ ...x, pdf: 'failed' })) }
+  }
+  return { download: () => save('docx'), pdf: () => save('pdf'), view, state, ready: { docx: !!ready('docx'), pdf: !!ready('pdf') }, fileName: name('docx') }
+}
+export type VersionFiles = ReturnType<typeof useVersionFiles>
+
+/** The download block's quiet line: what failed, and the one tap that retries it. */
+export function DownloadFailed({ files }: { files: VersionFiles }) {
+  const which = files.state.docx === 'failed' ? 'docx' : files.state.pdf === 'failed' ? 'pdf' : null
+  if (!which) return null
   return (
-    <div className={s.qActions} data-testid="download-version">
-      <Button variant="primary" icon="download" onClick={() => { void get('pdf') }} disabled={state === 'busy'}>{state === 'busy' ? 'Preparing…' : state === 'failed' ? 'Try the download again' : 'Download this version'}</Button>
-      <button type="button" className={s.toggle} onClick={() => { void get('docx') }} disabled={state === 'busy'}>Word (.docx)</button>
+    <p className={s.problem} role="alert" data-testid="download-failed">
+      <Icon name="triangle-alert" size={14} label="Failed" />
+      <span>{which === 'docx' ? 'The Word file did not download.' : 'The PDF did not open.'} Nothing was charged. <button type="button" className={s.retry} onClick={() => { void (which === 'docx' ? files.download() : files.view()) }} data-testid="download-retry">Retry</button></span>
+    </p>
+  )
+}
+
+/** Download the person's CURRENT version: the Word file at once, with "View it" (the PDF) and "PDF" under it. */
+export function DownloadVersion({ doc, paid, jobTitle = '' }: { doc: ResumeDoc | null; paid?: PaidExport | null; jobTitle?: string }) {
+  const files = useVersionFiles(doc, paid, { jobTitle, enabled: !!doc })
+  if (!doc) return null
+  return (
+    <div className={s.download} data-testid="download-version">
+      <Button variant="primary" icon="download" onClick={() => { void files.download() }} disabled={files.state.docx === 'building'} data-testid="download-docx">{files.state.docx === 'building' ? 'Preparing…' : 'Download this version'}</Button>
+      <DownloadFailed files={files} />
+      <div className={s.qActions}>
+        <button type="button" className={s.toggle} onClick={() => { void files.view() }} disabled={files.state.pdf === 'building'} data-testid="download-view">{files.state.pdf === 'building' ? 'Opening…' : 'View it'}</button>
+        <button type="button" className={s.toggle} onClick={() => { void files.pdf() }} data-testid="download-pdf">PDF</button>
+      </div>
     </div>
+  )
+}
+
+/** Re-optimize: the versions made for this posting, what the one on screen changed, and the way back. */
+export function VersionBar({ index, total, note, from, max, canMore, busy, message, onMore, onGo }: { index: number; total: number; note?: string; from?: number; max: number; canMore: boolean; busy: boolean; message?: string; onMore: () => void; onGo: (i: number) => void }) {
+  const more = total - 1
+  return (
+    <section className={s.versions} aria-label="Versions" data-testid="version-bar">
+      {total > 1 && <p className={s.kind} data-testid="version-head">Version {index + 1} of {total}</p>}
+      {index > 0 && note && <p className={s.after} data-testid="version-note">{from != null && from !== index - 1 ? `Compared with version ${from + 1}: ` : ''}{note}</p>}
+      <div className={s.qActions}>
+        {index > 0 && <button type="button" className={s.toggle} onClick={() => onGo(index - 1)} data-testid="version-back">Back to version {index}</button>}
+        {index < total - 1 && <button type="button" className={s.toggle} onClick={() => onGo(index + 1)} data-testid="version-next">Version {index + 2}</button>}
+        {canMore && <button type="button" className={s.toggle} onClick={onMore} disabled={busy} aria-busy={busy} data-testid="modal-reoptimize">{busy ? 'Building another version…' : 'Re-optimize — try a different version'}</button>}
+      </div>
+      {canMore && total === 1 && !message && <p className={s.why}>No extra credit — up to {max} more versions of this build, each from your own lines.</p>}
+      {message && <p className={s.why} data-testid="version-message">{message}</p>}
+      {!canMore && !message && more >= max && <p className={s.why} data-testid="version-max">That is every version Seen makes for this job — {max} besides the first, none of them charged.</p>}
+    </section>
   )
 }

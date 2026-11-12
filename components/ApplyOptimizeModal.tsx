@@ -34,7 +34,8 @@ import { markOptimized } from '@/lib/optimizedJobs'
 import { RequirementsView, Checklist, PlanChanges, CopyBtn, planChangeCount, type Verdict, type RequirementRow, type ConstraintRow, type PaidPlan } from './optimizer/Verdict'
 import FitRead, { type Statement, type FieldMatch, type Answer } from './optimizer/FitRead'
 import { confirmedOf, withAnswer, type Stored } from './optimizer/useConfirmations'
-import { PaidResult, BlockedResult, ResultTopLine, PaidOffer, BuildSteps, usePaidVersion, type AlreadyRight, paidExportFields, type Tailored, type Charge, type Blocked, type ChangeCounts, type Question } from './optimizer/PaidResult'
+import { PaidResult, BlockedResult, ResultTopLine, PaidOffer, BuildSteps, usePaidVersion, useVersionFiles, DownloadFailed, VersionBar, type AlreadyRight, type Tailored, type Charge, type Blocked, type ChangeCounts, type Question } from './optimizer/PaidResult'
+import { describeVersionChange } from '@/lib/resume/tailor/versionDiff.js'
 import { renderText } from '@/lib/resume/engine-client'
 import PostingInput, { PostingReadRow, type PostingRead } from './jobs/PostingInput'
 import ResumePicker from './resume/ResumePicker'
@@ -166,10 +167,13 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
     if (answersKey) { try { localStorage.setItem(answersKey, JSON.stringify(n)) } catch { /* storage unavailable */ } }
     if (a !== 'skip') void reask(confirmedOf(n))
   }
-  // the downloadable version: built from the CURRENT document (accepted changes only), pre-built so the
-  // download runs inside the tap (iOS); keyed by the document so a toggle never serves a stale file
-  const [pdf, setPdf] = useState<{ key: string; blob: Blob } | null>(null)
-  const [pdfState, setPdfState] = useState<'idle' | 'building' | 'failed'>('idle')
+  // Re-optimize: every version made for this posting (the paid build is version 1), the one on screen, and what the
+  // request for another one needs — the SAME posting body the paid build sent (its export token is bound to that key)
+  const [versions, setVersions] = useState<{ r: OptimizeResult; note: string; from: number }[]>([])
+  const [vi, setVi] = useState(0)
+  const [reopt, setReopt] = useState<{ state: 'idle' | 'busy' | 'done'; message: string }>({ state: 'idle', message: '' })
+  const [maxVariants, setMaxVariants] = useState(3)
+  const paidBody = useRef<Record<string, unknown> | null>(null)
   // lines of the résumé the parser could not place — named on screen before anything is scored (no silent loss)
   const resumeDoc = useMemo(() => { try { return resumeText.length > 50 ? parseResumeText(resumeText) : null } catch { return null } }, [resumeText])
 
@@ -204,7 +208,7 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
     if (!text || text.length <= 50) { setPickErr('Could not open that résumé — try again.'); return }
     setResumeId(r.id)
     setResumeText(text)
-    setResult(null); setDiag(null); setProbe(null); setPdf(null)
+    setResult(null); setDiag(null); setProbe(null)
     void prepare(text, ctx)
   }
   const showPicker = ['choose', 'review', 'needs-posting', 'no-requirements'].includes(step)
@@ -267,7 +271,7 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
       if (pr.error === 'no_requirements') { setNoReqNote(pr.message || NO_REQUIREMENTS_NOTE); setDiag(diagRes.ok && d.verdict ? d : null); setStep('no-requirements'); return }
       if (pr.error === 'RESUME_CORRUPTED') { setStep('resume-corrupted'); return }
       // already built for this job + résumé in the last 7 days: the result comes back, no credit
-      if (probeRes.ok && pr.cached) { showResult(pr); return }
+      if (probeRes.ok && pr.cached) { paidBody.current = { resume: text, ...body }; showResult(pr); return }
       if (probeRes.ok) setProbe(pr)
       setDiag(diagRes.ok && d.verdict ? d : null)
       setStep('choose')
@@ -300,7 +304,7 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
     const c: PostingCtx = other
       ? { pasted: t, title: '', company: '', other: true, link: httpHref(/^https?:\/\//i.test(t) ? t : `https://${t}`) }
       : { pasted: t, title: job.title, company: job.company, other: false, link: null }
-    setCtx(c); setResult(null); setDiag(null); setPdf(null)
+    setCtx(c); setResult(null); setDiag(null)
     void prepare(resumeText, c)
   }
   function correctPosting(v: { title: string; company: string }) {
@@ -311,6 +315,7 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
 
   function showResult(data: OptimizeResult) {
     setResult(data)
+    setVersions([{ r: data, note: '', from: 0 }]); setVi(0); setReopt({ state: 'idle', message: '' })
     if (!ctx.other) markOptimized(user?.id, job.id)
     setStep('review')
   }
@@ -334,12 +339,13 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
   useEffect(() => { refreshCredits() }, [refreshCredits, user?.id])
 
   async function runOptimize(fresh = false) {
-    setStep('optimizing'); setError(''); setPdf(null)
+    setStep('optimizing'); setError('')
     try {
       const headers = await aiHeaders()
+      const sent = { resume: resumeText, ...postingBody(ctx) }
       const r = await fetch('/api/resume', {
         method: 'POST', headers,
-        body: JSON.stringify({ tool: 'optimize', resume: resumeText, ...postingBody(ctx), ...(fresh ? { fresh: true } : {}) }),
+        body: JSON.stringify({ tool: 'optimize', ...sent, ...(fresh ? { fresh: true } : {}) }),
       })
       if (!r.ok) {
         const e = await r.json().catch(() => ({})) as ApiErr
@@ -353,6 +359,7 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
       }
       const data = await r.json() as OptimizeResult
       if (data.charged) { window.dispatchEvent(new Event('seen:credits-updated')); void refreshCredits() }
+      paidBody.current = sent
       showResult(data)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Could not build your version — try again.')
@@ -366,48 +373,40 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
 
   // ── the person's version: the server's finished résumé + their toggles and answers (kept for this tab) ──
   const tailored = result && !result.blocked && result.tailored && result.tailored.doc ? result.tailored : null
-  const version = usePaidVersion(tailored, user?.id ? `${user.id}:${job.id}:${ctx.pasted ? 'p' : 'l'}:${resumeText.length}` : '')
-  const docKey = version.doc ? JSON.stringify(version.doc) : ''
-  const fileBase = (() => {
-    const n = String(version.doc?.basics?.name || '').replace(/[^\w .'-]/g, '').trim()
-    return /^[A-Za-z][\w.'-]*(\s+[A-Za-z][\w.'-]*){1,3}$/.test(n) ? `${n} - Resume` : 'Resume'
-  })()
+  // each version keeps its own toggles and answers (its change ids are its own)
+  const version = usePaidVersion(tailored, user?.id ? `${user.id}:${job.id}:${ctx.pasted ? 'p' : 'l'}:${resumeText.length}:v${vi}` : '')
+  // the Word file and the PDF of the CURRENT version, prepared in the background so the tap only saves them
+  const files = useVersionFiles(version.doc, tailored, { jobTitle: (ctx.other ? read?.title || ctx.title : job.title) || '', enabled: step === 'review' && !!tailored })
 
-  async function exportVersion(format: 'pdf' | 'docx'): Promise<Blob | null> {
-    if (!version.doc) return null
-    const res = await fetch('/api/resume', { method: 'POST', headers: await aiHeaders(), body: JSON.stringify({ action: 'export', doc: version.doc, format, ...paidExportFields(tailored) }) })
-    if (!res.ok) return null
-    return await res.blob()
+  // Re-optimize: another honest version of THIS paid build (same posting, résumé and answers — the server checks the
+  // export token it issued for them). Never charged; up to `maxVariants` more; the screen says what changed.
+  const paidToken = versions[0]?.r.tailored?.export_token || null
+  const paidKey = versions[0]?.r.tailored?.export_key || null
+  const canReoptimize = !!(tailored && paidToken && paidKey && paidBody.current) && reopt.state !== 'done' && versions.length <= maxVariants
+  async function reoptimize() {
+    if (!canReoptimize || reopt.state === 'busy') return
+    const next = versions.length
+    setReopt({ state: 'busy', message: '' })
+    try {
+      const r = await fetch('/api/resume', { method: 'POST', headers: await aiHeaders(), body: JSON.stringify({ tool: 'optimize', ...paidBody.current, variant: next, exportToken: paidToken, exportKey: paidKey }) })
+      const data = await r.json().catch(() => ({})) as OptimizeResult & ApiErr & { variant_exhausted?: boolean; sentence?: string; max_variants?: number }
+      if (needsSignIn(r.status, data)) { setStep('signin'); return }
+      if (r.ok && data.variant_exhausted) { setReopt({ state: 'done', message: data.sentence || 'There is no other honest version for this job.' }); return }
+      if (!r.ok || !data.tailored || !data.tailored.doc) { setReopt({ state: 'idle', message: 'Another version did not build. No credit was used — try again.' }); return }
+      if (typeof data.max_variants === 'number') setMaxVariants(data.max_variants)
+      const shown = versions[vi]?.r.tailored?.doc || null
+      const note = describeVersionChange(shown, data.tailored.doc)
+      setVersions((xs) => [...xs, { r: data, note, from: vi }])
+      setVi(next); setResult(data)
+      setReopt({ state: next >= (data.max_variants ?? maxVariants) ? 'done' : 'idle', message: '' })
+    } catch {
+      setReopt({ state: 'idle', message: 'Another version did not build. No credit was used — try again.' })
+    }
   }
-  // pre-build the PDF of the current version (debounced: a toggle re-builds once the person pauses)
-  useEffect(() => {
-    if (step !== 'review' || !version.doc) return
-    if (pdf && pdf.key === docKey) return
-    let live = true
-    const t = setTimeout(async () => {
-      setPdfState('building')
-      try { const b = await exportVersion('pdf'); if (!live) return; if (b) { setPdf({ key: docKey, blob: b }); setPdfState('idle') } else setPdfState('failed') } catch { if (live) setPdfState('failed') }
-    }, 500)
-    return () => { live = false; clearTimeout(t) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, docKey])
-
-  function saveBlob(blob: Blob, name: string) {
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url; a.download = name
-    document.body.appendChild(a); a.click(); a.remove()
-    setTimeout(() => URL.revokeObjectURL(url), 10000)
-  }
-  async function downloadPdf() {
-    if (pdf && pdf.key === docKey) { saveBlob(pdf.blob, `${fileBase}.pdf`); return }
-    setPdfState('building')
-    const b = await exportVersion('pdf').catch(() => null)
-    if (b) { setPdf({ key: docKey, blob: b }); setPdfState('idle'); saveBlob(b, `${fileBase}.pdf`) } else setPdfState('failed')
-  }
-  async function downloadDocx() {
-    const b = await exportVersion('docx').catch(() => null)
-    if (b) saveBlob(b, `${fileBase}.docx`); else setError('The Word file did not build — try the PDF, or try again.')
+  function goVersion(i: number) {
+    const v = versions[i]
+    if (!v) return
+    setVi(i); setResult(v.r)
   }
 
   // The posting the sheet is about: the listing's own link, or the link pasted for another posting.
@@ -473,11 +472,13 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
     </>
   } else if (step === 'review' && tailored) {
     foot = <>
-      <Button variant="primary" size="lg" full icon="download" onClick={() => { void downloadPdf() }} disabled={pdfState === 'building' && !pdf} data-testid="modal-download">
-        {pdfState === 'building' && !(pdf && pdf.key === docKey) ? 'Preparing your PDF…' : pdfState === 'failed' ? 'Try the download again' : 'Download this version'}
+      <Button variant="primary" size="lg" full icon="download" onClick={() => { void files.download() }} disabled={files.state.docx === 'building'} data-testid="modal-download">
+        {files.state.docx === 'building' ? 'Preparing your Word file…' : 'Download this version'}
       </Button>
+      <DownloadFailed files={files} />
       <div className={s.links}>
-        <button type="button" className={s.textBtn} onClick={() => { void downloadDocx() }} data-testid="modal-docx">Word (.docx)</button>
+        <button type="button" className={s.textBtn} onClick={() => { void files.view() }} disabled={files.state.pdf === 'building'} data-testid="modal-view">{files.state.pdf === 'building' ? 'Opening…' : 'View it'}</button>
+        <button type="button" className={s.textBtn} onClick={() => { void files.pdf() }} data-testid="modal-pdf">PDF</button>
         <button type="button" className={s.textBtn} data-done={copied === 'pkg' ? '1' : undefined} onClick={() => version.doc && copyText(renderText(version.doc), 'pkg')} data-testid="modal-copy-all">{copied === 'pkg' ? 'Copied' : 'Copy text'}</button>
         {applyHref && <button type="button" className={s.textBtn} onClick={openPosting} data-testid="modal-apply">{ctx.other ? 'Open this posting' : 'Apply'}<Icon name="arrow-up-right" size={14} /></button>}
       </div>
@@ -658,8 +659,12 @@ export default function ApplyOptimizeModal({ job, onClose, onApplied }: { job: J
             <>
               {errorBox}
               {readRow}
-              <ResultTopLine charge={result.charge || tailored.charge} charged={!!result.charged} cached={!!result.cached} pro={pro} balance={balance} cost={cost} vis={tailored.visibility || null} />
-              <BuildSteps steps={steps} />
+              <ResultTopLine charge={vi > 0 && !(result.charge || tailored.charge)?.charge ? null : (result.charge || tailored.charge)} charged={vi > 0 ? false : !!result.charged} cached={vi > 0 ? false : !!result.cached} variant={vi > 0} pro={pro} balance={balance} cost={cost} vis={tailored.visibility || null} />
+              {vi === 0 && <BuildSteps steps={steps} />}
+              {(paidToken || versions.length > 1) && (
+                <VersionBar index={vi} total={versions.length} note={versions[vi]?.note} from={versions[vi]?.from} max={maxVariants}
+                  canMore={canReoptimize} busy={reopt.state === 'busy'} message={reopt.message} onMore={() => { void reoptimize() }} onGo={goVersion} />
+              )}
               <PaidResult t={tailored} questions={result.questions || []} v={version} alreadyRight={(result as { already_right?: AlreadyRight | null }).already_right || null} />
               {result.availability && (
                 <section className={s.section} aria-label="Availability line">

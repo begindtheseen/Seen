@@ -284,7 +284,7 @@ function RewriteView({ out, copy, copied, onRerun, pro }: { out: PaidOptimize; c
     <div className="ai-stack" data-testid="resume-version">
       <ResultTopLine charge={x.charge || tailored.charge} charged={!!x.charged} cached={!!out.cached} pro={pro} balance={x.balance ?? null} cost={OPTIMIZE_PRICE} vis={tailored.visibility || null} />
       <PaidResult t={tailored} questions={(x.questions || []) as Question[]} v={version} alreadyRight={(x as { already_right?: AlreadyRight | null }).already_right || null} />
-      <DownloadVersion doc={version.doc} paid={tailored} />
+      <DownloadVersion doc={version.doc} paid={tailored} jobTitle={(out as { posting?: { title?: string | null } }).posting?.title || ''} />
       {out.application_message && (
         <details>
           <summary style={{ minHeight: 44, display: 'flex', alignItems: 'center', cursor: 'pointer', color: 'var(--accent)', fontWeight: 600, fontSize: 'var(--fs-sm)' }}>Message to the employer</summary>
