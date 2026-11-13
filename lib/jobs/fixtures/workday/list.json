@@ -1,0 +1,41 @@
+{
+ "total": 4,
+ "jobPostings": [
+  {
+   "title": "U.S. Rig Based Positions",
+   "externalPath": "/job/Odessa-TX-USA/US-Rig-Based-Positions_REQ-1",
+   "locationsText": "6 Locations",
+   "postedOn": "Posted 30+ Days Ago",
+   "bulletFields": [
+    "REQ-1"
+   ]
+  },
+  {
+   "title": "Saudi Arabia: CCTV Operator",
+   "externalPath": "/job/Saudi-Arabia-Office/Saudi-Arabia--CCTV-Operator_REQ-3048",
+   "locationsText": "Saudi Arabia Office",
+   "postedOn": "Posted Today",
+   "bulletFields": [
+    "REQ-3048"
+   ]
+  },
+  {
+   "title": "Experienced Senior Accountant, Corporate Accounting & Consolidations",
+   "externalPath": "/job/Tulsa-OK-USA/Experienced-Senior-Accountant--Consolidations---Intercompany-Accounting_REQ-2862",
+   "locationsText": "Tulsa-OK-USA",
+   "postedOn": "Posted 2 Days Ago",
+   "bulletFields": [
+    "REQ-2862"
+   ]
+  },
+  {
+   "title": "India: Accounts Payable Coordinator",
+   "externalPath": "/job/Taleigao---Goa/Accounts-Payable-Coordinator_REQ-3006-1",
+   "locationsText": "Taleigao - Goa",
+   "postedOn": "Posted 6 Days Ago",
+   "bulletFields": [
+    "REQ-3006"
+   ]
+  }
+ ]
+}
