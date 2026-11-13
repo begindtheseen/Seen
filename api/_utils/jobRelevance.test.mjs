@@ -328,3 +328,118 @@ test('ranking: a tighter title match outranks a buried one; the searcher\'s own 
   assert.equal(filterAndRank([unrelated, jencap], q, { fit }).length, 1);
   assert.ok(relevanceScore(walmart, q, { fit }) > relevanceScore(unrelated, q, { fit }));
 });
+
+// ── Oilfield and skilled trades (2026-11-13). Titles are real postings read for the research (Patterson-UTI,
+// Halliburton, Nabors, H&P, Liberty, TETRA boards; Indeed postings in resume-hiring-side.md §4) or real production rows.
+import { isTitleRelated as titleRelated } from './jobRelevance.js';
+const T = (title, company = 'Co') => ({ title, company, description: '', score: 50 });
+
+test('oilfield: a roustabout / oilfield search finds the field-hand titles employers use', () => {
+  for (const title of ['Floorhand - Oklahoma', 'Casing Floorhand- OKC', 'Derrickhand - Permian Basin', 'Motorhand - ETX / STX',
+    'Workover Rig Hand', 'NexTier Frac Equipment Operator WTX', 'Flowback Operator I', 'Lease Operator', 'ALASKA ROUSTABOUT',
+    'US Odessa: Operator Assistant Trainee - Frac/Acid', 'Entry Level Oilfield Operator - Wireline Logging & Perforating',
+    'Production Testing Operator', 'Pumping Operator NEX - WTX']) {
+    assert.equal(titleRelated(T(title), 'roustabout'), true, `roustabout ↔ ${title}`);
+    assert.equal(titleRelated(T(title), 'oilfield'), true, `oilfield ↔ ${title}`);
+    assert.equal(isRelevant(T(title), 'oil and gas'), true, `oil and gas ↔ ${title}`);
+  }
+  assert.equal(titleRelated(T('Floor Hand'), 'floorhand'), true);
+  assert.equal(titleRelated(T('Roughneck'), 'floorhand'), true);
+  assert.equal(titleRelated(T('Floorhand (Experienced) - Permian Basin'), 'roughneck'), true);
+  // beginner words around the trade word still reach the family
+  assert.equal(titleRelated(T('Floorhand - Colorado, Utah'), 'entry level roustabout'), true);
+  assert.equal(titleRelated(T('Floorhand - Colorado, Utah'), 'oilfield jobs no experience'), true);
+  assert.ok(expandQueryTerms('rig').includes('roustabout'));
+  assert.ok(expandQueryTerms('oil & gas').includes('floorhand'));
+});
+
+test('oilfield: haulers stay haulers; a CDL water hauler search does not call every rig job a match', () => {
+  assert.equal(titleRelated(T('CDL-A Water Hauler'), 'cdl water hauler'), true);
+  assert.equal(titleRelated(T('SAND HAULER'), 'cdl water hauler'), true);
+  assert.equal(titleRelated(T('Crude Oil Hauler'), 'cdl water hauler'), true);
+  assert.equal(titleRelated(T('Floorhand - Oklahoma'), 'cdl water hauler'), false);
+  // a CDL truck driver row is still relevant (the "cdl" word) but under "Other openings"
+  assert.equal(isRelevant(T('CDL A Truck Driver'), 'cdl water hauler'), true);
+  assert.equal(titleRelated(T('CDL A Truck Driver'), 'cdl water hauler'), false);
+});
+
+test('trades: helper ≈ apprentice ≈ trainee inside a trade title, and the trade nouns read their stand-ins', () => {
+  assert.equal(titleRelated(T('Electrician Helper'), 'apprentice electrician'), true);
+  assert.equal(titleRelated(T('Electrical Apprentice'), 'apprentice electrician'), true);
+  assert.equal(titleRelated(T('Electrical Trainee'), 'electrician helper'), true);
+  assert.equal(titleRelated(T('Plumbing Installer  Apprentice'), 'plumber apprentice'), true);
+  assert.equal(titleRelated(T("Plumbers Apprentice"), 'plumber apprentice'), true);
+  assert.equal(titleRelated(T('HVAC Technician Apprentice'), 'hvac helper'), true);
+  assert.equal(titleRelated(T('HVAC Install Helper'), 'hvac apprentice'), true);
+  assert.equal(titleRelated(T('Welder Helper'), 'welding apprentice'), true);
+  assert.equal(titleRelated(T('Apprentice Lineman/Groundman'), 'lineworker'), true);
+  assert.equal(titleRelated(T('Journeyman Lineworker'), 'lineman'), true);
+  assert.equal(titleRelated(T('Materials Groundman'), 'apprentice lineman'), true);
+  assert.equal(titleRelated(T('Diesel Technician Apprentice-Paid Training'), 'diesel mechanic apprentice'), true);
+  assert.equal(titleRelated(T('Fire Sprinkler Fitter Trainee'), 'pipefitter'), true);
+  // the beginner rung ranks above the journeyman for an apprentice search
+  const q = 'apprentice electrician';
+  assert.ok(relevanceScore(T('Electrician Helper'), q) > relevanceScore(T('Journeyman Electrician'), q));
+  assert.deepEqual(filterAndRank([T('Journeyman Electrician'), T('Electrician Helper'), T('Apprentice Piercer')], q).map((j) => j.title),
+    ['Electrician Helper', 'Journeyman Electrician', 'Apprentice Piercer']);
+});
+
+test('trades: "apprentice" / "helper" / "trainee" alone never widen into a trade; non-craft titles are not family matches', () => {
+  for (const q of ['apprentice', 'helper', 'trainee', 'apprentice piercer', 'public relations apprentice', 'no experience']) {
+    assert.deepEqual(expandQueryTerms(q), [], q);
+  }
+  // a trade search never calls these a match through its family
+  for (const [title, q] of [['Apprentice Piercer', 'electrician apprentice'], ['Winter 2027 Public Relations Apprentice - US Locations', 'apprenticeship'],
+    ['Field Service Technician (San Francisco)', 'oilfield'], ['Robotics Field Service Technician', 'roustabout'],
+    ['Production Operator - 2nd Shift', 'oilfield'], ['Equipment Operator | 1pm - 9:30pm', 'heavy equipment operator'],
+    ['Electrical Apprenticeship Instructor', 'apprentice electrician'], ['Journeyman Lineworker Instructor', 'apprentice lineman'],
+    ['Rig Manager - Permian Basin', 'roustabout'], ['Welding Engineer (Starship)', 'welder helper'], ['Driver Helper', 'electrician helper']]) {
+    assert.equal(titleRelated(T(title), q), false, `${q} ↛ ${title}`);
+  }
+  assert.equal(isRelevant(T('Apprentice Piercer'), 'electrician helper'), false);
+  assert.equal(isRelevant(T('Electrical Apprenticeship Instructor'), 'apprentice electrician'), false);
+  // the query's own words still match as before: an "apprentice" search lists every apprentice title
+  assert.equal(titleRelated(T('Apprentice Piercer'), 'apprentice'), true);
+  assert.equal(titleRelated(T('Journeyman Lineman Instructor'), 'lineman'), true);
+});
+
+test('trades: "apprenticeship" / "trades" reach the beginner rungs of every trade', () => {
+  for (const q of ['apprenticeship', 'trades', 'skilled trades', 'union apprenticeship', 'trade jobs']) {
+    for (const title of ['Electrical Apprentice', 'Plumbers Apprentice', 'HVAC Technician Apprentice', 'Welder Helper', 'Apprentice Lineman', 'Diesel Technician Apprentice-Paid Training']) {
+      assert.equal(titleRelated(T(title), q), true, `${q} ↔ ${title}`);
+    }
+  }
+  assert.equal(titleRelated(T('Journeyman Electrician'), 'apprenticeship'), false);
+});
+
+test('trades: a beginner-rung search keeps higher rungs and look-alike titles under "Other openings"', () => {
+  // production rows: still relevant by the trade word, never a family match for an apprentice / helper search
+  for (const [title, q] of [['Master Electrician', 'apprentice electrician'], ['Journeyman Electrician', 'electrician helper'],
+    ['TIG Welder (Starship) - Level 4/5', 'welder helper'], ['Diesel Mechanic Lead', 'diesel mechanic apprentice'], ['Master HVAC Technician', 'hvac helper']]) {
+    assert.equal(isRelevant(T(title), q), true, `${q} keeps ${title} in the pool`);
+    assert.equal(titleRelated(T(title), q), false, `${q} ↛ ${title}`);
+  }
+  // a plain trade search still matches every rung
+  assert.equal(titleRelated(T('Master Electrician'), 'electrician'), true);
+  // "electrician" ↔ "electrical" is not a stand-in: these production rows are not electrician matches
+  for (const title of ['Electrical Integration Intern - Avionics (Winter 2027)', 'Electrical Test Technician', 'Vehicle Electrical Integration Technician']) {
+    assert.equal(titleRelated(T(title), 'electrician'), false, title);
+  }
+});
+
+test('trades: families stay apart — an electrician search is not a plumbing match, operators are not mechanics', () => {
+  assert.equal(titleRelated(T('Plumbing Apprentice'), 'apprentice electrician'), false);
+  assert.equal(titleRelated(T('Heavy Equipment Shop Technician (Mechanic)'), 'heavy equipment operator'), false);
+  assert.equal(titleRelated(T('Excavator Operator'), 'heavy equipment operator'), true);
+  assert.equal(titleRelated(T('Excavator Operator'), 'equipment operator'), true);
+  assert.equal(titleRelated(T('Heavy Equipment Shop Technician (Mechanic)'), 'diesel mechanic'), true);
+  assert.equal(titleRelated(T('NexTier Frac Equipment Operator WTX'), 'heavy equipment operator'), false);
+});
+
+test('existing families are untouched by the trade tables (spot checks; the full proof is the equivalence harness)', () => {
+  assert.deepEqual(expandQueryTerms('forklift operator').slice(0, 3), ['warehouse', 'material handler', 'package handler']);
+  assert.deepEqual(expandQueryTerms('truck driver').slice(0, 2), ['delivery driver', 'courier']);
+  assert.deepEqual(expandQueryTerms('production operator'), []);
+  assert.deepEqual(expandQueryTerms('field service technician'), []);
+  assert.equal(titleRelated(T('Electrician Helper'), 'cashier'), false);
+});

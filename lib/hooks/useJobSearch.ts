@@ -168,6 +168,7 @@ function toJobs(items: unknown[], loc: string): SearchJob[] {
       waste: numOrNull(j.waste_score ?? j.waste),
       // '' = the title says nothing about level; never a default label (the old 'Mid level').
       level: String(j.level || j.lvl || ''),
+      trains_beginners: j.trains_beginners === true,
       relevance: numOrNull(j.relevance),
       in_radius: j.in_radius !== false,
       related: j.related !== false,

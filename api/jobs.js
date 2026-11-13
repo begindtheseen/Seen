@@ -8,7 +8,8 @@ import { checkLiveness, checkableId } from '../lib/server/listingLiveness.js';
 import { filterAndRank, relevanceScore, isTitleRelated, locationDbTerm, expandQueryTerms, parseLocation, locationScore, searchFitFromSignal, tokenize, isRelevant } from './_utils/jobRelevance.js';
 import { sortByPriority, companyMatchesQuery, queryNamesCompany, isSeedListing } from '../lib/server/jobPriority.js';
 import { waitUntil } from '@vercel/functions';
-import { aggregateForQuery, inferLevel, wasRecentlyPulled, recordPull } from '../lib/server/jobSources.js';
+import { aggregateForQuery, inferLevel, listingLevel, wasRecentlyPulled, recordPull } from '../lib/server/jobSources.js';
+import { listingTrainsBeginners } from '../lib/jobs/trainsBeginners.js';
 
 // Adzuna rows stored before 2026-10-20 carry Adzuna's own salary ESTIMATE (salary_is_predicted) as if it were
 // the posting's pay (adzunaPay() drops estimates at ingest since then; a re-seen row keeps its old value). A
@@ -1080,7 +1081,11 @@ function toUiRow(j, loc = '') {
     id: j.id || null, // keep the DB id — without it /jobs/<id> permalinks can never resolve
     title: j.title, company: j.company, location: j.location || loc,
     salary: honestSalary(j), url: j.apply_url || j.url || null, description: j.description,
-    type: j.type || 'Full-time', level: inferLevel(j.title || ''),
+    // The title's level, else 'Entry level' when the posting says it trains beginners (lib/server/jobSources.js
+    // listingLevel); `trains_beginners` is that offer itself (lib/jobs/trainsBeginners.js). A light row without its
+    // posting reads from the title only — the page's rows have theirs (exactTop reads them by id).
+    type: j.type || 'Full-time', level: listingLevel(j.title || '', j.description || ''),
+    trains_beginners: listingTrainsBeginners(j),
     source: j.source || 'Seen', ...scoreRow(j),
     search_query: j.search_query || null, // provenance for the merged re-filter downstream
     lat: j.lat ?? null, lng: j.lng ?? null, posted_at: j.created_at || null,
@@ -1149,7 +1154,8 @@ async function corpusRelevant({ supabaseUrl, dbHeaders, terms, query, canonical,
       id: j.id || null,
       title: j.title, company: j.company, location: j.location || loc,
       salary: honestSalary(j), url: j.apply_url || j.url || null, description: j.description,
-      type: j.type || 'Full-time', level: inferLevel(j.title || ''),
+      type: j.type || 'Full-time', level: listingLevel(j.title || '', j.description || ''),
+      trains_beginners: listingTrainsBeginners(j),
       source: j.source || 'Seen', ...scoreRow(j),
       search_query: j.search_query || null,
       lat: j.lat ?? null, lng: j.lng ?? null, posted_at: j.created_at || null,
@@ -1173,7 +1179,8 @@ async function nearestListings(loc, supabaseUrl, dbHeaders) {
     id: j.id || null,
     title: j.title, company: j.company, location: j.location,
     salary: honestSalary(j), url: j.apply_url, description: j.description,
-    type: j.type || 'Full-time', level: inferLevel(j.title || ''),
+    type: j.type || 'Full-time', level: listingLevel(j.title || '', j.description || ''),
+    trains_beginners: listingTrainsBeginners(j),
     source: j.source || 'Seen', ...scoreRow(j),
     posted_at: j.created_at || null,
     ats_tenant: j.ats_tenant || null,
@@ -1453,7 +1460,8 @@ async function buildRail(SUPABASE_URL, SUPABASE_SERVICE_KEY, user_id) {
     apply_url: j.apply_url,
     description: j.description,
     type: j.type || 'Full-time',
-    level: inferLevel(j.title || ''),
+    level: listingLevel(j.title || '', j.description || ''),
+    trains_beginners: listingTrainsBeginners(j),
     source: j.source || 'Seen',
     match_reason: j._reason,
     // the checks behind the sentence (field, licences, years, limits, level) — each one passed
