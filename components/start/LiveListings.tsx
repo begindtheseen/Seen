@@ -11,7 +11,8 @@ import Link from 'next/link'
 import type { Job } from '@/lib/types'
 import { JobCache } from '@/lib/stores/JobCache'
 import { jobsSearchHref } from '@/lib/searchRoute'
-import { guideListingRows } from '@/lib/start/listingRows.js'
+import { mergeListingAnswers, GUIDE_MAX_ROWS } from '@/lib/start/listingRows.js'
+import Icon from '@/components/ui/Icon'
 import st from './guide.module.css'
 
 const DEADLINE_MS = 15000
@@ -41,35 +42,52 @@ function toJob(r: Row): Job {
   }
 }
 
-export default function LiveListings({ query, seeAllQuery, label }: { query: string; seeAllQuery: string; label: string }) {
+export default function LiveListings({ queries, prefer, seeAllQuery, label, seeAllLabel = 'See all in job search', max = GUIDE_MAX_ROWS }: {
+  /** One or more searches; several are merged (rows each search counts as a match, interleaved, each once). */
+  queries: string[]
+  /** Title pattern (regex source) for the guide's own roles, shown first. */
+  prefer?: string | null
+  seeAllQuery: string
+  label: string
+  seeAllLabel?: string
+  /** How many rows the guide shows (the rest are one tap away in job search). */
+  max?: number
+}) {
   const [state, setState] = useState<State>({ status: 'loading' })
+  const key = queries.join('\n') // a stable dependency for the effect (a new array every render is not)
 
   useEffect(() => {
     let alive = true
     const ctrl = new AbortController()
     const timer = setTimeout(() => ctrl.abort(), DEADLINE_MS)
-    fetch('/api/jobs', {
+    const one = (query: string) => fetch('/api/jobs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query, location: '', radius: '25' }),
       signal: ctrl.signal,
-    })
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
-      .then((data) => { if (alive) setState({ status: 'done', rows: (guideListingRows(data) as Row[]).map(toJob) }) })
+    }).then((res) => (res.ok ? res.json() : null)).catch(() => null)
+    // Each search may fail on its own; the block is an error only when every one did.
+    Promise.all(key.split('\n').map(one))
+      .then((answers) => {
+        if (!alive) return
+        if (answers.every((a) => a === null)) { setState({ status: 'error' }); return }
+        const rows = mergeListingAnswers(answers, { max, prefer: prefer ? new RegExp(prefer, 'i') : null, perCompany: 2 }) as Row[]
+        setState({ status: 'done', rows: rows.map(toJob) })
+      })
       .catch(() => { if (alive) setState({ status: 'error' }) })
       .finally(() => clearTimeout(timer))
     return () => { alive = false; clearTimeout(timer); ctrl.abort() }
-  }, [query])
+  }, [key, prefer, max])
 
   const seeAll = (
-    <Link href={jobsSearchHref(seeAllQuery)} prefetch={false} className={st.seeAll}>See all in job search →</Link>
+    <Link href={jobsSearchHref(seeAllQuery)} prefetch={false} className={st.seeAll}>{seeAllLabel} <Icon name="arrow-right" size={14} /></Link>
   )
 
   if (state.status === 'loading') {
     return (
       <div role="status" aria-label={`Loading ${label}`}>
         <ul className={st.rows} aria-hidden>
-          {[0, 1, 2].map((i) => (
+          {[0, 1, 2, 3].map((i) => (
             <li key={i} className={st.skRow}>
               <div className={`sk ${st.skLine}`} />
               <div className={`sk ${st.skLine2}`} />
@@ -83,7 +101,7 @@ export default function LiveListings({ query, seeAllQuery, label }: { query: str
   if (state.status === 'error' || state.rows.length === 0) {
     return (
       <div data-testid="guide-listings-empty">
-        <p className={st.empty}>No live listings right now — new ones are read from employers&rsquo; boards every few hours.</p>
+        <p className={st.empty}>No live listings right now. New ones are read from employers&rsquo; boards every few hours.</p>
         {seeAll}
       </div>
     )
@@ -95,12 +113,13 @@ export default function LiveListings({ query, seeAllQuery, label }: { query: str
         {state.rows.map((j) => (
           <li key={j.id} className={st.row}>
             <Link href={`/jobs/${encodeURIComponent(j.id)}`} prefetch={false} className={st.rowLink} onClick={() => JobCache.set(j)}>
-              <span className={st.rowTitle}>{j.title}</span>
-              <span className={st.rowMeta}>
-                {j.company && <span>{j.company}</span>}
-                {j.location && <span>{j.location}</span>}
-                {j.trains_beginners && <span className={st.tag}>Paid training</span>}
+              <span className={st.rowMain}>
+                <span className={st.rowTitle}>{j.title}</span>
+                <span className={st.rowMeta}>
+                  {[j.company, j.location.replace(/,\s*(United States|USA|US)$/i, '')].filter(Boolean).join(' · ')}
+                </span>
               </span>
+              {j.trains_beginners && <span className={st.tag}>Paid training</span>}
             </Link>
           </li>
         ))}
