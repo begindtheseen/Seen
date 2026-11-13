@@ -1,0 +1,107 @@
+/* /start/oilfield and /start/trades — calm reading pages. Tokens only (DESIGN.md); every text ≥ 12px at every width;
+   grid tracks are minmax(0, …) so a long word never widens the page; no filled button anywhere on these pages. */
+.wrap { max-width: var(--w-narrow); margin: 0 auto; padding: var(--sp-12) var(--sp-4) var(--sp-16); width: 100%; box-sizing: border-box; min-width: 0; }
+@media (min-width: 768px) { .wrap { padding: var(--sp-16) var(--sp-8) var(--sp-24); } }
+
+.asof { font-family: var(--body); font-size: var(--fs-meta); color: var(--text-4); line-height: 1.6; margin: 0 0 var(--sp-6); }
+
+/* On this page — a wrapped row of plain text links. */
+.toc { margin: 0 0 var(--sp-8); padding: var(--sp-4) 0; border-top: 1px solid var(--border-1); border-bottom: 1px solid var(--border-1); }
+.tocTitle { font-family: var(--body); font-size: var(--fs-meta); font-weight: 600; letter-spacing: var(--ls-meta); text-transform: uppercase; color: var(--text-3); margin: 0 0 var(--sp-2); }
+.tocList { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0 var(--sp-4); }
+.tocLink { display: inline-flex; align-items: center; min-height: 44px; font-family: var(--body); font-size: var(--fs-sm); color: var(--text-2); text-decoration: none; }
+.tocLink:hover { color: var(--text-1); text-decoration: underline; text-underline-offset: .2em; }
+
+.section { padding: var(--sp-8) 0; border-top: 1px solid var(--border-1); min-width: 0; scroll-margin-top: var(--sp-16); }
+.section:first-of-type { border-top: 0; padding-top: 0; }
+.h2 { font-family: var(--display); font-weight: 700; font-size: var(--fs-xl); letter-spacing: var(--ls-heading); line-height: var(--lh-snug); color: var(--text-1); margin: 0 0 var(--sp-3); text-wrap: balance; }
+.h3 { font-family: var(--body); font-weight: 600; font-size: var(--fs-body); color: var(--text-1); margin: var(--sp-6) 0 var(--sp-2); line-height: var(--lh-snug); }
+.p { font-family: var(--body); font-size: var(--fs-body); color: var(--text-2); line-height: var(--lh-body); margin: var(--sp-3) 0 0; overflow-wrap: anywhere; max-width: 68ch; }
+.p:first-child { margin-top: 0; }
+.quiet { color: var(--text-3); font-size: var(--fs-sm); }
+.inlineLink { color: var(--text-2); text-decoration: underline; text-decoration-color: var(--border-3); text-underline-offset: .2em; }
+.inlineLink:hover { color: var(--text-1); }
+.list { margin: var(--sp-3) 0 0; padding-left: var(--sp-5); color: var(--text-2); font-size: var(--fs-body); line-height: var(--lh-body); max-width: 68ch; }
+.list li { margin-top: var(--sp-2); overflow-wrap: anywhere; }
+.list li::marker { color: var(--text-4); }
+
+/* Source references: [3] — ink, small, beside the figure they back. */
+.refs { font-family: var(--body); font-size: var(--fs-meta); color: var(--text-4); white-space: nowrap; margin-left: var(--sp-1); }
+.ref { color: var(--text-3); text-decoration: none; }
+.ref:hover { color: var(--text-1); text-decoration: underline; }
+
+/* A role / item list: name, one line, optional schedule. */
+.items { list-style: none; margin: var(--sp-4) 0 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-4); }
+.item { min-width: 0; padding: var(--sp-4); border: 1px solid var(--border-1); border-radius: var(--r-card); background: var(--surface-1); }
+.itemName { font-family: var(--body); font-weight: 600; font-size: var(--fs-body); color: var(--text-1); margin: 0; line-height: var(--lh-snug); }
+.itemText { font-family: var(--body); font-size: var(--fs-sm); color: var(--text-2); line-height: var(--lh-body); margin: var(--sp-1) 0 0; overflow-wrap: anywhere; }
+.itemMeta { font-family: var(--body); font-size: var(--fs-sm); color: var(--text-3); line-height: var(--lh-body); margin: var(--sp-2) 0 0; overflow-wrap: anywhere; }
+.itemLabel { font-weight: 600; color: var(--text-3); }
+.itemLink { display: inline-flex; align-items: center; gap: var(--sp-1); min-height: 44px; margin-bottom: calc(-1 * var(--sp-3)); font-family: var(--body); font-size: var(--fs-sm); font-weight: 500; color: var(--accent); text-decoration: none; }
+.itemLink:hover { text-decoration: underline; }
+
+/* Tables: columns on wide screens, one stacked block per row on phones (each cell carries its column label). */
+.tableWrap { margin: var(--sp-4) 0 0; min-width: 0; }
+.table { width: 100%; border-collapse: collapse; font-family: var(--body); font-size: var(--fs-sm); color: var(--text-2); table-layout: auto; }
+.table th { text-align: left; font-weight: 600; font-size: var(--fs-meta); letter-spacing: var(--ls-meta); text-transform: uppercase; color: var(--text-3); padding: var(--sp-2) var(--sp-3) var(--sp-2) 0; border-bottom: 1px solid var(--border-2); vertical-align: bottom; }
+.table td { padding: var(--sp-3) var(--sp-3) var(--sp-3) 0; border-bottom: 1px solid var(--border-1); vertical-align: top; line-height: var(--lh-ui); }
+.table td:first-child { color: var(--text-1); font-weight: 600; min-width: 7.5rem; }
+.table td, .table th { overflow-wrap: break-word; word-break: normal; }
+.num { white-space: nowrap; color: var(--text-1); }
+@media (max-width: 640px) {
+  .table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); }
+  .table, .table tbody, .table tr, .table td { display: block; width: 100%; }
+  .table tr { padding: var(--sp-3) 0; border-bottom: 1px solid var(--border-1); }
+  .table td { border: 0; padding: var(--sp-1) 0; overflow-wrap: anywhere; }
+  .table td:first-child { min-width: 0; }
+  .table td[data-label]::before { content: attr(data-label); display: block; font-size: var(--fs-meta); font-weight: 600; letter-spacing: var(--ls-meta); text-transform: uppercase; color: var(--text-4); margin-bottom: 2px; }
+  .table td:first-child::before { display: none; }
+  .num { white-space: normal; }
+}
+
+/* First-hand accounts: what people say, set apart from facts by a hairline and a plain label. */
+.said { margin: var(--sp-4) 0 0; padding-left: var(--sp-4); border-left: 2px solid var(--border-2); }
+.saidLabel { font-family: var(--body); font-size: var(--fs-meta); font-weight: 600; letter-spacing: var(--ls-meta); text-transform: uppercase; color: var(--text-3); margin: 0; }
+
+/* Scams — the one semantic colour on the page, with its word. */
+.h2Icon { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.cautionIcon { color: var(--caution-text); flex: none; }
+
+/* Two doors (trades). */
+.doors { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-4); margin-top: var(--sp-4); }
+@media (min-width: 768px) { .doors { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+
+/* FAQ */
+.qa { margin-top: var(--sp-6); }
+.qa:first-of-type { margin-top: var(--sp-2); }
+.q { font-family: var(--body); font-weight: 600; font-size: var(--fs-body); color: var(--text-1); margin: 0; line-height: var(--lh-snug); }
+.a { font-family: var(--body); font-size: var(--fs-sm); color: var(--text-2); line-height: var(--lh-body); margin: var(--sp-1) 0 0; max-width: 68ch; overflow-wrap: anywhere; }
+
+/* Sources: a numbered plain-text list. */
+.sources { margin: var(--sp-3) 0 0; padding-left: var(--sp-6); font-family: var(--body); font-size: var(--fs-meta); color: var(--text-3); line-height: var(--lh-body); }
+.sources li { margin-top: var(--sp-2); overflow-wrap: anywhere; scroll-margin-top: var(--sp-16); }
+.sources li::marker { color: var(--text-4); }
+.sources li:target { color: var(--text-1); }
+.srcLink { color: var(--text-2); text-decoration: underline; text-decoration-color: var(--border-3); text-underline-offset: .2em; }
+.srcLink:hover { color: var(--text-1); }
+
+/* Live listings */
+.rows { list-style: none; margin: var(--sp-4) 0 0; padding: 0; border-top: 1px solid var(--border-1); }
+.row { border-bottom: 1px solid var(--border-1); min-width: 0; }
+.rowLink { display: block; padding: var(--sp-3) 0; text-decoration: none; min-height: 44px; box-sizing: border-box; }
+.rowTitle { display: block; font-family: var(--body); font-weight: 600; font-size: var(--fs-body); color: var(--text-1); line-height: var(--lh-snug); overflow-wrap: anywhere; }
+.rowLink:hover .rowTitle { color: var(--accent); }
+.rowMeta { display: flex; flex-wrap: wrap; gap: 0 var(--sp-2); margin-top: var(--sp-1); font-family: var(--body); font-size: var(--fs-sm); color: var(--text-3); line-height: var(--lh-ui); min-width: 0; }
+.rowMeta > span { min-width: 0; overflow-wrap: anywhere; }
+.tag { font-size: var(--fs-meta); font-weight: 500; color: var(--text-3); }
+.skRow { padding: var(--sp-3) 0; border-bottom: 1px solid var(--border-1); }
+.skLine { height: 14px; width: 60%; }
+.skLine2 { height: 12px; width: 35%; margin-top: var(--sp-2); }
+.empty { font-family: var(--body); font-size: var(--fs-sm); color: var(--text-3); line-height: var(--lh-body); margin: var(--sp-4) 0 0; }
+.seeAll { display: inline-flex; align-items: center; gap: var(--sp-1); min-height: 44px; margin-top: var(--sp-2); font-family: var(--body); font-size: var(--fs-sm); font-weight: 500; color: var(--accent); text-decoration: none; }
+.seeAll:hover { text-decoration: underline; }
+
+/* The /jobs results line ("New to oilfield work? …") — small ink text link, no card, no button. */
+.guideLine { margin: var(--sp-4) 0 0; font-family: var(--body); font-size: var(--fs-sm); color: var(--text-3); }
+.guideLink { display: inline-flex; align-items: center; min-height: 44px; color: var(--text-3); text-decoration: underline; text-decoration-color: var(--border-3); text-underline-offset: .2em; }
+.guideLink:hover { color: var(--text-1); }

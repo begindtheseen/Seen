@@ -12,6 +12,7 @@ import {
   type Dataset, type DatasetRow, datasetSummary, plural, CSV_PATH, JSON_PATH, DATA_PATH, METHODS_PATH,
   LICENSE_NAME, LICENSE_URL, LIST_MIN_REPORTS, MIN_REPORTS_FOR_RATES,
 } from './openDataset.ts'
+import { START_GUIDES } from './start/guides.js'
 
 /** How many companies llms.txt lists by name (the rest are in llms-full.txt). */
 export const LLMS_TOP_COMPANIES = 25
@@ -53,6 +54,10 @@ function header(d: Dataset): string[] {
     `- [Staffing agencies that ghost applicants](${abs('/lists/staffing-agencies-ghosting')}): monthly ranking of staffing agencies with ${LIST_MIN_REPORTS} or more applicant accounts`,
     `- [Staffing Agency Ghost Index](${abs('/agencies')}): major staffing agencies by reported ghost rate`,
     `- [Company scoreboard](${abs('/companies')}): browse and search every company`,
+    '',
+    '## Guides',
+    '',
+    ...START_GUIDES.map((g) => `- [${g.label}](${abs(g.path)}): ${g.llms}`),
     '',
   ]
 }
