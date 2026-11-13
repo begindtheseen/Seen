@@ -1,4 +1,5 @@
-// Employer-board sync — Greenhouse / Lever / Ashby / Workable / Recruitee / SmartRecruiters boards
+// Employer-board sync — Greenhouse / Lever / Ashby / Workable / Recruitee / SmartRecruiters / Workday /
+// Oracle Recruiting / UKG / EmpForce boards
 // registered in company_sources, pulled straight from each company's public job-board API.
 //
 // Why its own function (2026-10-20, prod): the registry held 4,002 active Greenhouse boards listing
@@ -37,6 +38,7 @@ const BUDGET_MS = Number(process.env.EMPLOYER_BOARDS_BUDGET_MS || 240_000);
 const WAVE = 24;        // boards fetched before their rows are written
 const CONCURRENCY = 8;  // simultaneous board fetches (public APIs, each ≤ 9 s)
 const UPSERT_BATCH = 100;
+const BOARD_BUDGET_MS = 90_000; // one list + detail board at most (lib/jobs/providers/*)
 
 const send = (res, code, body) => res.status(code).json(body);
 
@@ -54,7 +56,10 @@ export async function syncBoards(sources, {
     if (Date.now() >= deadline) { out.out_of_time = true; break; }
     const wave = sources.slice(i, i + WAVE);
     const results = await mapLimit(wave, CONCURRENCY, async (s) => {
-      const r = await fetchJobs({ provider: s.provider, tenant: s.tenant, companyName: s.company_name });
+      // A list + detail board (Workday, Oracle, UKG, EmpForce) reads one page per posting inside its own
+      // budget; it never runs past the function's limit (maxDuration 300 s = BUDGET_MS + 60 s).
+      const boardBudget = Math.max(5_000, Math.min(BOARD_BUDGET_MS, deadline + 30_000 - Date.now()));
+      const r = await fetchJobs({ provider: s.provider, tenant: s.tenant, companyName: s.company_name }, { budgetMs: boardBudget });
       // fetchSourceJobs already drops rows outside the market and reports the board's full size;
       // an older fake / caller that returns unfiltered rows is filtered here as well.
       const rows = r.rows || [];

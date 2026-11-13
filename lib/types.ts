@@ -121,6 +121,9 @@ export interface Job {
   filled?: boolean
   /** Factual, our-own-observation freshness descriptor (see lib/server/listingFreshness.js). */
   freshness?: ListingFreshness
+  /** The posting says the employer takes and trains beginners ("paid training", "no experience required",
+   *  "apprenticeship program" — lib/jobs/trainsBeginners.js). Data for a quiet "Paid training" note. */
+  trains_beginners?: boolean
 }
 
 /**

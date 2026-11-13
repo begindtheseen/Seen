@@ -1,0 +1,145 @@
+{
+ "opportunities": [
+  {
+   "Id": "35b0d824-633f-4153-b692-cdbc158609c0",
+   "Featured": false,
+   "Title": "Cactus Wellhead - Assembly Technician - North Dakota",
+   "RequisitionNumber": "CACTU002538",
+   "FullTime": true,
+   "JobCategoryName": "Manufacturing",
+   "Locations": [
+    {
+     "Id": "5e401287-ded7-56cb-8a0e-ee55abb82ede",
+     "LocalizedName": "Williston",
+     "LocalizedLocationId": "CW - Williston",
+     "LocalizedDescription": "CW - Williston",
+     "Address": {
+      "Line1": "711 84th St E",
+      "Line2": null,
+      "City": "Williston",
+      "PostalCode": "58801",
+      "State": {
+       "Code": "ND",
+       "Name": "North Dakota"
+      },
+      "Country": {
+       "Code": "USA",
+       "Name": "United States"
+      }
+     },
+     "DisplayName": true,
+     "DisplayLocationId": false,
+     "DisplayAddress": true,
+     "DisplayStreetAddress": false,
+     "DisplayDescription": false,
+     "SourceOfTruth": 1,
+     "Coordinates": {
+      "Latitude": 48.1512782746676,
+      "Longitude": -103.61954579077255
+     }
+    }
+   ],
+   "PostedDate": "2026-11-09T19:28:38.451Z",
+   "BriefDescription": "WHY CACTUS WELLHEAD? As a leader in the Oil and Gas industry, you will find a career with Cactus rewarding and fulfilling. If you are a team player, self-starter and are able to adapt to a fast-paced work environment, this position is for you. As a Assembly Technician, you will be a part of a team that is essential to the success of Cactus Companies and FlexSteel. To see if you are a good fit for this position, please select the job title and review the job description.",
+   "MatchScore": 1.0,
+   "MatchedLocations": [],
+   "Distance": null,
+   "JobLocationType": 1,
+   "OpportunityType": 0
+  },
+  {
+   "Id": "7af8a65b-c4b7-4fd1-b837-0af8e977ffa2",
+   "Featured": false,
+   "Title": "Cactus Wellhead - Warehouse Clerk I- Night",
+   "RequisitionNumber": "CACTU002588",
+   "FullTime": true,
+   "JobCategoryName": "Manufacturing",
+   "Locations": [
+    {
+     "Id": "30838e70-5242-59b7-b69d-dd9bff8c736e",
+     "LocalizedName": "Bossier City",
+     "LocalizedLocationId": "CW - Bossier City",
+     "LocalizedDescription": "CW - Bossier City",
+     "Address": {
+      "Line1": "4117 Meadow Ln",
+      "Line2": null,
+      "City": "Bossier City",
+      "PostalCode": "71111",
+      "State": {
+       "Code": "LA",
+       "Name": "Louisiana"
+      },
+      "Country": {
+       "Code": "USA",
+       "Name": "United States"
+      }
+     },
+     "DisplayName": true,
+     "DisplayLocationId": false,
+     "DisplayAddress": true,
+     "DisplayStreetAddress": false,
+     "DisplayDescription": false,
+     "SourceOfTruth": 1,
+     "Coordinates": {
+      "Latitude": 32.53385691885224,
+      "Longitude": -93.68110862293094
+     }
+    }
+   ],
+   "PostedDate": "2026-11-09T16:57:30.473Z",
+   "BriefDescription": "WHY CACTUS WELLHEAD? As a leader in the Oil and Gas industry, you will find a career with Cactus rewarding and fulfilling. If you are a team player, self-starter and are able to adapt to a fast-paced work environment, this position is for you. As a Warehouse Clerk, you will be a part of a team that is essential to the success of Cactus Companies and FlexSteel. To see if you are a good fit for this position, please select the job title and review the job description.",
+   "MatchScore": 1.0,
+   "MatchedLocations": [],
+   "Distance": null,
+   "JobLocationType": 1,
+   "OpportunityType": 0
+  },
+  {
+   "Id": "9cbc9e1d-37ac-4d4c-8dd4-88e7f862159c",
+   "Featured": false,
+   "Title": "VN - Lead Systems Engineer - Product Design",
+   "RequisitionNumber": "VNLEA002721",
+   "FullTime": true,
+   "JobCategoryName": "Engineering",
+   "Locations": [
+    {
+     "Id": "f1bfaf90-0f04-5a92-9484-5cebe9b320f5",
+     "LocalizedName": "Ho Chi Minh, Vietnam",
+     "LocalizedLocationId": null,
+     "LocalizedDescription": "SPC - Vietnam",
+     "Address": {
+      "Line1": "920 Memorial City Way",
+      "Line2": null,
+      "City": "Vietnam",
+      "PostalCode": "77024",
+      "State": null,
+      "Country": {
+       "Code": "VNM",
+       "Name": "Vietnam"
+      }
+     },
+     "DisplayName": true,
+     "DisplayLocationId": false,
+     "DisplayAddress": false,
+     "DisplayStreetAddress": false,
+     "DisplayDescription": false,
+     "SourceOfTruth": 1,
+     "Coordinates": {
+      "Latitude": 29.781736442718,
+      "Longitude": -95.535822378255
+     }
+    }
+   ],
+   "PostedDate": "2026-10-23T19:47:20.872Z",
+   "BriefDescription": "Cactus International is a recognized leader in the oil and gas industry, delivering innovative solutions and reliable products that support energy operations worldwide. Safety is a core value at Cactus, guiding every aspect of its operations and decision-making. The company fosters a dynamic, fast-paced environment where collaboration, initiative, and adaptability are valued. Through its specialized teams, including valve and flow-control expertise, Cactus International plays a critical role in the success of its operations and affiliated companies such as FlexSteel. To see if you are a good fit for this position, please select the job title and review the job description.",
+   "MatchScore": 1.0,
+   "MatchedLocations": [],
+   "Distance": null,
+   "JobLocationType": 1,
+   "OpportunityType": 0
+  }
+ ],
+ "totalCount": 3,
+ "initialTotalOpportunitiesCount": 3,
+ "locations": []
+}

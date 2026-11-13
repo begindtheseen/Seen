@@ -79,6 +79,182 @@ const ROLE_FAMILIES = [
   ['retail manager', 'store manager', 'assistant store manager', 'retail store manager'],
 ];
 
+// ── Oilfield and skilled-trades families (2026-11-13) ─────────────────────────────────────────────
+// What a green hand types ("roustabout", "oilfield", "apprentice electrician", "hvac helper") is rarely what the
+// posting is titled ("Floorhand - Oklahoma", "Lease Operator", "Electrician Helper", "HVAC Install Helper"). These
+// families are the same deterministic bridge as ROLE_FAMILIES, with three precision rules the rest do not need:
+//  1. They are consulted only AFTER ROLE_FAMILIES finds nothing, so every query that already had a family keeps it
+//     (and every other query that matches none of them is unchanged — pinned by the equivalence harness).
+//  2. A query reaches one by an exact member or `keys` phrase (keys trigger a family, they are never title
+//     synonyms: "oil and gas", "rig", "hvac", "equipment operator"), by the same after dropping beginner words
+//     ("entry level roustabout", "oilfield jobs no experience", "union apprenticeship"), or by CONTAINING a member
+//     ("cdl water hauler" ⊇ "water hauler"). Never the reverse: a short generic query ("apprentice", "helper",
+//     "operator", "technician", "mechanic", "electrical") is not widened into a trade because a member contains it
+//     — "Apprentice Piercer", "Public Relations Apprentice" and a software "Field Service Technician" are real rows.
+//  3. Members are titles the WORK carries: never a bare "production operator" (chemical-plant rows in prod), bare
+//     "equipment operator" (warehouse rows), "field service technician" (software/robotics rows), "line worker"
+//     (factory lines), bare "fabricator", "pumper" or "swamper" (septic, movers) — those are keys at most.
+// Family members also act as title synonyms only on a craft title: a family synonym never makes an instructor /
+// engineer / manager / sales title a match (TRADE_NON_CRAFT_RE) — the query's own words still do.
+const TRADE_FAMILIES = [
+  // Oilfield hauling — listed before the field-hand family so "water hauler" stays with the haulers.
+  { id: 'oilfield_hauling', keys: ['oilfield hauling', 'oilfield trucking'], members: [
+    'water hauler', 'sand hauler', 'frac sand hauler', 'crude hauler', 'crude oil hauler', 'oilfield truck driver',
+    'oilfield driver', 'water hauling driver', 'frac sand driver', 'oilfield cdl driver',
+  ] },
+  // Oilfield field hands: the entry rungs on drilling, workover, completions, production and compression crews.
+  { id: 'oilfield', keys: [
+    'oilfield', 'oil field', 'oil and gas', 'oil gas', 'oil rig', 'oil rigs', 'rig', 'rigs', 'drilling rig', 'rig crew',
+    'oilfield services', 'oil field services', 'frac', 'fracking', 'wireline', 'workover', 'swamper', 'pumper',
+    'green hand', 'green hat', 'oil patch', 'oilpatch', 'oil well', 'pressure pumping',
+  ], members: [
+    'roustabout', 'floorhand', 'roughneck', 'floor hand', 'frac hand', 'flowback', 'wireline operator', 'lease operator',
+    'floorman', 'leasehand', 'lease hand', 'rig hand', 'derrickhand', 'derrick hand', 'derrickman', 'motorhand',
+    'motor hand', 'casing floorhand', 'casing hand', 'rack hand', 'rig up hand', 'rig up operator', 'workover rig hand',
+    'workover hand', 'well service rig hand', 'frac operator', 'frac equipment operator', 'frac crew',
+    'pressure pumping operator', 'pumping operator', 'pumpdown operator', 'flowback hand', 'flowback operator',
+    'well testing operator', 'well tester', 'production testing operator', 'wireline helper', 'wireline trainee',
+    'coiled tubing', 'coil tubing operator', 'cementing operator', 'cement equipment operator', 'lease pumper',
+    'pumper gauger', 'oilfield pumper', 'water transfer operator', 'water management operator',
+    'operator assistant trainee', 'entry level oilfield operator', 'oilfield operator', 'oilfield hand',
+    'oilfield worker', 'oilfield laborer', 'oilfield trainee', 'compression technician', 'compressor technician',
+    'compression mechanic', 'tubular services technician', 'roustabouts', 'floorhands', 'roughnecks',
+  ] },
+  // Electrical (inside wireman, residential, low voltage) and its apprentice / helper / trainee rungs.
+  { id: 'electrical', keys: ['electrical apprenticeship', 'electrician apprenticeship', 'ibew apprenticeship'], members: [
+    'electrician', 'electrical apprentice', 'electrician apprentice', 'apprentice electrician', 'electrician helper',
+    'electrical helper', 'wireman', 'low voltage technician', 'electrician trainee', 'electrical trainee',
+    'inside wireman', 'residential wireman', 'construction wireman', 'journeyman electrician',
+    'construction electrician', 'fire alarm technician', 'low voltage installer', 'electricians',
+  ] },
+  // Plumbing and pipe trades (one UA trade family: plumber, pipefitter, steamfitter, sprinkler fitter).
+  { id: 'plumbing', keys: ['plumbing', 'plumbing apprenticeship', 'pipefitting', 'pipe trades'], members: [
+    'plumber', 'plumbing apprentice', 'apprentice plumber', 'plumber apprentice', 'plumbers apprentice',
+    'plumber helper', 'plumbing helper', 'plumbing installer', 'pipefitter', 'pipe fitter', 'steamfitter',
+    'steam fitter', 'sprinkler fitter', 'plumbing technician', 'service plumber', 'journeyman plumber',
+    'pipefitter apprentice', 'pipefitter helper', 'plumbers', 'pipefitters',
+  ] },
+  // HVAC/R.
+  { id: 'hvac', keys: ['hvac', 'hvacr', 'hvac r', 'hvac apprenticeship', 'heating and air', 'heating and cooling'], members: [
+    'hvac technician', 'hvac installer', 'hvac helper', 'hvac apprentice', 'hvac tech', 'hvac service technician',
+    'hvac mechanic', 'hvac trainee', 'hvac install helper', 'hvac technician apprentice', 'hvac/r technician',
+    'hvac/r service technician', 'hvacr technician', 'refrigeration technician', 'refrigeration mechanic',
+    'duct installer', 'ductwork installer', 'hvac maintenance technician',
+  ] },
+  // Welding.
+  { id: 'welding', keys: ['welding'], members: [
+    'welder', 'welder helper', 'welding helper', 'welder fitter', 'fitter welder', 'welder fabricator',
+    'structural welder', 'pipe welder', 'mig welder', 'tig welder', 'welder apprentice', 'welding apprentice',
+    'welder trainee', 'welding trainee', 'steel fabricator', 'welders',
+  ] },
+  // Lineworkers (power lines) and their ground crews.
+  { id: 'lineworker', keys: ['linework', 'lineman apprenticeship', 'power line', 'powerline'], members: [
+    'lineman', 'lineworker', 'apprentice lineman', 'lineman apprentice', 'apprentice lineworker', 'journeyman lineman',
+    'groundman', 'groundmen', 'linemen', 'substation technician', 'substation electrician', 'powerline technician',
+    'power line technician',
+  ] },
+  // Heavy equipment operators (construction / IUOE). Bare "equipment operator" is a key: warehouses use the title.
+  { id: 'heavy_equipment_operator', keys: ['equipment operator', 'heavy equipment', 'operating engineer'], members: [
+    'heavy equipment operator', 'construction equipment operator', 'excavator operator', 'dozer operator',
+    'bulldozer operator', 'backhoe operator', 'front end loader operator', 'motor grader operator', 'grader operator',
+    'scraper operator', 'operating engineer apprentice', 'heavy equipment operator trainee', 'wheel loader operator',
+  ] },
+  // Diesel and heavy-equipment mechanics — separate from the operators: different work, different résumé.
+  { id: 'diesel_mechanic', keys: ['diesel mechanic apprenticeship'], members: [
+    'diesel mechanic', 'diesel technician', 'diesel tech', 'heavy equipment mechanic', 'heavy equipment technician',
+    'heavy duty mechanic', 'heavy duty technician', 'diesel apprentice', 'diesel technician apprentice',
+    'diesel mechanic apprentice', 'diesel mechanic helper', 'heavy equipment shop technician',
+    'heavy equipment field technician', 'diesel fleet technician', 'diesel service technician',
+  ] },
+  // "apprenticeship" / "trades" / "skilled trades": the beginner rungs of every trade above (and the common union
+  // crafts). Last, so a specific trade query ("apprentice electrician") reaches its own family first.
+  { id: 'trades_entry', keys: [
+    'apprenticeship', 'apprenticeships', 'trades', 'trade', 'skilled trades', 'skilled trade', 'trade apprenticeship',
+    'trades apprenticeship', 'construction apprenticeship', 'registered apprenticeship', 'pre apprenticeship',
+    'preapprenticeship', 'apprenticeship program', 'apprenticeship programs', 'construction trades', 'building trades',
+    'trade school',
+  ], members: [
+    'electrician apprentice', 'apprentice electrician', 'electrical apprentice', 'electrician helper', 'electrical helper',
+    'plumbing apprentice', 'apprentice plumber', 'plumber apprentice', 'plumbers apprentice', 'plumber helper',
+    'plumbing helper', 'plumbing installer apprentice', 'hvac apprentice', 'hvac helper', 'hvac technician apprentice', 'pipefitter apprentice', 'pipefitter helper',
+    'welder helper', 'welder apprentice', 'welding apprentice', 'apprentice lineman', 'lineman apprentice', 'groundman',
+    'diesel technician apprentice', 'diesel apprentice', 'electrician trainee', 'electrical trainee', 'hvac trainee',
+    'welder trainee', 'carpenter apprentice', 'apprentice carpenter', 'sheet metal apprentice', 'ironworker apprentice',
+    'millwright apprentice', 'operating engineer apprentice', 'elevator apprentice', 'construction apprentice',
+  ] },
+];
+const TRADE_BY_MEMBERS = new Map(TRADE_FAMILIES.map((f) => [f.members, f]));
+// Beginner / search-filler words dropped before a trade query is looked up again ("entry level roustabout",
+// "oilfield jobs no experience", "apprentice lineman"). Dropping them can only ever reach a family by a REAL trade
+// word left over: "apprentice", "helper" or "no experience" alone leave nothing and reach none.
+const TRADE_FILLER = new Set(['entry', 'level', 'beginner', 'beginners', 'no', 'experience', 'needed', 'required',
+  'necessary', 'hiring', 'now', 'immediately', 'work', 'worker', 'workers', 'jobs', 'job', 'trainee', 'trainees',
+  'apprentice', 'apprentices', 'helper', 'helpers', 'union', 'paid', 'training', 'near', 'me', 'local', 'green',
+  'opportunity', 'opportunities', 'position', 'positions', 'full', 'time', 'the', 'a', 'an', 'in', 'for']);
+function _tradeFamilyFor(qn) {
+  for (const f of TRADE_FAMILIES) if (f.members.includes(qn) || f.keys.includes(qn)) return f;
+  const core = qn.split(' ').filter((w) => !TRADE_FILLER.has(w)).join(' ');
+  if (core && core !== qn) for (const f of TRADE_FAMILIES) if (f.members.includes(core) || f.keys.includes(core)) return f;
+  if (qn.length >= 4) for (const f of TRADE_FAMILIES) for (const m of f.members) if (_phraseIn(qn, m)) return f;
+  return null;
+}
+// A family synonym never makes one of these titles a match for a trade query (the query's own words still can):
+// "Electrical Apprenticeship Instructor", "Journeyman Lineworker Instructor", "Rig Manager", "HSE Advisor".
+const TRADE_NON_CRAFT_RE = /(^|[^a-z0-9])(instructor|teacher|trainer|professor|faculty|engineer|engineering|designer|drafter|estimator|inspector|manager|director|superintendent|supervisor|coordinator|dispatcher|scheduler|planner|recruiter|recruiting|sales|account|marketing|analyst|accountant|attorney|counsel|administrator|advisor|consultant|buyer|procurement|executive|president)s?([^a-z0-9]|$)/;
+// Whole-word stand-ins a trade title uses for a query word — consulted for trade queries only, so the rest of
+// search is unchanged. helper ≈ apprentice ≈ trainee is the beginner rung of a trade, never a match on its own: it
+// counts only where EVERY query word must be in the title ("apprentice electrician" ↔ "Electrician Helper").
+// No "electrician" ↔ "electrical" / "plumber" ↔ "plumbing": alone they made "Electrical Test Technician" and
+// "Electrical Integration Intern" electrician matches; the family's own phrases ("electrical apprentice",
+// "plumbing installer") carry those titles instead.
+const TRADE_TOKEN_ALIASES = {
+  apprentice: ['helper', 'trainee', 'apprentices'],
+  apprenticeship: ['apprentice', 'helper', 'trainee'],
+  helper: ['apprentice', 'trainee'],
+  trainee: ['apprentice', 'helper'],
+  pipefitter: ['pipe fitter'],
+  steamfitter: ['steam fitter'],
+  welder: ['welding'],
+  welding: ['welder'],
+  lineman: ['lineworker', 'linemen'],
+  lineworker: ['lineman', 'linemen'],
+  groundman: ['groundmen'],
+  floorhand: ['floor hand', 'floorman', 'roughneck'],
+  roughneck: ['floorhand', 'floor hand', 'floorman'],
+  derrickhand: ['derrick hand', 'derrickman'],
+  motorhand: ['motor hand', 'motorman'],
+  leasehand: ['lease hand', 'roustabout'],
+  roustabout: ['leasehand', 'lease hand'],
+  hauler: ['hauling'],
+  mechanic: ['technician', 'tech'],
+  technician: ['mechanic'],
+};
+// A search for the beginner rung ("apprentice electrician", "welder helper") does not take a family synonym from a
+// title that names a higher rung: "Master Electrician", "TIG Welder - Level 4/5", "Diesel Mechanic Lead" stay under
+// "Other openings" (still relevant by the trade word), below every apprentice / helper / plain-trade match.
+const TRADE_HIGHER_RUNG_RE = /(^|[^a-z0-9])(journeyman|journeymen|journey[- ]?level|master|senior|sr|lead|foreman|licensed|experienced|ii|iii|iv|level [2-9])([^a-z0-9]|$)/;
+const TRADE_LEVEL = new Set(['apprentice', 'apprentices', 'apprenticeship', 'apprenticeships', 'helper', 'helpers', 'trainee', 'trainees']);
+// The trade family a query belongs to (null for every other query, including the ROLE_FAMILIES ones).
+function _tradeOf(query) {
+  const fam = _familyFor(query);
+  return fam ? TRADE_BY_MEMBERS.get(fam) || null : null;
+}
+// Stand-in words apply to a trade query that names a trade word, never to one made only of beginner / filler words
+// ("apprenticeship", "union apprenticeship"): there "apprentice" would match every apprentice title (a PR apprentice).
+function _tradeAliasesOn(query, tokens) {
+  return !!_tradeOf(query) && tokens.some((t) => !TRADE_LEVEL.has(t) && !TRADE_FILLER.has(t));
+}
+// May a trade query take its family's synonyms from this title? Never from a non-craft title; for a beginner-rung
+// query, never from a higher-rung title.
+function _tradeSynonymsOk(tokens, title) {
+  if (TRADE_NON_CRAFT_RE.test(title)) return false;
+  return !(tokens.some((t) => TRADE_LEVEL.has(t)) && TRADE_HIGHER_RUNG_RE.test(title));
+}
+function _tradeAliasInTitle(title, token) {
+  const aliases = TRADE_TOKEN_ALIASES[token];
+  return !!aliases && aliases.some((a) => tokenInTitle(title, a));
+}
+
 // Normalize a surface for family matching: lowercase, keep alnum/+#., collapse spaces.
 function _norm(s) {
   return String(s || '').toLowerCase().replace(/[^a-z0-9+#.\s]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -119,7 +295,9 @@ function _familyForUncached(query) {
       if (_phraseIn(m, qn) || _phraseIn(qn, m)) return fam;
     }
   }
-  return null;
+  // Only a query no ROLE_FAMILIES row claims can reach a trade family (see TRADE_FAMILIES for the stricter match).
+  const trade = _tradeFamilyFor(qn);
+  return trade ? trade.members : null;
 }
 
 // Deterministic (no-AI) query expansion: the curated family phrases that name the SAME job,
@@ -347,11 +525,17 @@ export function relevanceScore(job, query, { synonyms = [], canonical = '', fit 
   const desc = String(job.description || '').toLowerCase();
   const qNorm = normalizeCompany(query);
 
+  // A trade query also reads a title's stand-in words ("apprentice" ↔ "Helper", "plumber" ↔ "Plumbing") and never
+  // takes a family synonym from an instructor / engineer / manager title. Every other query: trade = null, unchanged.
+  const trade = _tradeOf(query);
+  const synOk = !trade || _tradeSynonymsOk(tokens, title);
+  const aliasOn = synOk && !!trade && _tradeAliasesOn(query, tokens);
+
   let score = 0;
   if (isCompanyMatch(company, qNorm)) score += 60;
   let titleHits = 0;
   for (const t of tokens) {
-    if (tokenInTitle(title, t)) { score += 12; titleHits++; }
+    if (tokenInTitle(title, t) || (aliasOn && _tradeAliasInTitle(title, t))) { score += 12; titleHits++; }
     else if (company.includes(t)) score += 8;
     else if (desc.includes(t)) score += 3;
   }
@@ -362,7 +546,7 @@ export function relevanceScore(job, query, { synonyms = [], canonical = '', fit 
   // Phrase bonus: the full query appears verbatim in the title.
   if (qNorm && title.includes(qNorm)) score += 30;
   // True-synonym title match (e.g. "budtender" → a "Cannabis Dispensary Associate").
-  for (const syn of effectiveSynonyms(query, synonyms)) {
+  if (synOk) for (const syn of effectiveSynonyms(query, synonyms)) {
     if (titleHasSynonym(title, syn)) score += 12;
   }
   // The searcher's own family or industry leads among equal title matches.
@@ -391,7 +575,8 @@ export function isRelevant(job, query, { synonyms = [], canonical = '' } = {}) {
   if (isCompanyMatch(company, qNorm)) return true;
   for (const t of tokens) { if (tokenInTitle(title, t)) return true; }
   if (qNorm && title.includes(qNorm)) return true;
-  for (const syn of effectiveSynonyms(query, synonyms)) { if (titleHasSynonym(title, syn)) return true; }
+  const synOk = !_tradeOf(query) || !TRADE_NON_CRAFT_RE.test(title);
+  if (synOk) for (const syn of effectiveSynonyms(query, synonyms)) { if (titleHasSynonym(title, syn)) return true; }
   // Fetched by our aggregation FOR this exact query (search_query provenance) — the signal that
   // recovers "Asset Protection Specialist" for a "theft prevention" search. Not description, not a
   // generic expansion word, so the budtender→Sales Manager leak stays closed.
@@ -438,6 +623,11 @@ export function isTitleRelated(job, query, { canonical = '' } = {}) {
   if (isCompanyMatch(company, qNorm)) return true;
   if (qNorm && title.includes(qNorm)) return true;
   if (tokens.every((t) => tokenOrAliasInTitle(title, t))) return true;
+  // A trade query: no stand-in word and no family synonym makes an instructor / engineer / manager title a match.
+  const trade = _tradeOf(query);
+  if (trade && TRADE_NON_CRAFT_RE.test(title)) return false;
+  if (trade && _tradeAliasesOn(query, tokens) && tokens.every((t) => tokenOrAliasInTitle(title, t) || _tradeAliasInTitle(title, t))) return true;
+  if (trade && !_tradeSynonymsOk(tokens, title)) return false;
   const fam = [...(_familyFor(query) || [])];
   const cn = String(canonical || '').toLowerCase().trim();
   if (cn && cn !== qNorm && cn.split(' ').length > 1) fam.push(cn);
