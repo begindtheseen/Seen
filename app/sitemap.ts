@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next'
 import { fetchSitemapCompanies } from '@/lib/server/sitemapCompanies.js'
+import { START_GUIDES } from '@/lib/start/guides.js'
 
 // Dynamic sitemap: static routes + every GRADED company page. Refreshes hourly so newly graded
 // companies get indexed. Pulls names server-side (service key, never shipped to client).
@@ -43,6 +44,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE}/lists`, lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${BASE}/lists/employers-that-respond`, lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
     { url: `${BASE}/lists/staffing-agencies-ghosting`, lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
+    // The "getting in" guides (/start/oilfield, /start/trades).
+    ...START_GUIDES.map((g): MetadataRoute.Sitemap[number] => ({ url: `${BASE}${g.path}`, lastModified: now, changeFrequency: 'monthly', priority: 0.7 })),
   ]
 
   const companies = await getCompanies()
