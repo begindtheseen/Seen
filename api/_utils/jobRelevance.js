@@ -239,6 +239,27 @@ function _tradeOf(query) {
   const fam = _familyFor(query);
   return fam ? TRADE_BY_MEMBERS.get(fam) || null : null;
 }
+// An umbrella search ("apprenticeship", "trades", "skilled trades" — the trades_entry family reached by its own
+// words, no trade named) matches TRADE titles only. Its words alone are not enough: "Pharmacy Technician / Pharm
+// Tech Apprenticeship" (Walgreens), "Apprentice Piercer" and "Public Relations Apprentice" carry them too, and on
+// production (2026-11-13) four Walgreens pharmacy rows led an "apprenticeship" search. A trade title is a member of the
+// trades_entry family (a beginner rung), or apprentice / helper / trainee beside a craft word.
+const TRADE_RUNG_RE = /(^|[^a-z])(apprentice|apprentices|apprenticeship|helper|trainee)([^a-z]|$)/;
+const TRADE_CRAFT_RE = /(^|[^a-z])(electric|electrical|electrician|wireman|wiremen|low voltage|plumb\w*|pipe ?fitter|steam ?fitter|sprinkler|fitter|hvac|refrigeration|duct|sheet metal|weld\w*|fabricat\w*|line ?man|line ?worker|groundman|substation|carpent\w*|drywall|framer|roofer|roofing|mason\w*|concrete|iron ?worker|millwright|elevator|diesel|mechanic|install\w*|maintenance|boilermaker|insulat\w*|glazier|painter|operating engineer|heavy equipment)([^a-z]|$)/;
+function _tradeUmbrella(query) {
+  const f = _tradeOf(query);
+  if (!f || f.id !== 'trades_entry') return false;
+  const qn = normalizeCompany(query);
+  return !f.members.includes(qn);
+}
+const TRADES_ENTRY = TRADE_FAMILIES.find((f) => f.id === 'trades_entry');
+// The beginner rung of a trade: a trades_entry member ("electrician helper", "groundman"), or an apprentice / helper /
+// trainee title naming a craft. A journeyman or master title is a trade job but not what an apprenticeship search asks for.
+function _isTradeTitle(title) {
+  if (TRADE_NON_CRAFT_RE.test(title)) return false;
+  for (const m of TRADES_ENTRY.members) if (titleHasSynonym(title, m)) return true;
+  return TRADE_RUNG_RE.test(title) && TRADE_CRAFT_RE.test(title);
+}
 // Stand-in words apply to a trade query that names a trade word, never to one made only of beginner / filler words
 // ("apprenticeship", "union apprenticeship"): there "apprentice" would match every apprentice title (a PR apprentice).
 function _tradeAliasesOn(query, tokens) {
@@ -572,6 +593,7 @@ export function isRelevant(job, query, { synonyms = [], canonical = '' } = {}) {
   const company = normalizeCompany(job.company);
   const qNorm = normalizeCompany(query);
 
+  if (_tradeUmbrella(query)) return _isTradeTitle(title);
   if (isCompanyMatch(company, qNorm)) return true;
   for (const t of tokens) { if (tokenInTitle(title, t)) return true; }
   if (qNorm && title.includes(qNorm)) return true;
@@ -620,6 +642,7 @@ export function isTitleRelated(job, query, { canonical = '' } = {}) {
   const title = String(job.title || '').toLowerCase();
   const company = normalizeCompany(job.company);
   const qNorm = normalizeCompany(query);
+  if (_tradeUmbrella(query)) return _isTradeTitle(title);
   if (isCompanyMatch(company, qNorm)) return true;
   if (qNorm && title.includes(qNorm)) return true;
   if (tokens.every((t) => tokenOrAliasInTitle(title, t))) return true;

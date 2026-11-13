@@ -1,20 +1,25 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import PageHeader from '@/components/shell/PageHeader'
+import Icon from '@/components/ui/Icon'
 import { pageMetadata } from '@/lib/seo'
 import { jsonLdHtml } from '@/lib/jsonLd'
-import { formatSourceDate, numberSources } from '@/lib/start/guides.js'
+import { formatSourceDate, numberSources, sourceHost } from '@/lib/start/guides.js'
 import {
-  sources, guide, doors, tradeRows, tradeNote, test, employers, employerCaveats, freeHelp, mistakes, peopleSay, scams,
-  faq, listings, pageEntries,
+  sources, guide, tiles, doors, tradeRows, tradeNote, test, employers, caveatLine, employerCaveats, freeHelp, mistakes, peopleSay,
+  scams, faq, listings, pageEntries, sectionEntries,
 } from '@/lib/start/trades.js'
-import { Fact, FactList, Faq, GuideTable, Refs, SaidList, Section, SourceList, Toc, faqJsonLd, type Source } from '@/components/start/Guide'
+import {
+  Checklist, Chips, DiscList, Faq, More, NoteList, Section, Sources, SrcLine, Tiles, faqJsonLd, type Source,
+} from '@/components/start/Guide'
 import LiveListings from '@/components/start/LiveListings'
 import st from '@/components/start/guide.module.css'
 
-// "Getting into the trades" — a calm, exact guide for people with no experience. Every fact and figure comes from
-// lib/start/trades.js, where each carries its source and as-of date (lib/start/guides.test.mjs keeps it that way).
-// Union rules are local, so every wage, window or cutoff names its local. No filled button on this page.
+// "Getting into the trades" — the first screen answers: does it pay, how hard is it to get in, what does it pay
+// once trained — then the live listings. The two doors side by side, the trades as rows (detail one tap away), the
+// test as a checklist. Every fact comes from lib/start/trades.js, where each carries its source and date
+// (lib/start/guides.test.mjs). Union rules are local, so every wage, window or cutoff names its local. No filled
+// button on this page.
 
 export const metadata: Metadata = pageMetadata({
   title: guide.title,
@@ -26,127 +31,134 @@ export const metadata: Metadata = pageMetadata({
 const P = 'tr'
 const SRC = sources as Record<string, Source>
 const { nums, ordered } = numberSources(SRC, pageEntries()) as { nums: Record<string, number>; ordered: Array<[string, Source]> }
-
-const TOC = [
-  { id: 'two-doors', label: 'Two ways in' },
-  { id: 'by-trade', label: 'Trade by trade' },
-  { id: 'aptitude-test', label: 'The aptitude test' },
-  { id: 'paid-training', label: 'Paid training' },
-  { id: 'free-help', label: 'Free help' },
-  { id: 'mistakes', label: 'Common mistakes' },
-  { id: 'scams', label: 'Scams' },
-  { id: 'listings', label: 'Live listings' },
-  { id: 'questions', label: 'Questions' },
-]
+const parts = sectionEntries()
 
 export default function TradesGuidePage() {
   return (
     <div className="page-full">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(faqJsonLd(faq)) }} />
       <div className={st.wrap}>
-        <PageHeader
-          eyebrow={guide.eyebrow}
-          title={guide.title}
-          crumbs={[{ href: '/jobs', label: 'Jobs' }]}
-          crumbLabel={guide.crumbLabel}
-          sub={guide.sub}
-        />
-        <p className={st.asof}>Read from government pages, union training programs and employers&rsquo; own pages on {formatSourceDate(guide.asOf)}.</p>
-        <Toc items={TOC} />
+        <div className={st.hero}>
+          <PageHeader
+            size="lg"
+            eyebrow={guide.eyebrow}
+            title={guide.title}
+            crumbs={[{ href: '/jobs', label: 'Jobs' }]}
+            crumbLabel={guide.crumbLabel}
+            sub={guide.answer.text}
+          />
+          <Tiles tiles={tiles} />
+          <SrcLine entries={parts.hero} nums={nums} prefix={P} lead={`${guide.asOfLine} ${formatSourceDate(guide.asOf)}.`} />
+        </div>
 
-        <Section id="two-doors" title="Two ways in">
+        <Section first id="listings" title="Hiring now" sub="Live apprentice, helper and trainee listings, nationwide.">
+          <LiveListings queries={listings.queries} prefer={listings.prefer} seeAllQuery={listings.seeAll} label="Live apprenticeship listings" seeAllLabel="See all apprenticeship jobs" max={8} />
+        </Section>
+
+        <Section id="two-doors" title="Two ways in" foot={<SrcLine entries={parts.doors} nums={nums} prefix={P} />}>
           <div className={st.doors}>
             {[doors.apprenticeship, doors.now].map((d) => (
-              <div key={d.title} className={st.item}>
-                <h3 className={st.itemName}>{d.title}</h3>
-                <p className={st.itemText}><Fact e={d.lead} nums={nums} prefix={P} /></p>
-                <ul className={st.list}>
-                  {d.examples.map((x, i) => <li key={i} className={st.itemText}><Fact e={x} nums={nums} prefix={P} /></li>)}
+              <div key={d.title} className={st.card}>
+                <h3 className={st.cardName}>{d.title}</h3>
+                <p className={st.cardText}>{d.lead.text}</p>
+                <ul className={st.figRows}>
+                  {d.examples.map((x) => (
+                    <li key={x.who} className={st.figRow}>
+                      <span className={st.figWho}>{x.who}</span>
+                      <span className={st.figVal}>{x.figure}</span>
+                      <span className={st.figText}>{x.text}</span>
+                    </li>
+                  ))}
                 </ul>
-                {d.note && <p className={st.itemMeta}><Fact e={d.note} nums={nums} prefix={P} /></p>}
+                {d.note && <p className={st.cardNote}>{d.note.text}</p>}
               </div>
             ))}
           </div>
         </Section>
 
-        <Section id="by-trade" title="Trade by trade">
-          <GuideTable
-            caption="How people enter each trade, how long training takes, how to apply, and the national median pay"
-            columns={[
-              { key: 'trade', label: 'Trade' }, { key: 'path', label: 'Way in' }, { key: 'length', label: 'Length' },
-              { key: 'apply', label: 'How to apply' }, { key: 'median', label: 'BLS median', num: true },
-            ]}
-            rows={tradeRows}
-            nums={nums}
-            prefix={P}
-          />
-          <p className={`${st.p} ${st.quiet}`}><Fact e={tradeNote} nums={nums} prefix={P} /></p>
+        <Section id="by-trade" title="Trade by trade" sub="Tap a trade for the way in and how to apply." foot={<SrcLine entries={parts.trades} nums={nums} prefix={P} lead={tradeNote.text} />}>
+          <div className={st.list}>
+            {tradeRows.map((t) => (
+              <details key={t.trade} className={st.trow}>
+                <summary className={st.trowSum}>
+                  <span className={st.trowName}>
+                    <span>{t.trade}</span>
+                    <span className={st.trowLen}>{t.length}</span>
+                  </span>
+                  <span className={st.trowLenWide}>{t.length}</span>
+                  <span className={st.trowFig}>{t.median}<small>median a year</small></span>
+                  <Icon name="chevron-down" size={16} className={st.chev} />
+                </summary>
+                <div className={st.trowBody}>
+                  <p><span>Way in</span>{t.path}</p>
+                  <p><span>How to apply</span>{t.apply}</p>
+                </div>
+              </details>
+            ))}
+          </div>
         </Section>
 
-        <Section id="aptitude-test" title="The aptitude test, and what committees weigh">
-          <p className={st.p}>The electrical apprenticeship test, as the IBEW/NECA Electrical Training Alliance describes it:</p>
-          <FactList items={test.facts} nums={nums} prefix={P} />
-          <h3 className={st.h3}>What selection committees say they look for</h3>
-          <FactList items={test.weigh} nums={nums} prefix={P} />
-          <p className={st.p}><Fact e={test.prep} nums={nums} prefix={P} /></p>
-          <p className={`${st.p} ${st.quiet}`}>
-            If you send a résumé, you can <Link href="/resume" prefetch={false} className={st.inlineLink}>check it against a posting</Link>: reliability,
-            your math and school record, hands-on work, and licenses and cards are what these committees name.
-          </p>
+        <Section id="aptitude-test" title="The aptitude test" sub={test.intro} foot={<SrcLine entries={parts.test} nums={nums} prefix={P} />}>
+          <Checklist items={test.facts} cols />
+          <p className={st.p}>{test.prep.text}</p>
+          <More title="What selection committees say they look for">
+            <NoteList items={test.weigh} />
+            <p className={st.p}>
+              If you send a résumé, you can <Link href="/resume" prefetch={false} className={st.inlineLink}>check it against a posting</Link>.
+            </p>
+          </More>
         </Section>
 
-        <Section id="paid-training" title="Employers with paid training">
-          <ul className={st.items}>
+        <Section id="paid-training" title="Employers that train you" foot={<SrcLine entries={parts.employers} nums={nums} prefix={P} />}>
+          <ul className={st.cards}>
             {employers.map((e) => (
-              <li key={e.name} className={st.item}>
-                <h3 className={st.itemName}>{e.name}</h3>
-                <p className={st.itemText}>{e.text}<Refs src={e.src} nums={nums} prefix={P} /></p>
+              <li key={e.name} className={st.card}>
+                <div className={st.cardTop}>
+                  <h3 className={st.cardName}>{e.name}</h3>
+                  <Chips items={[e.chip.text]} strong />
+                </div>
+                <p className={st.cardText}>{e.text}</p>
               </li>
             ))}
           </ul>
-          <h3 className={st.h3}>Before you sign</h3>
-          <FactList items={employerCaveats} nums={nums} prefix={P} />
+          <p className={st.callout}>{caveatLine.text}</p>
+          <More title="Before you sign: franchises, CDL contracts, repayment terms">
+            <NoteList items={employerCaveats} />
+          </More>
         </Section>
 
-        <Section id="free-help" title="Free help">
-          <ul className={st.items}>
+        <Section id="free-help" title="Free help" foot={<SrcLine entries={parts.freeHelp} nums={nums} prefix={P} />}>
+          <ul className={st.cards}>
             {freeHelp.map((f) => (
-              <li key={f.name} className={st.item}>
-                <h3 className={st.itemName}>{f.name}</h3>
-                <p className={st.itemText}>{f.text}<Refs src={f.src} nums={nums} prefix={P} /></p>
-                {f.url && (
-                  <a href={f.url} className={st.itemLink} target="_blank" rel="noopener noreferrer">
-                    {new URL(f.url).hostname.replace(/^www\./, '')}<span className="sr-only"> (opens in a new tab)</span> ↗
-                  </a>
-                )}
+              <li key={f.name} className={st.card}>
+                <div className={st.cardTop}>
+                  <h3 className={st.cardName}>{f.name}</h3>
+                  {f.url && (
+                    <a href={f.url} className={st.boardLink} target="_blank" rel="noopener noreferrer">
+                      {sourceHost(f.url)}<span className="sr-only"> (opens in a new tab)</span> <Icon name="arrow-up-right" size={14} />
+                    </a>
+                  )}
+                </div>
+                <p className={st.cardText}>{f.text}</p>
               </li>
             ))}
           </ul>
         </Section>
 
-        <Section id="mistakes" title="Common mistakes">
-          <FactList items={mistakes} nums={nums} prefix={P} />
-          <p className={st.p}>What people who got in say, from public Reddit threads in 2025 and 2026. These are accounts, not facts.</p>
-          <SaidList label="People in the trades say" items={peopleSay} nums={nums} prefix={P} />
+        <Section id="mistakes" title="Mistakes and scams" foot={<SrcLine entries={parts.mistakes} nums={nums} prefix={P} />}>
+          <DiscList items={mistakes} />
+          <More title="What people who got in say (accounts, not facts)">
+            <p className={st.moreText}>From public Reddit threads in 2025 and 2026, where several accounts agree.</p>
+            <NoteList items={peopleSay} />
+          </More>
+          <NoteList label="Scams" items={scams} icon="x" caution />
         </Section>
 
-        <Section id="scams" title="Scams and red flags" icon="caution">
-          <FactList items={scams} nums={nums} prefix={P} />
+        <Section id="questions" title="Common questions" foot={<SrcLine entries={parts.faq} nums={nums} prefix={P} />}>
+          <Faq items={faq} />
         </Section>
 
-        <Section id="listings" title="Live apprenticeship listings">
-          <p className={st.p}>Apprentice, helper and trainee listings Seen holds right now, nationwide. Each opens the listing&rsquo;s page with the employer&rsquo;s record.</p>
-          <LiveListings query={listings.query} seeAllQuery={listings.seeAll} label="Live apprenticeship listings" />
-        </Section>
-
-        <Section id="questions" title="Common questions">
-          <Faq items={faq} nums={nums} prefix={P} />
-        </Section>
-
-        <Section id="sources" title="Sources">
-          <p className={`${st.p} ${st.quiet}`}>Each number in brackets above points to one of these. Dates are when the page was posted, updated or read.</p>
-          <SourceList ordered={ordered} prefix={P} />
-        </Section>
+        <Sources ordered={ordered} prefix={P} />
       </div>
     </div>
   )
