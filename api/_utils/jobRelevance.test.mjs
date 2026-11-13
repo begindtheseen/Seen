@@ -443,3 +443,20 @@ test('existing families are untouched by the trade tables (spot checks; the full
   assert.deepEqual(expandQueryTerms('field service technician'), []);
   assert.equal(titleRelated(T('Electrician Helper'), 'cashier'), false);
 });
+
+test('an umbrella trades search ("apprenticeship", "trades") matches trade titles only (production 2026-11-13: Walgreens pharmacy rows led it)', async () => {
+  const m = await import('./jobRelevance.js');
+  const yes = ['Electrician Apprentice', 'Plumbing Install Apprentice', 'Duct Install Apprentice', 'Apprentice Lineman - Substation', 'Heavy Equipment Technician (Mechanic) Apprentice', 'Fire Sprinkler Fitter Trainee'];
+  const no = ['Pharmacy Technician / Pharm Tech Apprenticeship', 'Apprentice Piercer', 'Public Relations Apprentice', 'Immediate Talent Acquisition Apprentice', 'Early-Career Physician Apprentice Program', 'Electrical Apprenticeship Instructor', 'Sales Trainee'];
+  for (const q of ['apprenticeship', 'trades', 'skilled trades']) {
+    const syn = m.expandQueryTerms(q);
+    for (const t of yes) {
+      assert.equal(m.isRelevant({ title: t, company: 'X' }, q, { synonyms: syn, canonical: q }), true, `${q} → ${t}`);
+      assert.equal(m.isTitleRelated({ title: t, company: 'X' }, q, { canonical: q }), true, `${q} → ${t} (match)`);
+    }
+    for (const t of no) {
+      assert.equal(m.isRelevant({ title: t, company: 'X' }, q, { synonyms: syn, canonical: q }), false, `${q} ✗ ${t}`);
+      assert.equal(m.isTitleRelated({ title: t, company: 'X' }, q, { canonical: q }), false, `${q} ✗ ${t} (match)`);
+    }
+  }
+});
