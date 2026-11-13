@@ -11,3 +11,5 @@ paths-ignore:
   - '**/*.test.js'
   - '**/__tests__/**'
   - 'scratchpad/**'
+  # Saved board responses the provider tests read (real HTML/JSON pages, trimmed): data, not shipped code.
+  - 'lib/jobs/fixtures/**'
