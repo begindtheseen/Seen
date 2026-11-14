@@ -185,13 +185,23 @@ export function faqJsonLd(items: Array<{ q: string; a: Entry }>) {
 
 /** "Additional resources": every reference behind the page as plain grouped links — no numbers, no dates. */
 export function Resources({ groups, sources }: { groups: Array<{ title: string; items: Array<{ key: string; name: string }> }>; sources: Record<string, Source> }) {
+  // A link is shown once: several references can open the same page (Tesla's postings all open its careers search,
+  // which refuses servers), and a list of identical links reads as padding. The first item's name is the one shown.
+  const shown = new Set<string>()
+  const firstOfUrl = (i: { key: string }) => {
+    const url = sources[i.key] && sources[i.key].url
+    if (!url || shown.has(url)) return false
+    shown.add(url)
+    return true
+  }
+  const visible = groups.map((g) => ({ ...g, items: g.items.filter(firstOfUrl) })).filter((g) => g.items.length)
   return (
     <div className={st.resGroups}>
-      {groups.map((g) => (
+      {visible.map((g) => (
         <div key={g.title} className={st.resGroup}>
           <h3 className={st.resTitle}>{g.title}</h3>
           <ul className={st.resList}>
-            {g.items.filter((i) => sources[i.key]).map((i) => (
+            {g.items.map((i) => (
               <li key={i.key}>
                 <a href={sources[i.key].url} className={st.resLink} target="_blank" rel="noopener noreferrer">
                   <span className={st.resName}>{i.name}</span>
