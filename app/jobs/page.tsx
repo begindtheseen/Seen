@@ -30,7 +30,7 @@ import j from './jobs.module.css'
 import { useUrlPlace, useScrollMemory, afterPendingBack } from '@/lib/nav/urlState'
 import { JobCache } from '@/lib/stores/JobCache'
 import { httpHref } from '@/lib/safeHref.js'
-import GuideLine from '@/components/start/GuideLine'
+import GuidePrompt from '@/components/start/GuidePrompt'
 
 // Empty-state suggestions, most-held first. Live corpus counts by title (prod, read-only,
 // 2026-10-23): software engineer 3,960 · nurse 1,360 · sales associate 648 · customer service 489 ·
@@ -356,6 +356,9 @@ export default function JobsPage() {
           </div>
         )}
 
+        {/* A search a start guide covers (oilfield, trades…): one quiet card to it, right above the results. */}
+        {status === 'done' && (view === 'results' || view === 'empty') && <GuidePrompt query={committedQuery} />}
+
         {/* Results — swipe deck or list */}
         {filtered.length > 0 && swipeMode ? (
           <SwipeJobDeck
@@ -472,8 +475,6 @@ export default function JobsPage() {
             {hasFilters && <Button size="sm" variant="secondary" onClick={clearFilters}>Clear filters</Button>}
           </div>
         ) : null}
-        {/* An oilfield or trades search: one quiet line to the matching "getting in" guide (/start/…). */}
-        {status === 'done' && (view === 'results' || view === 'empty') && <GuideLine query={committedQuery} />}
       </div>
     </div>
 
