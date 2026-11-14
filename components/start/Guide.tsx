@@ -1,83 +1,20 @@
 /**
- * Building blocks for the "getting in" guides (/start/oilfield, /start/trades). Server-safe (no hooks), so the pages
- * stay server components and every word ships in the HTML.
- *
- * The page reads like a Seen screen, not a paper: readings (stat tiles), checklists, rows and chips. Sources are
- * still there for every figure, but out of the reading line: each part ends with ONE quiet "Sources: 1, 4, 6" line
- * whose numbers open the collapsed list at the bottom (SourcesDisclosure). Both are built from the same data module
- * (lib/start/*.js `sectionEntries()`), so a figure can never appear without its source and date.
+ * Building blocks for the start guides (/start/<field>). Server-safe (no hooks), so the page stays a server
+ * component and every word ships in the HTML. The page reads like a Seen screen: readings (stat tiles), a listings
+ * block, then openable rows (`MenuRow`, a native <details>) holding checklists, cards, rows and chips. Each row's
+ * content is DATA — the guide module's `menu` — rendered by `Blocks` from the block vocabulary below, so a new guide
+ * is a new data module, never new markup. No citations are printed: the references behind each fact live in the
+ * data module, and readers reach the links through the grouped "Additional resources" row.
  */
 import type { ReactNode } from 'react'
+import Link from 'next/link'
 import Icon from '@/components/ui/Icon'
 import StatTile from '@/components/ui/StatTile'
-import { formatSourceDate, sourceHost } from '@/lib/start/guides.js'
-import SourcesDisclosure from './SourcesDisclosure'
+import { sourceHost } from '@/lib/start/guides.js'
 import st from './guide.module.css'
 
 export type Source = { label: string; url: string; date: string; note?: string }
 export type Entry = { text?: string | null; src: string[]; firstHand?: boolean }
-export type Nums = Record<string, number>
-
-/** The source numbers a set of entries cites, each once, in list order. */
-export function sourceNumbers(entries: Array<{ src: string[] } | null>, nums: Nums): number[] {
-  const set = new Set<number>()
-  for (const e of entries) for (const k of e?.src || []) if (nums[k]) set.add(nums[k])
-  return [...set].sort((a, b) => a - b)
-}
-
-/** Consecutive numbers as ranges: [1,2,3,5,7,8] → [[1,3],[5,5],[7,8]]. */
-function ranges(list: number[]): Array<[number, number]> {
-  const out: Array<[number, number]> = []
-  for (const n of list) {
-    const last = out[out.length - 1]
-    if (last && n === last[1] + 1) last[1] = n
-    else out.push([n, n])
-  }
-  return out
-}
-
-/** "Sources 1–6, 16–23" — one quiet line at the end of a part; each number opens its line in the list at the bottom. */
-export function SrcLine({ entries, nums, prefix, lead }: { entries: Array<{ src: string[] } | null>; nums: Nums; prefix: string; lead?: ReactNode }) {
-  const list = sourceNumbers(entries, nums)
-  if (!list.length) return null
-  return (
-    <p className={st.srcLine}>
-      {lead ? <>{lead} </> : null}
-      <span>{list.length > 1 ? 'Sources' : 'Source'} </span>
-      {ranges(list).map(([a, b], i) => (
-        <span key={a}>
-          {i > 0 ? ', ' : ''}
-          <a href={`#${prefix}-src-${a}`} className={st.srcNum} aria-label={`Source ${a}`}>{a}</a>
-          {b > a ? <>{b === a + 1 ? ', ' : '–'}<a href={`#${prefix}-src-${b}`} className={st.srcNum} aria-label={`Source ${b}`}>{b}</a></> : null}
-        </span>
-      ))}
-    </p>
-  )
-}
-
-export function Section({ id, title, sub, icon, children, foot, first }: {
-  id: string
-  /** The part right under the hero: no hairline above it. */
-  first?: boolean
-  title: string
-  sub?: ReactNode
-  icon?: 'caution'
-  children: ReactNode
-  foot?: ReactNode
-}) {
-  return (
-    <section id={id} className={first ? `${st.section} ${st.sectionFirst}` : st.section} aria-labelledby={`${id}-h`}>
-      <h2 id={`${id}-h`} className={st.h2}>
-        {icon === 'caution'
-          ? <span className={st.h2Icon}><Icon name="triangle-alert" size={20} className={st.cautionIcon} />{title}</span>
-          : title}
-      </h2>
-      {sub ? <p className={st.sub}>{sub}</p> : null}
-      {children}
-      {foot}
-    </section>
-  )
-}
 
 /** The hero readings: THE stat tile (components/ui/StatTile), three across; one compact panel on a phone. */
 export function Tiles({ tiles }: { tiles: Array<{ label: string; value: string; text: string }> }) {
@@ -85,6 +22,23 @@ export function Tiles({ tiles }: { tiles: Array<{ label: string; value: string; 
     <div className={st.tiles}>
       {tiles.map((t) => <StatTile key={t.label} label={t.label} value={t.value} note={t.text} />)}
     </div>
+  )
+}
+
+/** One openable row of the page: the title (an h2), one line of what is inside, a chevron; closed by default. */
+export function MenuRow({ id, title, summary, icon, children }: { id: string; title: string; summary: string; icon?: 'caution'; children: ReactNode }) {
+  return (
+    <details className={st.menuRow} id={id}>
+      <summary className={st.menuSum}>
+        {icon === 'caution' ? <span className={st.menuIcon} aria-hidden><Icon name="triangle-alert" size={18} className={st.cautionIcon} /></span> : null}
+        <span className={st.menuText}>
+          <h2 className={st.menuTitle}>{title}</h2>
+          <span className={st.menuLine}>{summary}</span>
+        </span>
+        <Icon name="chevron-down" size={20} className={`${st.chev} ${st.menuChev}`} />
+      </summary>
+      <div className={st.menuBody}>{children}</div>
+    </details>
   )
 }
 
@@ -131,7 +85,7 @@ export function Steps({ items }: { items: Array<{ step: string; text: string }> 
   )
 }
 
-/** Short plain rows under a small ink label (first-hand accounts carry their label here). */
+/** Short plain rows under a small ink label. */
 export function NoteList({ label, items, icon, caution }: { label?: string; items: Array<{ text?: string | null; lead?: string }>; icon?: 'x' | 'dot'; caution?: boolean }) {
   return (
     <div className={st.notes}>
@@ -167,10 +121,10 @@ export function DiscList({ items }: { items: Array<{ lead: string; text: string 
   )
 }
 
-/** A quiet "more detail" disclosure: hairline row, chevron, closed by default. */
-export function More({ title, children, id }: { title: ReactNode; children: ReactNode; id?: string }) {
+/** A quiet "more detail" disclosure inside a row: hairline, chevron, closed by default. */
+export function More({ title, children }: { title: ReactNode; children: ReactNode }) {
   return (
-    <details className={st.more} id={id}>
+    <details className={st.more}>
       <summary className={st.moreSum}>
         <span>{title}</span>
         <Icon name="chevron-down" size={16} className={st.chev} />
@@ -182,11 +136,7 @@ export function More({ title, children, id }: { title: ReactNode; children: Reac
 
 export type Column = { key: string; label: string; num?: boolean }
 /** A compact figures table (columns on wide screens, one block per row on phones). */
-export function GuideTable({ caption, columns, rows }: {
-  caption: string
-  columns: Column[]
-  rows: Array<Record<string, unknown>>
-}) {
+export function GuideTable({ caption, columns, rows }: { caption: string; columns: Column[]; rows: Array<Record<string, unknown>> }) {
   return (
     <div className={st.tableWrap}>
       <table className={st.table}>
@@ -224,7 +174,7 @@ export function Faq({ items }: { items: Array<{ q: string; a: Entry }> }) {
   )
 }
 
-/** FAQPage JSON-LD built from the SAME Q&As the page shows (answers as plain text, no reference numbers). */
+/** FAQPage JSON-LD built from the SAME Q&As the page shows (answers as plain text). */
 export function faqJsonLd(items: Array<{ q: string; a: Entry }>) {
   return {
     '@context': 'https://schema.org',
@@ -233,19 +183,187 @@ export function faqJsonLd(items: Array<{ q: string; a: Entry }>) {
   }
 }
 
-/** The numbered sources, collapsed at the bottom, in the order lib/start/guides.js numberSources gives. */
-export function Sources({ ordered, prefix }: { ordered: Array<[string, Source]>; prefix: string }) {
+/** "Additional resources": every reference behind the page as plain grouped links — no numbers, no dates. */
+export function Resources({ groups, sources }: { groups: Array<{ title: string; items: Array<{ key: string; name: string }> }>; sources: Record<string, Source> }) {
+  // A link is shown once: several references can open the same page (Tesla's postings all open its careers search,
+  // which refuses servers), and a list of identical links reads as padding. The first item's name is the one shown.
+  const shown = new Set<string>()
+  const firstOfUrl = (i: { key: string }) => {
+    const url = sources[i.key] && sources[i.key].url
+    if (!url || shown.has(url)) return false
+    shown.add(url)
+    return true
+  }
+  const visible = groups.map((g) => ({ ...g, items: g.items.filter(firstOfUrl) })).filter((g) => g.items.length)
   return (
-    <SourcesDisclosure prefix={prefix} count={ordered.length}>
-      <p className={st.srcIntro}>Dates are when each page was posted, updated or read.</p>
-      <ol className={st.sources}>
-        {ordered.map(([k, s], i) => (
-          <li key={k} id={`${prefix}-src-${i + 1}`}>
-            {s.label}. <a href={s.url} className={st.srcLink} target="_blank" rel="noopener noreferrer">{sourceHost(s.url)}</a>
-            {', '}{s.note ? `${s.note} ` : ''}{formatSourceDate(s.date)}.
-          </li>
-        ))}
-      </ol>
-    </SourcesDisclosure>
+    <div className={st.resGroups}>
+      {visible.map((g) => (
+        <div key={g.title} className={st.resGroup}>
+          <h3 className={st.resTitle}>{g.title}</h3>
+          <ul className={st.resList}>
+            {g.items.map((i) => (
+              <li key={i.key}>
+                <a href={sources[i.key].url} className={st.resLink} target="_blank" rel="noopener noreferrer">
+                  <span className={st.resName}>{i.name}</span>
+                  <span className={st.resHost}>{sourceHost(sources[i.key].url)}<span className="sr-only"> (opens in a new tab)</span></span>
+                  <Icon name="arrow-up-right" size={14} className={st.resIcon} />
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** The resources row's one-line summary, from its group titles ("Employers’ job boards, entry postings, … and more"). */
+export function resourcesSummary(groups: Array<{ title: string }>) {
+  const names = groups.slice(0, 3).map((g, i) => (i === 0 ? g.title : g.title.charAt(0).toLowerCase() + g.title.slice(1)))
+  return `${names.join(', ')}${groups.length > 3 ? ' and more' : ''}`
+}
+
+// ── The block vocabulary a guide's `menu` rows are written in ─────────────────────────────────────────────────────
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export type Block = { type: string; [k: string]: any }
+
+function Employers({ items, shown, moreTitle, sources }: { items: any[]; shown: number; moreTitle: string; sources: Record<string, Source> }) {
+  const row = (e: any) => (
+    <li key={e.name} className={st.erow}>
+      <h3 className={st.erowName}>{e.name}</h3>
+      {e.pay && <p className={st.erowPay}><b>{e.pay.value}</b><span>{e.pay.note}</span></p>}
+      <div className={st.erowRoles}><Chips items={e.roles} /></div>
+      <p className={st.erowText}>
+        {e.evidence.text}{' '}
+        {sources[e.board] ? (
+          <a href={sources[e.board].url} className={st.boardLink} target="_blank" rel="noopener noreferrer">
+            Job board<span className="sr-only"> of {e.name} (opens in a new tab)</span>&nbsp;<Icon name="arrow-up-right" size={12} />
+          </a>
+        ) : null}
+      </p>
+    </li>
+  )
+  return (
+    <>
+      <ul className={st.list}>{items.slice(0, shown).map(row)}</ul>
+      {items.length > shown ? (
+        <More title={`${items.length - shown} ${moreTitle}`}>
+          <ul className={st.list}>{items.slice(shown).map(row)}</ul>
+        </More>
+      ) : null}
+    </>
+  )
+}
+
+function Doors({ items }: { items: any[] }) {
+  return (
+    <div className={st.doors}>
+      {items.map((d) => (
+        <div key={d.title} className={st.card}>
+          <h3 className={st.cardName}>{d.title}</h3>
+          <p className={st.cardText}>{d.lead.text}</p>
+          <ul className={st.figRows}>
+            {d.examples.map((x: any) => (
+              <li key={x.who} className={st.figRow}>
+                <span className={st.figWho}>{x.who}</span>
+                <span className={st.figVal}>{x.figure}</span>
+                <span className={st.figText}>{x.text}</span>
+              </li>
+            ))}
+          </ul>
+          {d.note && <p className={st.cardNote}>{d.note.text}</p>}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function TradeRows({ items }: { items: any[] }) {
+  return (
+    <div className={st.list}>
+      {items.map((t) => (
+        <details key={t.trade} className={st.trow}>
+          <summary className={st.trowSum}>
+            <span className={st.trowName}>
+              <span>{t.trade}</span>
+              <span className={st.trowLen}>{t.length}</span>
+            </span>
+            <span className={st.trowLenWide}>{t.length}</span>
+            <span className={st.trowFig}>{t.median}<small>median a year</small></span>
+            <Icon name="chevron-down" size={16} className={st.chev} />
+          </summary>
+          <div className={st.trowBody}>
+            <p><span>Way in</span>{t.path}</p>
+            <p><span>How to apply</span>{t.apply}</p>
+          </div>
+        </details>
+      ))}
+    </div>
+  )
+}
+
+function Cards({ items }: { items: any[] }) {
+  return (
+    <ul className={st.cards}>
+      {items.map((c) => (
+        <li key={c.name} className={st.card}>
+          <div className={st.cardTop}>
+            <div className={st.cardHead}>
+              <h3 className={st.cardName}>{c.name}</h3>
+              {c.aka ? <span className={st.cardAka}>{c.aka}</span> : null}
+            </div>
+            {c.link ? (
+              <a href={c.link} className={st.boardLink} target="_blank" rel="noopener noreferrer">
+                {sourceHost(c.link)}<span className="sr-only"> (opens in a new tab)</span> <Icon name="arrow-up-right" size={14} />
+              </a>
+            ) : null}
+          </div>
+          {c.body?.text ? <p className={st.cardText}>{c.body.text}</p> : null}
+          {c.chips?.length ? <Chips items={c.chips.map((x: Entry) => x.text || '').filter(Boolean)} strong /> : null}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/** Render a row's blocks. `sources` resolves an employer's job-board link. */
+export function Blocks({ blocks, sources }: { blocks: Block[]; sources: Record<string, Source> }) {
+  return (
+    <>
+      {blocks.map((b, i) => {
+        switch (b.type) {
+          case 'text':
+            if (b.entries) return <p key={i} className={st.p}>{b.entries.map((e: Entry) => e.text).join(' ')}</p>
+            return <p key={i} className={st.p}>{b.lead ? <>{b.lead} </> : null}{b.plain ?? b.entry?.text}</p>
+          case 'note': return <p key={i} className={st.note2}>{b.entry.text}</p>
+          case 'heading': return <h3 key={i} className={st.subhead}>{b.text}</h3>
+          case 'callout': return <p key={i} className={st.callout}>{b.entry.text}</p>
+          case 'checklist': return <Checklist key={i} items={b.items} cols={b.cols} />
+          case 'cards': return <Cards key={i} items={b.items} />
+          case 'doors': return <Doors key={i} items={b.items} />
+          case 'tradeRows': return <TradeRows key={i} items={b.items} />
+          case 'employers': return <Employers key={i} items={b.items} shown={b.shown} moreTitle={b.moreTitle} sources={sources} />
+          case 'table': return <GuideTable key={i} caption={b.caption} columns={b.columns} rows={b.rows} />
+          case 'steps': return <Steps key={i} items={b.items} />
+          case 'notes': return <NoteList key={i} label={b.label} items={b.items} icon={b.icon} caution={b.caution} />
+          case 'notesGrid':
+            return (
+              <div key={i} className={st.notesGrid}>
+                {b.groups.map((g: any) => <NoteList key={g.label} label={g.label} items={g.items} icon={g.icon} caution={g.caution} />)}
+              </div>
+            )
+          case 'disclosures': return <DiscList key={i} items={b.items} />
+          case 'faq': return <Faq key={i} items={b.items} />
+          case 'more': return <More key={i} title={b.title}><Blocks blocks={b.blocks} sources={sources} /></More>
+          case 'resumeLink':
+            return (
+              <p key={i} className={st.p}>
+                {b.before} <Link href="/resume" prefetch={false} className={st.inlineLink}>{b.label}</Link>.
+              </p>
+            )
+          default: return null
+        }
+      })}
+    </>
   )
 }

@@ -30,7 +30,9 @@ import j from './jobs.module.css'
 import { useUrlPlace, useScrollMemory, afterPendingBack } from '@/lib/nav/urlState'
 import { JobCache } from '@/lib/stores/JobCache'
 import { httpHref } from '@/lib/safeHref.js'
-import GuideLine from '@/components/start/GuideLine'
+import GuidePrompt from '@/components/start/GuidePrompt'
+import SearchContext from '@/components/jobs/SearchContext'
+import WhereJobsAre from '@/components/jobs/WhereJobsAre'
 
 // Empty-state suggestions, most-held first. Live corpus counts by title (prod, read-only,
 // 2026-10-23): software engineer 3,960 · nurse 1,360 · sales associate 648 · customer service 489 ·
@@ -78,6 +80,8 @@ export default function JobsPage() {
     hasMore,
     loadingMore,
     loadMore,
+    training, setTraining,
+    searchContext,
   } = useJobSearch()
   // ONE decision for the results area (lib/searchView.js): error / idle / loading / empty / results.
   const view = resultsView({ status, count: filtered.length })
@@ -289,6 +293,7 @@ export default function JobsPage() {
             jobType={jobType} setJobType={setJobType}
             posted={posted} setPosted={setPosted}
             pay={pay} setPay={setPay}
+            training={training} setTraining={area ? undefined : setTraining}
             hasFilters={hasFilters} clearFilters={clearFilters}
           />
         </div>
@@ -344,7 +349,10 @@ export default function JobsPage() {
             </div>
           </div>
         )}
-        {notice && filtered.length > 0 && <div className={bar.notice} role="status">{notice}</div>}
+        {status === 'done' && !area && searchContext && searchContext.elsewhere.length > 0
+          ? <WhereJobsAre context={searchContext} onPick={place => { setLocation(place); void runSearch(place) }} />
+          : notice && filtered.length > 0 && <div className={bar.notice} role="status">{notice}</div>}
+        {status === 'done' && !area && filtered.length > 0 && <SearchContext context={searchContext} />}
         {/* Area search: remote listings based here are counted apart and shown only on request. */}
         {area && status === 'done' && area.remoteTotal > 0 && (
           <div className={bar.areaRemote}>
@@ -355,6 +363,9 @@ export default function JobsPage() {
             </Chip>
           </div>
         )}
+
+        {/* A search a start guide covers (oilfield, trades…): one quiet card to it, right above the results. */}
+        {status === 'done' && (view === 'results' || view === 'empty') && <GuidePrompt query={committedQuery} />}
 
         {/* Results — swipe deck or list */}
         {filtered.length > 0 && swipeMode ? (
@@ -472,8 +483,6 @@ export default function JobsPage() {
             {hasFilters && <Button size="sm" variant="secondary" onClick={clearFilters}>Clear filters</Button>}
           </div>
         ) : null}
-        {/* An oilfield or trades search: one quiet line to the matching "getting in" guide (/start/…). */}
-        {status === 'done' && (view === 'results' || view === 'empty') && <GuideLine query={committedQuery} />}
       </div>
     </div>
 

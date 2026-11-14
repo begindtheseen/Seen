@@ -36,6 +36,7 @@ export default function JobFilters({
   jobType, setJobType,
   posted, setPosted,
   pay = false, setPay,
+  training = false, setTraining,
   hasFilters, clearFilters,
 }: {
   niche: NicheFilter; setNiche: (v: NicheFilter) => void
@@ -43,6 +44,9 @@ export default function JobFilters({
   jobType: TypeFilter; setJobType: (v: TypeFilter) => void
   posted: PostedFilter; setPosted: (v: PostedFilter) => void
   pay?: boolean; setPay?: (v: boolean) => void
+  // "Paid training": only listings whose posting says it trains beginners. Leave setTraining out where it cannot apply
+  // (an area search reads no postings before it pages) and the option is not offered.
+  training?: boolean; setTraining?: (v: boolean) => void
   hasFilters: boolean; clearFilters: () => void
 }) {
   const [open, setOpen] = useState(false)
@@ -64,6 +68,7 @@ export default function JobFilters({
   if (jobType) active.push({ k: 'type', text: label(TYPE, jobType), clear: () => setJobType('' as TypeFilter) })
   if (posted) active.push({ k: 'posted', text: label(POSTED, posted), clear: () => setPosted('' as PostedFilter) })
   if (pay && setPay) active.push({ k: 'pay', text: 'Shows pay', clear: () => setPay(false) })
+  if (training && setTraining) active.push({ k: 'training', text: 'Paid training', clear: () => setTraining(false) })
 
   return (
     <div className={styles.wrap} ref={ref}>
@@ -120,6 +125,15 @@ export default function JobFilters({
               <select className={styles.select} value={pay ? '1' : ''} onChange={e => setPay(e.target.value === '1')}>
                 <option value="">Any listing</option>
                 <option value="1">Only listings that show pay</option>
+              </select>
+            </label>
+          )}
+          {setTraining && (
+            <label className={styles.row}>
+              <span className={styles.label} title="The posting says it takes people with no experience and trains them">Training</span>
+              <select className={styles.select} value={training ? '1' : ''} onChange={e => setTraining(e.target.value === '1')} data-testid="filter-training">
+                <option value="">Any listing</option>
+                <option value="1">Only listings with paid training</option>
               </select>
             </label>
           )}

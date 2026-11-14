@@ -25,6 +25,7 @@ import { httpHref, loginHref } from '@/lib/safeHref.js'
 import { JobCache } from '@/lib/stores/JobCache'
 import { JOB_INSIGHTS_VERSION } from '@/lib/jobInsightsVersion.js'
 import ListingScoreRing from '@/components/jobs/ListingScoreRing'
+import BeforeYouApply from '@/components/jobs/BeforeYouApply'
 import PostingInput, { PostingReadRow, type PostingRead } from '@/components/jobs/PostingInput'
 import { readFacts } from '@/lib/postingRead.js'
 import { needsSignIn, signInHereHref, SIGNIN_EXPIRED_TEXT } from '@/lib/toolAuth.js'
@@ -401,6 +402,10 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
               <span className={d.fine}><Icon name="check" size={14} /> Reported — thanks</span>
             )}
           </div>
+
+          {/* Before you apply — a beginner's checks, the words explained, a pay-to-train caution (from this posting only).
+              Its résumé link opens the same Optimize sheet as the footer's Optimize button, and only where that button shows. */}
+          {!closed && <BeforeYouApply job={job} onCheckResume={externalApply && !seenApply ? () => onApply(job) : undefined} />}
 
           {/* AI Insights — only when there is a posting to read (one "no description" message, below). */}
           {insightsState !== 'no_desc' && (!closed || insightsState === 'done') && (

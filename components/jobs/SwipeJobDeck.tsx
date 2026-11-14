@@ -286,7 +286,7 @@ export default function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply,
         </div>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.25rem', marginBottom: '.5rem' }}>
-          {[displayPay(topJob), topJob.type, topJob.level].filter(Boolean).map(f => (
+          {[displayPay(topJob), topJob.type, topJob.level, topJob.trains_beginners === true ? 'Paid training' : null].filter(Boolean).map(f => (
             <span key={String(f)} className="tnum" style={{ border: '1px solid var(--border-2)', borderRadius: 'var(--r-chip)', padding: '4px 8px', fontSize: 'var(--fs-sm)', fontFamily: 'var(--body)', color: 'var(--text-2)' }}>{f}</span>
           ))}
         </div>

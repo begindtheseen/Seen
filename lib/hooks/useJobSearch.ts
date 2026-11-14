@@ -19,7 +19,7 @@ import { resolvePlaceText } from '@/lib/geo/placesClient'
 // In-memory search cache: `${query}|${location}|${radius}` → the page as it was shown (rows, whether
 // the server has more, and the honest note/label it carried), so a repeat of the same search — Enter
 // right after the auto-search, Back from a listing — is served without a second request.
-interface CachedSearch { jobs: Job[]; ts: number; hasMore: boolean; pages: number; notice: string | null; label: string | null; area?: AreaInfo | null; problem?: AreaProblem | null; cursor?: string | null }
+interface CachedSearch { jobs: Job[]; ts: number; hasMore: boolean; pages: number; notice: string | null; label: string | null; area?: AreaInfo | null; problem?: AreaProblem | null; cursor?: string | null; context?: SearchContextInfo | null }
 
 // An area search (a place, no title — api/jobs.js handleAreaSearch): what the server counted.
 export interface AreaInfo {
@@ -42,6 +42,31 @@ export interface AreaInfo {
 }
 // An area search the server could not run as asked: an unknown / foreign / ambiguous place, "near me" with no
 // position, or Remote with no title.
+// What a titled search says about itself (api/jobs.js searchContext → lib/jobs/searchContext.js), for
+// components/jobs/SearchContext.tsx and components/jobs/WhereJobsAre.tsx. Every figure comes from the rows the server read.
+export interface PaySummary { stated: number; total: number; other: number; low: number; high: number; unit: 'hr' | 'yr'; text: string }
+export interface ElsewhereCluster { place: string; count: number; miles: number | null }
+export interface SearchContextInfo {
+  query: string; location: string; radius: string
+  alsoSearched: string[]
+  pay: PaySummary | null
+  elsewhere: ElsewhereCluster[]
+  elsewherePartial: boolean
+  // matches (not "other openings") inside the searched area, for "No floorhand jobs within 100 mi of Boise, ID"
+  matchesInRadius: number
+}
+function contextFrom(d: Record<string, unknown>, rows: SearchJob[], q: string, loc: string, rad: string): SearchContextInfo | null {
+  const also = Array.isArray(d.also_searched) ? (d.also_searched as unknown[]).filter((x): x is string => typeof x === 'string').slice(0, 4) : []
+  const p = d.pay_summary as PaySummary | undefined
+  const pay = p && typeof p.stated === 'number' && typeof p.total === 'number' && typeof p.text === 'string' && (p.unit === 'hr' || p.unit === 'yr') ? p : null
+  const elsewhere = Array.isArray(d.elsewhere)
+    ? (d.elsewhere as ElsewhereCluster[]).filter(c => c && typeof c.place === 'string' && typeof c.count === 'number' && c.count > 0).slice(0, 3)
+    : []
+  if (!also.length && !pay && !elsewhere.length) return null
+  return { query: q, location: loc, radius: rad, alsoSearched: also, pay, elsewhere, elsewherePartial: d.elsewhere_partial === true, matchesInRadius: rows.filter(isMatchInRadius).length }
+}
+const isMatchInRadius = (j: SearchJob) => j.related !== false && j.in_radius !== false
+
 export interface AreaProblem { message: string; suggestions: string[]; reason: string | null; needTitle?: boolean }
 
 /** The results header for an area search: exactly what is listed. */
@@ -210,6 +235,9 @@ export function useJobSearch() {
   const [jobType, setJobType] = useState<TypeFilter>('')
   const [posted, setPosted] = useState<PostedFilter>('')
   const [pay, setPay] = useState(false) // only listings that show pay
+  // Only listings whose posting says it trains beginners (`trains_beginners`, lib/jobs/trainsBeginners.js). A titled search
+  // only: an area search reads no postings before it pages, so it cannot apply this honestly (searchArea turns it off).
+  const [training, setTraining] = useState(false)
   // Area search: include the remote listings based in the area (off by default — remote is not "in" a place).
   const [includeRemote, setIncludeRemote] = useState(false)
   const [area, setArea] = useState<AreaInfo | null>(null)
@@ -227,6 +255,8 @@ export function useJobSearch() {
   const [statusMsg, setStatusMsg] = useState('Enter a search above →')
   // The honest location note for the current page ("Only 6 within 25 mi …"); null = nothing to say.
   const [notice, setNotice] = useState<string | null>(null)
+  // The context line + where-the-jobs-are line for the current titled search; null = nothing to say.
+  const [searchContext, setSearchContext] = useState<SearchContextInfo | null>(null)
   const [recommended, setRecommended] = useState<Job[]>([])
   const [recSkills, setRecSkills] = useState<string[]>([])
   const [recStatus, setRecStatus] = useState<'idle' | 'loading' | 'done'>('idle')
@@ -258,7 +288,7 @@ export function useJobSearch() {
   // The last fresh result per query|place, to tell a radius change that returned the very same rows apart from one that did not.
   const lastResultRef = useRef<{ key: string; radius: string; ids: string } | null>(null)
   const jobsRef = useRef(jobs); jobsRef.current = jobs
-  const filtersRef = useRef({ niche, level, jobType, posted, pay }); filtersRef.current = { niche, level, jobType, posted, pay }
+  const filtersRef = useRef({ niche, level, jobType, posted, pay, training }); filtersRef.current = { niche, level, jobType, posted, pay, training }
   const includeRemoteRef = useRef(includeRemote); includeRemoteRef.current = includeRemote
   // The last COMMITTED search (Enter / Search / a pick / a link) — what the URL shows and "Show more"
   // continues. The debounced auto-search never commits.
@@ -270,7 +300,7 @@ export function useJobSearch() {
   // A radius set FROM the URL on load: its state change must not re-run the search it came with.
   const urlRadiusRef = useRef<string | null>(null)
 
-  const hasFilters = !!(niche || level || jobType || posted || pay)
+  const hasFilters = !!(niche || level || jobType || posted || pay || training)
 
   // The committed search (+ current sort and filters) as the page URL: shareable, survives a reload,
   // and Back from a listing lands on it (lib/jobs/searchUrl.js). replaceState — no history entry per
@@ -279,7 +309,7 @@ export function useJobSearch() {
     const c = committedRef.current
     if (!c || typeof window === 'undefined') return
     const f = filtersRef.current
-    const qs = searchQueryString({ q: c.q, loc: c.loc, radius: over.radius ?? c.radius, sort: sortRef.current, niche: f.niche, level: f.level, type: f.jobType, posted: f.posted, pay: f.pay, remote: !c.q && includeRemoteRef.current })
+    const qs = searchQueryString({ q: c.q, loc: c.loc, radius: over.radius ?? c.radius, sort: sortRef.current, niche: f.niche, level: f.level, type: f.jobType, posted: f.posted, pay: f.pay, training: !!c.q && f.training, remote: !c.q && includeRemoteRef.current })
     replaceSearchKeepingPlaces(qs)
   }
 
@@ -299,6 +329,7 @@ export function useJobSearch() {
     let out = list
     if (niche) out = out.filter(j => matchesNiche(j, niche))
     if (pay) out = out.filter(j => !!j.salary)
+    if (training) out = out.filter(j => j.trains_beginners === true)
     if (level) out = out.filter(j => (j.level || '').toLowerCase().includes(level))
     if (jobType) out = out.filter(j => j.type === jobType)
     // "Added to Seen" within 1/7/30 days (posted_at = the row's created_at). Every search row carries
@@ -328,7 +359,7 @@ export function useJobSearch() {
       setFiltered([])
       // The date filter is the usual culprit — say how fresh the newest listing actually is.
       const newest = posted ? Math.max(0, ...list.map(j => Date.parse(j.posted_at || '') || 0)) : 0
-      const onlyDate = posted && !niche && !level && !jobType
+      const onlyDate = posted && !niche && !level && !jobType && !pay && !training
       setStatusMsg(onlyDate && newest
         ? `None of these were added to Seen in the ${posted === '1' ? 'last 24 hours' : posted === '7' ? 'last week' : 'last month'} — the newest arrived ${new Date(newest).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric' })}.`
         : 'No listings match these filters — clear one to see the rest.')
@@ -345,7 +376,7 @@ export function useJobSearch() {
       : nMatch > 0 && nOther > 0 ? `${nMatch}${plus} match${nMatch !== 1 ? 'es' : ''} · ${nOther} other opening${nOther !== 1 ? 's' : ''}`
       : nMatch === 0 ? `No matches for "${committedRef.current?.q || ''}" — ${nOther} other opening${nOther !== 1 ? 's' : ''}`
       : `${s.length}${plus} result${s.length !== 1 ? 's' : ''}`)
-  }, [niche, level, jobType, posted, pay]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [niche, level, jobType, posted, pay, training]) // eslint-disable-line react-hooks/exhaustive-deps
   // Latest sort + filters for the delayed top-up refresh (its timer outlives the render it was set in).
   const sortRef = useRef(sort); sortRef.current = sort
   const updateDisplayRef = useRef(updateDisplay); updateDisplayRef.current = updateDisplay
@@ -358,7 +389,7 @@ export function useJobSearch() {
     if (c && !c.q && searchedOnceRef.current) { void searchJobs('', c.loc, { radius: c.radius }); return }
     if (jobs.length > 0) updateDisplay(jobs, sort)
     writeUrl() // a filter or sort change after a committed search is part of the shareable URL
-  }, [niche, level, jobType, posted, pay, sort, includeRemote]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [niche, level, jobType, posted, pay, training, sort, includeRemote]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Radius is a SERVER-side geo filter (the DB does the bbox scan) — it can't be applied to the
   // already-loaded listings client-side like niche/level/type. So changing the radius dropdown
@@ -395,7 +426,8 @@ export function useJobSearch() {
         if (u.type) setJobType(u.type as TypeFilter)
         if (u.posted) setPosted(u.posted as PostedFilter)
         if (u.pay) setPay(true)
-        filtersRef.current = { niche: u.niche as NicheFilter, level: u.level as LevelFilter, jobType: u.type as TypeFilter, posted: u.posted as PostedFilter, pay: u.pay }
+        if (u.training) setTraining(true)
+        filtersRef.current = { niche: u.niche as NicheFilter, level: u.level as LevelFilter, jobType: u.type as TypeFilter, posted: u.posted as PostedFilter, pay: u.pay, training: u.training }
         searchJobs(u.q, u.loc || '', { radius: u.radius, restore: true })
       } else if (u.loc) {
         // A place with no title is a search: every job in that area (a shared /jobs?loc=… link, Back, reload,
@@ -410,7 +442,7 @@ export function useJobSearch() {
         if (u.posted) setPosted(u.posted as PostedFilter)
         if (u.pay) setPay(true)
         if (u.remote) { includeRemoteRef.current = true; setIncludeRemote(true) }
-        filtersRef.current = { niche: u.niche as NicheFilter, level: u.level as LevelFilter, jobType: u.type as TypeFilter, posted: u.posted as PostedFilter, pay: u.pay }
+        filtersRef.current = { niche: u.niche as NicheFilter, level: u.level as LevelFilter, jobType: u.type as TypeFilter, posted: u.posted as PostedFilter, pay: u.pay, training: false }
         searchJobs('', u.loc, { radius: u.radius, restore: true })
       }
     } catch {}
@@ -648,6 +680,7 @@ export function useJobSearch() {
       setStatus('done')
       // The note the page carried, else the radius comparison against what was shown before (lib/jobs/radiusNotice.js).
       setNotice(c.notice ?? radiusNotice({ q, loc, radius: rad, total: c.jobs.length, inRadius: null, prev: prevShown, ids }))
+      setSearchContext(c.context ?? null)
       if (c.label) setStatusMsg(c.label)
       else if (refreshing) setStatusMsg(`${c.jobs.length} result${c.jobs.length !== 1 ? 's' : ''} (from cache — refreshing…)`)
     }
@@ -662,6 +695,7 @@ export function useJobSearch() {
     const seq = ++searchSeqRef.current
     if (topupTimerRef.current) { clearTimeout(topupTimerRef.current); topupTimerRef.current = null }
     setNotice(null)
+    if (!cached) setSearchContext(null)
 
     // A repeat of a search seen in the last 30 min shows its rows at once while the fresh answer loads
     // (was 5 min; past that the page went blank to "Searching..." for a search it had just shown).
@@ -713,7 +747,7 @@ export function useJobSearch() {
           return
         }
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        type SearchResponse = { jobs?: unknown[]; results?: unknown[]; widened?: boolean; fallback?: 'outside_radius' | 'unrelated' | 'remote_thin' | null; radius?: number | null; location?: string; topup?: string | null; in_radius?: number | null; has_more?: boolean }
+        type SearchResponse = { jobs?: unknown[]; results?: unknown[]; widened?: boolean; fallback?: 'outside_radius' | 'unrelated' | 'remote_thin' | null; radius?: number | null; location?: string; topup?: string | null; in_radius?: number | null; has_more?: boolean; also_searched?: unknown; pay_summary?: unknown; elsewhere?: unknown; elsewhere_partial?: unknown }
         const data = await res.json() as SearchResponse
         clearTimeout(deadline)
         if (seq !== searchSeqRef.current) return // a newer search took over
@@ -746,10 +780,13 @@ export function useJobSearch() {
           label = `Few remote matches for "${q}" — also showing roles that aren't marked remote`
         }
         const note = noteFor(data, raw)
+        // `elsewhere` is for a place search only (a Remote / anywhere search has no "near")
+        const ctx = contextFrom(data as Record<string, unknown>, raw as SearchJob[], q, placeSearch ? loc : '', String(data.radius || rad))
         lastResultRef.current = { key: `${q}|${loc}`, radius: rad, ids: leadIds(raw) }
         if (label) setStatusMsg(label)
         setNotice(note)
-        cacheSearch(cacheKey, { jobs: raw, ts: Date.now(), hasMore: more, pages: 1, notice: note, label })
+        setSearchContext(ctx)
+        cacheSearch(cacheKey, { jobs: raw, ts: Date.now(), hasMore: more, pages: 1, notice: note, label, context: ctx })
         if (q) try { RecentSearchesStore.push(q, loc || undefined) } catch {}
         // The server answered instantly from our corpus and is pulling more listings in the
         // background (topup:'pending'). Re-read once, silently — no spinner, sort kept — and merge
@@ -772,12 +809,14 @@ export function useJobSearch() {
               // The note is recomputed for the rows now shown and set again — the refresh must never leave the
               // page without the sentence it had a moment ago (round 3: "present at 1.6 s, absent at 3 s").
               const note2 = noteFor(d2, fresh)
-              cacheSearch(cacheKey, { jobs: fresh, ts: Date.now(), hasMore: more2, pages: 1, notice: note2, label })
+              const ctx2 = contextFrom(d2 as Record<string, unknown>, fresh, q, placeSearch ? loc : '', String(d2.radius || rad))
+              cacheSearch(cacheKey, { jobs: fresh, ts: Date.now(), hasMore: more2, pages: 1, notice: note2, label, context: ctx2 })
               JobCache.setMany(fresh)
               lastResultRef.current = { key: `${q}|${loc}`, radius: rad, ids: leadIds(fresh) }
               setJobs(fresh)
               updateDisplayRef.current(fresh, sortRef.current)
               setNotice(note2)
+              setSearchContext(ctx2)
             } catch { /* keep the first page */ }
           }, 4000)
         }
@@ -851,6 +890,9 @@ export function useJobSearch() {
   }
   async function searchArea(loc: string, rad: string, { commit = true, restore = false, silent = false }: { commit?: boolean; restore?: boolean; silent?: boolean } = {}) {
     searchedOnceRef.current = true
+    setSearchContext(null)
+    // The paid-training filter reads each posting; an area search pages on the server before any posting is read.
+    if (filtersRef.current.training) { filtersRef.current = { ...filtersRef.current, training: false }; setTraining(false) }
     if (sortRef.current !== 'recent' && sortRef.current !== 'nearest') { sortRef.current = 'nearest'; setSort('nearest') }
     const key = areaKey(loc, rad)
     if (commit) { committedRef.current = { q: '', loc, radius: rad }; setCommittedQuery(''); writeUrl({ radius: rad }) }
@@ -990,6 +1032,7 @@ export function useJobSearch() {
     setJobType('')
     setPosted('')
     setPay(false)
+    setTraining(false)
     if (areaRef.current) return // the area search re-runs on the filter change
     setFiltered(applySort(jobs, sort))
     setStatusMsg(jobs.length > 0 ? `${jobs.length} result${jobs.length !== 1 ? 's' : ''}` : 'Enter a search above →')
@@ -1020,6 +1063,7 @@ export function useJobSearch() {
     jobType, setJobType,
     posted, setPosted,
     pay, setPay,
+    training, setTraining,
     sort, setSort,
     hasFilters,
     // area search (a place, no title)
@@ -1031,6 +1075,7 @@ export function useJobSearch() {
     status,
     statusMsg,
     notice,
+    searchContext,
     // recommendations + company scores
     recommended,
     recSkills,

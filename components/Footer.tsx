@@ -7,14 +7,11 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import styles from './Footer.module.css'
-import { START_GUIDES } from '@/lib/start/guides.js'
 
 const COLS: Array<{ title: string; links: Array<{ href: string; label: string }> }> = [
   { title: 'Product', links: [
     { href: '/dashboard', label: 'Dashboard' },
     { href: '/jobs', label: 'Jobs' },
-    // The two "getting in" guides, listed quietly beside job search (owner 2026-11-13: not out of place).
-    ...START_GUIDES.map(g => ({ href: g.path, label: g.footerLabel })),
     { href: '/tracker', label: 'Application tracker' },
     { href: '/resume', label: 'Résumé' },
     { href: '/pricing', label: 'Pricing' },
