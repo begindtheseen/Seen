@@ -1,0 +1,16 @@
+/* The two quiet lines above a titled search's results: what the search also showed and the pay its matches state
+   (SearchContext.tsx), and where the jobs are when the radius is thin (WhereJobsAre.tsx). Ink text; links are the
+   only colour. */
+.line { margin: 0 0 var(--sp-3); font-size: var(--fs-sm); line-height: 1.5; color: var(--text-3); overflow-wrap: anywhere; }
+.line b { font-weight: 600; color: var(--text-2); }
+.where { margin: 0 0 var(--sp-3); display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-2); font-size: var(--fs-sm); line-height: 1.5; color: var(--text-2); }
+.where svg { color: var(--text-3); flex-shrink: 0; }
+.places { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0 var(--sp-2); color: var(--text-3); }
+.placeItem { display: inline-flex; align-items: center; gap: var(--sp-2); white-space: nowrap; }
+.sep { color: var(--text-3); }
+.pick { display: inline-flex; align-items: center; min-height: 32px; padding: 0; background: none; border: 0; font: inherit; font-size: var(--fs-sm); color: var(--accent); cursor: pointer; }
+.pick:hover { text-decoration: underline; text-underline-offset: 3px; }
+.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r-chip); }
+@media (max-width: 768px) { .placeItem { display: inline-flex; align-items: center; gap: var(--sp-2); white-space: nowrap; }
+.sep { color: var(--text-3); }
+.pick { min-height: 44px; } }

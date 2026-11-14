@@ -58,6 +58,7 @@ import { placeListing, withinRadius, inState as geoInState, placeSearch, RADIUS_
 import { readAreaRows, rankArea, pageArea } from '../lib/server/areaSearch.js';
 import { MIN_HOURLY } from '../lib/jobs/pay.js';
 import { collapseLocationVariants, roleKey } from '../lib/jobs/groupListings.js';
+import { alsoSearched, paySummary, elsewhereClusters } from '../lib/jobs/searchContext.js';
 
 // ── Deadlines and load limits for this module's database reads (2026-11-12) ─────────────────────
 // Production 2026-11-11: with the database stalled, /api/jobs calls waited on fetches that had no timeout until the
@@ -746,6 +747,29 @@ export default async function handler(req, res) {
     // How many ranked rows to hand serve() for one page: a Remote search's per-city copies collapse there.
     const candidates = (arr, n = PAGE) => arr.slice(0, isRemote ? n * 5 : n);
     const countInRadius = (jobs) => (jobs || []).filter((j) => j.in_radius !== false).length;
+    // What page one can say about the search itself, from rows already in hand (lib/jobs/searchContext.js — no read):
+    //  also_searched  the family titles the expansion brought in, each carried by a shown match ("Floorhand");
+    //  pay_summary    the employer-stated pay on the shown matches (10th–90th percentile, one unit), or nothing;
+    //  elsewhere      a thin place search (< PAGE_MIN matches in the radius): where matches exist instead, from the
+    //                 nationwide rows the corpus fill (corpusRelevant) already read — grouped to a nearby big place.
+    const searchContext = (jobs, pool = null) => {
+      const out = {};
+      try {
+        const also = alsoSearched(jobs, relevanceQuery);
+        if (also.length) out.also_searched = also;
+        const pay = paySummary(jobs);
+        if (pay) out.pay_summary = pay;
+        if (pool && Array.isArray(pool.rows) && loc && !isRemote && center
+          && (jobs || []).filter((j) => j.related !== false && j.in_radius !== false).length < PAGE_MIN) {
+          const elsewhere = elsewhereClusters(pool.rows, {
+            center,
+            skip: (r) => nearSearch(r) || !isTitleRelated(r, relevanceQuery, { canonical }) || isSeedListing(r) || titleNamesNonUs(r.title),
+          });
+          if (elsewhere.length) { out.elsewhere = elsewhere; if (pool.capped) out.elsewhere_partial = true; }
+        }
+      } catch (e) { console.warn('search context error:', e.message); }
+      return out;
+    };
 
     // ── DB-FIRST search ──────────────────────────────────────────────────────
     // Serve from our own jobs corpus, relevance-filtered to the query (and to the
@@ -928,7 +952,7 @@ export default async function handler(req, res) {
           console.log(`DB HIT: "${query}" → "${canonical}" @ "${loc}" (${radiusMiles}mi) — ${dbMatches.length} in-radius results (no API call)`);
           const jobs = await serve(candidates(dbMatches));
           if (seedsDropped) console.log(`SEED ROWS DROPPED: ${seedsDropped}`);
-          return res.status(200).json({ ok: true, jobs, in_radius: countInRadius(jobs), query, location: loc, radius: Number.isFinite(radiusMiles) ? radiusMiles : null, offset: 0, has_more: dbMatches.length > PAGE || (poolFull && dbMatches.length >= PAGE), _src: 'db' });
+          return res.status(200).json({ ok: true, jobs, in_radius: countInRadius(jobs), query, location: loc, radius: Number.isFinite(radiusMiles) ? radiusMiles : null, offset: 0, has_more: dbMatches.length > PAGE || (poolFull && dbMatches.length >= PAGE), _src: 'db', ...searchContext(jobs) });
         }
       } catch(e) { console.warn('DB-first search error:', e.message); }
       console.log(`DB TOP-UP: "${query}" → "${canonical}" @ "${loc}" — ${dbMatches.length} in DB, pulling more from API`);
@@ -954,7 +978,8 @@ export default async function handler(req, res) {
     if (await searchGate()) return;
     const pageP = (async () => {
       const thin = candidates(dbMatches).length < PAGE_MIN && SUPABASE_URL && SUPABASE_SERVICE_KEY;
-      const corpusP = thin ? corpusRelevant({ supabaseUrl: SUPABASE_URL, dbHeaders, terms: searchTerms, query: relevanceQuery, canonical, synonyms, fit, center, loc, limit: 60 }) : null;
+      const pool = {}; // the corpus fill's nationwide related rows, for `elsewhere` (searchContext)
+      const corpusP = thin ? corpusRelevant({ supabaseUrl: SUPABASE_URL, dbHeaders, terms: searchTerms, query: relevanceQuery, canonical, synonyms, fit, center, loc, limit: 60, poolOut: pool }) : null;
       if (dbMatchesP) { dbMatches = await dbMatchesP; dbMatchesP = null; }
       let page = candidates(dbMatches);
       let fallback = null; // 'outside_radius' | 'remote_thin' | 'unrelated' — the client labels the page by this
@@ -965,7 +990,7 @@ export default async function handler(req, res) {
         if (page.length > before) fallback = isRemote ? 'remote_thin' : 'outside_radius';
       }
       if (!page.length && SUPABASE_URL && SUPABASE_SERVICE_KEY) { page = await nearestListings(loc, SUPABASE_URL, dbHeaders); if (page.length) fallback = 'unrelated'; }
-      return { page, fallback };
+      return { page, fallback, pool: corpusP ? pool : null };
     })();
     // Decide whether a live top-up may run — in parallel with building the page. The budget is only
     // consumed when no recent pull already covered this (query, location).
@@ -980,7 +1005,7 @@ export default async function handler(req, res) {
       ]);
       return topupBucket.allowed && topupGlobal.allowed ? 'pull' : 'budget';
     })();
-    const [{ page, fallback }, decision] = await Promise.all([pageP, decisionP]);
+    const [{ page, fallback, pool: corpusPool }, decision] = await Promise.all([pageP, decisionP]);
 
     // The live pull after the response is bounded by TOPUP_BUDGET_MS from the request's start (the function has
     // 60 s; production 2026-11-11 logged top-ups that ran into that limit). Past it the response is long sent, the
@@ -1057,6 +1082,7 @@ export default async function handler(req, res) {
       _src: dbOnly ? 'db-refresh' : `db-${decision}`, widened, fallback,
       topup: pending ? 'pending' : null,
       ...(decision === 'budget' ? { degraded: true } : {}),
+      ...searchContext(jobs, corpusPool),
     });
 
   } catch(err) {
@@ -1114,7 +1140,7 @@ function dedupByIdentity(arr) {
 // page shows "1 result" when we have plenty nearby. This reads the corpus for the query's terms
 // with NO box, applies the SAME relevance bar, and ranks nearest-first. Pure DB — no paid pull —
 // so it's safe to call on the cooldown / degraded / geo-widen paths. Never throws.
-async function corpusRelevant({ supabaseUrl, dbHeaders, terms, query, canonical, synonyms, fit = null, center, loc, limit = 60 }) {
+async function corpusRelevant({ supabaseUrl, dbHeaders, terms, query, canonical, synonyms, fit = null, center, loc, limit = 60, poolOut = null }) {
   if (!supabaseUrl) return [];
   const now = encodeURIComponent(new Date().toISOString());
   const uniq = [...new Set((terms || []).map(t => String(t || '').toLowerCase().trim()).filter(t => t.length > 1))].slice(0, 6);
@@ -1137,6 +1163,9 @@ async function corpusRelevant({ supabaseUrl, dbHeaders, terms, query, canonical,
     }
     const hasQuery = tokenize(query).length > 0;
     const items = pool.map((j, idx) => ({ j, idx })).filter((x) => !hasQuery || isRelevant(x.j, query, { synonyms, canonical }));
+    // The caller's `elsewhere` reads these related rows (nationwide); `capped` = a term read came back full (120), so a
+    // count built from them is a floor.
+    if (poolOut) { poolOut.rows = items.map((x) => x.j); poolOut.capped = arrays.some((a) => Array.isArray(a) && a.length >= 120); }
     // Nearest-first (rows we cannot place last), relevance order as the tiebreak — the place key in front of
     // filterAndRank's order. Without a center: the place-text score (sortByProximity), else relevance alone.
     let primary = null;

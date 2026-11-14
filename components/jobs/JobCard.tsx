@@ -95,6 +95,10 @@ export default function JobCard({ job, onSaveToggle, onOpen, onCheckCompany, alr
                 Posting score <b>{job.score}</b>
               </span>
             )}
+            {/* The posting says it takes people with no experience and trains them (lib/jobs/trainsBeginners.js) — ink, no fill. */}
+            {job.trains_beginners === true && (
+              <span className={s.chip} title="The posting says it takes people with no experience and trains them" data-testid="chip-paid-training">Paid training</span>
+            )}
             {typeof employerScore === 'number'
               ? <EmployerGradeChip company={job.company} score={employerScore} compact />
               : (

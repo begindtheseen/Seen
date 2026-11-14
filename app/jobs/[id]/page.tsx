@@ -31,6 +31,7 @@ import { paragraphs, isDescriptionPreview, stripDanglingEllipsis, endsCutOff } f
 import { displayLocation } from '@/lib/jobs/displayLocation.js'
 import { isGradeableScore } from '@/lib/gradeGate'
 import ListingScoreRing from '@/components/jobs/ListingScoreRing'
+import BeforeYouApply from '@/components/jobs/BeforeYouApply'
 import EmployerGradeChip from '@/components/jobs/EmployerGradeChip'
 import { JOB_INSIGHTS_VERSION } from '@/lib/jobInsightsVersion.js'
 import PostingInput, { PostingReadRow, type PostingRead } from '@/components/jobs/PostingInput'
@@ -510,6 +511,10 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             <span className={d.fine}><Icon name="check" size={14} /> Reported — thanks</span>
           )}
         </div>
+
+        {/* Before you apply — a beginner's checks, the words explained, a pay-to-train caution (from this posting only).
+            Its résumé link opens the Optimize sheet, only where the Optimize button above shows. */}
+        {!job.filled && !closed && <BeforeYouApply job={job} onCheckResume={postingHref && !takesSeenApply(job) ? () => setShowApplyModal(true) : undefined} />}
 
         {/* AI insights — only when there is a posting to read (one "no description" message, below). */}
         {insightsState !== 'no_desc' && (!closed || insightsState === 'done') && (
