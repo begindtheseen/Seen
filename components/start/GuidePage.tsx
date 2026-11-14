@@ -16,7 +16,8 @@ import st from './guide.module.css'
 export type GuideContent = {
   guide: { asOf: string; title: string }
   tiles: Array<{ label: string; value: string; text: string }>
-  listings: ListingsConfig
+  /** null: no listing source this page can trust (a company whose careers site Seen cannot read) — no block at all. */
+  listings: ListingsConfig | null
   menu: Array<{ id: string; title: string; summary: string; icon?: 'caution'; blocks: Block[] }>
   faq: Array<{ q: string; a: Entry }>
   sources: Record<string, Source>
@@ -38,10 +39,12 @@ export default function GuidePage({ content, header }: { content: GuideContent; 
           <Tiles tiles={tiles} />
         </div>
 
-        <section id="listings" className={st.listings} aria-labelledby="listings-h">
-          <h2 id="listings-h" className={st.h2}>Hiring now</h2>
-          <ListingFinder config={listings} id="guide" />
-        </section>
+        {listings && (
+          <section id="listings" className={st.listings} aria-labelledby="listings-h">
+            <h2 id="listings-h" className={st.h2}>Hiring now</h2>
+            <ListingFinder config={listings} id="guide" />
+          </section>
+        )}
 
         <div className={st.menu}>
           {menu.map((row) => (
