@@ -57,6 +57,40 @@ Editor — comments stripped, one block per migration, and say which to run firs
 - **Skill:** `.claude/skills/ui-ux-pro-max/` (UX rules, patterns, charts, WCAG — Python search over local CSVs) is for
   decisions INSIDE this system; never use its `--design-system` output to pick a palette or font.
 
+## Session 2026-11-14: start guides (8, fact-checked) + search that helps you think — PR #401 (same branch)
+- **Owner asks:** oilfield/trades entry "the right way, on brand, not too highlighted"; "a company, not a personal project
+  … it's additional resources, not sources"; short pages with openable menus; listings with location / position / level
+  filters "tailored to the field"; more pages (CDL, healthcare, warehouse, IT help desk, SpaceX, Tesla) "spot tf on";
+  NOT sections of the site — reached by link or a card above /jobs results when the search matches (high sensitivity);
+  "find more ways" → listing help, explain search + pay, where the jobs are, paid-training chip + filter.
+- **Template:** `app/start/[field]` (dynamicParams=false) renders `lib/start/<field>.js` data modules via
+  `components/start/GuidePage.tsx`; registry `lib/start/registry.js` + `ready` in `lib/start/guides.js` (tests fail if they
+  disagree). Facts are `{ text, src }`; references never printed as citations — only the "Additional resources" row (a
+  link repeated across references shows once). `listings: null` = no listings block (Tesla). Filters live in the URL
+  (`?pos=&loc=&r=&lvl=`, `lib/start/listingFilters.js`); a position with `orTraining: true` also keeps rows the search
+  flags `trains_beginners`. ENTRY_RE reads junior / Tier 1 / Level 1 / L1 / new grad / student as entry.
+- **The card:** `lib/start/guideFor.js` keyword tables (strip / veto per guide; company guide beats field; longest keyword
+  wins; only live guides answer) → `components/start/GuidePrompt.tsx` right above /jobs results. Look-alikes pinned never
+  to open a card (pct, CNA Financial, benefits help desk, wheel loader, rocket mortgage, model y, non-CDL delivery).
+- **Search support:** `api/jobs.js searchContext` (no new read: rows already in hand) → `also_searched` ("Also showing
+  related titles: …" — NOT "the same job"), `pay_summary` (employer-stated only), `elsewhere` (thin place search, from the
+  corpus fill's pool); paid-training chip + `training=1`; `components/jobs/BeforeYouApply.tsx`.
+- **Fact-check process (reusable):** writer agents work ONLY from a research file and print only VERIFIED claims; then an
+  independent checker re-verifies every printed claim against the primary page (eCFR API, BLS/OEWS, OSHA letters, SEC
+  filings, the employer's own postings) and fixes the module. Results: Tesla ~110 claims / 22 fixed, IT 98 / 18, SpaceX
+  ~100 / ~29, healthcare ~115 / 26, warehouse ~100 / 24, CDL ~112 / 19. Every removed value is pinned per guide in
+  `FORBIDDEN` (lib/start/guides.test.mjs). `GUIDE_DRAFT=<field> node --test lib/start/guides.test.mjs` tests a draft alone.
+  Lesson: the research files were wrong ~15–25% of the time; never ship a page without the second pass.
+- **Owner decisions taken by me (reversible):** Tesla has no listings block (careers site refuses servers, Seen holds 0
+  Tesla rows); a taken-down Sysco posting dropped; Prime's terms on BOTH trades and CDL = its current page ("pay nothing
+  if you drive 1 year", exit terms not stated; the old $155/$4,475 was a 2021 blog post); unverifiable lease-purchase line
+  removed (the FMCSA PDF could not be read — fetching with a spoofed browser user-agent is refused by the session
+  classifier; do not retry that way). Program dates written so they do not go stale.
+- **Harness:** many writers in one tree → each edits only its own file; checkpoint commits `[skip ci]` replace the PR head
+  CI shows, so push a real commit after. Prod search rate-limits the sandbox IP when several agents search at once
+  (`db-cooldown` empty answers) — space live checks out. Reply drafts: scratchpad `replies.md` (post only now the pages
+  are live; Prime line must use the current terms).
+
 ## Session 2026-11-08: the optimizer reads the whole listing (branch claude/kind-noether-8wj48e)
 - **Owner:** "most of the time the optimizer can't read the whole listing so it doesn't optimize anything." Measured
   with `scripts/optimizer-corpus.mjs` (+ `optimizer-corpus-pull.mjs`, read-only) on 324 live postings: 58.6% optimizable,

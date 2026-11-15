@@ -124,6 +124,26 @@ export interface Job {
   /** The posting says the employer takes and trains beginners ("paid training", "no experience required",
    *  "apprenticeship program" — lib/jobs/trainsBeginners.js). Data for a quiet "Paid training" note. */
   trains_beginners?: boolean
+  /** An upcoming dated event the posting announces (a hiring event, job fair, walk-in interviews…) —
+   *  lib/jobs/hiringEvents.js. Null or absent when the posting announces none, or its dates have passed. */
+  hiring_event?: PostingEvent | null
+}
+
+/** A hiring event read from a posting's own words (lib/jobs/hiringEvents.js listingHiringEvent). */
+export interface PostingEvent {
+  kind: string
+  label: string
+  /** The next date (ISO, YYYY-MM-DD) — the next weekly day for a recurring event. */
+  next: string
+  dates: string[]
+  recurring: string | null
+  time: string | null
+  where: string | null
+  virtual: boolean
+  walkIn: boolean
+  rsvp: boolean
+  onTheSpot: boolean
+  inviteOnly: boolean
 }
 
 /**

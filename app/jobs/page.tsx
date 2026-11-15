@@ -352,7 +352,7 @@ export default function JobsPage() {
         {status === 'done' && !area && searchContext && searchContext.elsewhere.length > 0
           ? <WhereJobsAre context={searchContext} onPick={place => { setLocation(place); void runSearch(place) }} />
           : notice && filtered.length > 0 && <div className={bar.notice} role="status">{notice}</div>}
-        {status === 'done' && !area && filtered.length > 0 && <SearchContext context={searchContext} />}
+        {status === 'done' && !area && filtered.length > 0 && <SearchContext context={searchContext} jobs={filtered} />}
         {/* Area search: remote listings based here are counted apart and shown only on request. */}
         {area && status === 'done' && area.remoteTotal > 0 && (
           <div className={bar.areaRemote}>

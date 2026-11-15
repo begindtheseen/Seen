@@ -23,6 +23,8 @@ import Icon from '@/components/ui/Icon'
 import {
   LEVELS, bodyKey, countLine, emptyState, filterParams, parseFilterState, pickRows, requestBodies, seeAllHref,
 } from '@/lib/start/listingFilters.js'
+import { eventDateLabel } from '@/lib/jobs/hiringEvents.js'
+import GuideEvents from './GuideEvents'
 import st from './guide.module.css'
 
 type Position = { id: string; label: string }
@@ -95,6 +97,7 @@ function toJob(r: Row): Job {
     posted_at: r.posted_at ? String(r.posted_at) : null,
     employer_posted: r.employer_posted === true,
     trains_beginners: r.trains_beginners === true,
+    hiring_event: (r.hiring_event as Job['hiring_event']) || null,
   }
 }
 
@@ -250,12 +253,15 @@ export default function ListingFinder({ config, id }: { config: ListingsConfig; 
                     {[j.company, j.location.replace(/,\s*(United States|USA|US)$/i, '')].filter(Boolean).join(' · ')}
                   </span>
                 </span>
-                {j.trains_beginners && <span className={st.tag}>Paid training</span>}
+                {j.hiring_event ? <span className={st.tag}>{j.hiring_event.label} · {eventDateLabel(j.hiring_event)}</span>
+                  : j.trains_beginners && <span className={st.tag}>Paid training</span>}
               </Link>
             </li>
           ))}
         </ul>
       )}
+
+      {ready && <GuideEvents config={config} pos={state.pos} loc={state.loc} r={state.r} listingRows={shown} />}
 
       <Link href={seeAllHref(config, state)} prefetch={false} className={st.seeAll} data-testid="guide-see-all">
         See all in job search <Icon name="arrow-right" size={14} />
