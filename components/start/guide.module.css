@@ -46,6 +46,11 @@
 .rowTitle { font-family: var(--body); font-weight: 600; font-size: var(--fs-ui); color: var(--text-1); line-height: var(--lh-snug); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rowLink:hover .rowTitle { color: var(--accent); }
 .rowMeta { font-family: var(--body); font-size: var(--fs-meta); color: var(--text-3); line-height: var(--lh-ui); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.events { margin-top: var(--sp-6); min-width: 0; }
+.eventsH { font-family: var(--body); font-size: var(--fs-sm); font-weight: 600; color: var(--text-1); margin: 0; }
+.eventRows { list-style: none; margin: var(--sp-2) 0 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); border-top: 1px solid var(--border-1); }
+.eventDate { flex: none; width: 96px; font-family: var(--body); font-size: var(--fs-meta); font-weight: 600; color: var(--text-2); line-height: var(--lh-ui); }
+@media (max-width: 640px) { .eventDate { width: 88px; } }
 .tag { flex: none; font-family: var(--body); font-size: var(--fs-meta); font-weight: 500; color: var(--text-2); border: 1px solid var(--border-2); border-radius: var(--r-chip); padding: 2px var(--sp-2); white-space: nowrap; }
 .skRow { padding: var(--sp-3) 0; border-bottom: 1px solid var(--border-1); min-height: 56px; box-sizing: border-box; }
 .skLine { height: 14px; width: 60%; }

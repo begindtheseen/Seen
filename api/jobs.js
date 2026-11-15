@@ -59,6 +59,8 @@ import { readAreaRows, rankArea, pageArea } from '../lib/server/areaSearch.js';
 import { MIN_HOURLY } from '../lib/jobs/pay.js';
 import { collapseLocationVariants, roleKey } from '../lib/jobs/groupListings.js';
 import { alsoSearched, paySummary, elsewhereClusters } from '../lib/jobs/searchContext.js';
+import { readUpcomingEvents, eventsNear } from '../lib/server/hiringEvents.js';
+import { listingHiringEvent } from '../lib/jobs/hiringEvents.js';
 
 // ── Deadlines and load limits for this module's database reads (2026-11-12) ─────────────────────
 // Production 2026-11-11: with the database stalled, /api/jobs calls waited on fetches that had no timeout until the
@@ -493,6 +495,13 @@ export default async function handler(req, res) {
     if (await applyRateLimit(req, res, 'job-read', { bucketKey: rlBucket.key })) return;
     setPublicCache(res, 'listing_signals');
     return handleListingSignals(req, res, _body);
+  }
+
+  // ── Hiring events: upcoming events open listings announce (lib/server/hiringEvents.js), near a place ──
+  if (_body.action === 'hiring_events') {
+    if (await applyRateLimit(req, res, 'job-read', { bucketKey: rlBucket.key })) return;
+    setPublicCache(res, 'hiring_events');
+    return handleHiringEvents(req, res, _body);
   }
 
   // ── Recommended jobs: personalized from resume_skills ────────────────────
@@ -1112,6 +1121,7 @@ function toUiRow(j, loc = '') {
     // posting reads from the title only — the page's rows have theirs (exactTop reads them by id).
     type: j.type || 'Full-time', level: listingLevel(j.title || '', j.description || ''),
     trains_beginners: listingTrainsBeginners(j),
+    hiring_event: listingHiringEvent(j), // an upcoming dated event the posting announces (lib/jobs/hiringEvents.js), or null
     source: j.source || 'Seen', ...scoreRow(j),
     search_query: j.search_query || null, // provenance for the merged re-filter downstream
     lat: j.lat ?? null, lng: j.lng ?? null, posted_at: j.created_at || null,
@@ -1185,6 +1195,7 @@ async function corpusRelevant({ supabaseUrl, dbHeaders, terms, query, canonical,
       salary: honestSalary(j), url: j.apply_url || j.url || null, description: j.description,
       type: j.type || 'Full-time', level: listingLevel(j.title || '', j.description || ''),
       trains_beginners: listingTrainsBeginners(j),
+      hiring_event: listingHiringEvent(j),
       source: j.source || 'Seen', ...scoreRow(j),
       search_query: j.search_query || null,
       lat: j.lat ?? null, lng: j.lng ?? null, posted_at: j.created_at || null,
@@ -1210,6 +1221,7 @@ async function nearestListings(loc, supabaseUrl, dbHeaders) {
     salary: honestSalary(j), url: j.apply_url, description: j.description,
     type: j.type || 'Full-time', level: listingLevel(j.title || '', j.description || ''),
     trains_beginners: listingTrainsBeginners(j),
+    hiring_event: listingHiringEvent(j), // an upcoming dated event the posting announces (lib/jobs/hiringEvents.js), or null
     source: j.source || 'Seen', ...scoreRow(j),
     posted_at: j.created_at || null,
     ats_tenant: j.ats_tenant || null,
@@ -1292,6 +1304,21 @@ function buildFallbackFilter(q) {
 // legal suffixes dropped, hyphens and spaces alike — "Coca-Cola" ↔ "Coca Cola", never "Amazon Flex" ↔ "Amazon".
 const companyNameKey = n => String(n || '').toLowerCase().trim().replace(/[\s,]+(inc\.?|llc\.?|corp\.?|ltd\.?|co\.|plc\.?)\.?$/i, '').replace(/[\s-]+/g, ' ').trim();
 const companyIlike = name => encodeURIComponent(`*${String(name).toLowerCase().trim().replace(/[\s-]+/g, '*')}*`);
+
+// ── handleHiringEvents: upcoming hiring events, optionally within a radius of a typed place ─────────────────────
+async function handleHiringEvents(req, res, body) {
+  const SUPABASE_URL = process.env.SUPABASE_URL, KEY = process.env.SUPABASE_SERVICE_KEY;
+  if (!SUPABASE_URL || !KEY) return res.status(503).json({ error: 'DB unavailable', events: [] });
+  const location = typeof body.location === 'string' ? body.location.trim().slice(0, 120) : '';
+  try {
+    const all = await readUpcomingEvents({ supabaseUrl: SUPABASE_URL, serviceKey: KEY });
+    const events = eventsNear(all, location, body.radius).slice(0, 200);
+    return res.status(200).json({ ok: true, events, total: events.length });
+  } catch (e) {
+    logError('hiring_events', e.message, {});
+    return res.status(502).json({ error: 'Could not read hiring events — try again.', events: [] });
+  }
+}
 
 // ── handleListingSignals: every open post of ONE company → lib/server/listingSignals.js ─────────
 // Read-only. Up to 3,000 posts (3 pages); cached per instance for 30 minutes (posts change hourly at most).
@@ -1491,6 +1518,7 @@ async function buildRail(SUPABASE_URL, SUPABASE_SERVICE_KEY, user_id) {
     type: j.type || 'Full-time',
     level: listingLevel(j.title || '', j.description || ''),
     trains_beginners: listingTrainsBeginners(j),
+    hiring_event: listingHiringEvent(j), // an upcoming dated event the posting announces (lib/jobs/hiringEvents.js), or null
     source: j.source || 'Seen',
     match_reason: j._reason,
     // the checks behind the sentence (field, licences, years, limits, level) — each one passed

@@ -17,6 +17,7 @@ import { LISTING_SCORE_TITLE } from '@/components/jobs/ListingScoreRing'
 import EmployerGradeChip from '@/components/jobs/EmployerGradeChip'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
+import { eventDateLabel } from '@/lib/jobs/hiringEvents.js'
 import Icon from '@/components/ui/Icon'
 import s from './JobCard.module.css'
 import { displayLocation } from '@/lib/jobs/displayLocation.js'
@@ -98,6 +99,12 @@ export default function JobCard({ job, onSaveToggle, onOpen, onCheckCompany, alr
             {/* The posting says it takes people with no experience and trains them (lib/jobs/trainsBeginners.js) — ink, no fill. */}
             {job.trains_beginners === true && (
               <span className={s.chip} title="The posting says it takes people with no experience and trains them" data-testid="chip-paid-training">Paid training</span>
+            )}
+            {/* An upcoming event the posting announces (lib/jobs/hiringEvents.js) — ink, no fill, like Paid training. */}
+            {job.hiring_event && (
+              <span className={s.chip} title={`${job.hiring_event.label} in this posting${job.hiring_event.time ? ` · ${job.hiring_event.time}` : ''}`} data-testid="chip-hiring-event">
+                <Icon name="calendar" size={12} />{job.hiring_event.label} · {eventDateLabel(job.hiring_event)}
+              </span>
             )}
             {typeof employerScore === 'number'
               ? <EmployerGradeChip company={job.company} score={employerScore} compact />
