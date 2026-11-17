@@ -302,6 +302,17 @@ function TradeRows({ items }: { items: any[] }) {
   )
 }
 
+/** A link to one of Seen's own pages ("/start/cdl", or a seenjobs.io URL) as an in-site path; null for anything else. */
+export function internalPath(link: unknown): string | null {
+  const s = String(link || '').trim()
+  if (/^\/(?!\/)[\w\-./?=&%#]*$/.test(s)) return s
+  try {
+    const u = new URL(s)
+    if (u.protocol === 'https:' && (u.hostname === 'seenjobs.io' || u.hostname === 'www.seenjobs.io')) return `${u.pathname}${u.search}${u.hash}` || '/'
+  } catch { /* not a URL */ }
+  return null
+}
+
 function Cards({ items }: { items: any[] }) {
   return (
     <ul className={st.cards}>
@@ -312,7 +323,11 @@ function Cards({ items }: { items: any[] }) {
               <h3 className={st.cardName}>{c.name}</h3>
               {c.aka ? <span className={st.cardAka}>{c.aka}</span> : null}
             </div>
-            {c.link ? (
+            {c.link && internalPath(c.link) ? (
+              <Link href={internalPath(c.link) as string} prefetch={false} className={st.boardLink}>
+                {c.linkLabel || 'Read the guide'} <Icon name="arrow-right" size={14} />
+              </Link>
+            ) : c.link ? (
               <a href={c.link} className={st.boardLink} target="_blank" rel="noopener noreferrer">
                 {sourceHost(c.link)}<span className="sr-only"> (opens in a new tab)</span> <Icon name="arrow-up-right" size={14} />
               </a>
@@ -355,6 +370,14 @@ export function Blocks({ blocks, sources }: { blocks: Block[]; sources: Record<s
           case 'disclosures': return <DiscList key={i} items={b.items} />
           case 'faq': return <Faq key={i} items={b.items} />
           case 'more': return <More key={i} title={b.title}><Blocks blocks={b.blocks} sources={sources} /></More>
+          case 'link': {
+            const href = internalPath(b.href)
+            return href ? (
+              <p key={i} className={st.p}>
+                {b.before} <Link href={href} prefetch={false} className={st.inlineLink}>{b.label}</Link>{b.after ?? '.'}
+              </p>
+            ) : null
+          }
           case 'resumeLink':
             return (
               <p key={i} className={st.p}>
