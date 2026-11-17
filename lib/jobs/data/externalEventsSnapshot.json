@@ -1,6 +1,6 @@
 {
  "about": "The rows api/cron-hiring-events.js fetched from the real sources on `fetched` (writes stubbed). The read (lib/server/externalEvents.js) serves these, re-filtered on the Pacific clock, only until public.external_hiring_events exists and the cron has filled it.",
- "fetched": "2026-11-17T20:17:44.677Z",
+ "fetched": "2026-11-17T20:18:39.229Z",
  "rows": [
   {
    "id": "ext:tx-wfs-dallas:nrmt4g",
@@ -33,8 +33,9 @@
     "sourceName": "Workforce Solutions Greater Dallas",
     "state": "TX",
     "src": "https://www.wfsdallas.com/event/opportunity-center-job-fair-6/",
-    "general": true,
-    "many": false
+    "general": false,
+    "many": false,
+    "zip": "75226"
    }
   },
   {
@@ -69,7 +70,8 @@
     "state": "TX",
     "src": "https://www.wfsdallas.com/event/randstad-hiring-event-2/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "75237"
    }
   },
   {
@@ -104,7 +106,8 @@
     "state": "TX",
     "src": "https://www.wfsdallas.com/event/midway-hiring-event/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "75217"
    }
   },
   {
@@ -138,8 +141,9 @@
     "sourceName": "Workforce Solutions for Tarrant County",
     "state": "TX",
     "src": "https://workforcesolutions.net/event/mid-cities-workforce-center-hiring-fair-days-event-15/",
-    "general": true,
-    "many": false
+    "general": false,
+    "many": false,
+    "zip": "76053"
    }
   },
   {
@@ -174,7 +178,8 @@
     "state": "TX",
     "src": "https://workforcesolutions.net/event/congressman-marc-veasey-11th-annual-job-fair/",
     "general": true,
-    "many": true
+    "many": true,
+    "zip": "76105"
    }
   },
   {
@@ -209,7 +214,8 @@
     "state": "TX",
     "src": "https://wfscapitalarea.com/event/job-fair-with-housing-authority-of-city-of-austin/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "78704"
    }
   },
   {
@@ -244,7 +250,8 @@
     "state": "TX",
     "src": "https://wfscapitalarea.com/event/city-of-austin-50-community-job-fair/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "78753"
    }
   },
   {
@@ -314,7 +321,8 @@
     "state": "FL",
     "src": "https://careersourcenortheastflorida.com/event/job-news-jacksonville-job-fair-multi-industry-hiring-event-3/",
     "general": true,
-    "many": true
+    "many": true,
+    "zip": "32207"
    }
   },
   {
@@ -349,7 +357,8 @@
     "state": "FL",
     "src": "https://careersourcenortheastflorida.com/event/2027-first-coast-technical-college-annual-career-fair/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "32084"
    }
   },
   {
@@ -384,7 +393,8 @@
     "state": "CO",
     "src": "https://www.adworks.org/event/29357-11-19-26/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "80112"
    }
   },
   {
@@ -419,7 +429,8 @@
     "state": "CO",
     "src": "https://www.adworks.org/event/hiring-event-denver-public-schools-in-person-aurora-centrepoint-01/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "80012"
    }
   },
   {
@@ -454,7 +465,8 @@
     "state": "CO",
     "src": "https://www.adworks.org/event/hiring-event-american-automation-services-in-person-aurora-centrepoint-12-03-26/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "80012"
    }
   },
   {
@@ -489,7 +501,8 @@
     "state": "CO",
     "src": "https://www.adworks.org/event/skills-first-hiring-business-education-event-in-person-lima-12-10-26/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "80112"
    }
   },
   {
@@ -524,7 +537,8 @@
     "state": "CO",
     "src": "https://www.adworks.org/event/hiring-event-kelly-education-in-person-aurora-centrepoint/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "80012"
    }
   },
   {
@@ -563,356 +577,6 @@
    }
   },
   {
-   "id": "ext:ny-rochesterworks:sq3tfd",
-   "title": "Monroe Community Hospital Monthly Job Fair!",
-   "company": "RochesterWorks!",
-   "location": "Rochester, NY",
-   "lat": 43.155,
-   "lng": -77.616,
-   "url": "https://rochesterworks.org/event/monroe-community-hospital-monthly-job-fair-8/",
-   "roles": "",
-   "event": {
-    "kind": "external_fair",
-    "label": "Job fair",
-    "next": "2026-11-19",
-    "dates": [
-     "2026-11-19"
-    ],
-    "recurring": null,
-    "time": "9 AM–4 PM",
-    "where": "Monroe Community Hospital, 435 East Henrietta Rd, Rochester, NY 14620",
-    "virtual": false,
-    "walkIn": false,
-    "rsvp": false,
-    "onTheSpot": false,
-    "inviteOnly": false
-   },
-   "external": {
-    "type": "fair",
-    "source": "ny-rochesterworks",
-    "sourceName": "RochesterWorks!",
-    "state": "NY",
-    "src": "https://rochesterworks.org/event/monroe-community-hospital-monthly-job-fair-8/",
-    "general": false,
-    "many": false
-   }
-  },
-  {
-   "id": "ext:ny-rochesterworks:hdn20c",
-   "title": "On-Site Recruiting Event at RochesterWorks (11/19)",
-   "company": "RochesterWorks!",
-   "location": "Rochester, NY",
-   "lat": 43.155,
-   "lng": -77.616,
-   "url": "https://rochesterworks.org/event/on-site-recruiting-event-at-rochesterworks-11-19/",
-   "roles": "Direct Support Professionals Vehicle Operators (no CDL required!) Wegmans Job Opportunities: Food Production Workers Warehouse Workers Monroe 2-Orleans BOCES",
-   "event": {
-    "kind": "external_fair",
-    "label": "Hiring event",
-    "next": "2026-11-19",
-    "dates": [
-     "2026-11-19"
-    ],
-    "recurring": null,
-    "time": "9 AM–11 AM",
-    "where": "100 College Avenue, Rochester, NY 14607",
-    "virtual": false,
-    "walkIn": false,
-    "rsvp": true,
-    "onTheSpot": false,
-    "inviteOnly": false
-   },
-   "external": {
-    "type": "fair",
-    "source": "ny-rochesterworks",
-    "sourceName": "RochesterWorks!",
-    "state": "NY",
-    "src": "https://rochesterworks.org/event/on-site-recruiting-event-at-rochesterworks-11-19/",
-    "general": false,
-    "many": false
-   }
-  },
-  {
-   "id": "ext:ny-rochesterworks:tw403t",
-   "title": "Ibero Job Fair",
-   "company": "RochesterWorks!",
-   "location": "Rochester, NY",
-   "lat": 43.155,
-   "lng": -77.616,
-   "url": "https://rochesterworks.org/event/ibero-job-fair/",
-   "roles": "https://www.ibero.org/jobs/ CLICK HERE to view the event flyer in English and Spanish! Call 585-454-1430 to learn",
-   "event": {
-    "kind": "external_fair",
-    "label": "Job fair",
-    "next": "2026-11-19",
-    "dates": [
-     "2026-11-19"
-    ],
-    "recurring": null,
-    "time": "11 AM–2 PM",
-    "where": "Ibero-American Action League, 216 Clifford Ave, Rochester, NY 14621",
-    "virtual": false,
-    "walkIn": false,
-    "rsvp": false,
-    "onTheSpot": false,
-    "inviteOnly": false
-   },
-   "external": {
-    "type": "fair",
-    "source": "ny-rochesterworks",
-    "sourceName": "RochesterWorks!",
-    "state": "NY",
-    "src": "https://rochesterworks.org/event/ibero-job-fair/",
-    "general": true,
-    "many": false
-   }
-  },
-  {
-   "id": "ext:ny-rochesterworks:1i5hd52",
-   "title": "DelMonte Hotel Group Open Interviews",
-   "company": "RochesterWorks!",
-   "location": "Rochester, NY",
-   "lat": 43.155,
-   "lng": -77.616,
-   "url": "https://rochesterworks.org/event/delmonte-hotel-group-open-interviews/",
-   "roles": "",
-   "event": {
-    "kind": "external_fair",
-    "label": "Hiring event",
-    "next": "2026-12-01",
-    "dates": [
-     "2026-12-01"
-    ],
-    "recurring": null,
-    "time": "9 AM–7 PM",
-    "where": "Courtyard by Marriott Rochester/Brighton, 33 Corporate Woods, Rochester, NY 14623",
-    "virtual": false,
-    "walkIn": false,
-    "rsvp": false,
-    "onTheSpot": false,
-    "inviteOnly": false
-   },
-   "external": {
-    "type": "fair",
-    "source": "ny-rochesterworks",
-    "sourceName": "RochesterWorks!",
-    "state": "NY",
-    "src": "https://rochesterworks.org/event/delmonte-hotel-group-open-interviews/",
-    "general": false,
-    "many": false
-   }
-  },
-  {
-   "id": "ext:ny-rochesterworks:is2hct",
-   "title": "Bausch + Lomb Networking and Hiring Event",
-   "company": "RochesterWorks!",
-   "location": "Rochester, NY",
-   "lat": 43.155,
-   "lng": -77.616,
-   "url": "https://rochesterworks.org/event/bausch-lomb-networking-and-hiring-event/",
-   "roles": "",
-   "event": {
-    "kind": "external_fair",
-    "label": "Hiring event",
-    "next": "2026-12-02",
-    "dates": [
-     "2026-12-02"
-    ],
-    "recurring": null,
-    "time": "4 PM–7 PM",
-    "where": "DoubleTree by Hilton Rochester, 1111 Jefferson Road, Rochester, NY 14623",
-    "virtual": false,
-    "walkIn": false,
-    "rsvp": true,
-    "onTheSpot": false,
-    "inviteOnly": false
-   },
-   "external": {
-    "type": "fair",
-    "source": "ny-rochesterworks",
-    "sourceName": "RochesterWorks!",
-    "state": "NY",
-    "src": "https://rochesterworks.org/event/bausch-lomb-networking-and-hiring-event/",
-    "general": false,
-    "many": false
-   }
-  },
-  {
-   "id": "ext:ny-rochesterworks:ohn9mv",
-   "title": "Mini Job Fair at RochesterWorks (12/3)",
-   "company": "RochesterWorks!",
-   "location": "Rochester, NY",
-   "lat": 43.155,
-   "lng": -77.616,
-   "url": "https://rochesterworks.org/event/mini-job-fair-at-rochesterworks-12-3/",
-   "roles": "Ages 17+ Interested in healthcare and working with the public Enjoy helping others and working with your hands Selected candidates will be invited for an",
-   "event": {
-    "kind": "external_fair",
-    "label": "Job fair",
-    "next": "2026-12-03",
-    "dates": [
-     "2026-12-03"
-    ],
-    "recurring": null,
-    "time": "9 AM–11 AM",
-    "where": "100 College Avenue, Rochester, NY 14607",
-    "virtual": false,
-    "walkIn": false,
-    "rsvp": true,
-    "onTheSpot": false,
-    "inviteOnly": false
-   },
-   "external": {
-    "type": "fair",
-    "source": "ny-rochesterworks",
-    "sourceName": "RochesterWorks!",
-    "state": "NY",
-    "src": "https://rochesterworks.org/event/mini-job-fair-at-rochesterworks-12-3/",
-    "general": true,
-    "many": false
-   }
-  },
-  {
-   "id": "ext:ny-rochesterworks:gsjzjk",
-   "title": "DelMonte Hotel Group Open Interviews",
-   "company": "RochesterWorks!",
-   "location": "Rochester, NY",
-   "lat": 43.155,
-   "lng": -77.616,
-   "url": "https://rochesterworks.org/event/delmonte-hotel-group-open-interviews-2/",
-   "roles": "",
-   "event": {
-    "kind": "external_fair",
-    "label": "Hiring event",
-    "next": "2026-12-10",
-    "dates": [
-     "2026-12-10"
-    ],
-    "recurring": null,
-    "time": "9 AM–5 PM",
-    "where": "Hilton Garden Inn, Rochester University & Medical Center, 30 Celebration Drive, Rochester, NY 14620",
-    "virtual": false,
-    "walkIn": false,
-    "rsvp": false,
-    "onTheSpot": false,
-    "inviteOnly": false
-   },
-   "external": {
-    "type": "fair",
-    "source": "ny-rochesterworks",
-    "sourceName": "RochesterWorks!",
-    "state": "NY",
-    "src": "https://rochesterworks.org/event/delmonte-hotel-group-open-interviews-2/",
-    "general": false,
-    "many": false
-   }
-  },
-  {
-   "id": "ext:ny-rochesterworks:7uufw",
-   "title": "DelMonte Hotel Group Open Interviews",
-   "company": "RochesterWorks!",
-   "location": "Rochester, NY",
-   "lat": 43.155,
-   "lng": -77.616,
-   "url": "https://rochesterworks.org/event/delmonte-hotel-group-open-interviews-3/",
-   "roles": "",
-   "event": {
-    "kind": "external_fair",
-    "label": "Hiring event",
-    "next": "2026-12-14",
-    "dates": [
-     "2026-12-14"
-    ],
-    "recurring": null,
-    "time": "9 AM–7 PM",
-    "where": "Courtyard by Marriott Rochester/Brighton, 33 Corporate Woods, Rochester, NY 14623",
-    "virtual": false,
-    "walkIn": false,
-    "rsvp": false,
-    "onTheSpot": false,
-    "inviteOnly": false
-   },
-   "external": {
-    "type": "fair",
-    "source": "ny-rochesterworks",
-    "sourceName": "RochesterWorks!",
-    "state": "NY",
-    "src": "https://rochesterworks.org/event/delmonte-hotel-group-open-interviews-3/",
-    "general": false,
-    "many": false
-   }
-  },
-  {
-   "id": "ext:ny-rochesterworks:1bvfq1c",
-   "title": "Monroe Community Hospital Monthly Job Fair!",
-   "company": "RochesterWorks!",
-   "location": "Rochester, NY",
-   "lat": 43.155,
-   "lng": -77.616,
-   "url": "https://rochesterworks.org/event/monroe-community-hospital-monthly-job-fair-9/",
-   "roles": "",
-   "event": {
-    "kind": "external_fair",
-    "label": "Job fair",
-    "next": "2026-12-17",
-    "dates": [
-     "2026-12-17"
-    ],
-    "recurring": null,
-    "time": "9 AM–4 PM",
-    "where": "Monroe Community Hospital, 435 East Henrietta Rd, Rochester, NY 14620",
-    "virtual": false,
-    "walkIn": false,
-    "rsvp": false,
-    "onTheSpot": false,
-    "inviteOnly": false
-   },
-   "external": {
-    "type": "fair",
-    "source": "ny-rochesterworks",
-    "sourceName": "RochesterWorks!",
-    "state": "NY",
-    "src": "https://rochesterworks.org/event/monroe-community-hospital-monthly-job-fair-9/",
-    "general": false,
-    "many": false
-   }
-  },
-  {
-   "id": "ext:ny-rochesterworks:1o3erfc",
-   "title": "DelMonte Hotel Group Open Interviews",
-   "company": "RochesterWorks!",
-   "location": "Rochester, NY",
-   "lat": 43.155,
-   "lng": -77.616,
-   "url": "https://rochesterworks.org/event/delmonte-hotel-group-open-interviews-4/",
-   "roles": "",
-   "event": {
-    "kind": "external_fair",
-    "label": "Hiring event",
-    "next": "2026-12-18",
-    "dates": [
-     "2026-12-18"
-    ],
-    "recurring": null,
-    "time": "9 AM–5 PM",
-    "where": "Courtyard by Marriott Rochester/Brighton, 33 Corporate Woods, Rochester, NY 14623",
-    "virtual": false,
-    "walkIn": false,
-    "rsvp": false,
-    "onTheSpot": false,
-    "inviteOnly": false
-   },
-   "external": {
-    "type": "fair",
-    "source": "ny-rochesterworks",
-    "sourceName": "RochesterWorks!",
-    "state": "NY",
-    "src": "https://rochesterworks.org/event/delmonte-hotel-group-open-interviews-4/",
-    "general": false,
-    "many": false
-   }
-  },
-  {
    "id": "ext:tx-wfs-northtexas:1svl8u0",
    "title": "HIRING EVENT: Fortrex",
    "company": "Workforce Solutions North Texas",
@@ -944,7 +608,8 @@
     "state": "TX",
     "src": "https://ntxworksolutions.org/event/11-17-26-hiring-event-fortrex/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "76384"
    }
   },
   {
@@ -979,7 +644,8 @@
     "state": "TX",
     "src": "https://ntxworksolutions.org/event/tdcj-he-vernon-2026-11-18/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "76384"
    }
   },
   {
@@ -1014,7 +680,8 @@
     "state": "TX",
     "src": "https://ntxworksolutions.org/event/hrwy-2026/",
     "general": true,
-    "many": true
+    "many": true,
+    "zip": "76306"
    }
   },
   {
@@ -1049,7 +716,8 @@
     "state": "TX",
     "src": "https://ntxworksolutions.org/event/hiring-event-temp-warehouse-cleaners-2026-11-24/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "76302"
    }
   },
   {
@@ -1084,7 +752,8 @@
     "state": "TX",
     "src": "https://ntxworksolutions.org/event/12-10-26-hiring-event-material-handlers/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "76384"
    }
   },
   {
@@ -1119,273 +788,65 @@
     "state": "TX",
     "src": "https://ntxworksolutions.org/event/tdcj-he-2026-12-11/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "76302"
    }
   },
   {
-   "id": "ext:id-labor:62k4ir",
-   "title": "Hiring Event – Post Falls",
-   "company": "Idaho Department of Labor",
-   "location": "Post Falls, ID",
-   "lat": 47.718,
-   "lng": -116.952,
-   "url": "https://www.labor.idaho.gov/event/hiring-event-post-falls-2/",
-   "roles": "",
-   "event": {
-    "kind": "external_fair",
-    "label": "Hiring event",
-    "next": "2026-11-18",
-    "dates": [
-     "2026-11-18"
-    ],
-    "recurring": null,
-    "time": "10 AM–1 PM",
-    "where": "Idaho Department of Labor – Post Falls office, 600 N. Thornton St., Post Falls, ID 83854",
-    "virtual": false,
-    "walkIn": false,
-    "rsvp": false,
-    "onTheSpot": false,
-    "inviteOnly": false
-   },
-   "external": {
-    "type": "fair",
-    "source": "id-labor",
-    "sourceName": "Idaho Department of Labor",
-    "state": "ID",
-    "src": "https://www.labor.idaho.gov/event/hiring-event-post-falls-2/",
-    "general": false,
-    "many": false
-   }
-  },
-  {
-   "id": "ext:id-labor:1x9qo7v",
-   "title": "Hiring Event – Idaho Falls",
-   "company": "Idaho Department of Labor",
-   "location": "Idaho Falls, ID",
-   "lat": 43.467,
-   "lng": -112.034,
-   "url": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-17/",
-   "roles": "",
-   "event": {
-    "kind": "external_fair",
-    "label": "Hiring event",
-    "next": "2026-11-18",
-    "dates": [
-     "2026-11-18"
-    ],
-    "recurring": null,
-    "time": "11 AM–2 PM",
-    "where": "Idaho Department of Labor – Idaho Falls office, 1515 E. Lincoln Road, Idaho Falls, ID 83401",
-    "virtual": false,
-    "walkIn": false,
-    "rsvp": false,
-    "onTheSpot": false,
-    "inviteOnly": false
-   },
-   "external": {
-    "type": "fair",
-    "source": "id-labor",
-    "sourceName": "Idaho Department of Labor",
-    "state": "ID",
-    "src": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-17/",
-    "general": false,
-    "many": false
-   }
-  },
-  {
-   "id": "ext:id-labor:1wfbl43",
-   "title": "Hiring Event – Idaho Falls",
-   "company": "Idaho Department of Labor",
-   "location": "Idaho Falls, ID",
-   "lat": 43.467,
-   "lng": -112.034,
-   "url": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-3/",
-   "roles": "",
-   "event": {
-    "kind": "external_fair",
-    "label": "Hiring event",
-    "next": "2026-11-25",
-    "dates": [
-     "2026-11-25"
-    ],
-    "recurring": null,
-    "time": "11 AM–2 PM",
-    "where": "Idaho Department of Labor – Idaho Falls office, 1515 E. Lincoln Road, Idaho Falls, ID 83401",
-    "virtual": false,
-    "walkIn": false,
-    "rsvp": false,
-    "onTheSpot": false,
-    "inviteOnly": false
-   },
-   "external": {
-    "type": "fair",
-    "source": "id-labor",
-    "sourceName": "Idaho Department of Labor",
-    "state": "ID",
-    "src": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-3/",
-    "general": false,
-    "many": false
-   }
-  },
-  {
-   "id": "ext:id-labor:1jgeitp",
-   "title": "Hiring Event – Rexburg",
-   "company": "Idaho Department of Labor",
-   "location": "Rexburg, ID",
-   "lat": 43.826,
-   "lng": -111.79,
-   "url": "https://www.labor.idaho.gov/event/hiring-event-rexburg/",
-   "roles": "",
-   "event": {
-    "kind": "external_fair",
-    "label": "Hiring event",
-    "next": "2026-12-08",
-    "dates": [
-     "2026-12-08"
-    ],
-    "recurring": null,
-    "time": "11 AM–2 PM",
-    "where": "VFW – Veterans of Foreign Wars Hall, 480 W Second N., Rexburg, ID 83440",
-    "virtual": false,
-    "walkIn": false,
-    "rsvp": false,
-    "onTheSpot": false,
-    "inviteOnly": false
-   },
-   "external": {
-    "type": "fair",
-    "source": "id-labor",
-    "sourceName": "Idaho Department of Labor",
-    "state": "ID",
-    "src": "https://www.labor.idaho.gov/event/hiring-event-rexburg/",
-    "general": false,
-    "many": false
-   }
-  },
-  {
-   "id": "ext:id-labor:c4jjqu",
-   "title": "Hiring Event – Idaho Falls",
-   "company": "Idaho Department of Labor",
-   "location": "Idaho Falls, ID",
-   "lat": 43.467,
-   "lng": -112.034,
-   "url": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-2/",
-   "roles": "",
-   "event": {
-    "kind": "external_fair",
-    "label": "Hiring event",
-    "next": "2026-12-09",
-    "dates": [
-     "2026-12-09"
-    ],
-    "recurring": null,
-    "time": "11 AM–12 PM",
-    "where": "Idaho Department of Labor – Idaho Falls office, 1515 E. Lincoln Road, Idaho Falls, ID 83401",
-    "virtual": false,
-    "walkIn": false,
-    "rsvp": false,
-    "onTheSpot": false,
-    "inviteOnly": false
-   },
-   "external": {
-    "type": "fair",
-    "source": "id-labor",
-    "sourceName": "Idaho Department of Labor",
-    "state": "ID",
-    "src": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-2/",
-    "general": false,
-    "many": false
-   }
-  },
-  {
-   "id": "ext:id-labor:1clovzo",
-   "title": "Hiring Event – Post Falls",
-   "company": "Idaho Department of Labor",
-   "location": "Post Falls, ID",
-   "lat": 47.718,
-   "lng": -116.952,
-   "url": "https://www.labor.idaho.gov/event/hiring-event-post-falls/",
-   "roles": "",
-   "event": {
-    "kind": "external_fair",
-    "label": "Hiring event",
-    "next": "2026-12-16",
-    "dates": [
-     "2026-12-16"
-    ],
-    "recurring": null,
-    "time": "10 AM–1 PM",
-    "where": "Idaho Department of Labor – Post Falls office, 600 N. Thornton St., Post Falls, ID 83854",
-    "virtual": false,
-    "walkIn": false,
-    "rsvp": false,
-    "onTheSpot": false,
-    "inviteOnly": false
-   },
-   "external": {
-    "type": "fair",
-    "source": "id-labor",
-    "sourceName": "Idaho Department of Labor",
-    "state": "ID",
-    "src": "https://www.labor.idaho.gov/event/hiring-event-post-falls/",
-    "general": false,
-    "many": false
-   }
-  },
-  {
-   "id": "ext:id-labor:1wbzlhy",
-   "title": "Hiring Event – Idaho Falls",
-   "company": "Idaho Department of Labor",
-   "location": "Idaho Falls, ID",
-   "lat": 43.467,
-   "lng": -112.034,
-   "url": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls/",
-   "roles": "",
-   "event": {
-    "kind": "external_fair",
-    "label": "Hiring event",
-    "next": "2026-12-23",
-    "dates": [
-     "2026-12-23"
-    ],
-    "recurring": null,
-    "time": "11 AM–2 PM",
-    "where": "Idaho Department of Labor – Idaho Falls office, 1515 E. Lincoln Road, Idaho Falls, ID 83401",
-    "virtual": false,
-    "walkIn": false,
-    "rsvp": false,
-    "onTheSpot": false,
-    "inviteOnly": false
-   },
-   "external": {
-    "type": "fair",
-    "source": "id-labor",
-    "sourceName": "Idaho Department of Labor",
-    "state": "ID",
-    "src": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls/",
-    "general": false,
-    "many": false
-   }
-  },
-  {
-   "id": "ext:ca-sdwp:xe2938",
-   "title": "Lay The Foundation Career Fair",
-   "company": "San Diego Workforce Partnership",
-   "location": "San Diego, CA",
-   "lat": 32.7178162,
-   "lng": -117.15074,
-   "url": "https://www.workforce.org/events/lay-the-foundation-career-fair/",
+   "id": "ext:ny-rochesterworks:sq3tfd",
+   "title": "Monroe Community Hospital Monthly Job Fair!",
+   "company": "RochesterWorks!",
+   "location": "Rochester, NY",
+   "lat": 43.155,
+   "lng": -77.616,
+   "url": "https://rochesterworks.org/event/monroe-community-hospital-monthly-job-fair-8/",
    "roles": "",
    "event": {
     "kind": "external_fair",
     "label": "Job fair",
-    "next": "2026-11-18",
+    "next": "2026-11-19",
     "dates": [
-     "2026-11-18"
+     "2026-11-19"
     ],
     "recurring": null,
-    "time": "10 AM–12 PM",
-    "where": "San Diego City College, A Building – Patio, 1313 Park Boulevard, San Diego, CA 92101, 1313 Park Boulevard, San Diego, CA 92101",
+    "time": "9 AM–4 PM",
+    "where": "Monroe Community Hospital, 435 East Henrietta Rd, Rochester, NY 14620",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "ny-rochesterworks",
+    "sourceName": "RochesterWorks!",
+    "state": "NY",
+    "src": "https://rochesterworks.org/event/monroe-community-hospital-monthly-job-fair-8/",
+    "general": false,
+    "many": false,
+    "zip": "14620"
+   }
+  },
+  {
+   "id": "ext:ny-rochesterworks:hdn20c",
+   "title": "On-Site Recruiting Event at RochesterWorks (11/19)",
+   "company": "RochesterWorks!",
+   "location": "Rochester, NY",
+   "lat": 43.155,
+   "lng": -77.616,
+   "url": "https://rochesterworks.org/event/on-site-recruiting-event-at-rochesterworks-11-19/",
+   "roles": "Direct Support Professionals Vehicle Operators (no CDL required!) Wegmans Job Opportunities: Food Production Workers Warehouse Workers Monroe 2-Orleans BOCES",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-19",
+    "dates": [
+     "2026-11-19"
+    ],
+    "recurring": null,
+    "time": "9 AM–11 AM",
+    "where": "100 College Avenue, Rochester, NY 14607",
     "virtual": false,
     "walkIn": false,
     "rsvp": true,
@@ -1394,12 +855,301 @@
    },
    "external": {
     "type": "fair",
-    "source": "ca-sdwp",
-    "sourceName": "San Diego Workforce Partnership",
-    "state": "CA",
-    "src": "https://www.workforce.org/events/lay-the-foundation-career-fair/",
+    "source": "ny-rochesterworks",
+    "sourceName": "RochesterWorks!",
+    "state": "NY",
+    "src": "https://rochesterworks.org/event/on-site-recruiting-event-at-rochesterworks-11-19/",
+    "general": false,
+    "many": false,
+    "zip": "14607"
+   }
+  },
+  {
+   "id": "ext:ny-rochesterworks:tw403t",
+   "title": "Ibero Job Fair",
+   "company": "RochesterWorks!",
+   "location": "Rochester, NY",
+   "lat": 43.155,
+   "lng": -77.616,
+   "url": "https://rochesterworks.org/event/ibero-job-fair/",
+   "roles": "https://www.ibero.org/jobs/ CLICK HERE to view the event flyer in English and Spanish! Call 585-454-1430 to learn",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-11-19",
+    "dates": [
+     "2026-11-19"
+    ],
+    "recurring": null,
+    "time": "11 AM–2 PM",
+    "where": "Ibero-American Action League, 216 Clifford Ave, Rochester, NY 14621",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "ny-rochesterworks",
+    "sourceName": "RochesterWorks!",
+    "state": "NY",
+    "src": "https://rochesterworks.org/event/ibero-job-fair/",
+    "general": false,
+    "many": false,
+    "zip": "14621"
+   }
+  },
+  {
+   "id": "ext:ny-rochesterworks:1i5hd52",
+   "title": "DelMonte Hotel Group Open Interviews",
+   "company": "RochesterWorks!",
+   "location": "Rochester, NY",
+   "lat": 43.155,
+   "lng": -77.616,
+   "url": "https://rochesterworks.org/event/delmonte-hotel-group-open-interviews/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-01",
+    "dates": [
+     "2026-12-01"
+    ],
+    "recurring": null,
+    "time": "9 AM–7 PM",
+    "where": "Courtyard by Marriott Rochester/Brighton, 33 Corporate Woods, Rochester, NY 14623",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "ny-rochesterworks",
+    "sourceName": "RochesterWorks!",
+    "state": "NY",
+    "src": "https://rochesterworks.org/event/delmonte-hotel-group-open-interviews/",
+    "general": false,
+    "many": false,
+    "zip": "14623"
+   }
+  },
+  {
+   "id": "ext:ny-rochesterworks:is2hct",
+   "title": "Bausch + Lomb Networking and Hiring Event",
+   "company": "RochesterWorks!",
+   "location": "Rochester, NY",
+   "lat": 43.155,
+   "lng": -77.616,
+   "url": "https://rochesterworks.org/event/bausch-lomb-networking-and-hiring-event/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-02",
+    "dates": [
+     "2026-12-02"
+    ],
+    "recurring": null,
+    "time": "4 PM–7 PM",
+    "where": "DoubleTree by Hilton Rochester, 1111 Jefferson Road, Rochester, NY 14623",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "ny-rochesterworks",
+    "sourceName": "RochesterWorks!",
+    "state": "NY",
+    "src": "https://rochesterworks.org/event/bausch-lomb-networking-and-hiring-event/",
+    "general": false,
+    "many": false,
+    "zip": "14623"
+   }
+  },
+  {
+   "id": "ext:ny-rochesterworks:ohn9mv",
+   "title": "Mini Job Fair at RochesterWorks (12/3)",
+   "company": "RochesterWorks!",
+   "location": "Rochester, NY",
+   "lat": 43.155,
+   "lng": -77.616,
+   "url": "https://rochesterworks.org/event/mini-job-fair-at-rochesterworks-12-3/",
+   "roles": "Ages 17+ Interested in healthcare and working with the public Enjoy helping others and working with your hands Selected candidates will be invited for an",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-12-03",
+    "dates": [
+     "2026-12-03"
+    ],
+    "recurring": null,
+    "time": "9 AM–11 AM",
+    "where": "100 College Avenue, Rochester, NY 14607",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "ny-rochesterworks",
+    "sourceName": "RochesterWorks!",
+    "state": "NY",
+    "src": "https://rochesterworks.org/event/mini-job-fair-at-rochesterworks-12-3/",
     "general": true,
-    "many": false
+    "many": false,
+    "zip": "14607"
+   }
+  },
+  {
+   "id": "ext:ny-rochesterworks:gsjzjk",
+   "title": "DelMonte Hotel Group Open Interviews",
+   "company": "RochesterWorks!",
+   "location": "Rochester, NY",
+   "lat": 43.155,
+   "lng": -77.616,
+   "url": "https://rochesterworks.org/event/delmonte-hotel-group-open-interviews-2/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-10",
+    "dates": [
+     "2026-12-10"
+    ],
+    "recurring": null,
+    "time": "9 AM–5 PM",
+    "where": "Hilton Garden Inn, Rochester University & Medical Center, 30 Celebration Drive, Rochester, NY 14620",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "ny-rochesterworks",
+    "sourceName": "RochesterWorks!",
+    "state": "NY",
+    "src": "https://rochesterworks.org/event/delmonte-hotel-group-open-interviews-2/",
+    "general": false,
+    "many": false,
+    "zip": "14620"
+   }
+  },
+  {
+   "id": "ext:ny-rochesterworks:7uufw",
+   "title": "DelMonte Hotel Group Open Interviews",
+   "company": "RochesterWorks!",
+   "location": "Rochester, NY",
+   "lat": 43.155,
+   "lng": -77.616,
+   "url": "https://rochesterworks.org/event/delmonte-hotel-group-open-interviews-3/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-14",
+    "dates": [
+     "2026-12-14"
+    ],
+    "recurring": null,
+    "time": "9 AM–7 PM",
+    "where": "Courtyard by Marriott Rochester/Brighton, 33 Corporate Woods, Rochester, NY 14623",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "ny-rochesterworks",
+    "sourceName": "RochesterWorks!",
+    "state": "NY",
+    "src": "https://rochesterworks.org/event/delmonte-hotel-group-open-interviews-3/",
+    "general": false,
+    "many": false,
+    "zip": "14623"
+   }
+  },
+  {
+   "id": "ext:ny-rochesterworks:1bvfq1c",
+   "title": "Monroe Community Hospital Monthly Job Fair!",
+   "company": "RochesterWorks!",
+   "location": "Rochester, NY",
+   "lat": 43.155,
+   "lng": -77.616,
+   "url": "https://rochesterworks.org/event/monroe-community-hospital-monthly-job-fair-9/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-12-17",
+    "dates": [
+     "2026-12-17"
+    ],
+    "recurring": null,
+    "time": "9 AM–4 PM",
+    "where": "Monroe Community Hospital, 435 East Henrietta Rd, Rochester, NY 14620",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "ny-rochesterworks",
+    "sourceName": "RochesterWorks!",
+    "state": "NY",
+    "src": "https://rochesterworks.org/event/monroe-community-hospital-monthly-job-fair-9/",
+    "general": false,
+    "many": false,
+    "zip": "14620"
+   }
+  },
+  {
+   "id": "ext:ny-rochesterworks:1o3erfc",
+   "title": "DelMonte Hotel Group Open Interviews",
+   "company": "RochesterWorks!",
+   "location": "Rochester, NY",
+   "lat": 43.155,
+   "lng": -77.616,
+   "url": "https://rochesterworks.org/event/delmonte-hotel-group-open-interviews-4/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-18",
+    "dates": [
+     "2026-12-18"
+    ],
+    "recurring": null,
+    "time": "9 AM–5 PM",
+    "where": "Courtyard by Marriott Rochester/Brighton, 33 Corporate Woods, Rochester, NY 14623",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "ny-rochesterworks",
+    "sourceName": "RochesterWorks!",
+    "state": "NY",
+    "src": "https://rochesterworks.org/event/delmonte-hotel-group-open-interviews-4/",
+    "general": false,
+    "many": false,
+    "zip": "14623"
    }
   },
   {
@@ -1434,7 +1184,8 @@
     "state": "NJ",
     "src": "https://thegrwdb.org/event/realreal-in-person-recruitment-event/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "08861"
    }
   },
   {
@@ -1442,8 +1193,8 @@
    "title": "Forged Solutions Group Walk-In Recruitment Event in November",
    "company": "Greater Raritan Workforce Development Board",
    "location": "High Bridg, NJ",
-   "lat": null,
-   "lng": null,
+   "lat": 40.67,
+   "lng": -74.89,
    "url": "https://thegrwdb.org/event/forged-solutions-group-walk-in-recruitment-event-in-november/",
    "roles": "",
    "event": {
@@ -1469,7 +1220,8 @@
     "state": "NJ",
     "src": "https://thegrwdb.org/event/forged-solutions-group-walk-in-recruitment-event-in-november/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "08829"
    }
   },
   {
@@ -1504,7 +1256,8 @@
     "state": "NJ",
     "src": "https://thegrwdb.org/event/abm-industries-recruitment-event/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "08876"
    }
   },
   {
@@ -1547,8 +1300,8 @@
    "title": "Forged Solutions Group Walk-In Recruitment Event in December",
    "company": "Greater Raritan Workforce Development Board",
    "location": "High Bridg, NJ",
-   "lat": null,
-   "lng": null,
+   "lat": 40.67,
+   "lng": -74.89,
    "url": "https://thegrwdb.org/event/forged-solutions-group-walk-in-recruitment-event-in-december/",
    "roles": "",
    "event": {
@@ -1574,7 +1327,8 @@
     "state": "NJ",
     "src": "https://thegrwdb.org/event/forged-solutions-group-walk-in-recruitment-event-in-december/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "08829"
    }
   },
   {
@@ -1582,8 +1336,8 @@
    "title": "Forged Solutions Group Walk-In Recruitment Event in December",
    "company": "Greater Raritan Workforce Development Board",
    "location": "High Bridg, NJ",
-   "lat": null,
-   "lng": null,
+   "lat": 40.67,
+   "lng": -74.89,
    "url": "https://thegrwdb.org/event/forged-solutions-group-walk-in-recruitment-event-in-december-2/",
    "roles": "",
    "event": {
@@ -1609,7 +1363,8 @@
     "state": "NJ",
     "src": "https://thegrwdb.org/event/forged-solutions-group-walk-in-recruitment-event-in-december-2/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "08829"
    }
   },
   {
@@ -1644,7 +1399,8 @@
     "state": "NJ",
     "src": "https://thegrwdb.org/event/restaurant-depot-on-site-recruitment-event/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "08822"
    }
   },
   {
@@ -1652,8 +1408,8 @@
    "title": "Forged Solutions Group Walk-In Recruitment Event in December",
    "company": "Greater Raritan Workforce Development Board",
    "location": "High Bridg, NJ",
-   "lat": null,
-   "lng": null,
+   "lat": 40.67,
+   "lng": -74.89,
    "url": "https://thegrwdb.org/event/forged-solutions-group-walk-in-recruitment-event-in-december-3/",
    "roles": "",
    "event": {
@@ -1679,7 +1435,44 @@
     "state": "NJ",
     "src": "https://thegrwdb.org/event/forged-solutions-group-walk-in-recruitment-event-in-december-3/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "08829"
+   }
+  },
+  {
+   "id": "ext:ca-sdwp:xe2938",
+   "title": "Lay The Foundation Career Fair",
+   "company": "San Diego Workforce Partnership",
+   "location": "San Diego, CA",
+   "lat": 32.7178162,
+   "lng": -117.15074,
+   "url": "https://www.workforce.org/events/lay-the-foundation-career-fair/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-11-18",
+    "dates": [
+     "2026-11-18"
+    ],
+    "recurring": null,
+    "time": "10 AM–12 PM",
+    "where": "San Diego City College, A Building – Patio, 1313 Park Boulevard, San Diego, CA 92101, 1313 Park Boulevard, San Diego, CA 92101",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "ca-sdwp",
+    "sourceName": "San Diego Workforce Partnership",
+    "state": "CA",
+    "src": "https://www.workforce.org/events/lay-the-foundation-career-fair/",
+    "general": false,
+    "many": false,
+    "zip": "92101"
    }
   },
   {
@@ -2148,6 +1941,258 @@
    }
   },
   {
+   "id": "ext:id-labor:62k4ir",
+   "title": "Hiring Event – Post Falls",
+   "company": "Idaho Department of Labor",
+   "location": "Post Falls, ID",
+   "lat": 47.718,
+   "lng": -116.952,
+   "url": "https://www.labor.idaho.gov/event/hiring-event-post-falls-2/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-18",
+    "dates": [
+     "2026-11-18"
+    ],
+    "recurring": null,
+    "time": "10 AM–1 PM",
+    "where": "Idaho Department of Labor – Post Falls office, 600 N. Thornton St., Post Falls, ID 83854",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "id-labor",
+    "sourceName": "Idaho Department of Labor",
+    "state": "ID",
+    "src": "https://www.labor.idaho.gov/event/hiring-event-post-falls-2/",
+    "general": false,
+    "many": false,
+    "zip": "83854"
+   }
+  },
+  {
+   "id": "ext:id-labor:1x9qo7v",
+   "title": "Hiring Event – Idaho Falls",
+   "company": "Idaho Department of Labor",
+   "location": "Idaho Falls, ID",
+   "lat": 43.467,
+   "lng": -112.034,
+   "url": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-17/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-18",
+    "dates": [
+     "2026-11-18"
+    ],
+    "recurring": null,
+    "time": "11 AM–2 PM",
+    "where": "Idaho Department of Labor – Idaho Falls office, 1515 E. Lincoln Road, Idaho Falls, ID 83401",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "id-labor",
+    "sourceName": "Idaho Department of Labor",
+    "state": "ID",
+    "src": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-17/",
+    "general": false,
+    "many": false,
+    "zip": "83401"
+   }
+  },
+  {
+   "id": "ext:id-labor:1wfbl43",
+   "title": "Hiring Event – Idaho Falls",
+   "company": "Idaho Department of Labor",
+   "location": "Idaho Falls, ID",
+   "lat": 43.467,
+   "lng": -112.034,
+   "url": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-3/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-25",
+    "dates": [
+     "2026-11-25"
+    ],
+    "recurring": null,
+    "time": "11 AM–2 PM",
+    "where": "Idaho Department of Labor – Idaho Falls office, 1515 E. Lincoln Road, Idaho Falls, ID 83401",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "id-labor",
+    "sourceName": "Idaho Department of Labor",
+    "state": "ID",
+    "src": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-3/",
+    "general": false,
+    "many": false,
+    "zip": "83401"
+   }
+  },
+  {
+   "id": "ext:id-labor:1jgeitp",
+   "title": "Hiring Event – Rexburg",
+   "company": "Idaho Department of Labor",
+   "location": "Rexburg, ID",
+   "lat": 43.826,
+   "lng": -111.79,
+   "url": "https://www.labor.idaho.gov/event/hiring-event-rexburg/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-08",
+    "dates": [
+     "2026-12-08"
+    ],
+    "recurring": null,
+    "time": "11 AM–2 PM",
+    "where": "VFW – Veterans of Foreign Wars Hall, 480 W Second N., Rexburg, ID 83440",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "id-labor",
+    "sourceName": "Idaho Department of Labor",
+    "state": "ID",
+    "src": "https://www.labor.idaho.gov/event/hiring-event-rexburg/",
+    "general": false,
+    "many": false,
+    "zip": "83440"
+   }
+  },
+  {
+   "id": "ext:id-labor:c4jjqu",
+   "title": "Hiring Event – Idaho Falls",
+   "company": "Idaho Department of Labor",
+   "location": "Idaho Falls, ID",
+   "lat": 43.467,
+   "lng": -112.034,
+   "url": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-2/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-09",
+    "dates": [
+     "2026-12-09"
+    ],
+    "recurring": null,
+    "time": "11 AM–12 PM",
+    "where": "Idaho Department of Labor – Idaho Falls office, 1515 E. Lincoln Road, Idaho Falls, ID 83401",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "id-labor",
+    "sourceName": "Idaho Department of Labor",
+    "state": "ID",
+    "src": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-2/",
+    "general": false,
+    "many": false,
+    "zip": "83401"
+   }
+  },
+  {
+   "id": "ext:id-labor:1clovzo",
+   "title": "Hiring Event – Post Falls",
+   "company": "Idaho Department of Labor",
+   "location": "Post Falls, ID",
+   "lat": 47.718,
+   "lng": -116.952,
+   "url": "https://www.labor.idaho.gov/event/hiring-event-post-falls/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-16",
+    "dates": [
+     "2026-12-16"
+    ],
+    "recurring": null,
+    "time": "10 AM–1 PM",
+    "where": "Idaho Department of Labor – Post Falls office, 600 N. Thornton St., Post Falls, ID 83854",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "id-labor",
+    "sourceName": "Idaho Department of Labor",
+    "state": "ID",
+    "src": "https://www.labor.idaho.gov/event/hiring-event-post-falls/",
+    "general": false,
+    "many": false,
+    "zip": "83854"
+   }
+  },
+  {
+   "id": "ext:id-labor:1wbzlhy",
+   "title": "Hiring Event – Idaho Falls",
+   "company": "Idaho Department of Labor",
+   "location": "Idaho Falls, ID",
+   "lat": 43.467,
+   "lng": -112.034,
+   "url": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-23",
+    "dates": [
+     "2026-12-23"
+    ],
+    "recurring": null,
+    "time": "11 AM–2 PM",
+    "where": "Idaho Department of Labor – Idaho Falls office, 1515 E. Lincoln Road, Idaho Falls, ID 83401",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "id-labor",
+    "sourceName": "Idaho Department of Labor",
+    "state": "ID",
+    "src": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls/",
+    "general": false,
+    "many": false,
+    "zip": "83401"
+   }
+  },
+  {
    "id": "ext:mn-careerforce:1fuzz68",
    "title": "Employer of the Day - Fairview Health",
    "company": "CareerForce Minnesota",
@@ -2493,7 +2538,7 @@
     "sourceName": "CareerForce Minnesota",
     "state": "MN",
     "src": "https://careerforce.mn.gov/events/external/us-postal-service-automotive-technician-job-fair-0",
-    "general": true,
+    "general": false,
     "many": false
    }
   },
@@ -2563,7 +2608,7 @@
     "sourceName": "CareerForce Minnesota",
     "state": "MN",
     "src": "https://careerforce.mn.gov/events/external/3m-new-ulm-job-fair-0",
-    "general": true,
+    "general": false,
     "many": false
    }
   },
@@ -2633,7 +2678,7 @@
     "sourceName": "CareerForce Minnesota",
     "state": "MN",
     "src": "https://careerforce.mn.gov/events/external/optum-minnesota-pharmacy-technician-virtual-job-fair",
-    "general": true,
+    "general": false,
     "many": false
    }
   },
@@ -2669,7 +2714,8 @@
     "state": "MN",
     "src": "https://www.swmnpic.org/event/worthington-career-fair-2027/",
     "general": true,
-    "many": false
+    "many": false,
+    "zip": "56187"
    }
   },
   {
@@ -2704,7 +2750,8 @@
     "state": "MN",
     "src": "https://www.swmnpic.org/event/cottonwood-area-career-fair-2027/",
     "general": true,
-    "many": false
+    "many": false,
+    "zip": "56229"
    }
   },
   {
@@ -2739,7 +2786,8 @@
     "state": "MN",
     "src": "https://www.swmnpic.org/event/windom-career-fair-2027/",
     "general": true,
-    "many": false
+    "many": false,
+    "zip": "56101"
    }
   },
   {
@@ -2773,8 +2821,9 @@
     "sourceName": "Golden Sierra Job Training Agency",
     "state": "CA",
     "src": "https://goldensierra.com/event/atwork-job-fair-4",
-    "general": true,
-    "many": false
+    "general": false,
+    "many": false,
+    "zip": "95815"
    }
   },
   {
@@ -2809,7 +2858,8 @@
     "state": "CA",
     "src": "https://goldensierra.com/event/sacramento-job-fair-5",
     "general": true,
-    "many": false
+    "many": false,
+    "zip": "95821"
    }
   },
   {
@@ -2843,8 +2893,9 @@
     "sourceName": "Golden Sierra Job Training Agency",
     "state": "CA",
     "src": "https://goldensierra.com/event/dgs-mini-pop-up-job-fair",
-    "general": true,
-    "many": false
+    "general": false,
+    "many": false,
+    "zip": "95817"
    }
   },
   {
@@ -2879,7 +2930,8 @@
     "state": "VA",
     "src": "https://virginiaworks.gov/event/grocery-outlet-hiring-event-indian-river-location/2026-11-17/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "23325"
    }
   },
   {
@@ -2949,7 +3001,8 @@
     "state": "VA",
     "src": "https://virginiaworks.gov/event/grocery-outlet-hiring-event-indian-river-location/2026-11-18/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "23325"
    }
   },
   {
@@ -2957,8 +3010,8 @@
    "title": "3rd Thursday Hiring Event",
    "company": "Virginia Works",
    "location": "Chesterfield, VA",
-   "lat": null,
-   "lng": null,
+   "lat": 37.52,
+   "lng": -77.511,
    "url": "https://virginiaworks.gov/event/3rd-thursday-hiring-event/2026-11-19/",
    "roles": "",
    "event": {
@@ -2984,7 +3037,8 @@
     "state": "VA",
     "src": "https://virginiaworks.gov/event/3rd-thursday-hiring-event/2026-11-19/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "23225"
    }
   },
   {
@@ -3019,7 +3073,8 @@
     "state": "VA",
     "src": "https://virginiaworks.gov/event/hiring-event-uva-temps/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "22901"
    }
   },
   {
@@ -3054,7 +3109,8 @@
     "state": "VA",
     "src": "https://virginiaworks.gov/event/temp-hiring-event-uva-transit-charlottesville/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "22903"
    }
   },
   {
@@ -3089,7 +3145,8 @@
     "state": "VA",
     "src": "https://virginiaworks.gov/event/skipwith-academy-to-host-childcare-job-fair/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "23111"
    }
   },
   {
@@ -3124,7 +3181,8 @@
     "state": "VA",
     "src": "https://virginiaworks.gov/event/fredericksburg-multi-employer-hiring-event/",
     "general": true,
-    "many": true
+    "many": true,
+    "zip": "22408"
    }
   },
   {
@@ -3159,7 +3217,8 @@
     "state": "VA",
     "src": "https://virginiaworks.gov/event/grocery-outlet-hiring-event-indian-river-location/2026-11-19/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "23325"
    }
   },
   {
@@ -3194,7 +3253,8 @@
     "state": "VA",
     "src": "https://virginiaworks.gov/event/maxim-healthcare-services-job-fair/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "22180"
    }
   },
   {
@@ -3229,7 +3289,8 @@
     "state": "VA",
     "src": "https://virginiaworks.gov/event/skipwith-academy-to-host-childcare-job-fair-2/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "23113"
    }
   },
   {
@@ -3264,7 +3325,8 @@
     "state": "VA",
     "src": "https://virginiaworks.gov/event/skipwith-academy-to-host-childcare-job-fair-3/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "23233"
    }
   },
   {
@@ -3299,7 +3361,8 @@
     "state": "VA",
     "src": "https://virginiaworks.gov/event/skipwith-academy-to-host-childcare-job-fair-4/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "23836"
    }
   },
   {
@@ -3334,7 +3397,8 @@
     "state": "VA",
     "src": "https://virginiaworks.gov/event/fredericksburg-healthcare-hiring-event/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "22408"
    }
   },
   {
@@ -3369,7 +3433,8 @@
     "state": "VA",
     "src": "https://virginiaworks.gov/event/super-tuesday-hiring-event/2026-12-08/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "23666"
    }
   },
   {
@@ -3403,8 +3468,9 @@
     "sourceName": "Virginia Works",
     "state": "VA",
     "src": "https://virginiaworks.gov/event/usps-job-fair-charlottesville-va/",
-    "general": true,
-    "many": false
+    "general": false,
+    "many": false,
+    "zip": "22906"
    }
   },
   {
@@ -3439,7 +3505,8 @@
     "state": "VA",
     "src": "https://virginiaworks.gov/event/2nd-wednesday-hiring-event-petersburg/2026-12-09/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "23803"
    }
   },
   {
@@ -3474,7 +3541,8 @@
     "state": "VA",
     "src": "https://virginiaworks.gov/event/resource-management-systems-rms-featured-employer-hiring-event-december-10-2026/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "24401"
    }
   },
   {
@@ -3482,8 +3550,8 @@
    "title": "Purpose in Every Position: SOAR365 Job Fair",
    "company": "Virginia Works",
    "location": "North Chesterfield, VA",
-   "lat": null,
-   "lng": null,
+   "lat": 37.453,
+   "lng": -77.467,
    "url": "https://virginiaworks.gov/event/purpose-in-every-position-soar365-job-fair/",
    "roles": "",
    "event": {
@@ -3508,8 +3576,9 @@
     "sourceName": "Virginia Works",
     "state": "VA",
     "src": "https://virginiaworks.gov/event/purpose-in-every-position-soar365-job-fair/",
-    "general": true,
-    "many": false
+    "general": false,
+    "many": false,
+    "zip": "23234"
    }
   },
   {
@@ -3552,8 +3621,8 @@
    "title": "3rd Thursday Hiring Event",
    "company": "Virginia Works",
    "location": "Chesterfield, VA",
-   "lat": null,
-   "lng": null,
+   "lat": 37.52,
+   "lng": -77.511,
    "url": "https://virginiaworks.gov/event/3rd-thursday-hiring-event/2026-12-17/",
    "roles": "",
    "event": {
@@ -3579,7 +3648,8 @@
     "state": "VA",
     "src": "https://virginiaworks.gov/event/3rd-thursday-hiring-event/2026-12-17/",
     "general": false,
-    "many": false
+    "many": false,
+    "zip": "23225"
    }
   }
  ]
