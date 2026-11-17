@@ -18,17 +18,21 @@
  * Shown only when there is at least one event — an empty list of events is not information. Three at first, the rest
  * one tap away. Every action here is quiet (a text link or a ghost button): the page's one filled button is elsewhere.
  */
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import type { Job, PostingEvent } from '@/lib/types'
 import { JobCache } from '@/lib/stores/JobCache'
 import { eventBelongs } from '@/lib/start/listingFilters.js'
 import { eventDateLabel, howToCome } from '@/lib/jobs/hiringEvents.js'
 import { externalBelongs, fairLabel, windowDateLabel, windowLabel, windowState } from '@/lib/jobs/externalEvents.js'
-import GoingButton from '@/components/jobs/GoingButton'
 import Icon from '@/components/ui/Icon'
 import st from './guide.module.css'
 import ex from './GuideEvents.module.css'
+
+// "I'm going" reaches the auth context (lib/auth.tsx → server-side helpers), which must stay out of the guide's
+// server render tree (lib/start/guides.test.mjs renders GuidePage in plain node). It loads on the client only when a
+// fair row is shown; the template-literal specifier keeps it a lazy chunk the bundler splits off.
+const GoingButton = lazy(() => import(`@/components/jobs/GoingButton`))
 
 type External = {
   type: 'fair' | 'apprenticeship'
@@ -151,7 +155,9 @@ export default function GuideEvents({ config, pos, loc, r, listingRows }: {
                           Details<Icon name="arrow-up-right" size={14} />
                         </a>
                       )}
-                      <GoingButton job={{ id: null, title: e.title, company: e.company, location: e.location }} ev={e.event} role={e.title || 'Job fair'} variant="ghost" />
+                      <Suspense fallback={null}>
+                        <GoingButton job={{ id: null, title: e.title, company: e.company, location: e.location }} ev={e.event} role={e.title || 'Job fair'} variant="ghost" />
+                      </Suspense>
                     </span>
                   </span>
                 </div>
