@@ -81,6 +81,11 @@ Editor — comments stripped, one block per migration, and say which to run firs
   `app/company/[slug]/companyData.ts`), raw counts beside the weighted stored rate, each saying what it counts; FAQ JSON-LD = the visible
   answers; old companyFaq + searched-intent FAQ no longer rendered (it put the weighted rate on the raw count); TOP_COMPANY_PAGES 500 →
   sitemap priority; extra index rule (≥1 applicant account + ≥10 postings with listing signals; none qualify yet).
+- **Verified before merge:** tsc clean; guides/guideFor/listingFilters/hiringEvents/externalEvents/cron/company-answers tests 313+ pass;
+  PR preview: all 20 new /start pages 200 with their h1, /homedepot → /start/homedepot, /company/walmart answers in server HTML,
+  /api/jobs?action=hiring_events near Richmond VA returns 7 external fairs (from the snapshot until the table exists). Event filters fixed
+  after the external run: bare "ESS" (a schools staffing firm) no longer reads as battery storage, "Hampton" → "Hampton Inn", security
+  employers never on retail.
 - **Growth program (owner brief 2026-11-17, Glassdoor model, phases 0–8):** Phase 0 audit done read-only → scratchpad growth/PHASE0.md;
   waiting for owner approval before Phase 1 (data gate). Key facts: 422 graded pages, ~1 first-party report/week, /companies and /jobs
   client-rendered, company pages not cached (6.9 s LCP lab), FAQ schema on 5 templates, case-variant company slugs indexable,
