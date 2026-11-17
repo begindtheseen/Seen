@@ -1,0 +1,11 @@
+/* External rows in a start guide's "Hiring events" strip (components/start/GuideEvents.tsx): a state job fair or an
+   apprenticeship window. Same row rhythm as a listing's event row (guide.module.css .rowLink), but the row itself is
+   not a link — its actions are: a quiet text link out and, for a fair, a ghost "I'm going". Tokens only. */
+.extRow { display: flex; align-items: flex-start; gap: var(--sp-3); padding: var(--sp-3) 0; min-height: 56px; box-sizing: border-box; min-width: 0; }
+@media (max-width: 640px) { .extRow { padding: var(--sp-2) 0; min-height: 52px; } }
+.extTitle { font-family: var(--body); font-weight: 600; font-size: var(--fs-ui); color: var(--text-1); line-height: var(--lh-snug); overflow-wrap: anywhere; }
+.extMeta { font-family: var(--body); font-size: var(--fs-meta); color: var(--text-3); line-height: var(--lh-ui); overflow-wrap: anywhere; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--sp-4); margin-top: var(--sp-1); min-width: 0; }
+.extLink { display: inline-flex; align-items: center; gap: var(--sp-1); min-height: 44px; font-family: var(--body); font-size: var(--fs-ui); font-weight: 600; color: var(--accent); text-decoration: none; }
+.extLink:hover { text-decoration: underline; text-underline-offset: .2em; }
+.extLink:focus-visible { outline: none; box-shadow: var(--sh-focus); border-radius: var(--r-chip); }

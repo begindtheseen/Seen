@@ -1,6 +1,6 @@
 {
  "about": "The rows api/cron-hiring-events.js fetched from the real sources on `fetched` (writes stubbed). The read (lib/server/externalEvents.js) serves these, re-filtered on the Pacific clock, only until public.external_hiring_events exists and the cron has filled it.",
- "fetched": "2026-11-17T20:18:39.229Z",
+ "fetched": "2026-11-17T20:20:23.740Z",
  "rows": [
   {
    "id": "ext:tx-wfs-dallas:nrmt4g",
@@ -252,6 +252,41 @@
     "general": false,
     "many": false,
     "zip": "78753"
+   }
+  },
+  {
+   "id": "ext:fl-cs-clm:bis05",
+   "title": "Hiring Event | Evergreen Private Care",
+   "company": "CareerSource Citrus Levy Marion",
+   "location": "Virtual · Florida",
+   "lat": null,
+   "lng": null,
+   "url": "https://careersourceclm.com/event/hiring-event-evergreen-private-care/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-19",
+    "dates": [
+     "2026-11-19"
+    ],
+    "recurring": null,
+    "time": null,
+    "where": null,
+    "virtual": true,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "fl-cs-clm",
+    "sourceName": "CareerSource Citrus Levy Marion",
+    "state": "FL",
+    "src": "https://careersourceclm.com/event/hiring-event-evergreen-private-care/",
+    "general": false,
+    "many": false
    }
   },
   {
@@ -539,41 +574,6 @@
     "general": false,
     "many": false,
     "zip": "80012"
-   }
-  },
-  {
-   "id": "ext:fl-cs-clm:bis05",
-   "title": "Hiring Event | Evergreen Private Care",
-   "company": "CareerSource Citrus Levy Marion",
-   "location": "Virtual · Florida",
-   "lat": null,
-   "lng": null,
-   "url": "https://careersourceclm.com/event/hiring-event-evergreen-private-care/",
-   "roles": "",
-   "event": {
-    "kind": "external_fair",
-    "label": "Hiring event",
-    "next": "2026-11-19",
-    "dates": [
-     "2026-11-19"
-    ],
-    "recurring": null,
-    "time": null,
-    "where": null,
-    "virtual": true,
-    "walkIn": false,
-    "rsvp": true,
-    "onTheSpot": false,
-    "inviteOnly": false
-   },
-   "external": {
-    "type": "fair",
-    "source": "fl-cs-clm",
-    "sourceName": "CareerSource Citrus Levy Marion",
-    "state": "FL",
-    "src": "https://careersourceclm.com/event/hiring-event-evergreen-private-care/",
-    "general": false,
-    "many": false
    }
   },
   {
@@ -1440,6 +1440,258 @@
    }
   },
   {
+   "id": "ext:id-labor:62k4ir",
+   "title": "Hiring Event – Post Falls",
+   "company": "Idaho Department of Labor",
+   "location": "Post Falls, ID",
+   "lat": 47.718,
+   "lng": -116.952,
+   "url": "https://www.labor.idaho.gov/event/hiring-event-post-falls-2/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-18",
+    "dates": [
+     "2026-11-18"
+    ],
+    "recurring": null,
+    "time": "10 AM–1 PM",
+    "where": "Idaho Department of Labor – Post Falls office, 600 N. Thornton St., Post Falls, ID 83854",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "id-labor",
+    "sourceName": "Idaho Department of Labor",
+    "state": "ID",
+    "src": "https://www.labor.idaho.gov/event/hiring-event-post-falls-2/",
+    "general": false,
+    "many": false,
+    "zip": "83854"
+   }
+  },
+  {
+   "id": "ext:id-labor:1x9qo7v",
+   "title": "Hiring Event – Idaho Falls",
+   "company": "Idaho Department of Labor",
+   "location": "Idaho Falls, ID",
+   "lat": 43.467,
+   "lng": -112.034,
+   "url": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-17/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-18",
+    "dates": [
+     "2026-11-18"
+    ],
+    "recurring": null,
+    "time": "11 AM–2 PM",
+    "where": "Idaho Department of Labor – Idaho Falls office, 1515 E. Lincoln Road, Idaho Falls, ID 83401",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "id-labor",
+    "sourceName": "Idaho Department of Labor",
+    "state": "ID",
+    "src": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-17/",
+    "general": false,
+    "many": false,
+    "zip": "83401"
+   }
+  },
+  {
+   "id": "ext:id-labor:1wfbl43",
+   "title": "Hiring Event – Idaho Falls",
+   "company": "Idaho Department of Labor",
+   "location": "Idaho Falls, ID",
+   "lat": 43.467,
+   "lng": -112.034,
+   "url": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-3/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-25",
+    "dates": [
+     "2026-11-25"
+    ],
+    "recurring": null,
+    "time": "11 AM–2 PM",
+    "where": "Idaho Department of Labor – Idaho Falls office, 1515 E. Lincoln Road, Idaho Falls, ID 83401",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "id-labor",
+    "sourceName": "Idaho Department of Labor",
+    "state": "ID",
+    "src": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-3/",
+    "general": false,
+    "many": false,
+    "zip": "83401"
+   }
+  },
+  {
+   "id": "ext:id-labor:1jgeitp",
+   "title": "Hiring Event – Rexburg",
+   "company": "Idaho Department of Labor",
+   "location": "Rexburg, ID",
+   "lat": 43.826,
+   "lng": -111.79,
+   "url": "https://www.labor.idaho.gov/event/hiring-event-rexburg/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-08",
+    "dates": [
+     "2026-12-08"
+    ],
+    "recurring": null,
+    "time": "11 AM–2 PM",
+    "where": "VFW – Veterans of Foreign Wars Hall, 480 W Second N., Rexburg, ID 83440",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "id-labor",
+    "sourceName": "Idaho Department of Labor",
+    "state": "ID",
+    "src": "https://www.labor.idaho.gov/event/hiring-event-rexburg/",
+    "general": false,
+    "many": false,
+    "zip": "83440"
+   }
+  },
+  {
+   "id": "ext:id-labor:c4jjqu",
+   "title": "Hiring Event – Idaho Falls",
+   "company": "Idaho Department of Labor",
+   "location": "Idaho Falls, ID",
+   "lat": 43.467,
+   "lng": -112.034,
+   "url": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-2/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-09",
+    "dates": [
+     "2026-12-09"
+    ],
+    "recurring": null,
+    "time": "11 AM–12 PM",
+    "where": "Idaho Department of Labor – Idaho Falls office, 1515 E. Lincoln Road, Idaho Falls, ID 83401",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "id-labor",
+    "sourceName": "Idaho Department of Labor",
+    "state": "ID",
+    "src": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-2/",
+    "general": false,
+    "many": false,
+    "zip": "83401"
+   }
+  },
+  {
+   "id": "ext:id-labor:1clovzo",
+   "title": "Hiring Event – Post Falls",
+   "company": "Idaho Department of Labor",
+   "location": "Post Falls, ID",
+   "lat": 47.718,
+   "lng": -116.952,
+   "url": "https://www.labor.idaho.gov/event/hiring-event-post-falls/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-16",
+    "dates": [
+     "2026-12-16"
+    ],
+    "recurring": null,
+    "time": "10 AM–1 PM",
+    "where": "Idaho Department of Labor – Post Falls office, 600 N. Thornton St., Post Falls, ID 83854",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "id-labor",
+    "sourceName": "Idaho Department of Labor",
+    "state": "ID",
+    "src": "https://www.labor.idaho.gov/event/hiring-event-post-falls/",
+    "general": false,
+    "many": false,
+    "zip": "83854"
+   }
+  },
+  {
+   "id": "ext:id-labor:1wbzlhy",
+   "title": "Hiring Event – Idaho Falls",
+   "company": "Idaho Department of Labor",
+   "location": "Idaho Falls, ID",
+   "lat": 43.467,
+   "lng": -112.034,
+   "url": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-23",
+    "dates": [
+     "2026-12-23"
+    ],
+    "recurring": null,
+    "time": "11 AM–2 PM",
+    "where": "Idaho Department of Labor – Idaho Falls office, 1515 E. Lincoln Road, Idaho Falls, ID 83401",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "id-labor",
+    "sourceName": "Idaho Department of Labor",
+    "state": "ID",
+    "src": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls/",
+    "general": false,
+    "many": false,
+    "zip": "83401"
+   }
+  },
+  {
    "id": "ext:ca-sdwp:xe2938",
    "title": "Lay The Foundation Career Fair",
    "company": "San Diego Workforce Partnership",
@@ -1473,76 +1725,6 @@
     "general": false,
     "many": false,
     "zip": "92101"
-   }
-  },
-  {
-   "id": "ext:md-labor:3l6ohv",
-   "title": "Doctors Community Medical Center In-Person Nursing Hiring Event",
-   "company": "Maryland Department of Labor",
-   "location": "Lanham, MD",
-   "lat": 38.967,
-   "lng": -76.862,
-   "url": "https://labor.md.gov/employment/jobfairs.shtml",
-   "roles": "",
-   "event": {
-    "kind": "external_fair",
-    "label": "Hiring event",
-    "next": "2026-11-18",
-    "dates": [
-     "2026-11-18"
-    ],
-    "recurring": null,
-    "time": "4 PM–6 PM",
-    "where": "Luminis Health Doctors Community Medical Center, 8118 Good Luck Road, North Building 5th Floor - Room DSE A&B, Lanham, MD 20706",
-    "virtual": false,
-    "walkIn": false,
-    "rsvp": false,
-    "onTheSpot": false,
-    "inviteOnly": false
-   },
-   "external": {
-    "type": "fair",
-    "source": "md-labor",
-    "sourceName": "Maryland Department of Labor",
-    "state": "MD",
-    "src": "https://labor.md.gov/employment/jobfairs.shtml",
-    "general": false,
-    "many": false
-   }
-  },
-  {
-   "id": "ext:md-labor:1em5oh0",
-   "title": "Maryland Regional Job Fair by Carroll County Workforce Development",
-   "company": "Maryland Department of Labor",
-   "location": "Virtual · Maryland",
-   "lat": null,
-   "lng": null,
-   "url": "https://labor.md.gov/employment/jobfairs.shtml",
-   "roles": "",
-   "event": {
-    "kind": "external_fair",
-    "label": "Job fair",
-    "next": "2026-12-03",
-    "dates": [
-     "2026-12-03"
-    ],
-    "recurring": null,
-    "time": "10 AM–12 PM",
-    "where": null,
-    "virtual": true,
-    "walkIn": false,
-    "rsvp": true,
-    "onTheSpot": false,
-    "inviteOnly": false
-   },
-   "external": {
-    "type": "fair",
-    "source": "md-labor",
-    "sourceName": "Maryland Department of Labor",
-    "state": "MD",
-    "src": "https://labor.md.gov/employment/jobfairs.shtml",
-    "general": true,
-    "many": true
    }
   },
   {
@@ -1861,6 +2043,76 @@
    }
   },
   {
+   "id": "ext:md-labor:3l6ohv",
+   "title": "Doctors Community Medical Center In-Person Nursing Hiring Event",
+   "company": "Maryland Department of Labor",
+   "location": "Lanham, MD",
+   "lat": 38.967,
+   "lng": -76.862,
+   "url": "https://labor.md.gov/employment/jobfairs.shtml",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-18",
+    "dates": [
+     "2026-11-18"
+    ],
+    "recurring": null,
+    "time": "4 PM–6 PM",
+    "where": "Luminis Health Doctors Community Medical Center, 8118 Good Luck Road, North Building 5th Floor - Room DSE A&B, Lanham, MD 20706",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "md-labor",
+    "sourceName": "Maryland Department of Labor",
+    "state": "MD",
+    "src": "https://labor.md.gov/employment/jobfairs.shtml",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:md-labor:1em5oh0",
+   "title": "Maryland Regional Job Fair by Carroll County Workforce Development",
+   "company": "Maryland Department of Labor",
+   "location": "Virtual · Maryland",
+   "lat": null,
+   "lng": null,
+   "url": "https://labor.md.gov/employment/jobfairs.shtml",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-12-03",
+    "dates": [
+     "2026-12-03"
+    ],
+    "recurring": null,
+    "time": "10 AM–12 PM",
+    "where": null,
+    "virtual": true,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "md-labor",
+    "sourceName": "Maryland Department of Labor",
+    "state": "MD",
+    "src": "https://labor.md.gov/employment/jobfairs.shtml",
+    "general": true,
+    "many": true
+   }
+  },
+  {
    "id": "appr:nydol-1x1e4gw",
    "title": "Carpentry apprenticeship · North Atlantic States Carpenters Training Fund",
    "company": "North Atlantic States Carpenters Training Fund",
@@ -1938,258 +2190,6 @@
     "how": "Applications are available online at the North Atlantic States Carpenters Training Fund (NASCTF) website.",
     "trade": "carpentry",
     "checked": "2026-11-17"
-   }
-  },
-  {
-   "id": "ext:id-labor:62k4ir",
-   "title": "Hiring Event – Post Falls",
-   "company": "Idaho Department of Labor",
-   "location": "Post Falls, ID",
-   "lat": 47.718,
-   "lng": -116.952,
-   "url": "https://www.labor.idaho.gov/event/hiring-event-post-falls-2/",
-   "roles": "",
-   "event": {
-    "kind": "external_fair",
-    "label": "Hiring event",
-    "next": "2026-11-18",
-    "dates": [
-     "2026-11-18"
-    ],
-    "recurring": null,
-    "time": "10 AM–1 PM",
-    "where": "Idaho Department of Labor – Post Falls office, 600 N. Thornton St., Post Falls, ID 83854",
-    "virtual": false,
-    "walkIn": false,
-    "rsvp": false,
-    "onTheSpot": false,
-    "inviteOnly": false
-   },
-   "external": {
-    "type": "fair",
-    "source": "id-labor",
-    "sourceName": "Idaho Department of Labor",
-    "state": "ID",
-    "src": "https://www.labor.idaho.gov/event/hiring-event-post-falls-2/",
-    "general": false,
-    "many": false,
-    "zip": "83854"
-   }
-  },
-  {
-   "id": "ext:id-labor:1x9qo7v",
-   "title": "Hiring Event – Idaho Falls",
-   "company": "Idaho Department of Labor",
-   "location": "Idaho Falls, ID",
-   "lat": 43.467,
-   "lng": -112.034,
-   "url": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-17/",
-   "roles": "",
-   "event": {
-    "kind": "external_fair",
-    "label": "Hiring event",
-    "next": "2026-11-18",
-    "dates": [
-     "2026-11-18"
-    ],
-    "recurring": null,
-    "time": "11 AM–2 PM",
-    "where": "Idaho Department of Labor – Idaho Falls office, 1515 E. Lincoln Road, Idaho Falls, ID 83401",
-    "virtual": false,
-    "walkIn": false,
-    "rsvp": false,
-    "onTheSpot": false,
-    "inviteOnly": false
-   },
-   "external": {
-    "type": "fair",
-    "source": "id-labor",
-    "sourceName": "Idaho Department of Labor",
-    "state": "ID",
-    "src": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-17/",
-    "general": false,
-    "many": false,
-    "zip": "83401"
-   }
-  },
-  {
-   "id": "ext:id-labor:1wfbl43",
-   "title": "Hiring Event – Idaho Falls",
-   "company": "Idaho Department of Labor",
-   "location": "Idaho Falls, ID",
-   "lat": 43.467,
-   "lng": -112.034,
-   "url": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-3/",
-   "roles": "",
-   "event": {
-    "kind": "external_fair",
-    "label": "Hiring event",
-    "next": "2026-11-25",
-    "dates": [
-     "2026-11-25"
-    ],
-    "recurring": null,
-    "time": "11 AM–2 PM",
-    "where": "Idaho Department of Labor – Idaho Falls office, 1515 E. Lincoln Road, Idaho Falls, ID 83401",
-    "virtual": false,
-    "walkIn": false,
-    "rsvp": false,
-    "onTheSpot": false,
-    "inviteOnly": false
-   },
-   "external": {
-    "type": "fair",
-    "source": "id-labor",
-    "sourceName": "Idaho Department of Labor",
-    "state": "ID",
-    "src": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-3/",
-    "general": false,
-    "many": false,
-    "zip": "83401"
-   }
-  },
-  {
-   "id": "ext:id-labor:1jgeitp",
-   "title": "Hiring Event – Rexburg",
-   "company": "Idaho Department of Labor",
-   "location": "Rexburg, ID",
-   "lat": 43.826,
-   "lng": -111.79,
-   "url": "https://www.labor.idaho.gov/event/hiring-event-rexburg/",
-   "roles": "",
-   "event": {
-    "kind": "external_fair",
-    "label": "Hiring event",
-    "next": "2026-12-08",
-    "dates": [
-     "2026-12-08"
-    ],
-    "recurring": null,
-    "time": "11 AM–2 PM",
-    "where": "VFW – Veterans of Foreign Wars Hall, 480 W Second N., Rexburg, ID 83440",
-    "virtual": false,
-    "walkIn": false,
-    "rsvp": false,
-    "onTheSpot": false,
-    "inviteOnly": false
-   },
-   "external": {
-    "type": "fair",
-    "source": "id-labor",
-    "sourceName": "Idaho Department of Labor",
-    "state": "ID",
-    "src": "https://www.labor.idaho.gov/event/hiring-event-rexburg/",
-    "general": false,
-    "many": false,
-    "zip": "83440"
-   }
-  },
-  {
-   "id": "ext:id-labor:c4jjqu",
-   "title": "Hiring Event – Idaho Falls",
-   "company": "Idaho Department of Labor",
-   "location": "Idaho Falls, ID",
-   "lat": 43.467,
-   "lng": -112.034,
-   "url": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-2/",
-   "roles": "",
-   "event": {
-    "kind": "external_fair",
-    "label": "Hiring event",
-    "next": "2026-12-09",
-    "dates": [
-     "2026-12-09"
-    ],
-    "recurring": null,
-    "time": "11 AM–12 PM",
-    "where": "Idaho Department of Labor – Idaho Falls office, 1515 E. Lincoln Road, Idaho Falls, ID 83401",
-    "virtual": false,
-    "walkIn": false,
-    "rsvp": false,
-    "onTheSpot": false,
-    "inviteOnly": false
-   },
-   "external": {
-    "type": "fair",
-    "source": "id-labor",
-    "sourceName": "Idaho Department of Labor",
-    "state": "ID",
-    "src": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-2/",
-    "general": false,
-    "many": false,
-    "zip": "83401"
-   }
-  },
-  {
-   "id": "ext:id-labor:1clovzo",
-   "title": "Hiring Event – Post Falls",
-   "company": "Idaho Department of Labor",
-   "location": "Post Falls, ID",
-   "lat": 47.718,
-   "lng": -116.952,
-   "url": "https://www.labor.idaho.gov/event/hiring-event-post-falls/",
-   "roles": "",
-   "event": {
-    "kind": "external_fair",
-    "label": "Hiring event",
-    "next": "2026-12-16",
-    "dates": [
-     "2026-12-16"
-    ],
-    "recurring": null,
-    "time": "10 AM–1 PM",
-    "where": "Idaho Department of Labor – Post Falls office, 600 N. Thornton St., Post Falls, ID 83854",
-    "virtual": false,
-    "walkIn": false,
-    "rsvp": false,
-    "onTheSpot": false,
-    "inviteOnly": false
-   },
-   "external": {
-    "type": "fair",
-    "source": "id-labor",
-    "sourceName": "Idaho Department of Labor",
-    "state": "ID",
-    "src": "https://www.labor.idaho.gov/event/hiring-event-post-falls/",
-    "general": false,
-    "many": false,
-    "zip": "83854"
-   }
-  },
-  {
-   "id": "ext:id-labor:1wbzlhy",
-   "title": "Hiring Event – Idaho Falls",
-   "company": "Idaho Department of Labor",
-   "location": "Idaho Falls, ID",
-   "lat": 43.467,
-   "lng": -112.034,
-   "url": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls/",
-   "roles": "",
-   "event": {
-    "kind": "external_fair",
-    "label": "Hiring event",
-    "next": "2026-12-23",
-    "dates": [
-     "2026-12-23"
-    ],
-    "recurring": null,
-    "time": "11 AM–2 PM",
-    "where": "Idaho Department of Labor – Idaho Falls office, 1515 E. Lincoln Road, Idaho Falls, ID 83401",
-    "virtual": false,
-    "walkIn": false,
-    "rsvp": false,
-    "onTheSpot": false,
-    "inviteOnly": false
-   },
-   "external": {
-    "type": "fair",
-    "source": "id-labor",
-    "sourceName": "Idaho Department of Labor",
-    "state": "ID",
-    "src": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls/",
-    "general": false,
-    "many": false,
-    "zip": "83401"
    }
   },
   {
@@ -2683,42 +2683,6 @@
    }
   },
   {
-   "id": "ext:mn-swmnpic:1h7ahni",
-   "title": "Worthington Career Fair 2027",
-   "company": "Southwest Minnesota PIC",
-   "location": "Worthington, MN",
-   "lat": 43.62,
-   "lng": -95.596,
-   "url": "https://www.swmnpic.org/event/worthington-career-fair-2027/",
-   "roles": "",
-   "event": {
-    "kind": "external_fair",
-    "label": "Job fair",
-    "next": "2027-02-26",
-    "dates": [
-     "2027-02-26"
-    ],
-    "recurring": null,
-    "time": "8:30 AM–11:30 AM",
-    "where": "Worthington High School, 1211 Clary St, Worthington, MN 56187",
-    "virtual": false,
-    "walkIn": false,
-    "rsvp": true,
-    "onTheSpot": false,
-    "inviteOnly": false
-   },
-   "external": {
-    "type": "fair",
-    "source": "mn-swmnpic",
-    "sourceName": "Southwest Minnesota PIC",
-    "state": "MN",
-    "src": "https://www.swmnpic.org/event/worthington-career-fair-2027/",
-    "general": true,
-    "many": false,
-    "zip": "56187"
-   }
-  },
-  {
    "id": "ext:mn-swmnpic:2e75lz",
    "title": "Cottonwood Area Career Fair 2027",
    "company": "Southwest Minnesota PIC",
@@ -2752,42 +2716,6 @@
     "general": true,
     "many": false,
     "zip": "56229"
-   }
-  },
-  {
-   "id": "ext:mn-swmnpic:1hrs8pr",
-   "title": "Windom Career Fair 2027",
-   "company": "Southwest Minnesota PIC",
-   "location": "Windom, MN",
-   "lat": 43.866,
-   "lng": -95.117,
-   "url": "https://www.swmnpic.org/event/windom-career-fair-2027/",
-   "roles": "",
-   "event": {
-    "kind": "external_fair",
-    "label": "Job fair",
-    "next": "2027-04-14",
-    "dates": [
-     "2027-04-14"
-    ],
-    "recurring": null,
-    "time": "8:30 AM–11:30 AM",
-    "where": "Windom High School, 1400 17th St., Windom, MN 56101",
-    "virtual": false,
-    "walkIn": false,
-    "rsvp": true,
-    "onTheSpot": false,
-    "inviteOnly": false
-   },
-   "external": {
-    "type": "fair",
-    "source": "mn-swmnpic",
-    "sourceName": "Southwest Minnesota PIC",
-    "state": "MN",
-    "src": "https://www.swmnpic.org/event/windom-career-fair-2027/",
-    "general": true,
-    "many": false,
-    "zip": "56101"
    }
   },
   {
