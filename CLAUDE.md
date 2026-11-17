@@ -77,7 +77,7 @@ Editor — comments stripped, one block per migration, and say which to run firs
   General fairs show on field guides only near a typed place; "I'm going" works without a listing id (GoingButton lazy-loaded so the
   guide render tree never reaches lib/auth.tsx — the guides test cannot resolve it). Migration
   `20261117120000_external_hiring_events.sql` NOT applied (SQL given to the owner).
-- **Company pages:** three answers (respond / how long / who hears back) right after the H1 in server HTML (`lib/company/answers.js`,
+- **Company pages:** three answers (respond / how long / who hears back) right after the H1 in server HTML (`components/company/answers.js`,
   `app/company/[slug]/companyData.ts`), raw counts beside the weighted stored rate, each saying what it counts; FAQ JSON-LD = the visible
   answers; old companyFaq + searched-intent FAQ no longer rendered (it put the weighted rate on the raw count); TOP_COMPANY_PAGES 500 →
   sitemap priority; extra index rule (≥1 applicant account + ≥10 postings with listing signals; none qualify yet).

@@ -1,7 +1,7 @@
 'use client'
 
 // What the server knows about a company before the page hydrates (app/company/[slug]/layout.tsx): the three
-// answers (lib/company/answers.js) and the listing signals of its own job posts (lib/server/listingSignals.js).
+// answers (components/company/answers.js) and the listing signals of its own job posts (lib/server/listingSignals.js).
 // Handed to the client page through context so both are in the server HTML; the page never recomputes them,
 // so the FAQPage JSON-LD the layout publishes and the visible answers are the same strings.
 

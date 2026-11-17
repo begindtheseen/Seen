@@ -5,7 +5,7 @@
 //   2. How long does <Company> take to respond?
 //   3. Who hears back from <Company>?
 //
-// Pure: no I/O, relative imports only, so `node --test lib/company/answers.test.mjs` runs it as is.
+// Pure: no I/O, relative imports only, so `node --test components/company/answers.test.mjs` runs it as is.
 //
 // THE RULES (owner: "real data first"; CLAUDE.md 2026-10-23 / 10-24 / 11-02):
 //   - Every number comes from the score row the page already reads (lib/growth.ts getScore) or from the
@@ -27,10 +27,10 @@
 //     the page names it.
 
 import { GHOST_OUTCOMES, RESPONSE_OUTCOMES, NONTERMINAL_OUTCOMES } from '../../api/_utils/companyIntel.js';
-import { firstPartyReportCount, mentionCount, webClaimCount, isScorableReport } from '../server/reportCounts.js';
-import { MIN_REPORTS_FOR_RATES, pctOf, responseVerdict, confidenceFrom, capDisplayConfidence } from '../companyPageSummary.ts';
-import { isPublicDiscussion, isImportedReview } from '../reportSource.ts';
-import { formatPacific } from '../time/pacific.js';
+import { firstPartyReportCount, mentionCount, webClaimCount, isScorableReport } from '../../lib/server/reportCounts.js';
+import { MIN_REPORTS_FOR_RATES, pctOf, responseVerdict, confidenceFrom, capDisplayConfidence } from '../../lib/companyPageSummary.ts';
+import { isPublicDiscussion, isImportedReview } from '../../lib/reportSource.ts';
+import { formatPacific } from '../../lib/time/pacific.js';
 
 /** A role is shown in the "by role" line only when this many applicant accounts name it. */
 export const MIN_ROLE_ACCOUNTS = 3;
@@ -128,12 +128,12 @@ function dayLabel(iso) {
   return formatPacific(iso, { dateStyle: 'medium' });
 }
 
-/** The listing facts Seen holds, said as what they are (job posts, not applicant reports). '' when none. */
+/** The listing facts Seen holds, said as what they are (job posts, not applicant accounts). '' when none. */
 export function listingFactsSentence(name, listing) {
   const f = listing && listing.facts;
   const open = int(f && f.open);
   if (!open) return '';
-  const head = `What Seen does know comes from ${name}'s own job posts, not applicant reports: ${plural(open, 'open posting')} on Seen`;
+  const head = `What Seen does know comes from ${name}'s own job posts, not applicant accounts: ${plural(open, 'open posting')} on Seen`;
   if (!listing.rated || f.payPct == null) return `${head}.`;
   const parts = [`${f.payPct}% state pay`, `${f.directPct}% let you apply with the employer`];
   if (f.longOpenPct != null) parts.push(`${f.longOpenPct}% have been open 30 days or more`);

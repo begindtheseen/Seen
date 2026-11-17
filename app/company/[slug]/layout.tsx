@@ -5,13 +5,13 @@ import type { Metadata } from 'next'
 import { cache } from 'react'
 import { getScoreState, slugToName, displayCompanyName, type GrowthScore } from '@/lib/growth'
 import { jsonLdHtml } from '@/lib/jsonLd'
-// The three answers at the top of the page (lib/company/answers.js) and the server reads behind them
+// The three answers at the top of the page (components/company/answers.js) and the server reads behind them
 // (./companyData.ts: the score once per request, the grade's report rows, the company's open job posts).
 // The FAQPage node below is built from the SAME answers, word for word, and only from answered questions.
 // It replaced the older FAQ (lib/server/companyFaq.js + the searched-intent answers), whose "of N applicant
 // accounts, X% say …" wording put the weighted rate on a raw count; the three answers now say both numbers
 // and what each counts, and cover the same searches (application status, how long, does it ghost).
-import { buildCompanyAnswers, answersFaq, companyIndexDecision, listingFactsSentence } from '@/lib/company/answers.js'
+import { buildCompanyAnswers, answersFaq, companyIndexDecision, listingFactsSentence } from '@/components/company/answers.js'
 import { readAnswerRows, readListing, readName } from './companyData'
 import { CompanyAnswersSeedProvider, type CompanyAnswer, type CompanyAnswersData, type ListingSignalsData } from '@/components/company/CompanyAnswersSeed'
 // Offline, numerically-grounded "What applicants report" paragraph (company_summaries). No-op when the
@@ -59,7 +59,7 @@ export async function generateMetadata(
   // Transparency Score" (owner 2026-10-24), no dashes.
   const { title } = facts
   let { description } = facts
-  // Who is indexed (lib/company/answers.js companyIndexDecision): every graded page, as before (companyRobots),
+  // Who is indexed (components/company/answers.js companyIndexDecision): every graded page, as before (companyRobots),
   // plus an ungraded page that holds at least one applicant account AND 10+ open postings with listing signals —
   // its answers state real counts and its listing facts are its own. A listings-only page stays noindex.
   // Such a page's description is its own first answer and its listing facts, never a promise of data it lacks.

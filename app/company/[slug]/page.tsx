@@ -344,7 +344,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   // grade, answer sentence and stats are in the HTML; the live /api/reports read below replaces it.
   const seed = useCompanySeed()
   // The three answers and the listing signals, built on the server (app/company/[slug]/layout.tsx →
-  // lib/company/answers.js): they are in the server HTML, and the FAQPage JSON-LD is the same strings.
+  // components/company/answers.js): they are in the server HTML, and the FAQPage JSON-LD is the same strings.
   const { answers: answersSeed, listing: listingSeed } = useCompanyAnswersSeed()
   const [score, setScore] = useState<CompanyScore | null>(seed as CompanyScore | null)
   const [industry, setIndustry] = useState(seed?.industry || '')
@@ -837,7 +837,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
           </div>
         </header>
 
-        {/* ── The three questions applicants search, answered first (server-built: lib/company/answers.js).
+        {/* ── The three questions applicants search, answered first (server-built: components/company/answers.js).
             A name the server knows nothing about waits for the client's verdict, so an unknown company never
             flashes a page of "not known yet" before its empty state. ── */}
         {answersSeed && (answersSeed.hasData || (!loading && !unknown)) && <CompanyAnswers data={answersSeed} />}

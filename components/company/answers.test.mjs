@@ -1,4 +1,4 @@
-// Run: node --test lib/company/answers.test.mjs
+// Run: node --test components/company/answers.test.mjs
 // The three company-page answers on score rows and report rows shaped like production's (read-only probe
 // 2026-11-17: Walmart 48 scorable resolved rows, Amazon 26, SpaceX 16, Chipotle 2).
 import { test } from 'node:test';
@@ -123,7 +123,7 @@ test('zero: honest empty answers, listing facts labelled as job posts, no FAQ', 
   assert.equal(b.accounts, 0);
   assert.ok(b.answers.every((a) => a.known === false));
   assert.equal(b.answers[0].sentence, 'Seen does not know yet: there are no applicant accounts for Sheetz on Seen.');
-  assert.equal(b.answers[0].detail, "What Seen does know comes from Sheetz's own job posts, not applicant reports: 25 open postings on Seen; 100% state pay, 0% let you apply with the employer and 12% have been open 30 days or more.");
+  assert.equal(b.answers[0].detail, "What Seen does know comes from Sheetz's own job posts, not applicant accounts: 25 open postings on Seen; 100% state pay, 0% let you apply with the employer and 12% have been open 30 days or more.");
   assert.match(b.answers[2].detail, /Not enough reports by role yet/);
   assert.deepEqual(answersFaq(b), []);
   assert.equal(b.hasData, true);
@@ -204,7 +204,7 @@ test('copy has no dashes', () => {
 });
 
 test('listing facts: an unrated handful states only the count', () => {
-  assert.equal(listingFactsSentence('Acme', { rated: false, listings: 2, facts: { open: 2 } }), "What Seen does know comes from Acme's own job posts, not applicant reports: 2 open postings on Seen.");
+  assert.equal(listingFactsSentence('Acme', { rated: false, listings: 2, facts: { open: 2 } }), "What Seen does know comes from Acme's own job posts, not applicant accounts: 2 open postings on Seen.");
   assert.equal(listingFactsSentence('Acme', null), '');
   assert.equal(listingFactsSentence('Acme', { rated: false, listings: 0, reason: 'no open job posts on Seen' }), '');
 });

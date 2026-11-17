@@ -1,4 +1,4 @@
-// The three answers at the top of a company page (lib/company/answers.js), in the server HTML. Each is one
+// The three answers at the top of a company page (components/company/answers.js), in the server HTML. Each is one
 // plain sentence with its numbers, then one small line saying what it counts. The FAQPage JSON-LD the layout
 // publishes is these exact strings (question = the h2, answer = sentence + line). No colour: the numbers
 // carry the answer, and a state colour would need its own word and icon (DESIGN.md §2).

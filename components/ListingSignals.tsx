@@ -34,7 +34,7 @@ export default function ListingSignals({ companyName, initial = null }: { compan
   const head = (
     <div className={styles.head}>
       <h2 className={styles.title}>Listing signals</h2>
-      <span className={styles.scope}>from its job posts · not applicant reports</span>
+      <span className={styles.scope}>from its job posts · not applicant accounts</span>
     </div>
   )
   if (!s.rated) {
