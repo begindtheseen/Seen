@@ -2,13 +2,17 @@ import type { Metadata } from 'next'
 // Build-safe score reader — reads the cached score DIRECTLY from Supabase and NEVER self-fetches
 // the live https://seenjobs.io/api/reports (which had no build detection here and could hang
 // `next build`). generateMetadata + the layout render below both go through this one helper.
-import { getScore, getScoreState, slugToName, displayCompanyName, type GrowthScore } from '@/lib/growth'
-import { buildCompanyFaq } from '@/lib/server/companyFaq'
-// Living search data (lib/server/searchOpportunities.js): the intents real searchers used for THIS company in
-// the last 28 days lead its FAQ, each answered from the page's own facts. Returns [] on any failure.
-import { topIntentsForCompany } from '@/lib/server/searchOpportunities.js'
-import { mergeIntentFaq } from '@/lib/server/intentAnswers.js'
+import { slugToName, displayCompanyName, type GrowthScore } from '@/lib/growth'
 import { jsonLdHtml } from '@/lib/jsonLd'
+// The three answers at the top of the page (lib/company/answers.js) and the server reads behind them
+// (./companyData.ts: the score once per request, the grade's report rows, the company's open job posts).
+// The FAQPage node below is built from the SAME answers, word for word, and only from answered questions.
+// It replaced the older FAQ (lib/server/companyFaq.js + the searched-intent answers), whose "of N applicant
+// accounts, X% say …" wording put the weighted rate on a raw count; the three answers now say both numbers
+// and what each counts, and cover the same searches (application status, how long, does it ghost).
+import { buildCompanyAnswers, answersFaq, companyIndexDecision } from '@/lib/company/answers.js'
+import { readScore, readAnswerRows, readListing, readName } from './companyData'
+import { CompanyAnswersSeedProvider, type CompanyAnswersData, type ListingSignalsData } from '@/components/company/CompanyAnswersSeed'
 // Offline, numerically-grounded "What applicants report" paragraph (company_summaries). No-op when the
 // table is missing/empty or the read fails — the page renders exactly as before.
 import { getCompanySummary, summaryMonth, type CompanySummary } from '@/lib/companySummary'
@@ -40,7 +44,7 @@ export async function generateMetadata(
   { params }: { params: Promise<{ slug: string }> }
 ): Promise<Metadata> {
   const { slug } = await params
-  const { score: s, ok: scoreRead } = await getScoreState(slug)
+  const { score: s, ok: scoreRead } = await readScore(slug)
   const name = bestName(slug, s)
   // The stored paragraph (company_summaries) is quoted only while its numbers still match the live
   // score; otherwise the description is built from the same facts the page shows (lib/companyMeta.ts).
@@ -50,6 +54,14 @@ export async function generateMetadata(
   // 13% never do. …" (lib/cardCopy.js via companyMetaFacts): the same facts as the page, never "Hiring
   // Transparency Score" (owner 2026-10-24), no dashes.
   const { title, description } = facts
+  // Who is indexed (lib/company/answers.js companyIndexDecision): every graded page, as before (companyRobots),
+  // plus an ungraded page that holds at least one applicant account AND 10+ open postings with listing signals —
+  // its answers state real counts and its listing facts are its own. A listings-only page stays noindex.
+  let robots = companyRobots(facts.gradeable, scoreRead)
+  if (robots.robots && facts.reportCount >= 1) {
+    const listing = await readListing(readName(slug, s))
+    if (companyIndexDecision({ gradeable: false, readOk: true, accounts: facts.reportCount, listing }).index) robots = {}
+  }
 
   return {
     title,
@@ -59,8 +71,8 @@ export async function generateMetadata(
       `${name} interview process`, `does ${name} ghost applicants`,
       ...(isStaffingAgency(s?.company_name ?? name) ? [`is ${name} legit`] : []),
     ],
-    // No grade → noindex, follow (only when the score read succeeded; lib/companyMeta.ts companyRobots).
-    ...companyRobots(facts.gradeable, scoreRead),
+    // No grade → noindex, follow (only when the score read succeeded), with the one exception above.
+    ...robots,
     openGraph: {
       title,
       description,
@@ -127,17 +139,26 @@ export default async function CompanySlugLayout(
   { children, params }: { children: React.ReactNode; params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params
-  const s = await getScore(slug)
+  const { score: s } = await readScore(slug)
   const name = bestName(slug, s)
-  const storedSummary: CompanySummary | null = s?.gradeable ? await getCompanySummary(summaryKey(slug, s)) : null
+  const key = readName(slug, s)
+  // Independent reads, side by side; each is bounded by a deadline and renders without its data when slow.
+  const [storedSummary, rows, listing] = await Promise.all([
+    s?.gradeable ? getCompanySummary(summaryKey(slug, s)) : Promise.resolve(null as CompanySummary | null),
+    readAnswerRows(key),
+    readListing(key),
+  ])
   const facts = companyMetaFacts(name, s, storedSummary)
   // A frozen paragraph whose numbers no longer match the live score is not shown or published.
   const summary = facts.summaryUsable ? storedSummary : null
   const pageUrl = `https://seenjobs.io/company/${slug}`
+  const built = buildCompanyAnswers({ name, score: s, rows, listing })
+  const answers: CompanyAnswersData = { name: built.name, graded: built.graded, accounts: built.accounts, hasData: built.hasData, answers: built.answers }
+  const faq = answersFaq(built)
 
   // No aggregateRating: a Seen Grade is Seen's own assessment, not a rating anyone gave the company
   // or Seen, and a self-asserted Organization rating is an ineligible / spam signal for search engines
-  // (money/legal audit 2026-10-24, L-1). The grade is published in the FAQPage answers and the H1.
+  // (money/legal audit 2026-10-24, L-1). The grade is published in the H1 paragraph below.
   const org: Record<string, unknown> = {
     '@type': 'Organization',
     '@id': `${pageUrl}#organization`,
@@ -145,25 +166,6 @@ export default async function CompanySlugLayout(
     url: pageUrl,
   }
   if (s?.industry) org.industry = s.industry
-  const fpSeo = facts.reportCount
-
-  // FAQ built ONLY from the same facts (percentages only with MIN_REPORTS_FOR_RATES applicant accounts;
-  // the grade Q always names its basis). Backs both a FAQPage node AND the visible block below — the
-  // format AI answer engines (ChatGPT, Perplexity, Gemini) cite for "does <company> ghost applicants?".
-  const baseFaq = s
-    ? buildCompanyFaq({
-        name,
-        overallScore: facts.score,
-        ghostRate: facts.ratesShown ? s.ghost_rate : null,
-        responseRate: facts.ratesShown ? s.response_rate : null,
-        avgWaitDays: facts.waitDays,
-        reportCount: fpSeo,
-        mentionCount: facts.mentions,
-        isAgency: isStaffingAgency(s.company_name ?? name),
-      })
-    : []
-  const searched = facts.gradeable ? await topIntentsForCompany(s?.company_name || name) : []
-  const faq = mergeIntentFaq(baseFaq, facts, searched, { avgRounds: s?.avg_rounds ?? null })
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -189,6 +191,8 @@ export default async function CompanySlugLayout(
             about: { '@id': `${pageUrl}#organization` },
           }]
         : []),
+      // The three answers at the top of the page, exactly as shown (components/company/CompanyAnswers.tsx),
+      // answered ones only — the format AI answer engines cite for "does <company> ghost applicants?".
       ...(faq.length
         ? [{
             '@type': 'FAQPage',
@@ -202,19 +206,12 @@ export default async function CompanySlugLayout(
     ],
   }
 
-  // Server-rendered factual summary so AI answer engines (ChatGPT, Perplexity, Gemini) and
-  // Google can read and cite real hiring data from the initial HTML — the client UI below
-  // only hydrates after load. Rendered ONLY when we have a real score or a grounded company
-  // summary (company_summaries, status 'ok'). Null-safe.
+  // Server-rendered long form for people and crawlers who want it: the grade in a sentence and the stored
+  // summary. The numbers themselves are the answers at the top of the page (in the same HTML), so this block
+  // does not repeat the rates. Rendered ONLY with a real score or a grounded summary. Null-safe.
   const hasFacts = facts.gradeable && s != null
   const accent = accentFor(s?.risk_level)
-  // Same numbers as the meta description, the FAQ and the page (lib/companyMeta.ts): rates only with
-  // enough applicant accounts, first-party count only.
-  const ghostPct = facts.ghostPct
-  const respPct = facts.respPct
-  const waitDays = facts.waitDays
-  const reportCount = fpSeo
-  const dataPoints = reportCount > 0 ? facts.basis : 'estimated data'
+  const dataPoints = facts.reportCount > 0 ? facts.basis : 'estimated data'
   const summaryDate = summary ? summaryMonth(summary.generated_at) : null
   const summaryBlock = summary ? (
     <div className={hasFacts ? `${seo.part} ${seo.rule}` : seo.part}>
@@ -232,19 +229,16 @@ export default async function CompanySlugLayout(
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }} />
-      {/* Layout lives in .co-seo (globals.css): it clears the fixed 58px nav on desktop, and on
-          phones it is visually ordered AFTER the interactive page (flex order) so a visitor lands
-          on the score, not a wall of text — the HTML order crawlers read is unchanged. */}
+      {/* Layout lives in .co-seo (globals.css): flex-ordered AFTER the interactive page at every width, so a
+          visitor lands on the answers and the grade; the HTML order crawlers read is unchanged. */}
       {(hasFacts || summary) && (
         <section className="co-seo" aria-label={`${name} hiring data summary`}>
-          {/* Collapsed by default (native <details>, no JS): the numbers are already on the page above;
-              this is the citable prose + FAQ for people and crawlers who want the long form. */}
           <details className="co-seo-details">
             <summary className="co-seo-summary">
               <span className="co-seo-ico" aria-hidden><Icon name="file-text" size={18} /></span>
               <span className="co-seo-txt">
                 <span className="co-seo-ttl">About {name}&apos;s hiring data</span>
-                <span className="co-seo-sub">{hasFacts && s ? `Seen Grade ${facts.grade} · ${facts.score}/100 in plain English` : 'What applicants report'}{faq.length > 0 ? ` · ${faq.length} frequently asked questions` : ''}</span>
+                <span className="co-seo-sub">{hasFacts && s ? `Seen Grade ${facts.grade} · ${facts.score}/100 in plain English` : 'What applicants report'}</span>
               </span>
               <span className="co-seo-chev" aria-hidden />
             </summary>
@@ -257,55 +251,29 @@ export default async function CompanySlugLayout(
               {name} has a Seen Grade of{' '}
               <strong className={seo.strong}>{facts.grade} · {facts.score}/100</strong>
               {' '}from {dataPoints}.{' '}
-              {ghostPct != null && (
-                <>Applicants report a{' '}
-                  <strong className={seo.strong}>{ghostPct}% ghost rate</strong>
-                  {respPct != null ? <> and a {respPct}% response rate</> : null}
-                  {waitDays != null ? <>, with an average wait of {waitDays} day{waitDays === 1 ? '' : 's'} to hear back</> : null}
-                  .{' '}
-                </>
-              )}
-              {ghostPct == null && <>Too few applicant accounts yet for a response or ghost rate. </>}
               {interpret(s)}
             </p>
             </>)}
             {summaryBlock}
-            {/* Crawlable internal links to the new growth surfaces — present in initial HTML.
-                Uses a div (not <nav>) on purpose: the global CSS `nav{position:fixed}` rule is
-                for the site header only, and a <nav> here would get pinned to the top of the
-                viewport and overlap the page. role="navigation" keeps the a11y semantics. */}
+            {/* Crawlable internal links — present in initial HTML. A div (not <nav>): the global CSS
+                `nav{position:fixed}` rule is for the site header only. role="navigation" keeps the semantics. */}
             <div
               role="navigation"
               aria-label={`Explore ${name} hiring`}
               className={`${seo.links} ${seo.rule}`}
             >
-              {/* The hiring-process and application-status questions are answered in the FAQ below; the
-                  old /faq/<x> pages now point their canonical here, so they are not linked. */}
               <a href="/methods" className={seo.link}>How grades work</a>
               <a href={`/compare?a=${encodeURIComponent(name)}`} className={seo.link}>Compare {name} vs another</a>
             </div>
           </div>
-
-          {/* Visible FAQ backing the FAQPage schema above (Google requires the schema's Q&A text to
-              be present on the page). Server-rendered so AI answer engines cite the real numbers from
-              the initial HTML. Real-data-gated — no fabricated rates. */}
-          {faq.length > 0 && (
-            <div className={seo.faq}>
-              <h2 className={seo.h3}>
-                {name} hiring — frequently asked
-              </h2>
-              {faq.map(f => (
-                <details key={f.question} className={seo.q}>
-                  <summary>{f.question}</summary>
-                  <p className={seo.p}>{f.answer}</p>
-                </details>
-              ))}
-            </div>
-          )}
           </details>
         </section>
       )}
-      <CompanySeedProvider seed={seedFrom(s)}>{children}</CompanySeedProvider>
+      <CompanySeedProvider seed={seedFrom(s)}>
+        <CompanyAnswersSeedProvider answers={answers} listing={(listing as ListingSignalsData | null) ?? null}>
+          {children}
+        </CompanyAnswersSeedProvider>
+      </CompanySeedProvider>
     </>
   )
 }

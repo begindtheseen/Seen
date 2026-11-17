@@ -18,7 +18,6 @@ import Odometer from '@/components/motion/Odometer'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Icon, { type IconName } from '@/components/ui/Icon'
-import StatTile from '@/components/ui/StatTile'
 import { accountsLabel, accountSources } from '@/lib/glossary.js'
 import { gradeTone, ghostRateTone, responseRateTone, wastedEffortTone, ghostRateWord, responseRateWord, wastedEffortWord, gradeWord, toneText, toneFill } from '@/lib/ui/tone.js'
 import c from './company.module.css'
@@ -28,6 +27,8 @@ import { LoadError } from '@/components/shell/LoadStates'
 import ListingSignals from '@/components/ListingSignals'
 import WarnFriendShare from '@/components/growth/WarnFriendShare'
 import TrackCta from '@/components/company/TrackCta'
+import CompanyAnswers from '@/components/company/CompanyAnswers'
+import { useCompanyAnswersSeed } from '@/components/company/CompanyAnswersSeed'
 import { warnFriendText } from '@/lib/growthCopy.js'
 import { gradeLetter, displayCompanyName, displayPlatform, isResolvedOutcome, lastUpdatedLabel, possessive } from '@/lib/companyDisplay'
 import { buildCompanySummary, reportsProvenanceLine, MIN_REPORTS_FOR_RATES, type CompanySummary } from '@/lib/companyPageSummary'
@@ -342,6 +343,9 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   // First paint from the server's stored row (components/CompanySeed.tsx) when it is gradeable — the
   // grade, answer sentence and stats are in the HTML; the live /api/reports read below replaces it.
   const seed = useCompanySeed()
+  // The three answers and the listing signals, built on the server (app/company/[slug]/layout.tsx →
+  // lib/company/answers.js): they are in the server HTML, and the FAQPage JSON-LD is the same strings.
+  const { answers: answersSeed, listing: listingSeed } = useCompanyAnswersSeed()
   const [score, setScore] = useState<CompanyScore | null>(seed as CompanyScore | null)
   const [industry, setIndustry] = useState(seed?.industry || '')
   const [loading, setLoading] = useState(!seed)
@@ -653,9 +657,6 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const logoLetter = (companyName[0] || '?').toUpperCase()
   const ghostPct = sum.ghostPct ?? 0
   const respPct = sum.responsePct ?? 0
-  // One plain-English line a first-time visitor can act on — the SAME response rate and thresholds as
-  // the odds panel (lib/companyPageSummary.ts responseVerdict), no percentage under MIN_REPORTS_FOR_RATES.
-  const verdict = sum.verdict
 
   // The rows behind the counts. Employee reviews are shown but are NOT hiring outcomes (same rule as the
   // score — lib/server/reportCounts.js); "applicant accounts" are the hiring rows WITH an outcome.
@@ -822,23 +823,30 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
           document.body
         )}
 
-        {/* ── Hero: who, the grade (letter · score · verdict · evidence), the numbers — each shown once ── */}
-        <section className={c.hero} ref={heroRef} aria-labelledby="co-name">
-          <div className={c.who}>
-            <div className={c.logo} aria-hidden="true">{logoLetter}</div>
-            <div className={c.whoText}>
-              {/* The page's ONE h1, in the initial HTML and the accessibility tree (audit 2026-10-24). */}
-              <h1 id="co-name" className={c.name}>{displayName}</h1>
-              <div className={c.whoMeta}>
-                {industry ? <span>{industry}</span> : null}
-                {perk.verified && <Badge tone="info" icon="shield-check" title="This employer committed to responding to applicants. Reviewed against real outcome data — it never affects the Seen Grade.">Transparency Verified</Badge>}
-                {perk.featured && <Badge tone="accent" icon="star" title="Featured employer — paid placement. Never affects the Seen Grade.">Featured</Badge>}
-              </div>
+        {/* ── Who: the page's ONE h1, in the initial HTML and the accessibility tree (audit 2026-10-24). ── */}
+        <header className={c.who}>
+          <div className={c.logo} aria-hidden="true">{logoLetter}</div>
+          <div className={c.whoText}>
+            <h1 id="co-name" className={c.name}>{displayName}</h1>
+            <div className={c.whoMeta}>
+              <span>Who hears back, from applicant accounts</span>
+              {industry ? <span>{industry}</span> : null}
+              {perk.verified && <Badge tone="info" icon="shield-check" title="This employer committed to responding to applicants. Reviewed against real outcome data — it never affects the Seen Grade.">Transparency Verified</Badge>}
+              {perk.featured && <Badge tone="accent" icon="star" title="Featured employer — paid placement. Never affects the Seen Grade.">Featured</Badge>}
             </div>
           </div>
+        </header>
+
+        {/* ── The three questions applicants search, answered first (server-built: lib/company/answers.js).
+            A name the server knows nothing about waits for the client's verdict, so an unknown company never
+            flashes a page of "not known yet" before its empty state. ── */}
+        {answersSeed && (answersSeed.hasData || (!loading && !unknown)) && <CompanyAnswers data={answersSeed} />}
+
+        {/* ── The grade (letter · score · what it stands on) — the rates live in the answers above ── */}
+        <section className={c.hero} ref={heroRef} aria-label={`${possessive(displayName)} Seen Grade`}>
 
           {loading ? (
-            /* Skeleton mirrors the grade block + stat row it's about to become (same heights: no shift). */
+            /* Skeleton mirrors the grade block it's about to become (same height: no shift). */
             <div aria-label="Loading company data" role="status" className={c.heroSk}>
               <div className={c.gradeRow}>
                 <div className="sk" style={{ width: 88, height: 88, borderRadius: 'var(--r-card)' }} />
@@ -848,7 +856,6 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                   <div className="sk" style={{ width: '52%', height: 12 }} />
                 </div>
               </div>
-              <div className={c.stats}>{[0, 1, 2, 3].map(i => <div key={i} className="sk" style={{ height: 92, borderRadius: 'var(--r-card)' }} />)}</div>
             </div>
           ) : error ? (
             <LoadError what={`${possessive(displayName)} hiring data`} detail="Seen could not be reached. The grade, rates and accounts below are hidden until it loads — nothing here is a verdict yet." onRetry={() => setReloadKey(k => k + 1)} />
@@ -884,7 +891,6 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                     <span className={c.score} aria-hidden="true"><Odometer value={score.overall_score} instant={!!seed} /><span className={c.scoreOf}>/100</span></span>
                     {tone && <Badge tone={tone}>{gradeWord(tone)}</Badge>}
                   </div>
-                  {verdict && <p className={c.verdict}>{verdict}</p>}
                   <p className={c.evidence}><Icon name="users" size={14} />{evidenceParts.join(' · ')}{fpReports === 0 && webEst > 0 ? ' · web-research estimate' : ''}</p>
                   <div className={c.meta}>
                     <ConfidenceBadge sum={sum} webCount={webEst} />
@@ -893,29 +899,8 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                   </div>
                 </div>
               </div>
-
-              {/* A number the reports never gave (no wait or round counts on any row) is left out, never shown as "—".
-                  Response / ghost percentages need MIN_REPORTS_FOR_RATES applicant accounts (Chipotle showed "77%"
-                  from 2 — audit 2026-10-23); below it the page says so instead. Every toned figure says its word. */}
-              {(() => {
-                const respP = ratePct(score.response_rate)
-                const ghostP = ratePct(score.ghost_rate)
-                const tiles = [
-                  sum.ratesShown && respP != null ? <StatTile key="r" label="Hear back" value={respP} suffix="%" tone={respTone} toneWord={responseRateWord(respTone)} instant={!!seed} /> : null,
-                  sum.ratesShown && ghostP != null ? <StatTile key="g" label="Ghosted" value={ghostP} suffix="%" tone={ghostTone} toneWord={ghostRateWord(ghostTone)} instant={!!seed} /> : null,
-                  score.avg_wait_days != null ? <StatTile key="w" label="Avg wait" value={score.avg_wait_days} suffix="d" instant={!!seed} /> : null,
-                  score.avg_rounds != null ? <StatTile key="n" label="Rounds" value={score.avg_rounds.toFixed(1)} /> : null,
-                  score.waste != null ? <StatTile key="x" label="Wasted-effort risk" value={score.waste} suffix="%" tone={wasteTone} toneWord={wastedEffortWord(wasteTone)} instant={!!seed} /> : null,
-                ].filter(Boolean)
-                return (
-                  <>
-                    {tiles.length > 0 && <div className={c.stats}>{tiles}</div>}
-                    {!sum.ratesShown && (
-                      <p className={c.fine} role="note">Response and ghost rates appear at {MIN_REPORTS_FOR_RATES} applicant accounts — {fpReports} so far.</p>
-                    )}
-                  </>
-                )
-              })()}
+              {/* Rates, wait and rounds are stated once, in the answers above (each with what it counts);
+                  the full breakdown is under "How the grade is built". */}
             </>
           ) : (
             /* No score row at all (the API answered no_data): what Seen holds, then the one end-state sentence.
@@ -935,6 +920,10 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
             <TrackCta company={displayName} slug={slug} responsePct={sum.ratesShown ? sum.responsePct : null} />
           </div>
         )}
+
+        {/* The company's own job posts, rated on their own — after the grade, separate from (and never part of)
+            it. The server's read comes with the page (listingSeed); without it the card asks the API itself. */}
+        {companyName && !error && <ListingSignals companyName={companyName} initial={listingSeed} />}
 
         {/* ── The evidence, open: what applicants say. Hidden while the load failed — "None yet" under an
             error would be a false statement (R-5). ── */}
@@ -1056,9 +1045,6 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                 <WebReviewsSection reviews={shownWebReviews} hidden={webReviews.length - shownWebReviews.length} />
               </section>
             )}
-
-            {/* The company's own job posts, rated on their own — separate from (and never part of) the Seen Grade. */}
-            {companyName && <ListingSignals companyName={companyName} />}
 
             {/* ── Detail, on demand ── */}
             <h2 className={`${c.h2} ${c.moreHead}`}>More about {displayName}</h2>
