@@ -16,7 +16,7 @@ export const revalidate = 3600
 const BASE = 'https://seenjobs.io'
 
 // Every graded company, read past PostgREST's 1,000-row cap (lib/server/sitemapCompanies.js).
-async function getCompanies(): Promise<Array<{ name: string; lastModified: string | null }>> {
+async function getCompanies(): Promise<Array<{ name: string; lastModified: string | null; top?: boolean }>> {
   return fetchSitemapCompanies({ url: process.env.SUPABASE_URL, key: process.env.SUPABASE_SERVICE_KEY })
 }
 
@@ -49,11 +49,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ]
 
   const companies = await getCompanies()
-  const companyRoutes: MetadataRoute.Sitemap = companies.map(({ name, lastModified }) => ({
+  // The top ~500 (most applicant accounts, lib/server/sitemapCompanies.js TOP_COMPANY_PAGES) carry the higher
+  // priority; every other graded page stays listed.
+  const companyRoutes: MetadataRoute.Sitemap = companies.map(({ name, lastModified, top }) => ({
     url: `${BASE}/company/${slugify(name)}`,
     lastModified: lastModified ? new Date(lastModified) : now,
     changeFrequency: 'weekly',
-    priority: 0.8,
+    priority: top ? 0.9 : 0.7,
   }))
 
   return [...staticRoutes, ...companyRoutes]

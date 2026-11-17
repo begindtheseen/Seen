@@ -10,7 +10,7 @@ import { jsonLdHtml } from '@/lib/jsonLd'
 // It replaced the older FAQ (lib/server/companyFaq.js + the searched-intent answers), whose "of N applicant
 // accounts, X% say …" wording put the weighted rate on a raw count; the three answers now say both numbers
 // and what each counts, and cover the same searches (application status, how long, does it ghost).
-import { buildCompanyAnswers, answersFaq, companyIndexDecision } from '@/lib/company/answers.js'
+import { buildCompanyAnswers, answersFaq, companyIndexDecision, listingFactsSentence } from '@/lib/company/answers.js'
 import { readScore, readAnswerRows, readListing, readName } from './companyData'
 import { CompanyAnswersSeedProvider, type CompanyAnswer, type CompanyAnswersData, type ListingSignalsData } from '@/components/company/CompanyAnswersSeed'
 // Offline, numerically-grounded "What applicants report" paragraph (company_summaries). No-op when the
@@ -20,7 +20,7 @@ import { isStaffingAgency } from '@/lib/agencies'
 // ONE set of facts for everything this file publishes (lib/companyMeta.ts): the meta description, the
 // JSON-LD nodes, the H1 paragraph and the FAQ read the same count, rates and grade as the page and the
 // OG card. Audit 2026-10-24 (L-1): the description said 62 / 73% / 81 while the H1 said 48 / 87% / 91.
-import { companyMetaFacts, companyRobots } from '@/lib/companyMeta'
+import { companyMetaFacts, companyRobots, clipSentences } from '@/lib/companyMeta'
 import { CompanySeedProvider, type CompanySeedScore } from '@/components/CompanySeed'
 import Icon from '@/components/ui/Icon'
 import seo from './seo.module.css'
@@ -53,14 +53,21 @@ export async function generateMetadata(
   // "Walmart application status: who hears back (48 reports)" + "87% of applicants hear back from Walmart;
   // 13% never do. …" (lib/cardCopy.js via companyMetaFacts): the same facts as the page, never "Hiring
   // Transparency Score" (owner 2026-10-24), no dashes.
-  const { title, description } = facts
+  const { title } = facts
+  let { description } = facts
   // Who is indexed (lib/company/answers.js companyIndexDecision): every graded page, as before (companyRobots),
   // plus an ungraded page that holds at least one applicant account AND 10+ open postings with listing signals —
   // its answers state real counts and its listing facts are its own. A listings-only page stays noindex.
+  // Such a page's description is its own first answer and its listing facts, never a promise of data it lacks.
   let robots = companyRobots(facts.gradeable, scoreRead)
   if (robots.robots && facts.reportCount >= 1) {
-    const listing = await readListing(readName(slug, s))
-    if (companyIndexDecision({ gradeable: false, readOk: true, accounts: facts.reportCount, listing }).index) robots = {}
+    const key = readName(slug, s)
+    const listing = await readListing(key)
+    if (companyIndexDecision({ gradeable: false, readOk: true, accounts: facts.reportCount, listing }).index) {
+      robots = {}
+      const built = buildCompanyAnswers({ name, score: s, rows: await readAnswerRows(key), listing })
+      description = clipSentences(`${built.answers[0].sentence} ${listingFactsSentence(name, listing)}`.trim())
+    }
   }
 
   return {
