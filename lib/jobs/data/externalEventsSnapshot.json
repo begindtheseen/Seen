@@ -1,0 +1,3586 @@
+{
+ "about": "The rows api/cron-hiring-events.js fetched from the real sources on `fetched` (writes stubbed). The read (lib/server/externalEvents.js) serves these, re-filtered on the Pacific clock, only until public.external_hiring_events exists and the cron has filled it.",
+ "fetched": "2026-11-17T20:14:58.149Z",
+ "rows": [
+  {
+   "id": "ext:tx-wfs-dallas:nrmt4g",
+   "title": "Opportunity Center Job Fair",
+   "company": "Workforce Solutions Greater Dallas",
+   "location": "Dallas, TX",
+   "lat": 32.783,
+   "lng": -96.807,
+   "url": "https://www.wfsdallas.com/event/opportunity-center-job-fair-6/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-11-18",
+    "dates": [
+     "2026-11-18"
+    ],
+    "recurring": null,
+    "time": "10 AM–1 PM",
+    "where": "The Opportunity Center, 1610 S. Malcolm X. Blvd, Building, Dallas, TX 75226",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "tx-wfs-dallas",
+    "sourceName": "Workforce Solutions Greater Dallas",
+    "state": "TX",
+    "src": "https://www.wfsdallas.com/event/opportunity-center-job-fair-6/",
+    "general": true,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:tx-wfs-dallas:1upbzzf",
+   "title": "Randstad Hiring Event",
+   "company": "Workforce Solutions Greater Dallas",
+   "location": "Dallas, TX",
+   "lat": 32.783,
+   "lng": -96.807,
+   "url": "https://www.wfsdallas.com/event/randstad-hiring-event-2/",
+   "roles": "General Warehouse Material Handlers Manufacturing 250 Available Positions Details: $22/hr rate Schedules: 1st , 2nd , 3rd , and weekend shifts available Hiring",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-18",
+    "dates": [
+     "2026-11-18"
+    ],
+    "recurring": null,
+    "time": "10 AM–2 PM",
+    "where": "Redbird Workforce Center, 3560 W. Camp Wisdom Road, Suite 110, Dallas, TX 75237",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "tx-wfs-dallas",
+    "sourceName": "Workforce Solutions Greater Dallas",
+    "state": "TX",
+    "src": "https://www.wfsdallas.com/event/randstad-hiring-event-2/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:tx-wfs-dallas:59l8gu",
+   "title": "Midway Hiring Event",
+   "company": "Workforce Solutions Greater Dallas",
+   "location": "Dallas, TX",
+   "lat": 32.783,
+   "lng": -96.807,
+   "url": "https://www.wfsdallas.com/event/midway-hiring-event/",
+   "roles": "Electrical Wiring Tech $20/hr Mechanical Assembler $19/hr Weld Cell Operator $18/hr Welder $16/hr QA Tech $14/hr Cycle Counter $14/hr Details: Hiring for",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-19",
+    "dates": [
+     "2026-11-19"
+    ],
+    "recurring": null,
+    "time": "10 AM–1 PM",
+    "where": "Pleasant Grove Workforce Center, 1125 South Buckner Boulevard, Dallas, TX 75217",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "tx-wfs-dallas",
+    "sourceName": "Workforce Solutions Greater Dallas",
+    "state": "TX",
+    "src": "https://www.wfsdallas.com/event/midway-hiring-event/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:tx-wfs-northtexas:1svl8u0",
+   "title": "HIRING EVENT: Fortrex",
+   "company": "Workforce Solutions North Texas",
+   "location": "Vernon, TX",
+   "lat": 34.155,
+   "lng": -99.265,
+   "url": "https://ntxworksolutions.org/event/11-17-26-hiring-event-fortrex/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-17",
+    "dates": [
+     "2026-11-17"
+    ],
+    "recurring": null,
+    "time": "9 AM–4 PM",
+    "where": "Workforce Solutions North Texas – Vernon Office, 1700 Wilbarger St., Basement Room B7, Vernon, TX 76384",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "tx-wfs-northtexas",
+    "sourceName": "Workforce Solutions North Texas",
+    "state": "TX",
+    "src": "https://ntxworksolutions.org/event/11-17-26-hiring-event-fortrex/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:tx-wfs-northtexas:16shxez",
+   "title": "HIRING EVENT: TDCJ Allred Unit – Vernon",
+   "company": "Workforce Solutions North Texas",
+   "location": "Vernon, TX",
+   "lat": 34.155,
+   "lng": -99.265,
+   "url": "https://ntxworksolutions.org/event/tdcj-he-vernon-2026-11-18/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-18",
+    "dates": [
+     "2026-11-18"
+    ],
+    "recurring": null,
+    "time": "9 AM–1 PM",
+    "where": "Workforce Solutions North Texas – Vernon Office, 1700 Wilbarger St., Basement Room B7, Vernon, TX 76384",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "tx-wfs-northtexas",
+    "sourceName": "Workforce Solutions North Texas",
+    "state": "TX",
+    "src": "https://ntxworksolutions.org/event/tdcj-he-vernon-2026-11-18/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:tx-wfs-northtexas:1vhy6q6",
+   "title": "Hiring Red, White, & You! Statewide Hiring Event",
+   "company": "Workforce Solutions North Texas",
+   "location": "Wichita Falls, TX",
+   "lat": 33.914,
+   "lng": -98.493,
+   "url": "https://ntxworksolutions.org/event/hrwy-2026/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-19",
+    "dates": [
+     "2026-11-19"
+    ],
+    "recurring": null,
+    "time": "11 AM–2 PM",
+    "where": "Region 9 Education Service Center, 301 TX-11 Loop, Wichita Falls, TX 76306",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "tx-wfs-northtexas",
+    "sourceName": "Workforce Solutions North Texas",
+    "state": "TX",
+    "src": "https://ntxworksolutions.org/event/hrwy-2026/",
+    "general": true,
+    "many": true
+   }
+  },
+  {
+   "id": "ext:tx-wfs-northtexas:12wo3m4",
+   "title": "HIRING EVENT: Seasonal Manufacturing Cleanup Crew",
+   "company": "Workforce Solutions North Texas",
+   "location": "Wichita Falls, TX",
+   "lat": 33.914,
+   "lng": -98.493,
+   "url": "https://ntxworksolutions.org/event/hiring-event-temp-warehouse-cleaners-2026-11-24/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-24",
+    "dates": [
+     "2026-11-24"
+    ],
+    "recurring": null,
+    "time": "10 AM–2 PM",
+    "where": "Workforce Solutions North Texas – Wichita Falls Office, 4309 Old Jacksboro Hwy, Entrance 5, Wichita Falls, TX 76302",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "tx-wfs-northtexas",
+    "sourceName": "Workforce Solutions North Texas",
+    "state": "TX",
+    "src": "https://ntxworksolutions.org/event/hiring-event-temp-warehouse-cleaners-2026-11-24/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:tx-wfs-northtexas:8l2l0w",
+   "title": "HIRING EVENT: Material Handlers",
+   "company": "Workforce Solutions North Texas",
+   "location": "Vernon, TX",
+   "lat": 34.155,
+   "lng": -99.265,
+   "url": "https://ntxworksolutions.org/event/12-10-26-hiring-event-material-handlers/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-10",
+    "dates": [
+     "2026-12-10"
+    ],
+    "recurring": null,
+    "time": "10 AM–4 PM",
+    "where": "Wilbarger Memorial Auditorium, 2100 Yamparika Street, Vernon, TX 76384",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "tx-wfs-northtexas",
+    "sourceName": "Workforce Solutions North Texas",
+    "state": "TX",
+    "src": "https://ntxworksolutions.org/event/12-10-26-hiring-event-material-handlers/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:tx-wfs-northtexas:nmuon9",
+   "title": "HIRING EVENT: TDCJ Allred Unit",
+   "company": "Workforce Solutions North Texas",
+   "location": "Wichita Falls, TX",
+   "lat": 33.914,
+   "lng": -98.493,
+   "url": "https://ntxworksolutions.org/event/tdcj-he-2026-12-11/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-11",
+    "dates": [
+     "2026-12-11"
+    ],
+    "recurring": null,
+    "time": "10 AM–3 PM",
+    "where": "Workforce Solutions North Texas – Wichita Falls Office, 4309 Old Jacksboro Hwy, Entrance 5, Wichita Falls, TX 76302",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "tx-wfs-northtexas",
+    "sourceName": "Workforce Solutions North Texas",
+    "state": "TX",
+    "src": "https://ntxworksolutions.org/event/tdcj-he-2026-12-11/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:id-labor:62k4ir",
+   "title": "Hiring Event – Post Falls",
+   "company": "Idaho Department of Labor",
+   "location": "Post Falls, ID",
+   "lat": 47.718,
+   "lng": -116.952,
+   "url": "https://www.labor.idaho.gov/event/hiring-event-post-falls-2/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-18",
+    "dates": [
+     "2026-11-18"
+    ],
+    "recurring": null,
+    "time": "10 AM–1 PM",
+    "where": "Idaho Department of Labor – Post Falls office, 600 N. Thornton St., Post Falls, ID 83854",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "id-labor",
+    "sourceName": "Idaho Department of Labor",
+    "state": "ID",
+    "src": "https://www.labor.idaho.gov/event/hiring-event-post-falls-2/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:id-labor:1x9qo7v",
+   "title": "Hiring Event – Idaho Falls",
+   "company": "Idaho Department of Labor",
+   "location": "Idaho Falls, ID",
+   "lat": 43.467,
+   "lng": -112.034,
+   "url": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-17/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-18",
+    "dates": [
+     "2026-11-18"
+    ],
+    "recurring": null,
+    "time": "11 AM–2 PM",
+    "where": "Idaho Department of Labor – Idaho Falls office, 1515 E. Lincoln Road, Idaho Falls, ID 83401",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "id-labor",
+    "sourceName": "Idaho Department of Labor",
+    "state": "ID",
+    "src": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-17/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:id-labor:1wfbl43",
+   "title": "Hiring Event – Idaho Falls",
+   "company": "Idaho Department of Labor",
+   "location": "Idaho Falls, ID",
+   "lat": 43.467,
+   "lng": -112.034,
+   "url": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-3/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-25",
+    "dates": [
+     "2026-11-25"
+    ],
+    "recurring": null,
+    "time": "11 AM–2 PM",
+    "where": "Idaho Department of Labor – Idaho Falls office, 1515 E. Lincoln Road, Idaho Falls, ID 83401",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "id-labor",
+    "sourceName": "Idaho Department of Labor",
+    "state": "ID",
+    "src": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-3/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:id-labor:1jgeitp",
+   "title": "Hiring Event – Rexburg",
+   "company": "Idaho Department of Labor",
+   "location": "Rexburg, ID",
+   "lat": 43.826,
+   "lng": -111.79,
+   "url": "https://www.labor.idaho.gov/event/hiring-event-rexburg/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-08",
+    "dates": [
+     "2026-12-08"
+    ],
+    "recurring": null,
+    "time": "11 AM–2 PM",
+    "where": "VFW – Veterans of Foreign Wars Hall, 480 W Second N., Rexburg, ID 83440",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "id-labor",
+    "sourceName": "Idaho Department of Labor",
+    "state": "ID",
+    "src": "https://www.labor.idaho.gov/event/hiring-event-rexburg/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:id-labor:c4jjqu",
+   "title": "Hiring Event – Idaho Falls",
+   "company": "Idaho Department of Labor",
+   "location": "Idaho Falls, ID",
+   "lat": 43.467,
+   "lng": -112.034,
+   "url": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-2/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-09",
+    "dates": [
+     "2026-12-09"
+    ],
+    "recurring": null,
+    "time": "11 AM–12 PM",
+    "where": "Idaho Department of Labor – Idaho Falls office, 1515 E. Lincoln Road, Idaho Falls, ID 83401",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "id-labor",
+    "sourceName": "Idaho Department of Labor",
+    "state": "ID",
+    "src": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-2/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:id-labor:1clovzo",
+   "title": "Hiring Event – Post Falls",
+   "company": "Idaho Department of Labor",
+   "location": "Post Falls, ID",
+   "lat": 47.718,
+   "lng": -116.952,
+   "url": "https://www.labor.idaho.gov/event/hiring-event-post-falls/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-16",
+    "dates": [
+     "2026-12-16"
+    ],
+    "recurring": null,
+    "time": "10 AM–1 PM",
+    "where": "Idaho Department of Labor – Post Falls office, 600 N. Thornton St., Post Falls, ID 83854",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "id-labor",
+    "sourceName": "Idaho Department of Labor",
+    "state": "ID",
+    "src": "https://www.labor.idaho.gov/event/hiring-event-post-falls/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:id-labor:1wbzlhy",
+   "title": "Hiring Event – Idaho Falls",
+   "company": "Idaho Department of Labor",
+   "location": "Idaho Falls, ID",
+   "lat": 43.467,
+   "lng": -112.034,
+   "url": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-23",
+    "dates": [
+     "2026-12-23"
+    ],
+    "recurring": null,
+    "time": "11 AM–2 PM",
+    "where": "Idaho Department of Labor – Idaho Falls office, 1515 E. Lincoln Road, Idaho Falls, ID 83401",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "id-labor",
+    "sourceName": "Idaho Department of Labor",
+    "state": "ID",
+    "src": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:fl-cs-clm:bis05",
+   "title": "Hiring Event | Evergreen Private Care",
+   "company": "CareerSource Citrus Levy Marion",
+   "location": "Virtual · Florida",
+   "lat": null,
+   "lng": null,
+   "url": "https://careersourceclm.com/event/hiring-event-evergreen-private-care/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-19",
+    "dates": [
+     "2026-11-19"
+    ],
+    "recurring": null,
+    "time": null,
+    "where": null,
+    "virtual": true,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "fl-cs-clm",
+    "sourceName": "CareerSource Citrus Levy Marion",
+    "state": "FL",
+    "src": "https://careersourceclm.com/event/hiring-event-evergreen-private-care/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:ny-rochesterworks:sq3tfd",
+   "title": "Monroe Community Hospital Monthly Job Fair!",
+   "company": "RochesterWorks!",
+   "location": "Rochester, NY",
+   "lat": 43.155,
+   "lng": -77.616,
+   "url": "https://rochesterworks.org/event/monroe-community-hospital-monthly-job-fair-8/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-11-19",
+    "dates": [
+     "2026-11-19"
+    ],
+    "recurring": null,
+    "time": "9 AM–4 PM",
+    "where": "Monroe Community Hospital, 435 East Henrietta Rd, Rochester, NY 14620",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "ny-rochesterworks",
+    "sourceName": "RochesterWorks!",
+    "state": "NY",
+    "src": "https://rochesterworks.org/event/monroe-community-hospital-monthly-job-fair-8/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:ny-rochesterworks:hdn20c",
+   "title": "On-Site Recruiting Event at RochesterWorks (11/19)",
+   "company": "RochesterWorks!",
+   "location": "Rochester, NY",
+   "lat": 43.155,
+   "lng": -77.616,
+   "url": "https://rochesterworks.org/event/on-site-recruiting-event-at-rochesterworks-11-19/",
+   "roles": "Direct Support Professionals Vehicle Operators (no CDL required!) Wegmans Job Opportunities: Food Production Workers Warehouse Workers Monroe 2-Orleans BOCES",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-19",
+    "dates": [
+     "2026-11-19"
+    ],
+    "recurring": null,
+    "time": "9 AM–11 AM",
+    "where": "100 College Avenue, Rochester, NY 14607",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "ny-rochesterworks",
+    "sourceName": "RochesterWorks!",
+    "state": "NY",
+    "src": "https://rochesterworks.org/event/on-site-recruiting-event-at-rochesterworks-11-19/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:ny-rochesterworks:tw403t",
+   "title": "Ibero Job Fair",
+   "company": "RochesterWorks!",
+   "location": "Rochester, NY",
+   "lat": 43.155,
+   "lng": -77.616,
+   "url": "https://rochesterworks.org/event/ibero-job-fair/",
+   "roles": "https://www.ibero.org/jobs/ CLICK HERE to view the event flyer in English and Spanish! Call 585-454-1430 to learn",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-11-19",
+    "dates": [
+     "2026-11-19"
+    ],
+    "recurring": null,
+    "time": "11 AM–2 PM",
+    "where": "Ibero-American Action League, 216 Clifford Ave, Rochester, NY 14621",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "ny-rochesterworks",
+    "sourceName": "RochesterWorks!",
+    "state": "NY",
+    "src": "https://rochesterworks.org/event/ibero-job-fair/",
+    "general": true,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:ny-rochesterworks:1i5hd52",
+   "title": "DelMonte Hotel Group Open Interviews",
+   "company": "RochesterWorks!",
+   "location": "Rochester, NY",
+   "lat": 43.155,
+   "lng": -77.616,
+   "url": "https://rochesterworks.org/event/delmonte-hotel-group-open-interviews/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-01",
+    "dates": [
+     "2026-12-01"
+    ],
+    "recurring": null,
+    "time": "9 AM–7 PM",
+    "where": "Courtyard by Marriott Rochester/Brighton, 33 Corporate Woods, Rochester, NY 14623",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "ny-rochesterworks",
+    "sourceName": "RochesterWorks!",
+    "state": "NY",
+    "src": "https://rochesterworks.org/event/delmonte-hotel-group-open-interviews/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:ny-rochesterworks:is2hct",
+   "title": "Bausch + Lomb Networking and Hiring Event",
+   "company": "RochesterWorks!",
+   "location": "Rochester, NY",
+   "lat": 43.155,
+   "lng": -77.616,
+   "url": "https://rochesterworks.org/event/bausch-lomb-networking-and-hiring-event/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-02",
+    "dates": [
+     "2026-12-02"
+    ],
+    "recurring": null,
+    "time": "4 PM–7 PM",
+    "where": "DoubleTree by Hilton Rochester, 1111 Jefferson Road, Rochester, NY 14623",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "ny-rochesterworks",
+    "sourceName": "RochesterWorks!",
+    "state": "NY",
+    "src": "https://rochesterworks.org/event/bausch-lomb-networking-and-hiring-event/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:ny-rochesterworks:ohn9mv",
+   "title": "Mini Job Fair at RochesterWorks (12/3)",
+   "company": "RochesterWorks!",
+   "location": "Rochester, NY",
+   "lat": 43.155,
+   "lng": -77.616,
+   "url": "https://rochesterworks.org/event/mini-job-fair-at-rochesterworks-12-3/",
+   "roles": "Ages 17+ Interested in healthcare and working with the public Enjoy helping others and working with your hands Selected candidates will be invited for an",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-12-03",
+    "dates": [
+     "2026-12-03"
+    ],
+    "recurring": null,
+    "time": "9 AM–11 AM",
+    "where": "100 College Avenue, Rochester, NY 14607",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "ny-rochesterworks",
+    "sourceName": "RochesterWorks!",
+    "state": "NY",
+    "src": "https://rochesterworks.org/event/mini-job-fair-at-rochesterworks-12-3/",
+    "general": true,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:ny-rochesterworks:gsjzjk",
+   "title": "DelMonte Hotel Group Open Interviews",
+   "company": "RochesterWorks!",
+   "location": "Rochester, NY",
+   "lat": 43.155,
+   "lng": -77.616,
+   "url": "https://rochesterworks.org/event/delmonte-hotel-group-open-interviews-2/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-10",
+    "dates": [
+     "2026-12-10"
+    ],
+    "recurring": null,
+    "time": "9 AM–5 PM",
+    "where": "Hilton Garden Inn, Rochester University & Medical Center, 30 Celebration Drive, Rochester, NY 14620",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "ny-rochesterworks",
+    "sourceName": "RochesterWorks!",
+    "state": "NY",
+    "src": "https://rochesterworks.org/event/delmonte-hotel-group-open-interviews-2/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:ny-rochesterworks:7uufw",
+   "title": "DelMonte Hotel Group Open Interviews",
+   "company": "RochesterWorks!",
+   "location": "Rochester, NY",
+   "lat": 43.155,
+   "lng": -77.616,
+   "url": "https://rochesterworks.org/event/delmonte-hotel-group-open-interviews-3/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-14",
+    "dates": [
+     "2026-12-14"
+    ],
+    "recurring": null,
+    "time": "9 AM–7 PM",
+    "where": "Courtyard by Marriott Rochester/Brighton, 33 Corporate Woods, Rochester, NY 14623",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "ny-rochesterworks",
+    "sourceName": "RochesterWorks!",
+    "state": "NY",
+    "src": "https://rochesterworks.org/event/delmonte-hotel-group-open-interviews-3/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:ny-rochesterworks:1bvfq1c",
+   "title": "Monroe Community Hospital Monthly Job Fair!",
+   "company": "RochesterWorks!",
+   "location": "Rochester, NY",
+   "lat": 43.155,
+   "lng": -77.616,
+   "url": "https://rochesterworks.org/event/monroe-community-hospital-monthly-job-fair-9/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-12-17",
+    "dates": [
+     "2026-12-17"
+    ],
+    "recurring": null,
+    "time": "9 AM–4 PM",
+    "where": "Monroe Community Hospital, 435 East Henrietta Rd, Rochester, NY 14620",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "ny-rochesterworks",
+    "sourceName": "RochesterWorks!",
+    "state": "NY",
+    "src": "https://rochesterworks.org/event/monroe-community-hospital-monthly-job-fair-9/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:ny-rochesterworks:1o3erfc",
+   "title": "DelMonte Hotel Group Open Interviews",
+   "company": "RochesterWorks!",
+   "location": "Rochester, NY",
+   "lat": 43.155,
+   "lng": -77.616,
+   "url": "https://rochesterworks.org/event/delmonte-hotel-group-open-interviews-4/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-18",
+    "dates": [
+     "2026-12-18"
+    ],
+    "recurring": null,
+    "time": "9 AM–5 PM",
+    "where": "Courtyard by Marriott Rochester/Brighton, 33 Corporate Woods, Rochester, NY 14623",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "ny-rochesterworks",
+    "sourceName": "RochesterWorks!",
+    "state": "NY",
+    "src": "https://rochesterworks.org/event/delmonte-hotel-group-open-interviews-4/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:nj-greater-raritan:1w57fho",
+   "title": "RealReal In-Person Recruitment Event",
+   "company": "Greater Raritan Workforce Development Board",
+   "location": "Perth Amboy, NJ",
+   "lat": 40.507,
+   "lng": -74.265,
+   "url": "https://thegrwdb.org/event/realreal-in-person-recruitment-event/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-18",
+    "dates": [
+     "2026-11-18"
+    ],
+    "recurring": null,
+    "time": "10 AM–12 PM",
+    "where": "Perth Amboy One-Stop Career Center, 161 New Brunswick Ave., Perth Amboy, NJ 08861",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "nj-greater-raritan",
+    "sourceName": "Greater Raritan Workforce Development Board",
+    "state": "NJ",
+    "src": "https://thegrwdb.org/event/realreal-in-person-recruitment-event/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:nj-greater-raritan:7j82ly",
+   "title": "Forged Solutions Group Walk-In Recruitment Event in November",
+   "company": "Greater Raritan Workforce Development Board",
+   "location": "High Bridg, NJ",
+   "lat": null,
+   "lng": null,
+   "url": "https://thegrwdb.org/event/forged-solutions-group-walk-in-recruitment-event-in-november/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-18",
+    "dates": [
+     "2026-11-18"
+    ],
+    "recurring": null,
+    "time": "1 PM–4 PM",
+    "where": "Forged Solutions Group – Custom Alloy Corp., 3 Washington Ave., High Bridg, NJ 08829",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "nj-greater-raritan",
+    "sourceName": "Greater Raritan Workforce Development Board",
+    "state": "NJ",
+    "src": "https://thegrwdb.org/event/forged-solutions-group-walk-in-recruitment-event-in-november/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:nj-greater-raritan:5rcllx",
+   "title": "ABM Industries Recruitment Event",
+   "company": "Greater Raritan Workforce Development Board",
+   "location": "Somerville, NJ",
+   "lat": 40.574,
+   "lng": -74.61,
+   "url": "https://thegrwdb.org/event/abm-industries-recruitment-event/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-19",
+    "dates": [
+     "2026-11-19"
+    ],
+    "recurring": null,
+    "time": "10 AM–2 PM",
+    "where": "Somerville One-Stop Career Center, 75 Veterans Memorial Drive East, Somerville, NJ 08876",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "nj-greater-raritan",
+    "sourceName": "Greater Raritan Workforce Development Board",
+    "state": "NJ",
+    "src": "https://thegrwdb.org/event/abm-industries-recruitment-event/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:nj-greater-raritan:e0xwoa",
+   "title": "UPS Seasonal Support Driver Virtual Recruitment Event",
+   "company": "Greater Raritan Workforce Development Board",
+   "location": "Virtual · New Jersey",
+   "lat": null,
+   "lng": null,
+   "url": "https://thegrwdb.org/event/ups-seasonal-support-driver-virtual-recruitment-event/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-25",
+    "dates": [
+     "2026-11-25"
+    ],
+    "recurring": null,
+    "time": "11 AM–12 PM",
+    "where": null,
+    "virtual": true,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "nj-greater-raritan",
+    "sourceName": "Greater Raritan Workforce Development Board",
+    "state": "NJ",
+    "src": "https://thegrwdb.org/event/ups-seasonal-support-driver-virtual-recruitment-event/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:nj-greater-raritan:xnhm1v",
+   "title": "Forged Solutions Group Walk-In Recruitment Event in December",
+   "company": "Greater Raritan Workforce Development Board",
+   "location": "High Bridg, NJ",
+   "lat": null,
+   "lng": null,
+   "url": "https://thegrwdb.org/event/forged-solutions-group-walk-in-recruitment-event-in-december/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-02",
+    "dates": [
+     "2026-12-02"
+    ],
+    "recurring": null,
+    "time": "1 PM–4 PM",
+    "where": "Forged Solutions Group – Custom Alloy Corp., 3 Washington Ave., High Bridg, NJ 08829",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "nj-greater-raritan",
+    "sourceName": "Greater Raritan Workforce Development Board",
+    "state": "NJ",
+    "src": "https://thegrwdb.org/event/forged-solutions-group-walk-in-recruitment-event-in-december/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:nj-greater-raritan:1aiuevw",
+   "title": "Forged Solutions Group Walk-In Recruitment Event in December",
+   "company": "Greater Raritan Workforce Development Board",
+   "location": "High Bridg, NJ",
+   "lat": null,
+   "lng": null,
+   "url": "https://thegrwdb.org/event/forged-solutions-group-walk-in-recruitment-event-in-december-2/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-09",
+    "dates": [
+     "2026-12-09"
+    ],
+    "recurring": null,
+    "time": "1 PM–4 PM",
+    "where": "Forged Solutions Group – Custom Alloy Corp., 3 Washington Ave., High Bridg, NJ 08829",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "nj-greater-raritan",
+    "sourceName": "Greater Raritan Workforce Development Board",
+    "state": "NJ",
+    "src": "https://thegrwdb.org/event/forged-solutions-group-walk-in-recruitment-event-in-december-2/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:nj-greater-raritan:1xl1648",
+   "title": "Restaurant Depot on-site Recruitment Event",
+   "company": "Greater Raritan Workforce Development Board",
+   "location": "Flemington, NJ",
+   "lat": 40.512,
+   "lng": -74.859,
+   "url": "https://thegrwdb.org/event/restaurant-depot-on-site-recruitment-event/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-10",
+    "dates": [
+     "2026-12-10"
+    ],
+    "recurring": null,
+    "time": "10 AM–12 PM",
+    "where": "Restaurant Depot (Jetro Holdings), 408 U.S. Route 202, Flemington, NJ 08822",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "nj-greater-raritan",
+    "sourceName": "Greater Raritan Workforce Development Board",
+    "state": "NJ",
+    "src": "https://thegrwdb.org/event/restaurant-depot-on-site-recruitment-event/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:nj-greater-raritan:sha7xc",
+   "title": "Forged Solutions Group Walk-In Recruitment Event in December",
+   "company": "Greater Raritan Workforce Development Board",
+   "location": "High Bridg, NJ",
+   "lat": null,
+   "lng": null,
+   "url": "https://thegrwdb.org/event/forged-solutions-group-walk-in-recruitment-event-in-december-3/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-16",
+    "dates": [
+     "2026-12-16"
+    ],
+    "recurring": null,
+    "time": "1 PM–4 PM",
+    "where": "Forged Solutions Group – Custom Alloy Corp., 3 Washington Ave., High Bridg, NJ 08829",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "nj-greater-raritan",
+    "sourceName": "Greater Raritan Workforce Development Board",
+    "state": "NJ",
+    "src": "https://thegrwdb.org/event/forged-solutions-group-walk-in-recruitment-event-in-december-3/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:va-virginiaworks:vafua3",
+   "title": "Grocery Outlet Hiring Event ~ Indian River Location",
+   "company": "Virginia Works",
+   "location": "Chesapeake, VA",
+   "lat": 36.819,
+   "lng": -76.275,
+   "url": "https://virginiaworks.gov/event/grocery-outlet-hiring-event-indian-river-location/2026-11-17/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-17",
+    "dates": [
+     "2026-11-17"
+    ],
+    "recurring": null,
+    "time": "11 AM–3 PM",
+    "where": "Grocery Outlet Indian River, 4323 Indian River Road, Chesapeake, VA 23325",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "va-virginiaworks",
+    "sourceName": "Virginia Works",
+    "state": "VA",
+    "src": "https://virginiaworks.gov/event/grocery-outlet-hiring-event-indian-river-location/2026-11-17/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:va-virginiaworks:15ua4ru",
+   "title": "Workforce Wednesday Virtual Job Fair",
+   "company": "Virginia Works",
+   "location": "Virtual · Virginia",
+   "lat": null,
+   "lng": null,
+   "url": "https://virginiaworks.gov/event/workforce-wednesday-virtual-job-fair/2026-11-18/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-11-18",
+    "dates": [
+     "2026-11-18"
+    ],
+    "recurring": null,
+    "time": "10 AM–2 PM",
+    "where": null,
+    "virtual": true,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "va-virginiaworks",
+    "sourceName": "Virginia Works",
+    "state": "VA",
+    "src": "https://virginiaworks.gov/event/workforce-wednesday-virtual-job-fair/2026-11-18/",
+    "general": true,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:va-virginiaworks:15mok1c",
+   "title": "Grocery Outlet Hiring Event ~ Indian River Location",
+   "company": "Virginia Works",
+   "location": "Chesapeake, VA",
+   "lat": 36.819,
+   "lng": -76.275,
+   "url": "https://virginiaworks.gov/event/grocery-outlet-hiring-event-indian-river-location/2026-11-18/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-18",
+    "dates": [
+     "2026-11-18"
+    ],
+    "recurring": null,
+    "time": "11 AM–3 PM",
+    "where": "Grocery Outlet Indian River, 4323 Indian River Road, Chesapeake, VA 23325",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "va-virginiaworks",
+    "sourceName": "Virginia Works",
+    "state": "VA",
+    "src": "https://virginiaworks.gov/event/grocery-outlet-hiring-event-indian-river-location/2026-11-18/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:va-virginiaworks:lxkt18",
+   "title": "3rd Thursday Hiring Event",
+   "company": "Virginia Works",
+   "location": "Chesterfield, VA",
+   "lat": null,
+   "lng": null,
+   "url": "https://virginiaworks.gov/event/3rd-thursday-hiring-event/2026-11-19/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-19",
+    "dates": [
+     "2026-11-19"
+    ],
+    "recurring": null,
+    "time": "10 AM–1 PM",
+    "where": "Workforce Center – Chesterfield, 304 N. Turner Rd, Suite N, Chesterfield, VA 23225",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "va-virginiaworks",
+    "sourceName": "Virginia Works",
+    "state": "VA",
+    "src": "https://virginiaworks.gov/event/3rd-thursday-hiring-event/2026-11-19/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:va-virginiaworks:1tp7t97",
+   "title": "Hiring Event: UVA Temps",
+   "company": "Virginia Works",
+   "location": "Charlottesville, VA",
+   "lat": 38.029,
+   "lng": -78.477,
+   "url": "https://virginiaworks.gov/event/hiring-event-uva-temps/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-19",
+    "dates": [
+     "2026-11-19"
+    ],
+    "recurring": null,
+    "time": "10 AM–1 PM",
+    "where": "Virginia Career Works–Piedmont, Charlottesville Center, 944 Glenwood Station Lane, Suite 103, Charlottesville, VA 22901",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "va-virginiaworks",
+    "sourceName": "Virginia Works",
+    "state": "VA",
+    "src": "https://virginiaworks.gov/event/hiring-event-uva-temps/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:va-virginiaworks:14ggrop",
+   "title": "Temp Hiring Event: UVA Transit (Charlottesville)",
+   "company": "Virginia Works",
+   "location": "Charlottesville, VA",
+   "lat": 38.029,
+   "lng": -78.477,
+   "url": "https://virginiaworks.gov/event/temp-hiring-event-uva-transit-charlottesville/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-19",
+    "dates": [
+     "2026-11-19"
+    ],
+    "recurring": null,
+    "time": "10 AM–1 PM",
+    "where": "University of Virginia Parking & Transportation, 1101 Millmont Street, Charlottesville, VA 22903",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "va-virginiaworks",
+    "sourceName": "Virginia Works",
+    "state": "VA",
+    "src": "https://virginiaworks.gov/event/temp-hiring-event-uva-transit-charlottesville/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:va-virginiaworks:aqp0gx",
+   "title": "Skipwith Academy to Host Childcare Job Fair",
+   "company": "Virginia Works",
+   "location": "Mechanicsville, VA",
+   "lat": 37.609,
+   "lng": -77.373,
+   "url": "https://virginiaworks.gov/event/skipwith-academy-to-host-childcare-job-fair/",
+   "roles": "Assistant Director, Program Manager, Montessori Teachers, Lead Teacher, Assistant Teacher, Cook, and Bus Driver positions at Skipwith Academy locations in",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-11-19",
+    "dates": [
+     "2026-11-19"
+    ],
+    "recurring": null,
+    "time": "10 AM–3 PM",
+    "where": "Skipwith Academy at Pebble Creek, 7386 Creighton Parkway, Mechanicsville, VA 23111",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "va-virginiaworks",
+    "sourceName": "Virginia Works",
+    "state": "VA",
+    "src": "https://virginiaworks.gov/event/skipwith-academy-to-host-childcare-job-fair/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:va-virginiaworks:zy3d52",
+   "title": "Fredericksburg: Multi-Employer Hiring Event",
+   "company": "Virginia Works",
+   "location": "Fredericksburg, VA",
+   "lat": 38.303,
+   "lng": -77.461,
+   "url": "https://virginiaworks.gov/event/fredericksburg-multi-employer-hiring-event/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-19",
+    "dates": [
+     "2026-11-19"
+    ],
+    "recurring": null,
+    "time": "10 AM–2 PM",
+    "where": "Workforce Center – Fredericksburg, 10304 Spotsylvania Ave, Suite #100, Fredericksburg, VA 22408",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "va-virginiaworks",
+    "sourceName": "Virginia Works",
+    "state": "VA",
+    "src": "https://virginiaworks.gov/event/fredericksburg-multi-employer-hiring-event/",
+    "general": true,
+    "many": true
+   }
+  },
+  {
+   "id": "ext:va-virginiaworks:1gow6sl",
+   "title": "Grocery Outlet Hiring Event ~ Indian River Location",
+   "company": "Virginia Works",
+   "location": "Chesapeake, VA",
+   "lat": 36.819,
+   "lng": -76.275,
+   "url": "https://virginiaworks.gov/event/grocery-outlet-hiring-event-indian-river-location/2026-11-19/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-19",
+    "dates": [
+     "2026-11-19"
+    ],
+    "recurring": null,
+    "time": "11 AM–3 PM",
+    "where": "Grocery Outlet Indian River, 4323 Indian River Road, Chesapeake, VA 23325",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "va-virginiaworks",
+    "sourceName": "Virginia Works",
+    "state": "VA",
+    "src": "https://virginiaworks.gov/event/grocery-outlet-hiring-event-indian-river-location/2026-11-19/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:va-virginiaworks:1q1i3f7",
+   "title": "Maxim Healthcare Services Job Fair",
+   "company": "Virginia Works",
+   "location": "Vienna, VA",
+   "lat": 38.901,
+   "lng": -77.265,
+   "url": "https://virginiaworks.gov/event/maxim-healthcare-services-job-fair/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-11-20",
+    "dates": [
+     "2026-11-20"
+    ],
+    "recurring": null,
+    "time": "10 AM–2 PM",
+    "where": "Maxim Healthcare, 2600 Park Tower Dr., Suite 200, Vienna, VA 22180",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "va-virginiaworks",
+    "sourceName": "Virginia Works",
+    "state": "VA",
+    "src": "https://virginiaworks.gov/event/maxim-healthcare-services-job-fair/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:va-virginiaworks:4h86e5",
+   "title": "Skipwith Academy to Host Childcare Job Fair",
+   "company": "Virginia Works",
+   "location": "Midlothian, VA",
+   "lat": 37.506,
+   "lng": -77.649,
+   "url": "https://virginiaworks.gov/event/skipwith-academy-to-host-childcare-job-fair-2/",
+   "roles": "Assistant Director, Program Manager, Montessori Teachers, Lead Teacher, Assistant Teacher, Cook, and Bus Driver positions at Skipwith Academy locations in",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-12-03",
+    "dates": [
+     "2026-12-03"
+    ],
+    "recurring": null,
+    "time": "10 AM–3 PM",
+    "where": "Skipwith Academy at Westchester Commons, 300 Schofield Drive, Midlothian, VA 23113",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "va-virginiaworks",
+    "sourceName": "Virginia Works",
+    "state": "VA",
+    "src": "https://virginiaworks.gov/event/skipwith-academy-to-host-childcare-job-fair-2/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:va-virginiaworks:pvmte8",
+   "title": "Skipwith Academy to Host Childcare Job Fair",
+   "company": "Virginia Works",
+   "location": "Richmond, VA",
+   "lat": 37.554,
+   "lng": -77.46,
+   "url": "https://virginiaworks.gov/event/skipwith-academy-to-host-childcare-job-fair-3/",
+   "roles": "Assistant Director, Program Manager, Montessori Teachers, Lead Teacher, Assistant Teacher, Cook, and Bus Driver positions at Skipwith Academy locations in",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-12-03",
+    "dates": [
+     "2026-12-03"
+    ],
+    "recurring": null,
+    "time": "10 AM–3 PM",
+    "where": "Skipwith Academy at Lauderdale Square, 3111 Lauderdale Drive, Richmond, VA 23233",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "va-virginiaworks",
+    "sourceName": "Virginia Works",
+    "state": "VA",
+    "src": "https://virginiaworks.gov/event/skipwith-academy-to-host-childcare-job-fair-3/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:va-virginiaworks:jw5qns",
+   "title": "Skipwith Academy to Host Childcare Job Fair",
+   "company": "Virginia Works",
+   "location": "Chester, VA",
+   "lat": 37.357,
+   "lng": -77.442,
+   "url": "https://virginiaworks.gov/event/skipwith-academy-to-host-childcare-job-fair-4/",
+   "roles": "Assistant Director, Program Manager, Montessori Teachers, Lead Teacher, Assistant Teacher, Cook, and Bus Driver positions at Skipwith Academy locations in",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-12-03",
+    "dates": [
+     "2026-12-03"
+    ],
+    "recurring": null,
+    "time": "10 AM–3 PM",
+    "where": "Skipwith Academy at Enon, 1831 Enon Station Drive, Chester, VA 23836",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "va-virginiaworks",
+    "sourceName": "Virginia Works",
+    "state": "VA",
+    "src": "https://virginiaworks.gov/event/skipwith-academy-to-host-childcare-job-fair-4/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:va-virginiaworks:r781aq",
+   "title": "Fredericksburg Healthcare Hiring Event",
+   "company": "Virginia Works",
+   "location": "Fredericksburg, VA",
+   "lat": 38.303,
+   "lng": -77.461,
+   "url": "https://virginiaworks.gov/event/fredericksburg-healthcare-hiring-event/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-05",
+    "dates": [
+     "2026-12-05"
+    ],
+    "recurring": null,
+    "time": "10 AM–2 PM",
+    "where": "Fredericksburg 3 VA Clinic, 10432 Patriot Highway, Fredericksburg, VA 22408",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "va-virginiaworks",
+    "sourceName": "Virginia Works",
+    "state": "VA",
+    "src": "https://virginiaworks.gov/event/fredericksburg-healthcare-hiring-event/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:va-virginiaworks:1mfrb3r",
+   "title": "Super Tuesday Hiring Event",
+   "company": "Virginia Works",
+   "location": "Hampton, VA",
+   "lat": 37.03,
+   "lng": -76.345,
+   "url": "https://virginiaworks.gov/event/super-tuesday-hiring-event/2026-12-08/",
+   "roles": "Hampton-Newport News CSB Newport News Public Schools Hampton Roads Transit (HRT) Securitas Security Services City of Newport News-HR Hampton City Schools",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-08",
+    "dates": [
+     "2026-12-08"
+    ],
+    "recurring": null,
+    "time": "9 AM–12 PM",
+    "where": "Workforce Center – Hampton, 600 Butler Farm Rd, Hampton, VA 23666",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "va-virginiaworks",
+    "sourceName": "Virginia Works",
+    "state": "VA",
+    "src": "https://virginiaworks.gov/event/super-tuesday-hiring-event/2026-12-08/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:va-virginiaworks:mf3r8l",
+   "title": "USPS Job Fair – Charlottesville VA",
+   "company": "Virginia Works",
+   "location": "Charlottesville, VA",
+   "lat": 38.029,
+   "lng": -78.477,
+   "url": "https://virginiaworks.gov/event/usps-job-fair-charlottesville-va/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-12-08",
+    "dates": [
+     "2026-12-08"
+    ],
+    "recurring": null,
+    "time": "1 PM–3 PM",
+    "where": "Charlottesville Post Office, 1155 Seminole Trail, Charlottesville, VA 22906",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "va-virginiaworks",
+    "sourceName": "Virginia Works",
+    "state": "VA",
+    "src": "https://virginiaworks.gov/event/usps-job-fair-charlottesville-va/",
+    "general": true,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:va-virginiaworks:sittks",
+   "title": "2nd Wednesday Hiring Event-Petersburg",
+   "company": "Virginia Works",
+   "location": "Petersburg, VA",
+   "lat": 37.228,
+   "lng": -77.402,
+   "url": "https://virginiaworks.gov/event/2nd-wednesday-hiring-event-petersburg/2026-12-09/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-09",
+    "dates": [
+     "2026-12-09"
+    ],
+    "recurring": null,
+    "time": "10 AM–1 PM",
+    "where": "Virginia Community Resource Center, 22 W. Washington Street, Petersburg, VA 23803",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "va-virginiaworks",
+    "sourceName": "Virginia Works",
+    "state": "VA",
+    "src": "https://virginiaworks.gov/event/2nd-wednesday-hiring-event-petersburg/2026-12-09/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:va-virginiaworks:qusqmd",
+   "title": "Resource Management Systems (RMS) Featured Employer Hiring Event – December 10, 2026",
+   "company": "Virginia Works",
+   "location": "Staunton, VA",
+   "lat": 38.15,
+   "lng": -79.072,
+   "url": "https://virginiaworks.gov/event/resource-management-systems-rms-featured-employer-hiring-event-december-10-2026/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-10",
+    "dates": [
+     "2026-12-10"
+    ],
+    "recurring": null,
+    "time": "1 PM–4 PM",
+    "where": "Workforce Center – Fishersville, 1076 Jefferson Hwy, Staunton, VA 24401",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "va-virginiaworks",
+    "sourceName": "Virginia Works",
+    "state": "VA",
+    "src": "https://virginiaworks.gov/event/resource-management-systems-rms-featured-employer-hiring-event-december-10-2026/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:va-virginiaworks:k3azjl",
+   "title": "Purpose in Every Position: SOAR365 Job Fair",
+   "company": "Virginia Works",
+   "location": "North Chesterfield, VA",
+   "lat": null,
+   "lng": null,
+   "url": "https://virginiaworks.gov/event/purpose-in-every-position-soar365-job-fair/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-12-15",
+    "dates": [
+     "2026-12-15"
+    ],
+    "recurring": null,
+    "time": "10 AM–2 PM",
+    "where": "Meadowdale Library, 4301 Meadowdale Boulevard, North Chesterfield, VA 23234",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "va-virginiaworks",
+    "sourceName": "Virginia Works",
+    "state": "VA",
+    "src": "https://virginiaworks.gov/event/purpose-in-every-position-soar365-job-fair/",
+    "general": true,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:va-virginiaworks:sbkatl",
+   "title": "Workforce Wednesday Virtual Job Fair",
+   "company": "Virginia Works",
+   "location": "Virtual · Virginia",
+   "lat": null,
+   "lng": null,
+   "url": "https://virginiaworks.gov/event/workforce-wednesday-virtual-job-fair/2026-12-16/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-12-16",
+    "dates": [
+     "2026-12-16"
+    ],
+    "recurring": null,
+    "time": "10 AM–2 PM",
+    "where": null,
+    "virtual": true,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "va-virginiaworks",
+    "sourceName": "Virginia Works",
+    "state": "VA",
+    "src": "https://virginiaworks.gov/event/workforce-wednesday-virtual-job-fair/2026-12-16/",
+    "general": true,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:va-virginiaworks:15wgeu7",
+   "title": "3rd Thursday Hiring Event",
+   "company": "Virginia Works",
+   "location": "Chesterfield, VA",
+   "lat": null,
+   "lng": null,
+   "url": "https://virginiaworks.gov/event/3rd-thursday-hiring-event/2026-12-17/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-17",
+    "dates": [
+     "2026-12-17"
+    ],
+    "recurring": null,
+    "time": "10 AM–1 PM",
+    "where": "Workforce Center – Chesterfield, 304 N. Turner Rd, Suite N, Chesterfield, VA 23225",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "va-virginiaworks",
+    "sourceName": "Virginia Works",
+    "state": "VA",
+    "src": "https://virginiaworks.gov/event/3rd-thursday-hiring-event/2026-12-17/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:ca-sdwp:xe2938",
+   "title": "Lay The Foundation Career Fair",
+   "company": "San Diego Workforce Partnership",
+   "location": "San Diego, CA",
+   "lat": 32.7178162,
+   "lng": -117.15074,
+   "url": "https://www.workforce.org/events/lay-the-foundation-career-fair/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-11-18",
+    "dates": [
+     "2026-11-18"
+    ],
+    "recurring": null,
+    "time": "10 AM–12 PM",
+    "where": "San Diego City College, A Building – Patio, 1313 Park Boulevard, San Diego, CA 92101, 1313 Park Boulevard, San Diego, CA 92101",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "ca-sdwp",
+    "sourceName": "San Diego Workforce Partnership",
+    "state": "CA",
+    "src": "https://www.workforce.org/events/lay-the-foundation-career-fair/",
+    "general": true,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:fl-cs-nefl:12a0l3r",
+   "title": "DAV RecruitMilitary National Military Community Virtual Hiring Event",
+   "company": "CareerSource Northeast Florida",
+   "location": "Virtual · Florida",
+   "lat": null,
+   "lng": null,
+   "url": "https://careersourcenortheastflorida.com/event/dav-recruitmilitary-national-military-community-virtual-hiring-event/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-24",
+    "dates": [
+     "2026-11-24"
+    ],
+    "recurring": null,
+    "time": "11 AM–3 PM",
+    "where": null,
+    "virtual": true,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "fl-cs-nefl",
+    "sourceName": "CareerSource Northeast Florida",
+    "state": "FL",
+    "src": "https://careersourcenortheastflorida.com/event/dav-recruitmilitary-national-military-community-virtual-hiring-event/",
+    "general": true,
+    "many": true
+   }
+  },
+  {
+   "id": "ext:fl-cs-nefl:1qzh4o3",
+   "title": "Job News Jacksonville Job Fair | Multi-Industry Hiring Event",
+   "company": "CareerSource Northeast Florida",
+   "location": "Jacksonville, FL",
+   "lat": 30.332,
+   "lng": -81.656,
+   "url": "https://careersourcenortheastflorida.com/event/job-news-jacksonville-job-fair-multi-industry-hiring-event-3/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-12-10",
+    "dates": [
+     "2026-12-10"
+    ],
+    "recurring": null,
+    "time": "10 AM–2 PM",
+    "where": "DoubleTree Riverfront, 1201 Riverplace Blvd, Jacksonville, FL 32207",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "fl-cs-nefl",
+    "sourceName": "CareerSource Northeast Florida",
+    "state": "FL",
+    "src": "https://careersourcenortheastflorida.com/event/job-news-jacksonville-job-fair-multi-industry-hiring-event-3/",
+    "general": true,
+    "many": true
+   }
+  },
+  {
+   "id": "ext:fl-cs-nefl:thnjyi",
+   "title": "2027 First Coast Technical College Annual Career Fair",
+   "company": "CareerSource Northeast Florida",
+   "location": "St. Augustine, FL",
+   "lat": 29.895,
+   "lng": -81.315,
+   "url": "https://careersourcenortheastflorida.com/event/2027-first-coast-technical-college-annual-career-fair/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2027-04-06",
+    "dates": [
+     "2027-04-06"
+    ],
+    "recurring": null,
+    "time": "8:30 AM–11:30 AM",
+    "where": "First Coast Technical College, 2980 Collins Avenue, St. Augustine, FL 32084",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "fl-cs-nefl",
+    "sourceName": "CareerSource Northeast Florida",
+    "state": "FL",
+    "src": "https://careersourcenortheastflorida.com/event/2027-first-coast-technical-college-annual-career-fair/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:md-labor:3l6ohv",
+   "title": "Doctors Community Medical Center In-Person Nursing Hiring Event",
+   "company": "Maryland Department of Labor",
+   "location": "Lanham, MD",
+   "lat": 38.967,
+   "lng": -76.862,
+   "url": "https://labor.md.gov/employment/jobfairs.shtml",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-18",
+    "dates": [
+     "2026-11-18"
+    ],
+    "recurring": null,
+    "time": "4 PM–6 PM",
+    "where": "Luminis Health Doctors Community Medical Center, 8118 Good Luck Road, North Building 5th Floor - Room DSE A&B, Lanham, MD 20706",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "md-labor",
+    "sourceName": "Maryland Department of Labor",
+    "state": "MD",
+    "src": "https://labor.md.gov/employment/jobfairs.shtml",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:md-labor:1em5oh0",
+   "title": "Maryland Regional Job Fair by Carroll County Workforce Development",
+   "company": "Maryland Department of Labor",
+   "location": "Virtual · Maryland",
+   "lat": null,
+   "lng": null,
+   "url": "https://labor.md.gov/employment/jobfairs.shtml",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-12-03",
+    "dates": [
+     "2026-12-03"
+    ],
+    "recurring": null,
+    "time": "10 AM–12 PM",
+    "where": null,
+    "virtual": true,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "md-labor",
+    "sourceName": "Maryland Department of Labor",
+    "state": "MD",
+    "src": "https://labor.md.gov/employment/jobfairs.shtml",
+    "general": true,
+    "many": true
+   }
+  },
+  {
+   "id": "ext:wv-workforce:1ilc7zi",
+   "title": "South Central Regional Jail and Correctional Facility Hiring Event",
+   "company": "WorkForce West Virginia",
+   "location": "Charleston, WV",
+   "lat": 38.35,
+   "lng": -81.633,
+   "url": "https://workforcewv.org/wp-content/uploads/2026/09/SCRJ_Hiring_Event_17_November_2026.pdf",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-17",
+    "dates": [
+     "2026-11-17"
+    ],
+    "recurring": null,
+    "time": null,
+    "where": null,
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "wv-workforce",
+    "sourceName": "WorkForce West Virginia",
+    "state": "WV",
+    "src": "https://workforcewv.org/wp-content/uploads/2026/09/SCRJ_Hiring_Event_17_November_2026.pdf",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:wv-workforce:197jebk",
+   "title": "On-Board Companies - Find More than a Job - Find a Career",
+   "company": "WorkForce West Virginia",
+   "location": "Parkersburg, WV",
+   "lat": 39.267,
+   "lng": -81.562,
+   "url": "https://workforcewv.org/wp-content/uploads/2026/11/workforce-JF-11.5.26.pdf",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-20",
+    "dates": [
+     "2026-11-20"
+    ],
+    "recurring": null,
+    "time": null,
+    "where": null,
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "wv-workforce",
+    "sourceName": "WorkForce West Virginia",
+    "state": "WV",
+    "src": "https://workforcewv.org/wp-content/uploads/2026/11/workforce-JF-11.5.26.pdf",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:wv-workforce:t0qubq",
+   "title": "Northern Regional Jail & Correctional Facility Hiring Event",
+   "company": "WorkForce West Virginia",
+   "location": "Moundsville, WV",
+   "lat": 39.92,
+   "lng": -80.743,
+   "url": "https://workforcewv.org/wp-content/uploads/2026/09/NRJ_Hiring_Event_-_01_December_2026.pdf",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-01",
+    "dates": [
+     "2026-12-01"
+    ],
+    "recurring": null,
+    "time": null,
+    "where": null,
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "wv-workforce",
+    "sourceName": "WorkForce West Virginia",
+    "state": "WV",
+    "src": "https://workforcewv.org/wp-content/uploads/2026/09/NRJ_Hiring_Event_-_01_December_2026.pdf",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:wv-workforce:1ptsjy5",
+   "title": "Western Regional Jail & Correctional Facility Hiring Event",
+   "company": "WorkForce West Virginia",
+   "location": "Barboursville, WV",
+   "lat": 38.41,
+   "lng": -82.295,
+   "url": "https://workforcewv.org/wp-content/uploads/2026/09/WRJ_Hiring_Event_-_02_December_2026.pdf",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-02",
+    "dates": [
+     "2026-12-02"
+    ],
+    "recurring": null,
+    "time": null,
+    "where": null,
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "wv-workforce",
+    "sourceName": "WorkForce West Virginia",
+    "state": "WV",
+    "src": "https://workforcewv.org/wp-content/uploads/2026/09/WRJ_Hiring_Event_-_02_December_2026.pdf",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:wv-workforce:1jbcs8b",
+   "title": "Statewide Monthly Virtual Job Fair - December 2",
+   "company": "WorkForce West Virginia",
+   "location": "Virtual · West Virginia",
+   "lat": null,
+   "lng": null,
+   "url": "https://workforcewv.org/wp-content/uploads/2026/10/December-VJF-Jobseeker-2026.pdf",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-12-02",
+    "dates": [
+     "2026-12-02"
+    ],
+    "recurring": null,
+    "time": null,
+    "where": null,
+    "virtual": true,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "wv-workforce",
+    "sourceName": "WorkForce West Virginia",
+    "state": "WV",
+    "src": "https://workforcewv.org/wp-content/uploads/2026/10/December-VJF-Jobseeker-2026.pdf",
+    "general": true,
+    "many": true
+   }
+  },
+  {
+   "id": "ext:wv-workforce:gud91e",
+   "title": "Tygart Valley Regional Jail & Correctional Facility Hiring Event",
+   "company": "WorkForce West Virginia",
+   "location": "Belington, WV",
+   "lat": 39.025,
+   "lng": -79.936,
+   "url": "https://workforcewv.org/wp-content/uploads/2026/09/TVRJ_Hiring_Event_05_December_2026.pdf",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-05",
+    "dates": [
+     "2026-12-05"
+    ],
+    "recurring": null,
+    "time": null,
+    "where": null,
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "wv-workforce",
+    "sourceName": "WorkForce West Virginia",
+    "state": "WV",
+    "src": "https://workforcewv.org/wp-content/uploads/2026/09/TVRJ_Hiring_Event_05_December_2026.pdf",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:wv-workforce:zo64xf",
+   "title": "Huttonsville Correctional Center & Jail Hiring Event",
+   "company": "WorkForce West Virginia",
+   "location": "Huttonsville, WV",
+   "lat": 38.713,
+   "lng": -79.979,
+   "url": "https://workforcewv.org/wp-content/uploads/2026/09/HCC_Hiring_Event_-_09_December_2026.pdf",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-09",
+    "dates": [
+     "2026-12-09"
+    ],
+    "recurring": null,
+    "time": null,
+    "where": null,
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "wv-workforce",
+    "sourceName": "WorkForce West Virginia",
+    "state": "WV",
+    "src": "https://workforcewv.org/wp-content/uploads/2026/09/HCC_Hiring_Event_-_09_December_2026.pdf",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:wv-workforce:jo43g0",
+   "title": "South Central Regional Jail & Correctional Facility Hiring Event",
+   "company": "WorkForce West Virginia",
+   "location": "Charleston, WV",
+   "lat": 38.35,
+   "lng": -81.633,
+   "url": "https://workforcewv.org/wp-content/uploads/2026/09/SCRJ_Hiring_Event_15_December_2026.pdf",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-15",
+    "dates": [
+     "2026-12-15"
+    ],
+    "recurring": null,
+    "time": null,
+    "where": null,
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "wv-workforce",
+    "sourceName": "WorkForce West Virginia",
+    "state": "WV",
+    "src": "https://workforcewv.org/wp-content/uploads/2026/09/SCRJ_Hiring_Event_15_December_2026.pdf",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:wv-workforce:127hw8i",
+   "title": "Spring '27 Job Fair",
+   "company": "WorkForce West Virginia",
+   "location": "Huntington, WV",
+   "lat": 38.419,
+   "lng": -82.445,
+   "url": "https://workforcewv.org/job-seeker/find-a-job/job-fairs/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2027-04-21",
+    "dates": [
+     "2027-04-21"
+    ],
+    "recurring": null,
+    "time": null,
+    "where": null,
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "wv-workforce",
+    "sourceName": "WorkForce West Virginia",
+    "state": "WV",
+    "src": "https://workforcewv.org/job-seeker/find-a-job/job-fairs/",
+    "general": true,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:mn-careerforce:1fuzz68",
+   "title": "Employer of the Day - Fairview Health",
+   "company": "CareerForce Minnesota",
+   "location": "Roseville, MN",
+   "lat": 45.006,
+   "lng": -93.157,
+   "url": "https://careerforce.mn.gov/events/external/employer-day-fairview-health",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-11-17",
+    "dates": [
+     "2026-11-17"
+    ],
+    "recurring": null,
+    "time": "3 PM–5 PM",
+    "where": null,
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "mn-careerforce",
+    "sourceName": "CareerForce Minnesota",
+    "state": "MN",
+    "src": "https://careerforce.mn.gov/events/external/employer-day-fairview-health",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:mn-careerforce:12nsiej",
+   "title": "Onsite Employer of the Day",
+   "company": "CareerForce Minnesota",
+   "location": "Blaine, MN",
+   "lat": 45.161,
+   "lng": -93.235,
+   "url": "https://careerforce.mn.gov/events/external/onsite-employer-day-1",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-18",
+    "dates": [
+     "2026-11-18"
+    ],
+    "recurring": null,
+    "time": "9:30 AM–10:15 AM",
+    "where": null,
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "mn-careerforce",
+    "sourceName": "CareerForce Minnesota",
+    "state": "MN",
+    "src": "https://careerforce.mn.gov/events/external/onsite-employer-day-1",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:mn-careerforce:15wmrwn",
+   "title": "Onsite Hiring Event",
+   "company": "CareerForce Minnesota",
+   "location": "Blaine, MN",
+   "lat": 45.161,
+   "lng": -93.235,
+   "url": "https://careerforce.mn.gov/events/external/onsite-hiring-event-1",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-18",
+    "dates": [
+     "2026-11-18"
+    ],
+    "recurring": null,
+    "time": "10 AM–12 PM",
+    "where": null,
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "mn-careerforce",
+    "sourceName": "CareerForce Minnesota",
+    "state": "MN",
+    "src": "https://careerforce.mn.gov/events/external/onsite-hiring-event-1",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:mn-careerforce:1fj8h46",
+   "title": "Job Fair/Hiring Event",
+   "company": "CareerForce Minnesota",
+   "location": "Forest Lake, MN",
+   "lat": 45.279,
+   "lng": -92.985,
+   "url": "https://careerforce.mn.gov/events/event-occurrence/564",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-11-18",
+    "dates": [
+     "2026-11-18"
+    ],
+    "recurring": null,
+    "time": "1 PM–3 PM",
+    "where": null,
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "mn-careerforce",
+    "sourceName": "CareerForce Minnesota",
+    "state": "MN",
+    "src": "https://careerforce.mn.gov/events/event-occurrence/564",
+    "general": true,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:mn-careerforce:1le7dgf",
+   "title": "Meet the Employers Hiring Event & CDL Exploration",
+   "company": "CareerForce Minnesota",
+   "location": "Little Falls, MN",
+   "lat": 45.976,
+   "lng": -94.363,
+   "url": "https://careerforce.mn.gov/events/external/meet-employers-hiring-event-cdl-exploration",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-19",
+    "dates": [
+     "2026-11-19"
+    ],
+    "recurring": null,
+    "time": "11:30 AM–2:30 PM",
+    "where": null,
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "mn-careerforce",
+    "sourceName": "CareerForce Minnesota",
+    "state": "MN",
+    "src": "https://careerforce.mn.gov/events/external/meet-employers-hiring-event-cdl-exploration",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:mn-careerforce:1np8men",
+   "title": "Job Fair/Hiring Event",
+   "company": "CareerForce Minnesota",
+   "location": "West St. Paul, MN",
+   "lat": 44.916,
+   "lng": -93.102,
+   "url": "https://careerforce.mn.gov/events/event-occurrence/685",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-11-19",
+    "dates": [
+     "2026-11-19"
+    ],
+    "recurring": null,
+    "time": "2 PM–4 PM",
+    "where": null,
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "mn-careerforce",
+    "sourceName": "CareerForce Minnesota",
+    "state": "MN",
+    "src": "https://careerforce.mn.gov/events/event-occurrence/685",
+    "general": true,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:mn-careerforce:13ne1z3",
+   "title": "169 Works! Free Hiring Event",
+   "company": "CareerForce Minnesota",
+   "location": "Elk River, MN",
+   "lat": 45.304,
+   "lng": -93.567,
+   "url": "https://careerforce.mn.gov/events/external/169-works-free-hiring-event",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-21",
+    "dates": [
+     "2026-11-21"
+    ],
+    "recurring": null,
+    "time": "10 AM–2 PM",
+    "where": null,
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "mn-careerforce",
+    "sourceName": "CareerForce Minnesota",
+    "state": "MN",
+    "src": "https://careerforce.mn.gov/events/external/169-works-free-hiring-event",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:mn-careerforce:42pxjk",
+   "title": "Employer of the Day",
+   "company": "CareerForce Minnesota",
+   "location": "St. Paul, MN",
+   "lat": 44.944,
+   "lng": -93.093,
+   "url": "https://careerforce.mn.gov/events/event-occurrence/585",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-24",
+    "dates": [
+     "2026-11-24"
+    ],
+    "recurring": null,
+    "time": "10 AM–1 PM",
+    "where": null,
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "mn-careerforce",
+    "sourceName": "CareerForce Minnesota",
+    "state": "MN",
+    "src": "https://careerforce.mn.gov/events/event-occurrence/585",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:mn-careerforce:1ixbbro",
+   "title": "Employer of the Day",
+   "company": "CareerForce Minnesota",
+   "location": "Virtual · Minnesota",
+   "lat": null,
+   "lng": null,
+   "url": "https://careerforce.mn.gov/events/event-occurrence/682",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-24",
+    "dates": [
+     "2026-11-24"
+    ],
+    "recurring": null,
+    "time": "2 PM–3 PM",
+    "where": null,
+    "virtual": true,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "mn-careerforce",
+    "sourceName": "CareerForce Minnesota",
+    "state": "MN",
+    "src": "https://careerforce.mn.gov/events/event-occurrence/682",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:mn-careerforce:punh7o",
+   "title": "US Postal Service - Automotive Technician Job Fair",
+   "company": "CareerForce Minnesota",
+   "location": "Eagan, MN",
+   "lat": 44.804,
+   "lng": -93.167,
+   "url": "https://careerforce.mn.gov/events/external/us-postal-service-automotive-technician-job-fair-0",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-11-25",
+    "dates": [
+     "2026-11-25"
+    ],
+    "recurring": null,
+    "time": "10 AM–2 PM",
+    "where": null,
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "mn-careerforce",
+    "sourceName": "CareerForce Minnesota",
+    "state": "MN",
+    "src": "https://careerforce.mn.gov/events/external/us-postal-service-automotive-technician-job-fair-0",
+    "general": true,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:mn-careerforce:1w46mdx",
+   "title": "Virtual Career Fair",
+   "company": "CareerForce Minnesota",
+   "location": "Virtual · Minnesota",
+   "lat": null,
+   "lng": null,
+   "url": "https://careerforce.mn.gov/events/external/virtual-career-fair",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-12-02",
+    "dates": [
+     "2026-12-02"
+    ],
+    "recurring": null,
+    "time": "1 PM–2 PM",
+    "where": null,
+    "virtual": true,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "mn-careerforce",
+    "sourceName": "CareerForce Minnesota",
+    "state": "MN",
+    "src": "https://careerforce.mn.gov/events/external/virtual-career-fair",
+    "general": true,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:mn-careerforce:1031gwr",
+   "title": "3M New Ulm Job Fair",
+   "company": "CareerForce Minnesota",
+   "location": "New Ulm, MN",
+   "lat": 44.312,
+   "lng": -94.461,
+   "url": "https://careerforce.mn.gov/events/external/3m-new-ulm-job-fair-0",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-12-03",
+    "dates": [
+     "2026-12-03"
+    ],
+    "recurring": null,
+    "time": "10 AM–2 PM",
+    "where": null,
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "mn-careerforce",
+    "sourceName": "CareerForce Minnesota",
+    "state": "MN",
+    "src": "https://careerforce.mn.gov/events/external/3m-new-ulm-job-fair-0",
+    "general": true,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:mn-careerforce:7qqkfq",
+   "title": "Job Fair/Hiring Event",
+   "company": "CareerForce Minnesota",
+   "location": "St. Cloud, MN",
+   "lat": 45.561,
+   "lng": -94.162,
+   "url": "https://careerforce.mn.gov/events/event-occurrence/604",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-12-08",
+    "dates": [
+     "2026-12-08"
+    ],
+    "recurring": null,
+    "time": "10 AM–12 PM",
+    "where": null,
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "mn-careerforce",
+    "sourceName": "CareerForce Minnesota",
+    "state": "MN",
+    "src": "https://careerforce.mn.gov/events/event-occurrence/604",
+    "general": true,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:mn-careerforce:1xtbmui",
+   "title": "Optum Minnesota Pharmacy Technician Virtual Job Fair",
+   "company": "CareerForce Minnesota",
+   "location": "Virtual · Minnesota",
+   "lat": null,
+   "lng": null,
+   "url": "https://careerforce.mn.gov/events/external/optum-minnesota-pharmacy-technician-virtual-job-fair",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-12-08",
+    "dates": [
+     "2026-12-08"
+    ],
+    "recurring": null,
+    "time": "12 PM–2 PM",
+    "where": null,
+    "virtual": true,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "mn-careerforce",
+    "sourceName": "CareerForce Minnesota",
+    "state": "MN",
+    "src": "https://careerforce.mn.gov/events/external/optum-minnesota-pharmacy-technician-virtual-job-fair",
+    "general": true,
+    "many": false
+   }
+  },
+  {
+   "id": "appr:nydol-1x1e4gw",
+   "title": "Carpentry apprenticeship · North Atlantic States Carpenters Training Fund",
+   "company": "North Atlantic States Carpenters Training Fund",
+   "location": "Hauppauge, NY",
+   "lat": 40.826,
+   "lng": -73.203,
+   "url": "https://dol.ny.gov/ap/north-atlantic-states-carpenters-training-fund-11",
+   "roles": "Carpenter apprentice",
+   "event": {
+    "kind": "apprenticeship",
+    "label": "Applications open",
+    "next": "2027-11-02",
+    "dates": [
+     "2027-11-02"
+    ],
+    "recurring": null,
+    "time": null,
+    "where": null,
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "apprenticeship",
+    "source": "ny-dol-apprenticeship",
+    "sourceName": "New York State Department of Labor",
+    "state": "NY",
+    "src": "https://dol.ny.gov/ap/north-atlantic-states-carpenters-training-fund-11",
+    "opens": "2026-11-03",
+    "closes": "2027-11-02",
+    "yearRound": false,
+    "rule": null,
+    "how": "Applications are available online at the North Atlantic States Carpenters Training Fund (NASCTF) website during the recruitment period.",
+    "trade": "carpentry",
+    "checked": "2026-11-17"
+   }
+  },
+  {
+   "id": "appr:nydol-1ehjdvk",
+   "title": "Carpentry apprenticeship · North Atlantic States Carpenters Training Fund",
+   "company": "North Atlantic States Carpenters Training Fund",
+   "location": "Syracuse, NY",
+   "lat": 43.048,
+   "lng": -76.147,
+   "url": "https://dol.ny.gov/news/north-atlantic-states-carpenters-training-fund-4",
+   "roles": "Carpenter apprentice",
+   "event": {
+    "kind": "apprenticeship",
+    "label": "Applications open",
+    "next": "2027-11-07",
+    "dates": [
+     "2027-11-07"
+    ],
+    "recurring": null,
+    "time": null,
+    "where": null,
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "apprenticeship",
+    "source": "ny-dol-apprenticeship",
+    "sourceName": "New York State Department of Labor",
+    "state": "NY",
+    "src": "https://dol.ny.gov/news/north-atlantic-states-carpenters-training-fund-4",
+    "opens": "2026-11-09",
+    "closes": "2027-11-07",
+    "yearRound": false,
+    "rule": null,
+    "how": "Applications are available online at the North Atlantic States Carpenters Training Fund (NASCTF) website.",
+    "trade": "carpentry",
+    "checked": "2026-11-17"
+   }
+  },
+  {
+   "id": "ext:mn-swmnpic:1h7ahni",
+   "title": "Worthington Career Fair 2027",
+   "company": "Southwest Minnesota PIC",
+   "location": "Worthington, MN",
+   "lat": 43.62,
+   "lng": -95.596,
+   "url": "https://www.swmnpic.org/event/worthington-career-fair-2027/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2027-02-26",
+    "dates": [
+     "2027-02-26"
+    ],
+    "recurring": null,
+    "time": "8:30 AM–11:30 AM",
+    "where": "Worthington High School, 1211 Clary St, Worthington, MN 56187",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "mn-swmnpic",
+    "sourceName": "Southwest Minnesota PIC",
+    "state": "MN",
+    "src": "https://www.swmnpic.org/event/worthington-career-fair-2027/",
+    "general": true,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:mn-swmnpic:2e75lz",
+   "title": "Cottonwood Area Career Fair 2027",
+   "company": "Southwest Minnesota PIC",
+   "location": "Cottonwood, MN",
+   "lat": 44.609,
+   "lng": -95.674,
+   "url": "https://www.swmnpic.org/event/cottonwood-area-career-fair-2027/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2027-03-03",
+    "dates": [
+     "2027-03-03"
+    ],
+    "recurring": null,
+    "time": "8:45 AM–12 PM",
+    "where": "875 Barstad Rd. N, Cottonwood, MN 56229",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "mn-swmnpic",
+    "sourceName": "Southwest Minnesota PIC",
+    "state": "MN",
+    "src": "https://www.swmnpic.org/event/cottonwood-area-career-fair-2027/",
+    "general": true,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:mn-swmnpic:1hrs8pr",
+   "title": "Windom Career Fair 2027",
+   "company": "Southwest Minnesota PIC",
+   "location": "Windom, MN",
+   "lat": 43.866,
+   "lng": -95.117,
+   "url": "https://www.swmnpic.org/event/windom-career-fair-2027/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2027-04-14",
+    "dates": [
+     "2027-04-14"
+    ],
+    "recurring": null,
+    "time": "8:30 AM–11:30 AM",
+    "where": "Windom High School, 1400 17th St., Windom, MN 56101",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "mn-swmnpic",
+    "sourceName": "Southwest Minnesota PIC",
+    "state": "MN",
+    "src": "https://www.swmnpic.org/event/windom-career-fair-2027/",
+    "general": true,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:ca-golden-sierra:fb56ls",
+   "title": "AtWork Job Fair",
+   "company": "Golden Sierra Job Training Agency",
+   "location": "Sacramento, CA",
+   "lat": 38.6083072,
+   "lng": -121.4357078,
+   "url": "https://goldensierra.com/event/atwork-job-fair-4",
+   "roles": "AtWork Job Fair",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-11-18",
+    "dates": [
+     "2026-11-18"
+    ],
+    "recurring": null,
+    "time": "9 AM–1 PM",
+    "where": "AtWork Personnel Sacramento, 2251 Harvard St. Ste 102, Sacramento, CA 95815",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "ca-golden-sierra",
+    "sourceName": "Golden Sierra Job Training Agency",
+    "state": "CA",
+    "src": "https://goldensierra.com/event/atwork-job-fair-4",
+    "general": true,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:ca-golden-sierra:khbpuk",
+   "title": "Sacramento Job Fair",
+   "company": "Golden Sierra Job Training Agency",
+   "location": "Sacramento, CA",
+   "lat": 38.6248269,
+   "lng": -121.4138195,
+   "url": "https://goldensierra.com/event/sacramento-job-fair-5",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-12-09",
+    "dates": [
+     "2026-12-09"
+    ],
+    "recurring": null,
+    "time": "11 AM–2 PM",
+    "where": "Holiday Inn Express & Suites Sacramento, 2224 Auburn Blvd, Sacramento, CA 95821",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "ca-golden-sierra",
+    "sourceName": "Golden Sierra Job Training Agency",
+    "state": "CA",
+    "src": "https://goldensierra.com/event/sacramento-job-fair-5",
+    "general": true,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:ca-golden-sierra:61nein",
+   "title": "DGS Mini Pop-up Job Fair",
+   "company": "Golden Sierra Job Training Agency",
+   "location": "Sacramento, CA",
+   "lat": 38.547361,
+   "lng": -121.4457494,
+   "url": "https://goldensierra.com/event/dgs-mini-pop-up-job-fair",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-12-14",
+    "dates": [
+     "2026-12-14"
+    ],
+    "recurring": null,
+    "time": "10 AM–1 PM",
+    "where": "Mark Sanders AJCC, 2901 50th Street, Sacramento, CA 95817",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "ca-golden-sierra",
+    "sourceName": "Golden Sierra Job Training Agency",
+    "state": "CA",
+    "src": "https://goldensierra.com/event/dgs-mini-pop-up-job-fair",
+    "general": true,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:tx-wfs-tarrant:1g6ayim",
+   "title": "Mid-Cities Workforce Center Hiring Fair Days Event",
+   "company": "Workforce Solutions for Tarrant County",
+   "location": "Hurst, TX",
+   "lat": 32.8338787,
+   "lng": -97.1961397,
+   "url": "https://workforcesolutions.net/event/mid-cities-workforce-center-hiring-fair-days-event-15/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-11-17",
+    "dates": [
+     "2026-11-17"
+    ],
+    "recurring": null,
+    "time": "10 AM–12 PM",
+    "where": "Mid-Cities Workforce Center, 8701 Bedford Euless Road, Suite 100, Hurst, TX 76053",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "tx-wfs-tarrant",
+    "sourceName": "Workforce Solutions for Tarrant County",
+    "state": "TX",
+    "src": "https://workforcesolutions.net/event/mid-cities-workforce-center-hiring-fair-days-event-15/",
+    "general": true,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:tx-wfs-tarrant:92vwal",
+   "title": "Congressman Marc Veasey 11th Annual Job Fair",
+   "company": "Workforce Solutions for Tarrant County",
+   "location": "Fort Worth, TX",
+   "lat": 32.7318775882,
+   "lng": -97.2795459098,
+   "url": "https://workforcesolutions.net/event/congressman-marc-veasey-11th-annual-job-fair/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-12-04",
+    "dates": [
+     "2026-12-04"
+    ],
+    "recurring": null,
+    "time": "10 AM–2 PM",
+    "where": "Texas Wesleyan University (Nick and Lou Martin University Center), 3165 E Rosedale St, Fort Worth, TX 76105",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "tx-wfs-tarrant",
+    "sourceName": "Workforce Solutions for Tarrant County",
+    "state": "TX",
+    "src": "https://workforcesolutions.net/event/congressman-marc-veasey-11th-annual-job-fair/",
+    "general": true,
+    "many": true
+   }
+  },
+  {
+   "id": "ext:tx-wfs-capital:1uijzcx",
+   "title": "Job Fair with Housing Authority of City of Austin",
+   "company": "Workforce Solutions Capital Area",
+   "location": "Austin, TX",
+   "lat": 30.267,
+   "lng": -97.743,
+   "url": "https://wfscapitalarea.com/event/job-fair-with-housing-authority-of-city-of-austin/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-11-17",
+    "dates": [
+     "2026-11-17"
+    ],
+    "recurring": null,
+    "time": "10 AM–12 PM",
+    "where": "Meadowbrook Apartments, 1201 West Live Oak Street, Austin, TX 78704",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "tx-wfs-capital",
+    "sourceName": "Workforce Solutions Capital Area",
+    "state": "TX",
+    "src": "https://wfscapitalarea.com/event/job-fair-with-housing-authority-of-city-of-austin/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:tx-wfs-capital:1tc7xer",
+   "title": "City of Austin 50+ Community Job Fair",
+   "company": "Workforce Solutions Capital Area",
+   "location": "Austin, TX",
+   "lat": 30.267,
+   "lng": -97.743,
+   "url": "https://wfscapitalarea.com/event/city-of-austin-50-community-job-fair/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Job fair",
+    "next": "2026-12-09",
+    "dates": [
+     "2026-12-09"
+    ],
+    "recurring": null,
+    "time": "10 AM–2 PM",
+    "where": "North Career Center, 9001 N IH 35, Austin, TX 78753",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": false,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "tx-wfs-capital",
+    "sourceName": "Workforce Solutions Capital Area",
+    "state": "TX",
+    "src": "https://wfscapitalarea.com/event/city-of-austin-50-community-job-fair/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:co-adworks:jrpt3s",
+   "title": "Hiring Event – ESS (In-Person) @ Centennial",
+   "company": "Arapahoe/Douglas Works!",
+   "location": "Centennial, CO",
+   "lat": 39.579,
+   "lng": -104.877,
+   "url": "https://www.adworks.org/event/29357-11-19-26/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-11-19",
+    "dates": [
+     "2026-11-19"
+    ],
+    "recurring": null,
+    "time": "10 AM–12 PM",
+    "where": "Centennial Workforce Center, 6974 S. Lima St., Centennial, CO 80112",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "co-adworks",
+    "sourceName": "Arapahoe/Douglas Works!",
+    "state": "CO",
+    "src": "https://www.adworks.org/event/29357-11-19-26/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:co-adworks:12e3bk2",
+   "title": "Hiring Event – Denver Public Schools (In-Person) @ Aurora CentrePoint",
+   "company": "Arapahoe/Douglas Works!",
+   "location": "Aurora, CO",
+   "lat": 39.729,
+   "lng": -104.832,
+   "url": "https://www.adworks.org/event/hiring-event-denver-public-schools-in-person-aurora-centrepoint-01/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-01",
+    "dates": [
+     "2026-12-01"
+    ],
+    "recurring": null,
+    "time": "10 AM–1 PM",
+    "where": "Aurora CentrePoint Plaza, 14980 E. Alameda, Aurora, CO 80012",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "co-adworks",
+    "sourceName": "Arapahoe/Douglas Works!",
+    "state": "CO",
+    "src": "https://www.adworks.org/event/hiring-event-denver-public-schools-in-person-aurora-centrepoint-01/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:co-adworks:1bjfjlg",
+   "title": "Hiring Event – American Automation Services (In Person) @ Aurora CentrePoint",
+   "company": "Arapahoe/Douglas Works!",
+   "location": "Aurora, CO",
+   "lat": 39.729,
+   "lng": -104.832,
+   "url": "https://www.adworks.org/event/hiring-event-american-automation-services-in-person-aurora-centrepoint-12-03-26/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-03",
+    "dates": [
+     "2026-12-03"
+    ],
+    "recurring": null,
+    "time": "9 AM–12 PM",
+    "where": "Aurora CentrePoint Plaza, 14980 E. Alameda, Aurora, CO 80012",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "co-adworks",
+    "sourceName": "Arapahoe/Douglas Works!",
+    "state": "CO",
+    "src": "https://www.adworks.org/event/hiring-event-american-automation-services-in-person-aurora-centrepoint-12-03-26/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:co-adworks:17qgvde",
+   "title": "Skills-First Hiring Business Education Event (In Person) @ Lima",
+   "company": "Arapahoe/Douglas Works!",
+   "location": "Centennial, CO",
+   "lat": 39.579,
+   "lng": -104.877,
+   "url": "https://www.adworks.org/event/skills-first-hiring-business-education-event-in-person-lima-12-10-26/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-10",
+    "dates": [
+     "2026-12-10"
+    ],
+    "recurring": null,
+    "time": "10 AM–11:30 AM",
+    "where": "Arapahoe Board Room, 6954 S. Lima St., Centennial, CO 80112",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "co-adworks",
+    "sourceName": "Arapahoe/Douglas Works!",
+    "state": "CO",
+    "src": "https://www.adworks.org/event/skills-first-hiring-business-education-event-in-person-lima-12-10-26/",
+    "general": false,
+    "many": false
+   }
+  },
+  {
+   "id": "ext:co-adworks:gj6v6",
+   "title": "Hiring Event – Kelly Education (In-Person) @ Aurora CentrePoint",
+   "company": "Arapahoe/Douglas Works!",
+   "location": "Aurora, CO",
+   "lat": 39.729,
+   "lng": -104.832,
+   "url": "https://www.adworks.org/event/hiring-event-kelly-education-in-person-aurora-centrepoint/",
+   "roles": "",
+   "event": {
+    "kind": "external_fair",
+    "label": "Hiring event",
+    "next": "2026-12-15",
+    "dates": [
+     "2026-12-15"
+    ],
+    "recurring": null,
+    "time": "10 AM–12 PM",
+    "where": "Aurora CentrePoint Plaza, 14980 E. Alameda, Aurora, CO 80012",
+    "virtual": false,
+    "walkIn": false,
+    "rsvp": true,
+    "onTheSpot": false,
+    "inviteOnly": false
+   },
+   "external": {
+    "type": "fair",
+    "source": "co-adworks",
+    "sourceName": "Arapahoe/Douglas Works!",
+    "state": "CO",
+    "src": "https://www.adworks.org/event/hiring-event-kelly-education-in-person-aurora-centrepoint/",
+    "general": false,
+    "many": false
+   }
+  }
+ ]
+}
