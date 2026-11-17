@@ -2,14 +2,15 @@
    minmax(0, …) so a long factor line can never widen the column past a phone screen. The factor bars are
    ink: the one semantic colour is the band badge (word + icon), decided by the server's threshold. */
 .card {
-  margin-top: var(--sp-4);
+  margin: 0 0 var(--sp-8);
   background: var(--surface-1);
   border: 1px solid var(--border-1);
   border-radius: var(--r-card);
-  padding: var(--sp-3) var(--sp-4);
+  padding: var(--sp-4);
   min-width: 0;
 }
 .head { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+.title { margin: 0; font-family: var(--body); font-size: var(--fs-body); font-weight: 600; color: var(--text-1); }
 .kicker { font-family: var(--body); font-size: var(--fs-meta); font-weight: 600; text-transform: uppercase; letter-spacing: var(--ls-meta); color: var(--text-3); }
 .scope { font-family: var(--body); font-size: var(--fs-meta); color: var(--text-3); border: 1px solid var(--border-1); border-radius: var(--r-pill); padding: 2px var(--sp-2); }
 .top { display: flex; align-items: center; gap: var(--sp-2); margin: var(--sp-2) 0; flex-wrap: wrap; }
@@ -25,3 +26,16 @@
 .fDetail { grid-area: d; font-size: var(--fs-meta); color: var(--text-4); min-width: 0; overflow-wrap: anywhere; }
 .basis { margin: var(--sp-2) 0 0; font-size: var(--fs-meta); color: var(--text-4); }
 .thinLine { margin: var(--sp-2) 0 0; font-size: var(--fs-meta); color: var(--text-4); }
+
+/* The four facts a reader asks first: open posts, pay shown, apply direct, open 30+ days. Two across on a
+   phone, four across from 560px. */
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3) var(--sp-4); margin: var(--sp-3) 0 0; }
+@media (min-width: 560px) { .facts { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.fact { min-width: 0; display: flex; flex-direction: column-reverse; gap: 2px; }
+.factValue { margin: 0; font-size: var(--fs-xl); font-weight: 600; color: var(--text-1); font-variant-numeric: tabular-nums; line-height: var(--lh-tight); }
+.factLabel { font-size: var(--fs-sm); color: var(--text-3); overflow-wrap: anywhere; }
+.more { margin-top: var(--sp-3); border-top: 1px solid var(--border-1); }
+.moreSum { list-style: none; display: flex; align-items: center; gap: var(--sp-2) var(--sp-3); flex-wrap: wrap; min-height: 44px; padding-top: var(--sp-2); cursor: pointer; }
+.moreSum::-webkit-details-marker { display: none; }
+.moreHint { margin-left: auto; font-size: var(--fs-sm); color: var(--accent); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--accent-line); }
+.more[open] .factors { margin-top: var(--sp-2); }

@@ -57,6 +57,40 @@ Editor — comments stripped, one block per migration, and say which to run firs
 - **Skill:** `.claude/skills/ui-ux-pro-max/` (UX rules, patterns, charts, WCAG — Python search over local CSVs) is for
   decisions INSIDE this system; never use its `--design-system` output to pick a palette or font.
 
+## Session 2026-11-17: 20 more start guides, external hiring events, company pages that answer first — PR #405 (same branch)
+- **Owner ask ("WE NEED SOMETHING HUGE… Do all of it"):** 20 new guides (security, retail, restaurants, hotels, delivery, callcenter,
+  dental, energy, secondchance, federal; amazon, walmart, target, ups, fedex, costco, starbucks, homedepot, usps, lowes), hiring events
+  from outside Seen's listings, and company pages rebuilt with real data first.
+- **Guides:** same template/process as 2026-11-14. Writer agents (brief: scratchpad guides20/BRIEF.md) → independent fact-checkers
+  (guides20/FACTCHECK.md). ~2,100 claims checked across the 20; roughly 15% fixed (overstated most often; e.g. FedEx medians had been read
+  from a hidden pay field, USPS PSE rates changed Nov 14 2026, EEOC withdrew its 2012 record guidance 2026-10-29, WOTC lapsed for hires
+  after 2025-12-31). Every removed value is pinned in FORBIDDEN (guides.test.mjs). Registration helpers: scratchpad guides20/forbid/
+  {add.py,register.py}. 20 company/field keyword tables in guideFor.js (company kind now read from GUIDES; "non cdl …" is a CDL veto and
+  belongs to delivery; Amazon Flex / DSP → delivery).
+- **New shared mechanics:** a card `link` that is relative or seenjobs.io renders as an in-site link (same tab); block
+  `{ type: 'link', before, label, href, after }`; listings `excludeCompany` (regex on employer); EXPERIENCED_RE += advanced, key holder,
+  coach; calm-wording test allows the clearance names "Secret"/"Top Secret"; a test fails when a live guide links to a guide that is not live.
+- **External hiring events** (`lib/jobs/externalEvents.js`, `lib/server/externalEvents.js`, `api/cron-hiring-events.js` 4×/day): 14
+  Events-Calendar JSON feeds + 4 state pages (VA, ID, TX boards, CO, FL, NY, NJ, CA, MN, MD, WV) with an honest UA and robots.txt; NY DOL
+  apprenticeship announcements; 14 curated apprenticeship windows (`lib/jobs/data/apprenticeshipWindows.json`, read on each program's page).
+  Served with posting events by `/api/jobs?action=hiring_events` (`external`); until the table exists the checked-in snapshot is used.
+  General fairs show on field guides only near a typed place; "I'm going" works without a listing id (GoingButton lazy-loaded so the
+  guide render tree never reaches lib/auth.tsx — the guides test cannot resolve it). Migration
+  `20261117120000_external_hiring_events.sql` NOT applied (SQL given to the owner).
+- **Company pages:** three answers (respond / how long / who hears back) right after the H1 in server HTML (`components/company/answers.js`,
+  `app/company/[slug]/companyData.ts`), raw counts beside the weighted stored rate, each saying what it counts; FAQ JSON-LD = the visible
+  answers; old companyFaq + searched-intent FAQ no longer rendered (it put the weighted rate on the raw count); TOP_COMPANY_PAGES 500 →
+  sitemap priority; extra index rule (≥1 applicant account + ≥10 postings with listing signals; none qualify yet).
+- **Verified before merge:** tsc clean; guides/guideFor/listingFilters/hiringEvents/externalEvents/cron/company-answers tests 313+ pass;
+  PR preview: all 20 new /start pages 200 with their h1, /homedepot → /start/homedepot, /company/walmart answers in server HTML,
+  /api/jobs?action=hiring_events near Richmond VA returns 7 external fairs (from the snapshot until the table exists). Event filters fixed
+  after the external run: bare "ESS" (a schools staffing firm) no longer reads as battery storage, "Hampton" → "Hampton Inn", security
+  employers never on retail.
+- **Growth program (owner brief 2026-11-17, Glassdoor model, phases 0–8):** Phase 0 audit done read-only → scratchpad growth/PHASE0.md;
+  waiting for owner approval before Phase 1 (data gate). Key facts: 422 graded pages, ~1 first-party report/week, /companies and /jobs
+  client-rendered, company pages not cached (6.9 s LCP lab), FAQ schema on 5 templates, case-variant company slugs indexable,
+  funnel_events 19 checkouts / 0 completed, Search Console table empty.
+
 ## Session 2026-11-14: start guides (8, fact-checked) + search that helps you think — PR #401 (same branch)
 - **Owner asks:** oilfield/trades entry "the right way, on brand, not too highlighted"; "a company, not a personal project
   … it's additional resources, not sources"; short pages with openable menus; listings with location / position / level

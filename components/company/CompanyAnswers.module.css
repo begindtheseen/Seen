@@ -1,0 +1,33 @@
+/* The three answers (components/company/CompanyAnswers.tsx). Phone first: stacked, hairlines between them.
+   From 900px they sit three across in one panel, so all three are above the fold on a desktop. Every value
+   is a token (app/globals.css); every track is minmax(0, …) so a long word never widens the page. */
+.answers {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0 0 var(--sp-6);
+  background: var(--surface-1);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-card);
+  min-width: 0;
+}
+.item { padding: var(--sp-4); min-width: 0; }
+.item + .item { border-top: 1px solid var(--border-1); }
+.q {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: var(--fs-h3);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--ls-heading);
+  color: var(--text-1);
+  overflow-wrap: anywhere;
+}
+.a { margin: var(--sp-2) 0 0; font-size: var(--fs-body); line-height: var(--lh-body); color: var(--text-1); overflow-wrap: anywhere; text-wrap: pretty; }
+.d { margin: var(--sp-2) 0 0; font-size: var(--fs-sm); line-height: 1.5; color: var(--text-3); overflow-wrap: anywhere; }
+.item[data-known="no"] .a { color: var(--text-2); }
+
+@media (min-width: 900px) {
+  .answers { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .item { padding: var(--sp-5) var(--sp-6); }
+  .item + .item { border-top: 0; border-left: 1px solid var(--border-1); }
+}

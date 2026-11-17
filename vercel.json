@@ -88,7 +88,7 @@
     },
     "api/jobs.js": {
       "maxDuration": 60,
-      "includeFiles": "{lib/geo/data/**,lib/occupations/data/**,lib/text/data/**}"
+      "includeFiles": "{lib/geo/data/**,lib/occupations/data/**,lib/text/data/**,lib/jobs/data/**}"
     },
     "api/ingest-local-indeed.js": {
       "maxDuration": 60,
@@ -135,6 +135,10 @@
     },
     "api/cron-search-data.js": {
       "maxDuration": 120
+    },
+    "api/cron-hiring-events.js": {
+      "maxDuration": 60,
+      "includeFiles": "{lib/geo/data/**,lib/jobs/data/**}"
     },
     "api/cron-job-matches.js": {
       "maxDuration": 300,
@@ -245,6 +249,10 @@
     {
       "path": "/api/cron-job-matches",
       "schedule": "5 16,22 * * *"
+    },
+    {
+      "path": "/api/cron-hiring-events",
+      "schedule": "27 1,7,13,19 * * *"
     }
   ]
 }

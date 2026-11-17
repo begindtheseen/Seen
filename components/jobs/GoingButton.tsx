@@ -15,16 +15,24 @@ import { eventStartClock, planEvent, roleFromEventTitle } from '@/lib/tracker/ev
 import Button from '@/components/ui/Button'
 import s from './HiringEventNote.module.css'
 
-export default function GoingButton({ job, ev }: { job: Pick<Job, 'id' | 'title' | 'company' | 'location'>; ev: PostingEvent }) {
+// An external job fair (a state workforce calendar — lib/jobs/externalEvents.js) has no Seen listing: `job.id` is
+// null, `job.company` is the host and `role` is the fair's name, so the card reads "Virginia Works · Fredericksburg:
+// Multi-Employer Hiring Event". `variant="ghost"` keeps it quiet in a list of events (the guide's strip).
+type GoingJob = Omit<Pick<Job, 'id' | 'title' | 'company' | 'location'>, 'id'> & { id: string | null }
+export default function GoingButton({ job, ev, role, variant = 'secondary' }: { job: GoingJob; ev: PostingEvent; role?: string; variant?: 'secondary' | 'ghost' }) {
   const { isLoggedIn, ready } = useAuth()
   const [appId, setAppId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [failed, setFailed] = useState(false)
 
+  const cardRole = role || roleFromEventTitle(job.title, job.company, ev.label)
   useEffect(() => {
-    const hit = AppStore.loadSync().find(a => a.jobId && String(a.jobId) === String(job.id))
+    const apps = AppStore.loadSync()
+    const hit = job.id
+      ? apps.find(a => a.jobId && String(a.jobId) === String(job.id))
+      : apps.find(a => !a.jobId && (a.company || '').toLowerCase() === job.company.toLowerCase() && (a.role || '').toLowerCase() === cardRole.toLowerCase())
     setAppId(hit ? hit.id : null)
-  }, [job.id])
+  }, [job.id, job.company, cardRole])
 
   async function go() {
     setSaving(true); setFailed(false)
@@ -33,14 +41,14 @@ export default function GoingButton({ job, ev }: { job: Pick<Job, 'id' | 'title'
     try {
       const r = await AppStore.add({
         company: job.company,
-        role: roleFromEventTitle(job.title, job.company, ev.label),
+        role: cardRole,
         location: job.location || '',
-        jobId: String(job.id),
+        ...(job.id ? { jobId: String(job.id) } : {}),
         platform: 'Hiring event',
         appliedAt: now,
         events: [
           { id: `ev_${now}`, type: 'application_submitted', date: now, source: 'user', confidence: 'low' },
-          planEvent(ev, at, job.id, now + 1) as HiringEvent,
+          planEvent(ev, at, job.id || null, now + 1) as HiringEvent,
         ],
       }, isLoggedIn)
       if (r.ok) setAppId(r.id); else setFailed(true)
@@ -59,7 +67,7 @@ export default function GoingButton({ job, ev }: { job: Pick<Job, 'id' | 'title'
   }
   return (
     <div className={s.goingRow}>
-      <Button size="sm" variant="secondary" icon="calendar" onClick={() => void go()} loading={saving} data-testid="going-button">I’m going</Button>
+      <Button size="sm" variant={variant} icon="calendar" onClick={() => void go()} loading={saving} data-testid="going-button">I’m going</Button>
       {failed && <span className={s.fine}>That didn’t save. Try again.</span>}
     </div>
   )

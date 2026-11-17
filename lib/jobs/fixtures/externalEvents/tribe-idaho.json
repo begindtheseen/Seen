@@ -1,0 +1,730 @@
+{
+ "total": 67,
+ "total_pages": 2,
+ "events": [
+  {
+   "title": "Resume Workshop – Boise",
+   "description": "<?xml encoding=\"UTF-8\"><p>Stand out in your job search with a strong resume. In this workshop, you will discover what employers seek, how to highlight your work and soft skills, and create the resume that fits your needs.</p>",
+   "url": "https://www.labor.idaho.gov/event/resume-workshop-boise-7/",
+   "start_date": "2026-11-17 14:00:00",
+   "end_date": "2026-11-17 15:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Boise office",
+    "address": "317 W. Main St.",
+    "city": "Boise",
+    "stateprovince": "ID",
+    "zip": "83735"
+   }
+  },
+  {
+   "title": "Sharpen Your Interview Skills – Lewiston",
+   "description": "<?xml encoding=\"UTF-8\"><p>Learn how to successfully navigate an interview and present yourself through this workshop. Individuals receive professional guidance on preparation and presentation skills.</p><p>*Mock interviews available by appointment.</p>",
+   "url": "https://www.labor.idaho.gov/event/sharpen-your-interview-skills-lewiston-2/",
+   "start_date": "2026-11-17 15:00:00",
+   "end_date": "2026-11-17 16:30:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Lewiston office",
+    "address": "1158 Idaho St.",
+    "city": "Lewiston",
+    "stateprovince": "ID",
+    "zip": "83501-1960"
+   }
+  },
+  {
+   "title": "Sharpen Your Interview Skills – Idaho Falls",
+   "description": "<?xml encoding=\"UTF-8\"><p>Learn how to successfully navigate an interview and present yourself through this workshop. Individuals receive professional guidance on preparation and presentation skills.</p><p>*Mock interviews available by appointment.</p>",
+   "url": "https://www.labor.idaho.gov/event/sharpen-your-interview-skills-idaho-falls-2/",
+   "start_date": "2026-11-17 15:00:00",
+   "end_date": "2026-11-17 16:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Idaho Falls office",
+    "address": "1515 E. Lincoln Road",
+    "city": "Idaho Falls",
+    "stateprovince": "ID",
+    "zip": "83401"
+   }
+  },
+  {
+   "title": "Maximize Your Job Search – Twin Falls",
+   "description": "<?xml encoding=\"UTF-8\"><div class=\"col-sm-9\">\n<div class=\"tribe-events-single-event-description tribe-events-content pt-4\">\n<div class=\"col-sm-9\">\n<div class=\"tribe-events-single-event-description tribe-events-content pt-4\">\n<p>This workshop is for everyone seeking guidance in their job search. Topics of discussion include labor market trends, practical ways to find employment and helpful tools offered by the Idaho Department of Labor.</p>\n</div>\n</div>\n</div>\n</div><div class=\"col-sm-3\">\n<div class=\"tribe-events-single-section tribe-events-event-meta primary tribe-clearfix\">\n<div class=\"tribe-events-meta-group tribe-events-meta-group-details\"></div>\n</div>\n</div>",
+   "url": "https://www.labor.idaho.gov/event/maximize-your-job-search-twin-falls-9/",
+   "start_date": "2026-11-18 09:00:00",
+   "end_date": "2026-11-18 10:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Twin Falls office",
+    "address": "458 Parkview Loop",
+    "city": "Twin Falls",
+    "stateprovince": "ID",
+    "zip": "83301"
+   }
+  },
+  {
+   "title": "Hiring Event – Post Falls",
+   "description": "<?xml encoding=\"UTF-8\"><p>The Idaho Department of Labor is hosting a hiring event at the Post Falls office. Employers planning to attend include Coeur d&rsquo;Alene Public Schools, Evergreen Home Care, Idaho Division of Veterans Services, Laborers Local 238, North Idaho College, Wagstaff and more.</p>",
+   "url": "https://www.labor.idaho.gov/event/hiring-event-post-falls-2/",
+   "start_date": "2026-11-18 10:00:00",
+   "end_date": "2026-11-18 13:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Post Falls office",
+    "address": "600 N. Thornton St.",
+    "city": "Post Falls",
+    "stateprovince": "ID",
+    "zip": "83854"
+   }
+  },
+  {
+   "title": "Hiring Event – Idaho Falls",
+   "description": "<?xml encoding=\"UTF-8\"><p>Meet multiple employers at Labor&rsquo;s hiring event in Idaho Falls and be prepared for interviews. Bring your resume.</p><p>Employers attending include Amentum, American Fabrication, Citizens Community Bank, Cornerstone Caregiving, Employment Express Professionals, Design for Making LLC, Gem State Staffing, Home Reach, Idahoan Foods, Idaho National Laboratory, Kimball Midwest, Lamb Weston, Lynx Trucking, Mission Home Health and Hospice, Naval Nuclear Laboratory, Oklo, Premier Technology, Route 20 Delivery &amp; Route 26, SAGE Truck Driving School, Sign Pro, Idaho State University TRIO, Yellowstone Plastics, Western Transportation and more.</p><p>&nbsp;</p>",
+   "url": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-17/",
+   "start_date": "2026-11-18 11:00:00",
+   "end_date": "2026-11-18 14:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Idaho Falls office",
+    "address": "1515 E. Lincoln Road",
+    "city": "Idaho Falls",
+    "stateprovince": "ID",
+    "zip": "83401"
+   }
+  },
+  {
+   "title": "Maximize Your Job Search – Boise",
+   "description": "<?xml encoding=\"UTF-8\"><p>This workshop is for everyone seeking guidance in their job search. Topics of discussion include labor market trends, practical ways to find employment and helpful tools offered by the Idaho Department of Labor.</p>",
+   "url": "https://www.labor.idaho.gov/event/maximize-your-job-search-boise-3/",
+   "start_date": "2026-11-18 14:00:00",
+   "end_date": "2026-11-18 15:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Boise office",
+    "address": "317 W. Main St.",
+    "city": "Boise",
+    "stateprovince": "ID",
+    "zip": "83735"
+   }
+  },
+  {
+   "title": "Sharpen Your Interview Skills – Boise",
+   "description": "<?xml encoding=\"UTF-8\"><p>Learn how to successfully navigate an interview and present yourself through this workshop. Individuals receive professional guidance on preparation and presentation skills.</p><p>*Mock interviews available by appointment.</p>",
+   "url": "https://www.labor.idaho.gov/event/sharpen-your-interview-skills-boise-6/",
+   "start_date": "2026-11-19 14:00:00",
+   "end_date": "2026-11-19 15:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Boise office",
+    "address": "317 W. Main St.",
+    "city": "Boise",
+    "stateprovince": "ID",
+    "zip": "83735"
+   }
+  },
+  {
+   "title": "Basic Computer Skills – Caldwell",
+   "description": "<?xml encoding=\"UTF-8\"><p>Learn to create an email account, complete online job applications and create employment documents.</p><p>No previous computer experience required.</p>",
+   "url": "https://www.labor.idaho.gov/event/basic-computer-skills-caldwell-3/",
+   "start_date": "2026-11-20 13:00:00",
+   "end_date": "2026-11-20 14:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Caldwell office",
+    "address": "4514 Thomas Jefferson St.",
+    "city": "Caldwell",
+    "stateprovince": "ID",
+    "zip": "83605"
+   }
+  },
+  {
+   "title": "Maximize Your Job Search – Caldwell",
+   "description": "<?xml encoding=\"UTF-8\"><p>This workshop is for everyone seeking guidance in their job search. Topics of discussion include labor market trends, practical ways to find employment and helpful tools offered by the Idaho Department of Labor.</p>",
+   "url": "https://www.labor.idaho.gov/event/maximize-your-job-search-caldwell-3/",
+   "start_date": "2026-11-20 14:00:00",
+   "end_date": "2026-11-20 15:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Caldwell office",
+    "address": "4514 Thomas Jefferson St.",
+    "city": "Caldwell",
+    "stateprovince": "ID",
+    "zip": "83605"
+   }
+  },
+  {
+   "title": "Resume Workshop – Virtual",
+   "description": "<?xml encoding=\"UTF-8\"><p>Stand out in your job search with a strong resume. In this workshop, you will discover what employers seek, how to highlight your work and soft skills, and create the resume that fits your needs.</p><p>*Participants will need to RSVP by emailing&nbsp;<a href=\"mailto:Boise@labor.idaho.gov\">Boise@labor.idaho.gov</a>&nbsp;at least one hour prior to the event to receive an invite.</p><p>Note for claimants: You must attend the ENTIRE workshop to use it as a weekly work search action for unemployment insurance benefits.</p>",
+   "url": "https://www.labor.idaho.gov/event/resume-workshop-virtual-3/",
+   "start_date": "2026-11-24 14:00:00",
+   "end_date": "2026-11-24 15:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Virtual"
+   }
+  },
+  {
+   "title": "Resume Workshop – Boise",
+   "description": "<?xml encoding=\"UTF-8\"><p>Stand out in your job search with a strong resume. In this workshop, you will discover what employers seek, how to highlight your work and soft skills, and create the resume that fits your needs.</p>",
+   "url": "https://www.labor.idaho.gov/event/resume-workshop-boise-6/",
+   "start_date": "2026-11-24 14:00:00",
+   "end_date": "2026-11-24 15:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Boise office",
+    "address": "317 W. Main St.",
+    "city": "Boise",
+    "stateprovince": "ID",
+    "zip": "83735"
+   }
+  },
+  {
+   "title": "Basic Computer Skills – Lewiston",
+   "description": "<?xml encoding=\"UTF-8\"><p>Learn to create an email account, complete online job applications and create employment documents.</p><p>No previous computer experience required.</p>",
+   "url": "https://www.labor.idaho.gov/event/basic-computer-skills-lewiston-2/",
+   "start_date": "2026-11-24 15:00:00",
+   "end_date": "2026-11-24 16:30:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Lewiston office",
+    "address": "1158 Idaho St.",
+    "city": "Lewiston",
+    "stateprovince": "ID",
+    "zip": "83501-1960"
+   }
+  },
+  {
+   "title": "Basic Computer Skills – Idaho Falls",
+   "description": "<?xml encoding=\"UTF-8\"><p>Learn to create an email account, complete online job applications and create employment documents.</p><p>No previous computer experience required.</p>",
+   "url": "https://www.labor.idaho.gov/event/basic-computer-skills-idaho-falls-2/",
+   "start_date": "2026-11-24 15:00:00",
+   "end_date": "2026-11-24 16:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Idaho Falls office",
+    "address": "1515 E. Lincoln Road",
+    "city": "Idaho Falls",
+    "stateprovince": "ID",
+    "zip": "83401"
+   }
+  },
+  {
+   "title": "Maximize Your Job Search – Pocatello",
+   "description": "<?xml encoding=\"UTF-8\"><div class=\"col pe-4\">\n<div class=\"tribe-events-single-event-description tribe-events-content pt-4\">\n<p>This workshop is for everyone seeking guidance in their job search. Topics of discussion include labor market trends, practical ways to find employment and helpful tools offered by the Idaho Department of Labor.</p>\n</div>\n</div>",
+   "url": "https://www.labor.idaho.gov/event/maximize-your-job-search-pocatello-3/",
+   "start_date": "2026-11-24 15:00:00",
+   "end_date": "2026-11-24 16:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Pocatello office",
+    "address": "430 N. 5th Ave.",
+    "city": "Pocatello",
+    "stateprovince": "ID",
+    "zip": "83201"
+   }
+  },
+  {
+   "title": "Sharpen Your Interview Skills – Twin Falls",
+   "description": "<?xml encoding=\"UTF-8\"><p>Learn how to successfully navigate an interview and present yourself through this workshop. Individuals receive professional guidance on preparation and presentation skills.</p><p>*Mock interviews available by appointment.</p>",
+   "url": "https://www.labor.idaho.gov/event/sharpen-your-interview-skills-twin-falls-8/",
+   "start_date": "2026-11-25 09:00:00",
+   "end_date": "2026-11-25 11:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Twin Falls office",
+    "address": "458 Parkview Loop",
+    "city": "Twin Falls",
+    "stateprovince": "ID",
+    "zip": "83301"
+   }
+  },
+  {
+   "title": "Hiring Event – Idaho Falls",
+   "description": "<?xml encoding=\"UTF-8\"><p>Meet multiple employers at Labor&rsquo;s hiring event in Idaho Falls&nbsp;and be prepared for interviews. Bring your resume.</p>",
+   "url": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-3/",
+   "start_date": "2026-11-25 11:00:00",
+   "end_date": "2026-11-25 14:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Idaho Falls office",
+    "address": "1515 E. Lincoln Road",
+    "city": "Idaho Falls",
+    "stateprovince": "ID",
+    "zip": "83401"
+   }
+  },
+  {
+   "title": "Sharpen Your Interview Skills – Virtual",
+   "description": "<?xml encoding=\"UTF-8\"><p>Learn how to successfully navigate an interview and present yourself through this workshop. Individuals receive professional guidance on preparation and presentation skills.</p><p>*Mock interviews available by appointment.</p><p>*Participants will need to RSVP by emailing&nbsp;<a href=\"mailto:Boise@labor.idaho.gov\">Boise@labor.idaho.gov</a>&nbsp;at least one hour prior to the event to receive an invite.</p><p>Note for claimants: You must attend the ENTIRE workshop to use it as a weekly work search action for unemployment insurance benefits.</p>",
+   "url": "https://www.labor.idaho.gov/event/sharpen-your-interview-skills-virtual-3/",
+   "start_date": "2026-11-25 14:00:00",
+   "end_date": "2026-11-25 15:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Virtual"
+   }
+  },
+  {
+   "title": "Thanksgiving Day &#8211; Offices closed",
+   "description": "<?xml encoding=\"UTF-8\"><p>All Idaho Department of Labor locations are closed for Thanksgiving Day.</p>",
+   "url": "https://www.labor.idaho.gov/event/thanksgiving-offices-closed/",
+   "start_date": "2026-11-26 08:00:00",
+   "end_date": "2026-11-26 17:00:00",
+   "all_day": false,
+   "venue": []
+  },
+  {
+   "title": "Sharpen Your Interview Skills – Caldwell",
+   "description": "<?xml encoding=\"UTF-8\"><p>Learn how to successfully navigate an interview and present yourself through this workshop. Individuals receive professional guidance on preparation and presentation skills.</p><p>*Mock interviews available by appointment.</p>",
+   "url": "https://www.labor.idaho.gov/event/sharpen-your-interview-skills-caldwell-2/",
+   "start_date": "2026-11-27 13:00:00",
+   "end_date": "2026-11-27 14:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Caldwell office",
+    "address": "4514 Thomas Jefferson St.",
+    "city": "Caldwell",
+    "stateprovince": "ID",
+    "zip": "83605"
+   }
+  },
+  {
+   "title": "Resume Workshop – Caldwell",
+   "description": "<?xml encoding=\"UTF-8\"><p>Stand out in your job search with a strong resume. In this workshop, you will discover what employers seek, how to highlight your work and soft skills, and create the resume that fits your needs.</p>",
+   "url": "https://www.labor.idaho.gov/event/resume-workshop-caldwell-2/",
+   "start_date": "2026-11-27 14:00:00",
+   "end_date": "2026-11-27 15:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Caldwell office",
+    "address": "4514 Thomas Jefferson St.",
+    "city": "Caldwell",
+    "stateprovince": "ID",
+    "zip": "83605"
+   }
+  },
+  {
+   "title": "Resume Workshop – Boise",
+   "description": "<?xml encoding=\"UTF-8\"><p>Stand out in your job search with a strong resume. In this workshop, you will discover what employers seek, how to highlight your work and soft skills, and create the resume that fits your needs.</p>",
+   "url": "https://www.labor.idaho.gov/event/resume-workshop-boise-5/",
+   "start_date": "2026-12-01 14:00:00",
+   "end_date": "2026-12-01 15:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Boise office",
+    "address": "317 W. Main St.",
+    "city": "Boise",
+    "stateprovince": "ID",
+    "zip": "83735"
+   }
+  },
+  {
+   "title": "Maximize Your Job Search – Lewiston",
+   "description": "<?xml encoding=\"UTF-8\"><p>This workshop is for everyone seeking guidance in their job search. Topics of discussion include labor market trends, practical ways to find employment and helpful tools offered by the Idaho Department of Labor.</p>",
+   "url": "https://www.labor.idaho.gov/event/maximize-your-job-search-lewiston/",
+   "start_date": "2026-12-01 15:00:00",
+   "end_date": "2026-12-01 16:30:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Lewiston office",
+    "address": "1158 Idaho St.",
+    "city": "Lewiston",
+    "stateprovince": "ID",
+    "zip": "83501-1960"
+   }
+  },
+  {
+   "title": "Maximize Your Job Search – Idaho Falls",
+   "description": "<?xml encoding=\"UTF-8\"><p>This workshop is for everyone seeking guidance in their job search. Topics of discussion include labor market trends, practical ways to find employment and helpful tools offered by the Idaho Department of Labor.</p>",
+   "url": "https://www.labor.idaho.gov/event/maximize-your-job-search-idaho-falls/",
+   "start_date": "2026-12-01 15:00:00",
+   "end_date": "2026-12-01 16:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Idaho Falls office",
+    "address": "1515 E. Lincoln Road",
+    "city": "Idaho Falls",
+    "stateprovince": "ID",
+    "zip": "83401"
+   }
+  },
+  {
+   "title": "Resume Workshop – Twin Falls",
+   "description": "<?xml encoding=\"UTF-8\"><div class=\"col pe-4\">\n<div class=\"tribe-events-single-event-description tribe-events-content pt-4\">\n<p>Stand out in your job search with a strong resume. In this workshop, you will discover what employers seek, how to highlight your work and soft skills, and create the resume that fits your needs.</p>\n</div>\n</div>",
+   "url": "https://www.labor.idaho.gov/event/resume-workshop-twin-falls-8/",
+   "start_date": "2026-12-02 09:00:00",
+   "end_date": "2026-12-02 10:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Twin Falls office",
+    "address": "458 Parkview Loop",
+    "city": "Twin Falls",
+    "stateprovince": "ID",
+    "zip": "83301"
+   }
+  },
+  {
+   "title": "Basic Computer Skills and Maximize Your Job Search – Post Falls",
+   "description": "<?xml encoding=\"UTF-8\"><p>Learn to create an email account, complete online job applications and create employment documents. No previous computer experience required.</p><p>This workshop is for everyone seeking guidance in their job search. Topics of discussion include labor market trends, practical ways to find employment and helpful tools offered by the Idaho Department of Labor.</p>",
+   "url": "https://www.labor.idaho.gov/event/basic-computer-skills-and-maximize-your-job-search-post-falls-3/",
+   "start_date": "2026-12-02 10:00:00",
+   "end_date": "2026-12-02 11:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Post Falls office",
+    "address": "600 N. Thornton St.",
+    "city": "Post Falls",
+    "stateprovince": "ID",
+    "zip": "83854"
+   }
+  },
+  {
+   "title": "Maximize Your Job Search – Boise",
+   "description": "<?xml encoding=\"UTF-8\"><p>This workshop is for everyone seeking guidance in their job search. Topics of discussion include labor market trends, practical ways to find employment and helpful tools offered by the Idaho Department of Labor.</p>",
+   "url": "https://www.labor.idaho.gov/event/maximize-your-job-search-boise-2/",
+   "start_date": "2026-12-02 14:00:00",
+   "end_date": "2026-12-02 15:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Boise office",
+    "address": "317 W. Main St.",
+    "city": "Boise",
+    "stateprovince": "ID",
+    "zip": "83735"
+   }
+  },
+  {
+   "title": "Sharpen Your Interview Skills – Boise",
+   "description": "<?xml encoding=\"UTF-8\"><p>Learn how to successfully navigate an interview and present yourself through this workshop. Individuals receive professional guidance on preparation and presentation skills.</p><p>*Mock interviews available by appointment.</p>",
+   "url": "https://www.labor.idaho.gov/event/sharpen-your-interview-skills-boise-5/",
+   "start_date": "2026-12-03 14:00:00",
+   "end_date": "2026-12-03 15:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Boise office",
+    "address": "317 W. Main St.",
+    "city": "Boise",
+    "stateprovince": "ID",
+    "zip": "83735"
+   }
+  },
+  {
+   "title": "Basic Computer Skills – Caldwell",
+   "description": "<?xml encoding=\"UTF-8\"><p>Learn to create an email account, complete online job applications and create employment documents.</p><p>No previous computer experience required.</p>",
+   "url": "https://www.labor.idaho.gov/event/basic-computer-skills-caldwell-2/",
+   "start_date": "2026-12-04 13:00:00",
+   "end_date": "2026-12-04 14:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Caldwell office",
+    "address": "4514 Thomas Jefferson St.",
+    "city": "Caldwell",
+    "stateprovince": "ID",
+    "zip": "83605"
+   }
+  },
+  {
+   "title": "Maximize Your Job Search – Caldwell",
+   "description": "<?xml encoding=\"UTF-8\"><p>This workshop is for everyone seeking guidance in their job search. Topics of discussion include labor market trends, practical ways to find employment and helpful tools offered by the Idaho Department of Labor.</p>",
+   "url": "https://www.labor.idaho.gov/event/maximize-your-job-search-caldwell-2/",
+   "start_date": "2026-12-04 14:00:00",
+   "end_date": "2026-12-04 15:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Caldwell office",
+    "address": "4514 Thomas Jefferson St.",
+    "city": "Caldwell",
+    "stateprovince": "ID",
+    "zip": "83605"
+   }
+  },
+  {
+   "title": "Hiring Event – Rexburg",
+   "description": "<?xml encoding=\"UTF-8\"><p>Meet multiple employers at Labor&rsquo;s hiring event in Rexburg and be prepared for interviews. Bring your resume.</p>",
+   "url": "https://www.labor.idaho.gov/event/hiring-event-rexburg/",
+   "start_date": "2026-12-08 11:00:00",
+   "end_date": "2026-12-08 14:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "VFW &#8211; Veterans of Foreign Wars Hall",
+    "address": "480 W Second N.",
+    "city": "Rexburg",
+    "stateprovince": "ID",
+    "zip": "83440"
+   }
+  },
+  {
+   "title": "Resume Workshop – Virtual",
+   "description": "<?xml encoding=\"UTF-8\"><p>Stand out in your job search with a strong resume. In this workshop, you will discover what employers seek, how to highlight your work and soft skills, and create the resume that fits your needs.</p><p>*Participants will need to RSVP by emailing&nbsp;<a href=\"mailto:Boise@labor.idaho.gov\">Boise@labor.idaho.gov</a>&nbsp;at least one hour prior to the event to receive an invite.</p><p>Note for claimants: You must attend the ENTIRE workshop to use it as a weekly work search action for unemployment insurance benefits.</p>",
+   "url": "https://www.labor.idaho.gov/event/resume-workshop-virtual-2/",
+   "start_date": "2026-12-08 14:00:00",
+   "end_date": "2026-12-08 15:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Virtual"
+   }
+  },
+  {
+   "title": "Basic Computer Skills (Day One) – Boise",
+   "description": "<?xml encoding=\"UTF-8\"><p>Learn to create an email account, complete online job applications and create employment documents.</p><p>No previous computer experience required.</p>",
+   "url": "https://www.labor.idaho.gov/event/basic-computer-skills-day-one-boise/",
+   "start_date": "2026-12-08 14:00:00",
+   "end_date": "2026-12-08 15:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Boise office",
+    "address": "317 W. Main St.",
+    "city": "Boise",
+    "stateprovince": "ID",
+    "zip": "83735"
+   }
+  },
+  {
+   "title": "Resume Workshop – Boise",
+   "description": "<?xml encoding=\"UTF-8\"><p>Stand out in your job search with a strong resume. In this workshop, you will discover what employers seek, how to highlight your work and soft skills, and create the resume that fits your needs.</p>",
+   "url": "https://www.labor.idaho.gov/event/resume-workshop-boise-4/",
+   "start_date": "2026-12-08 14:00:00",
+   "end_date": "2026-12-08 15:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Boise office",
+    "address": "317 W. Main St.",
+    "city": "Boise",
+    "stateprovince": "ID",
+    "zip": "83735"
+   }
+  },
+  {
+   "title": "Resume Workshop – Lewiston",
+   "description": "<?xml encoding=\"UTF-8\"><p>Stand out in your job search with a strong resume. In this workshop, you will discover what employers seek, how to highlight your work and soft skills, and create the resume that fits your needs.</p>",
+   "url": "https://www.labor.idaho.gov/event/resume-workshop-lewiston/",
+   "start_date": "2026-12-08 15:00:00",
+   "end_date": "2026-12-08 16:30:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Lewiston office",
+    "address": "1158 Idaho St.",
+    "city": "Lewiston",
+    "stateprovince": "ID",
+    "zip": "83501-1960"
+   }
+  },
+  {
+   "title": "Resume Workshop – Idaho Falls",
+   "description": "<?xml encoding=\"UTF-8\"><p>Stand out in your job search with a strong resume. In this workshop, you will discover what employers seek, how to highlight your work and soft skills, and create the resume that fits your needs.</p>",
+   "url": "https://www.labor.idaho.gov/event/resume-workshop-idaho-falls/",
+   "start_date": "2026-12-08 15:00:00",
+   "end_date": "2026-12-08 16:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Idaho Falls office",
+    "address": "1515 E. Lincoln Road",
+    "city": "Idaho Falls",
+    "stateprovince": "ID",
+    "zip": "83401"
+   }
+  },
+  {
+   "title": "Resume Workshop – Pocatello",
+   "description": "<?xml encoding=\"UTF-8\"><p>Stand out in your job search with a strong resume. In this workshop, you will discover what employers seek, how to highlight your work and soft skills, and create the resume that fits your needs.</p>",
+   "url": "https://www.labor.idaho.gov/event/resume-workshop-pocatello-19/",
+   "start_date": "2026-12-08 15:00:00",
+   "end_date": "2026-12-08 16:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Pocatello office",
+    "address": "430 N. 5th Ave.",
+    "city": "Pocatello",
+    "stateprovince": "ID",
+    "zip": "83201"
+   }
+  },
+  {
+   "title": "Basic Computer Skills – Twin Falls",
+   "description": "<?xml encoding=\"UTF-8\"><p>Learn to create an email account, complete online job applications and create employment documents.</p><p>No previous computer experience required.</p>",
+   "url": "https://www.labor.idaho.gov/event/basic-computer-skills-twin-falls-8/",
+   "start_date": "2026-12-09 09:00:00",
+   "end_date": "2026-12-09 10:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Twin Falls office",
+    "address": "458 Parkview Loop",
+    "city": "Twin Falls",
+    "stateprovince": "ID",
+    "zip": "83301"
+   }
+  },
+  {
+   "title": "Resume Workshop and Sharpen Your Interview Skills – Post Falls",
+   "description": "<?xml encoding=\"UTF-8\"><p>Stand out in your job search with a strong resume. In this workshop, you will discover what employers seek, how to highlight your work and soft skills, and create the resume that fits your needs.</p><p>Learn how to successfully navigate an interview and present yourself through this workshop. Individuals receive professional guidance on preparation and presentation skills.</p><p>*Mock interviews available by appointment.</p>",
+   "url": "https://www.labor.idaho.gov/event/resume-workshop-and-sharpen-your-interview-skills-post-falls-3/",
+   "start_date": "2026-12-09 10:00:00",
+   "end_date": "2026-12-09 11:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Post Falls office",
+    "address": "600 N. Thornton St.",
+    "city": "Post Falls",
+    "stateprovince": "ID",
+    "zip": "83854"
+   }
+  },
+  {
+   "title": "Hiring Event – Idaho Falls",
+   "description": "<?xml encoding=\"UTF-8\"><p>Meet multiple employers at Labor&rsquo;s hiring event in Idaho Falls&nbsp;and be prepared for interviews. Bring your resume.</p>",
+   "url": "https://www.labor.idaho.gov/event/hiring-event-idaho-falls-2/",
+   "start_date": "2026-12-09 11:00:00",
+   "end_date": "2026-12-09 12:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Idaho Falls office",
+    "address": "1515 E. Lincoln Road",
+    "city": "Idaho Falls",
+    "stateprovince": "ID",
+    "zip": "83401"
+   }
+  },
+  {
+   "title": "Sharpen Your Interview Skills – Virtual",
+   "description": "<?xml encoding=\"UTF-8\"><p>Learn how to successfully navigate an interview and present yourself through this workshop. Individuals receive professional guidance on preparation and presentation skills.</p><p>*Mock interviews available by appointment.</p><p>*Participants will need to RSVP by emailing&nbsp;<a href=\"mailto:Boise@labor.idaho.gov\">Boise@labor.idaho.gov</a>&nbsp;at least one hour prior to the event to receive an invite.</p><p>Note for claimants: You must attend the ENTIRE workshop to use it as a weekly work search action for unemployment insurance benefits.</p>",
+   "url": "https://www.labor.idaho.gov/event/sharpen-your-interview-skills-virtual-2/",
+   "start_date": "2026-12-09 14:00:00",
+   "end_date": "2026-12-09 15:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Virtual"
+   }
+  },
+  {
+   "title": "Basic Computer Skills (Day Two) – Boise",
+   "description": "<?xml encoding=\"UTF-8\"><p>Learn to create an email account, complete online job applications and create employment documents.</p><p>No previous computer experience required.</p>",
+   "url": "https://www.labor.idaho.gov/event/basic-computer-skills-day-two-boise/",
+   "start_date": "2026-12-09 14:00:00",
+   "end_date": "2026-12-09 15:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Boise office",
+    "address": "317 W. Main St.",
+    "city": "Boise",
+    "stateprovince": "ID",
+    "zip": "83735"
+   }
+  },
+  {
+   "title": "Sharpen Your Interview Skills – Boise",
+   "description": "<?xml encoding=\"UTF-8\"><p>Learn how to successfully navigate an interview and present yourself through this workshop. Individuals receive professional guidance on preparation and presentation skills.</p><p>*Mock interviews available by appointment.</p>",
+   "url": "https://www.labor.idaho.gov/event/sharpen-your-interview-skills-boise-4/",
+   "start_date": "2026-12-10 14:00:00",
+   "end_date": "2026-12-10 15:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Boise office",
+    "address": "317 W. Main St.",
+    "city": "Boise",
+    "stateprovince": "ID",
+    "zip": "83735"
+   }
+  },
+  {
+   "title": "Sharpen Your Interview Skills – Caldwell",
+   "description": "<?xml encoding=\"UTF-8\"><p>Learn how to successfully navigate an interview and present yourself through this workshop. Individuals receive professional guidance on preparation and presentation skills.</p><p>*Mock interviews available by appointment.</p>",
+   "url": "https://www.labor.idaho.gov/event/sharpen-your-interview-skills-caldwell/",
+   "start_date": "2026-12-11 13:00:00",
+   "end_date": "2026-12-11 14:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Caldwell office",
+    "address": "4514 Thomas Jefferson St.",
+    "city": "Caldwell",
+    "stateprovince": "ID",
+    "zip": "83605"
+   }
+  },
+  {
+   "title": "Resume Workshop – Caldwell",
+   "description": "<?xml encoding=\"UTF-8\"><p>Stand out in your job search with a strong resume. In this workshop, you will discover what employers seek, how to highlight your work and soft skills, and create the resume that fits your needs.</p>",
+   "url": "https://www.labor.idaho.gov/event/resume-workshop-caldwell/",
+   "start_date": "2026-12-11 14:00:00",
+   "end_date": "2026-12-11 15:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Caldwell office",
+    "address": "4514 Thomas Jefferson St.",
+    "city": "Caldwell",
+    "stateprovince": "ID",
+    "zip": "83605"
+   }
+  },
+  {
+   "title": "Utilizing Labor services as an employer",
+   "description": "<?xml encoding=\"UTF-8\"><p>Idaho Department of Labor staff will discuss how many services can help employers grow their business through hiring veterans, investing in a Registered Apprenticeship program and participating in the Industry-Driven Skills Training Fund. The Rapid Response program will also be discussed as a resource for employers who have layoffs or plant closures.</p><p><a href=\"https://us02web.zoom.us/webinar/register/WN_xPD3u-SLTsK-f_DXkMcQ8w#/registration\">Register for webinar</a></p><p>Note: This webinar takes place MT.</p>",
+   "url": "https://www.labor.idaho.gov/event/utilizing-labor-services-as-an-employer/",
+   "start_date": "2026-12-15 11:00:00",
+   "end_date": "2026-12-15 12:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Virtual"
+   }
+  },
+  {
+   "title": "Resume Workshop – Boise",
+   "description": "<?xml encoding=\"UTF-8\"><p>Stand out in your job search with a strong resume. In this workshop, you will discover what employers seek, how to highlight your work and soft skills, and create the resume that fits your needs.</p>",
+   "url": "https://www.labor.idaho.gov/event/resume-workshop-boise-3/",
+   "start_date": "2026-12-15 14:00:00",
+   "end_date": "2026-12-15 15:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Boise office",
+    "address": "317 W. Main St.",
+    "city": "Boise",
+    "stateprovince": "ID",
+    "zip": "83735"
+   }
+  },
+  {
+   "title": "Sharpen Your Interview Skills – Lewiston",
+   "description": "<?xml encoding=\"UTF-8\"><p>Learn how to successfully navigate an interview and present yourself through this workshop. Individuals receive professional guidance on preparation and presentation skills.</p><p>*Mock interviews available by appointment.</p>",
+   "url": "https://www.labor.idaho.gov/event/sharpen-your-interview-skills-lewiston/",
+   "start_date": "2026-12-15 15:00:00",
+   "end_date": "2026-12-15 16:30:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Lewiston office",
+    "address": "1158 Idaho St.",
+    "city": "Lewiston",
+    "stateprovince": "ID",
+    "zip": "83501-1960"
+   }
+  },
+  {
+   "title": "Sharpen Your Interview Skills – Idaho Falls",
+   "description": "<?xml encoding=\"UTF-8\"><p>Learn how to successfully navigate an interview and present yourself through this workshop. Individuals receive professional guidance on preparation and presentation skills.</p><p>*Mock interviews available by appointment.</p>",
+   "url": "https://www.labor.idaho.gov/event/sharpen-your-interview-skills-idaho-falls/",
+   "start_date": "2026-12-15 15:00:00",
+   "end_date": "2026-12-15 16:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Idaho Falls office",
+    "address": "1515 E. Lincoln Road",
+    "city": "Idaho Falls",
+    "stateprovince": "ID",
+    "zip": "83401"
+   }
+  },
+  {
+   "title": "Maximize Your Job Search – Twin Falls",
+   "description": "<?xml encoding=\"UTF-8\"><div class=\"col pe-4\">\n<div class=\"tribe-events-single-event-description tribe-events-content pt-4\">\n<p>This workshop is for everyone seeking guidance in their job search. Topics of discussion include labor market trends, practical ways to find employment and helpful tools offered by the Idaho Department of Labor.</p>\n</div>\n</div>",
+   "url": "https://www.labor.idaho.gov/event/maximize-your-job-search-twin-falls-10/",
+   "start_date": "2026-12-16 09:00:00",
+   "end_date": "2026-12-16 10:00:00",
+   "all_day": false,
+   "venue": {
+    "venue": "Idaho Department of Labor &#8211; Twin Falls office",
+    "address": "458 Parkview Loop",
+    "city": "Twin Falls",
+    "stateprovince": "ID",
+    "zip": "83301"
+   }
+  }
+ ]
+}
