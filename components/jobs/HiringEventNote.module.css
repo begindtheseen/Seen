@@ -8,3 +8,6 @@
 .line { margin: 0; display: flex; align-items: flex-start; gap: var(--sp-2); font-size: var(--fs-sm); color: var(--text-2); line-height: 1.5; overflow-wrap: anywhere; }
 .line svg { margin-top: 4px; }
 .fine { margin: 0; font-size: var(--fs-sm); color: var(--text-3); }
+.goingRow { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2) var(--sp-3); margin-top: var(--sp-1); }
+.going { margin: var(--sp-1) 0 0; font-size: var(--fs-sm); color: var(--text-2); line-height: 1.5; }
+.goingLink { color: var(--accent); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }

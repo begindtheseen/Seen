@@ -16,7 +16,8 @@
 // crash or an overlapping run can't double-mail; a hard send failure releases the claim so the
 // next run retries. No RESEND_KEY → clean no-op (nothing sent, 200).
 
-import { dueMilestone, buildEmail, unsubToken, trackerAppUrl } from '../lib/server/outcomeEmails.js';
+import { dueMilestone, buildEmail, buildEventEmail, unsubToken, trackerAppUrl } from '../lib/server/outcomeEmails.js';
+import { eventEmailDue, plannedEvent, dayIn, EVENT_EVE_DAY, EVENT_AFTER_DAY } from '../lib/tracker/eventPlan.js';
 import { isVercelCron } from '../lib/server/cronAuth.js';
 import { recordCronRun } from '../lib/server/cronRun.js';
 
@@ -112,6 +113,47 @@ export default async function handler(req, res) {
     }
   }
 
-  if (isCron) await recordCronRun('outcome-followups', 'ok', `sent ${sent} of ${(apps || []).length} candidates`);
-  return res.status(200).json({ ok: true, sent, skipped, candidates: (apps || []).length, byMilestone });
+  // ── Hiring events ("I'm going" on a listing — lib/tracker/eventPlan.js) ──────────────────────────────────────
+  // A reminder the day before and "How did it go?" from the day after (3 days, until answered). The plan is an
+  // interview_scheduled event with data.kind 'hiring_event' in applications.events (jsonb containment read); the
+  // ledger key is EVENT_EVE_DAY / EVENT_AFTER_DAY on the same (application, milestone_day) unique row.
+  let eventSent = 0;
+  const since = new Date(now - 120 * 86400e3).toISOString();
+  const plan = encodeURIComponent(JSON.stringify([{ type: 'interview_scheduled', data: { kind: 'hiring_event' } }]));
+  const er = await q(`applications?select=id,user_id,company_name,role,status,events,created_at&status=eq.active&events=cs.${plan}&created_at=gt.${encodeURIComponent(since)}&order=created_at.asc&limit=500`);
+  const eventApps = er.ok ? (await er.json()).map((a) => ({ ...a, company: a.company_name })) : [];
+  for (const app of eventApps) {
+    if (sent >= MAX_SENDS) break;
+    if (!app.user_id || optOut.has(app.user_id)) { skipped++; continue; }
+    const due = eventEmailDue(app, now);
+    if (!due) continue;
+    const day = due === 'eve' ? EVENT_EVE_DAY : EVENT_AFTER_DAY;
+    const email = await emailFor(app.user_id);
+    if (!email) { skipped++; continue; }
+    const claim = await q('outcome_email_log', {
+      method: 'POST', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ application_id: app.id, user_id: app.user_id, milestone_day: day }),
+    });
+    if (claim.status === 409) { skipped++; continue; }
+    if (!claim.ok && claim.status !== 201) { skipped++; continue; }
+    const p = plannedEvent(app);
+    const token = unsubToken(app.user_id, EMAIL_SECRET);
+    const unsubUrl = `${SITE}/api/unsubscribe?uid=${encodeURIComponent(app.user_id)}&token=${token}`;
+    const { subject, html, text } = buildEventEmail(app, due, { ...p, day: dayIn(p.at) }, { reportUrl: trackerAppUrl(SITE, app.id), unsubUrl });
+    try {
+      const send = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from: 'Seen <noreply@seenjobs.io>', to: [email], subject, html, text }),
+      });
+      if (send.ok) { sent++; eventSent++; }
+      else { await releaseClaim(app.id, day); skipped++; }
+    } catch {
+      await releaseClaim(app.id, day);
+      skipped++;
+    }
+  }
+
+  if (isCron) await recordCronRun('outcome-followups', 'ok', `sent ${sent} of ${(apps || []).length + eventApps.length} candidates (${eventSent} event)`);
+  return res.status(200).json({ ok: true, sent, skipped, candidates: (apps || []).length, byMilestone, events: { candidates: eventApps.length, sent: eventSent } });
 }

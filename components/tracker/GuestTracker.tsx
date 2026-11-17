@@ -14,7 +14,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import PageHeader from '@/components/shell/PageHeader'
 import { AppStore } from '@/lib/stores/AppStore'
-import type { Application } from '@/lib/types'
+import type { Application, HiringEvent } from '@/lib/types'
 import { daysSince } from '@/lib/stores/checkSchedule'
 import { COMPANY_MAX, ROLE_MAX } from '@/lib/stores/applicationEdit'
 import { appliedAtFromChoice, checkinEmailPlan, shortDay, type AppliedChoice } from '@/lib/trackCapture'
@@ -23,6 +23,8 @@ import { hasPendingRef } from '@/lib/referralClient'
 import { loginHref } from '@/lib/safeHref.js'
 import AppliedWhen from '@/components/track/AppliedWhen'
 import CheckinEmailAsk from '@/components/track/CheckinEmailAsk'
+import EventPlan from './EventPlan'
+import { EVENT_ANSWERS, eventAnsweredEvent, plannedEvent } from '@/lib/tracker/eventPlan.js'
 import InterviewPrep from '@/components/tracker/InterviewPrep'
 import s from '@/components/track/track.module.css'
 import Icon from '@/components/ui/Icon'
@@ -114,6 +116,12 @@ export default function GuestTracker({ still = false }: { still?: boolean } = {}
     await AppStore.update(id, { stage: 'Interview' }, false)
     setApps(AppStore.loadSync())
   }
+  async function answerEvent(id: string, answer: string) {
+    const a = EVENT_ANSWERS[answer as keyof typeof EVENT_ANSWERS]
+    if (!a) return
+    await AppStore.update(id, { ...a.changes } as Partial<Application>, false, { markers: [eventAnsweredEvent(answer) as HiringEvent] })
+    setApps(AppStore.loadSync())
+  }
   async function schedule(id: string, iso: string) {
     await AppStore.update(id, {}, false, { markers: [{ id: `ev_${Date.now()}`, type: 'interview_scheduled', date: Date.now(), source: 'user', confidence: 'high', data: { at: iso } }] })
     setApps(AppStore.loadSync())
@@ -179,6 +187,12 @@ export default function GuestTracker({ still = false }: { still?: boolean } = {}
                     <button type="button" className={s.ghost} onClick={() => void calledIn(a.id)} data-testid="gt-called-in"><Icon name="calendar" size={15} /> They called me in</button>
                   )}
                   <button type="button" className={s.ghost} onClick={() => void remove(a.id)} aria-label={`Remove ${a.company} ${a.role}`}>Remove</button>
+                  {/* A hiring event added with "I'm going": its date before, "How did it go?" after (lib/tracker/eventPlan.js). */}
+                  {plannedEvent(a) && (
+                    <div style={{ flexBasis: '100%', minWidth: 0 }}>
+                      <EventPlan app={a} onAnswer={(id, answer) => void answerEvent(id, answer)} />
+                    </div>
+                  )}
                   {a.status === 'active' && ['Phone Screen', 'Interview', 'Final Round'].includes(a.stage) && (
                     <div style={{ flexBasis: '100%', minWidth: 0 }}>
                       <InterviewPrep guest appId={a.id} company={a.company} role={a.role} interviewAt={scheduledAt(a)} isPro={false} stage={a.stage} onSchedule={iso => void schedule(a.id, iso)} />
