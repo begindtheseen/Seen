@@ -1,7 +1,7 @@
-// Server-only data for a company page's first paint: the stored score (lib/growth.ts getScoreState, the row
-// the <title>, meta description, OG card and grade already read), the report rows that score is built from,
-// and the company's open job posts. One request reads each of them once — generateMetadata and the layout
-// share the results through React's per-request cache().
+// Server-only data for a company page's first paint, beside the stored score the layout reads itself
+// (lib/growth.ts getScoreState): the report rows that score is built from, and the company's open job posts.
+// One request reads each of them once — generateMetadata and the layout share the results through React's
+// per-request cache().
 //
 // Request-path rules (CLAUDE.md 2026-11-12): no description / report_text column is selected; one exact
 // company-name filter per read (no OR of patterns); counts come from keyset pages over id
@@ -13,7 +13,7 @@
 
 import { cache } from 'react'
 import { unstable_cache } from 'next/cache'
-import { getScoreState, slugToName, type GrowthScore } from '@/lib/growth'
+import { slugToName, type GrowthScore } from '@/lib/growth'
 import { SCORABLE_REPORTS_FILTER } from '@/lib/server/reportCounts.js'
 import { NONTERMINAL_OUTCOMES } from '@/api/_utils/companyIntel.js'
 import { ilikeExact } from '@/lib/server/pgrest.js'
@@ -86,9 +86,6 @@ function withDeadline<T>(p: Promise<T>, ms: number): Promise<T | null> {
     p.then((v) => { clearTimeout(t); resolve(v) }, () => { clearTimeout(t); resolve(null) })
   })
 }
-
-/** The stored score, read once per request (generateMetadata + layout). */
-export const readScore = cache(async (slug: string): Promise<{ score: GrowthScore | null; ok: boolean }> => getScoreState(slug))
 
 /** The grade's rows for a STORED company name; null when unreadable or slower than the deadline. */
 export const readAnswerRows = cache(async (name: string): Promise<AnswerRow[] | null> =>

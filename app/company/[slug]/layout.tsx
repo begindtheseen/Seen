@@ -2,7 +2,8 @@ import type { Metadata } from 'next'
 // Build-safe score reader — reads the cached score DIRECTLY from Supabase and NEVER self-fetches
 // the live https://seenjobs.io/api/reports (which had no build detection here and could hang
 // `next build`). generateMetadata + the layout render below both go through this one helper.
-import { slugToName, displayCompanyName, type GrowthScore } from '@/lib/growth'
+import { cache } from 'react'
+import { getScoreState, slugToName, displayCompanyName, type GrowthScore } from '@/lib/growth'
 import { jsonLdHtml } from '@/lib/jsonLd'
 // The three answers at the top of the page (lib/company/answers.js) and the server reads behind them
 // (./companyData.ts: the score once per request, the grade's report rows, the company's open job posts).
@@ -11,7 +12,7 @@ import { jsonLdHtml } from '@/lib/jsonLd'
 // accounts, X% say …" wording put the weighted rate on a raw count; the three answers now say both numbers
 // and what each counts, and cover the same searches (application status, how long, does it ghost).
 import { buildCompanyAnswers, answersFaq, companyIndexDecision, listingFactsSentence } from '@/lib/company/answers.js'
-import { readScore, readAnswerRows, readListing, readName } from './companyData'
+import { readAnswerRows, readListing, readName } from './companyData'
 import { CompanyAnswersSeedProvider, type CompanyAnswer, type CompanyAnswersData, type ListingSignalsData } from '@/components/company/CompanyAnswersSeed'
 // Offline, numerically-grounded "What applicants report" paragraph (company_summaries). No-op when the
 // table is missing/empty or the read fails — the page renders exactly as before.
@@ -40,6 +41,9 @@ function summaryKey(slug: string, s: GrowthScore | null): string {
   return d.replace(/-/g, ' ')
 }
 
+// The stored score, read ONCE per request: generateMetadata and the layout share it (React cache).
+const readScore = cache((slug: string) => getScoreState(slug))
+
 export async function generateMetadata(
   { params }: { params: Promise<{ slug: string }> }
 ): Promise<Metadata> {
@@ -59,12 +63,12 @@ export async function generateMetadata(
   // plus an ungraded page that holds at least one applicant account AND 10+ open postings with listing signals —
   // its answers state real counts and its listing facts are its own. A listings-only page stays noindex.
   // Such a page's description is its own first answer and its listing facts, never a promise of data it lacks.
-  let robots = companyRobots(facts.gradeable, scoreRead)
-  if (robots.robots && facts.reportCount >= 1) {
+  let indexAnyway: { robots?: { index: true; follow: true } } = {}
+  if (companyRobots(facts.gradeable, scoreRead).robots && facts.reportCount >= 1) {
     const key = readName(slug, s)
     const listing = await readListing(key)
     if (companyIndexDecision({ gradeable: false, readOk: true, accounts: facts.reportCount, listing }).index) {
-      robots = {}
+      indexAnyway = { robots: { index: true, follow: true } }
       const built = buildCompanyAnswers({ name, score: s, rows: await readAnswerRows(key), listing })
       description = clipSentences(`${built.answers[0].sentence} ${listingFactsSentence(name, listing)}`.trim())
     }
@@ -78,8 +82,10 @@ export async function generateMetadata(
       `${name} interview process`, `does ${name} ghost applicants`,
       ...(isStaffingAgency(s?.company_name ?? name) ? [`is ${name} legit`] : []),
     ],
-    // No grade → noindex, follow (only when the score read succeeded), with the one exception above.
-    ...robots,
+    // No grade → noindex, follow (only when the score read succeeded; lib/companyMeta.ts companyRobots),
+    // with the one exception above.
+    ...companyRobots(facts.gradeable, scoreRead),
+    ...indexAnyway,
     openGraph: {
       title,
       description,
