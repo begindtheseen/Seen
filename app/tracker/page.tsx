@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth'
 import { AppStore, isDbId, type SyncState, type UpdateOptions, type UpdateResult } from '@/lib/stores/AppStore'
 import { EventStore } from '@/lib/stores/EventStore'
 import { STAGES } from '@/lib/constants'
-import type { Application, DueCheck } from '@/lib/types'
+import type { Application, DueCheck, HiringEvent } from '@/lib/types'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { listingHref } from '@/lib/listingHref.js'
@@ -17,6 +17,8 @@ import { gradeLetter } from '@/lib/companyDisplay'
 import WithdrawModal from '@/components/WithdrawModal'
 import PageHeader from '@/components/shell/PageHeader'
 import GuestTracker, { GuestTrackerShell } from '@/components/tracker/GuestTracker'
+import EventPlan from '@/components/tracker/EventPlan'
+import { EVENT_ANSWERS, eventAnsweredEvent, eventStage } from '@/lib/tracker/eventPlan.js'
 import InboxAutopilot from '@/components/tracker/InboxAutopilot'
 import InterviewPrep from '@/components/tracker/InterviewPrep'
 import ApplicationForm from '@/components/tracker/ApplicationForm'
@@ -92,7 +94,9 @@ function interviewAt(app: Application): string {
   return ev ? String(ev.data!.at) : ''
 }
 
-function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onShare, onReload, intel, check, onAnswer, onSnooze, sync, onRetry, isPro, autoPrep, leadPrep, onSchedule }: {
+function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onShare, onReload, intel, check, onAnswer, onSnooze, sync, onRetry, isPro, autoPrep, leadPrep, onSchedule, onEventAnswer }: {
+  /** Answers "How did the hiring event go?" on a card added with "I'm going" (components/tracker/EventPlan.tsx). */
+  onEventAnswer: (appId: string, answer: string) => void
   /** This card reached an interview a moment ago: its Interview Prep opens first and comes into view. */
   leadPrep: boolean
   /** Saves the interview date the person picked on the prep panel. */
@@ -216,8 +220,12 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
           jobId={app.jobId} stage={app.stage} onSchedule={iso => onSchedule(app.id, iso)} />
       )}
 
-      {/* Check-in: asked on the application it is about, not in a separate stack above the list. */}
-      {check && <CheckIn check={check} onAnswer={onAnswer} onSnooze={onSnooze} ghostRate={intel?.ghost_rate} avgWaitDays={intel?.avg_wait_days} />}
+      {/* A hiring event the person said they are going to: its date before, "How did it go?" after. */}
+      <EventPlan app={app} onAnswer={onEventAnswer} />
+
+      {/* Check-in: asked on the application it is about, not in a separate stack above the list. The event's own
+          question goes first — one question on a card at a time. */}
+      {check && eventStage(app) !== 'ask' && <CheckIn check={check} onAnswer={onAnswer} onSnooze={onSnooze} ghostRate={intel?.ghost_rate} avgWaitDays={intel?.avg_wait_days} />}
 
       {/* Ghost Watch — time-aware verdict from this company's real Seen data */}
       {watch && (
@@ -714,6 +722,13 @@ function TrackerPage() {
     return r
   }
 
+  // "How did the hiring event go?" (lib/tracker/eventPlan.js): the answer is kept on the application and moves the card.
+  const handleEventAnswer = async (id: string, answer: string) => {
+    const a = EVENT_ANSWERS[answer as keyof typeof EVENT_ANSWERS]
+    if (!a) return
+    await handleUpdate(id, { ...a.changes } as Partial<Application>, { markers: [eventAnsweredEvent(answer) as HiringEvent] })
+  }
+
   // The interview date from the prep panel: an interview_scheduled event on the application (synced with it).
   const handleSchedule = async (id: string, iso: string) => {
     const ev = { id: `ev_${Date.now()}`, type: 'interview_scheduled', date: Date.now(), source: 'user' as const, confidence: 'high' as const, data: { at: iso } }
@@ -1193,7 +1208,7 @@ function TrackerPage() {
           <div id="trackerList" style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
             {pageApps.map(app => (
               <div key={app.id} style={highlightId === app.id ? { borderRadius: 12, boxShadow: '0 0 0 2px var(--green)', transition: 'box-shadow 2.5s ease' } : undefined}>
-                <AppCard app={app} expanded={expandedId === app.id} setExpanded={open => setExpandedId(open ? app.id : '')} onUpdate={handleUpdate} onEdit={a => { setEditNotice(''); setEditing(a) }} onRemove={handleRemove} onShare={handleShare} onReload={loadApps} intel={companyScores[app.company.toLowerCase().trim()]} check={checkByApp.get(app.id)} onAnswer={handleCheckAnswer} onSnooze={handleSnooze} sync={syncOf(app)} onRetry={handleRetry} isPro={isPro} autoPrep={prepReturn === app.id && isPro} leadPrep={leadPrepId === app.id} onSchedule={handleSchedule} />
+                <AppCard app={app} expanded={expandedId === app.id} setExpanded={open => setExpandedId(open ? app.id : '')} onUpdate={handleUpdate} onEdit={a => { setEditNotice(''); setEditing(a) }} onRemove={handleRemove} onShare={handleShare} onReload={loadApps} intel={companyScores[app.company.toLowerCase().trim()]} check={checkByApp.get(app.id)} onAnswer={handleCheckAnswer} onSnooze={handleSnooze} sync={syncOf(app)} onRetry={handleRetry} isPro={isPro} autoPrep={prepReturn === app.id && isPro} leadPrep={leadPrepId === app.id} onSchedule={handleSchedule} onEventAnswer={handleEventAnswer} />
               </div>
             ))}
           </div>

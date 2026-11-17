@@ -1,5 +1,6 @@
 'use client'
 
+import { plannedEvent, eventStage } from '@/lib/tracker/eventPlan.js'
 import { whenLabel } from '@/lib/interviewTime'
 import { displayCompanyName, possessive } from '@/lib/companyDisplay'
 import { pathSegment, slugSegment, loginHref } from '@/lib/safeHref.js'
@@ -315,6 +316,12 @@ export default function DashboardPage() {
       .filter(x => !x.at || Date.parse(x.at) >= Date.now() - 86_400_000)
       .sort((x, y) => (x.at ? Date.parse(x.at) : Infinity) - (y.at ? Date.parse(y.at) : Infinity))[0]
     if (upcoming) moves.push({ icon: 'calendar', title: `Interview at ${upcoming.a.company}${upcoming.at ? ` · ${whenLabel(upcoming.at)}` : ''}`, sub: upcoming.at ? 'Open your prep: the questions, your answers, the thank-you email' : 'Add the date and open your prep', go: () => router.push(`/tracker#app_${pathSegment(upcoming.a.id)}`) })
+    // A hiring event the person said they're going to (lib/tracker/eventPlan.js), soonest first, before it happens.
+    const goingTo = active
+      .map(a => ({ a, plan: plannedEvent(a), stage: eventStage(a) }))
+      .filter(x => x.plan && (x.stage === 'upcoming' || x.stage === 'today'))
+      .sort((x, y) => Date.parse(x.plan!.at) - Date.parse(y.plan!.at))[0]
+    if (goingTo) moves.push({ icon: 'calendar', title: `${goingTo.plan!.label} at ${goingTo.a.company} · ${goingTo.stage === 'today' ? 'today' : whenLabel(goingTo.plan!.at)}`, sub: [goingTo.plan!.time, goingTo.plan!.where].filter(Boolean).join(' · ') || 'Check the posting for what to bring', go: () => router.push(`/tracker?app=${pathSegment(goingTo.a.id)}`) })
     const stale = staleApps[0]
     // Straight to that card (#app_<id>), like the Signals row — not the top of the tracker (M3).
     if (stale) moves.push({ icon: 'clock', title: `Follow up with ${stale.company}`, sub: windowOf(stale).reference ? `Past the ${REFERENCE_WINDOW_DAYS}-day reference window` : 'Past its usual response window', go: () => router.push(`/tracker#app_${pathSegment(stale.id)}`) })

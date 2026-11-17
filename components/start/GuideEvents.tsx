@@ -15,8 +15,7 @@ import Link from 'next/link'
 import type { Job, PostingEvent } from '@/lib/types'
 import { JobCache } from '@/lib/stores/JobCache'
 import { eventBelongs } from '@/lib/start/listingFilters.js'
-import { eventDateLabel } from '@/lib/jobs/hiringEvents.js'
-import { howToCome } from '@/components/jobs/HiringEventNote'
+import { eventDateLabel, howToCome } from '@/lib/jobs/hiringEvents.js'
 import st from './guide.module.css'
 
 type EventRow = { id: string; title: string; company: string; location: string; roles?: string; event: PostingEvent }

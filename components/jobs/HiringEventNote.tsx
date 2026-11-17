@@ -5,8 +5,9 @@
 // opened from a link (no search row) reads it from its own title and text. Nothing when the posting announces no
 // event or its dates have passed. Ink text on the quiet card surface — the date is information, not a call to action.
 import type { PostingEvent, Job } from '@/lib/types'
-import { eventDateLabel, listingHiringEvent } from '@/lib/jobs/hiringEvents.js'
+import { eventDateLabel, howToCome, listingHiringEvent } from '@/lib/jobs/hiringEvents.js'
 import Icon from '@/components/ui/Icon'
+import GoingButton from './GoingButton'
 import s from './HiringEventNote.module.css'
 
 export function eventOf(job: Pick<Job, 'title' | 'description' | 'posted_at' | 'hiring_event'>): PostingEvent | null {
@@ -14,18 +15,7 @@ export function eventOf(job: Pick<Job, 'title' | 'description' | 'posted_at' | '
   return listingHiringEvent({ title: job.title, description: job.description || '', created_at: job.posted_at }) as PostingEvent | null
 }
 
-/** "Walk-ins welcome · RSVP" — how to come, from the posting's own words. */
-export function howToCome(ev: PostingEvent): string {
-  return [
-    ev.virtual ? 'Virtual' : null,
-    ev.inviteOnly ? 'By invitation' : null,
-    ev.walkIn && !ev.inviteOnly ? 'Walk-ins welcome' : null,
-    ev.rsvp ? 'RSVP in the posting' : null,
-    ev.onTheSpot ? 'Interviews on the spot' : null,
-  ].filter(Boolean).join(' · ')
-}
-
-export default function HiringEventNote({ job }: { job: Pick<Job, 'title' | 'description' | 'posted_at' | 'hiring_event'> }) {
+export default function HiringEventNote({ job }: { job: Pick<Job, 'id' | 'title' | 'company' | 'location' | 'description' | 'posted_at' | 'hiring_event'> }) {
   const ev = eventOf(job)
   if (!ev) return null
   const how = howToCome(ev)
@@ -35,6 +25,7 @@ export default function HiringEventNote({ job }: { job: Pick<Job, 'title' | 'des
       {ev.where && <p className={s.line}><Icon name="map-pin" size={14} /> {ev.where}</p>}
       {how && <p className={s.line}>{how}</p>}
       <p className={s.fine}>From the posting. Check it for details before you go.</p>
+      {job.id && <GoingButton job={job} ev={ev} />}
     </section>
   )
 }
