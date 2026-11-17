@@ -12,7 +12,7 @@ import { jsonLdHtml } from '@/lib/jsonLd'
 // and what each counts, and cover the same searches (application status, how long, does it ghost).
 import { buildCompanyAnswers, answersFaq, companyIndexDecision } from '@/lib/company/answers.js'
 import { readScore, readAnswerRows, readListing, readName } from './companyData'
-import { CompanyAnswersSeedProvider, type CompanyAnswersData, type ListingSignalsData } from '@/components/company/CompanyAnswersSeed'
+import { CompanyAnswersSeedProvider, type CompanyAnswer, type CompanyAnswersData, type ListingSignalsData } from '@/components/company/CompanyAnswersSeed'
 // Offline, numerically-grounded "What applicants report" paragraph (company_summaries). No-op when the
 // table is missing/empty or the read fails — the page renders exactly as before.
 import { getCompanySummary, summaryMonth, type CompanySummary } from '@/lib/companySummary'
@@ -153,7 +153,7 @@ export default async function CompanySlugLayout(
   const summary = facts.summaryUsable ? storedSummary : null
   const pageUrl = `https://seenjobs.io/company/${slug}`
   const built = buildCompanyAnswers({ name, score: s, rows, listing })
-  const answers: CompanyAnswersData = { name: built.name, graded: built.graded, accounts: built.accounts, hasData: built.hasData, answers: built.answers }
+  const answers: CompanyAnswersData = { name: built.name, graded: built.graded, accounts: built.accounts, hasData: built.hasData, answers: built.answers as CompanyAnswer[] }
   const faq = answersFaq(built)
 
   // No aggregateRating: a Seen Grade is Seen's own assessment, not a rating anyone gave the company

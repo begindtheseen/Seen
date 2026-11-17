@@ -55,13 +55,13 @@ async function readRowsUncached(name: string): Promise<AnswerRow[]> {
   const out: AnswerRow[] = []
   let last: string | null = null
   for (let i = 0; i < MAX_PAGES; i++) {
-    const r = await fetch(`${c.url}/rest/v1/${base}&order=id.asc&limit=${PAGE}${last ? `&id=gt.${encodeURIComponent(last)}` : ''}`, {
+    const r: Response = await fetch(`${c.url}/rest/v1/${base}&order=id.asc&limit=${PAGE}${last ? `&id=gt.${encodeURIComponent(last)}` : ''}`, {
       headers: { apikey: c.key, Authorization: `Bearer ${c.key}` },
       cache: 'no-store',
       signal: AbortSignal.timeout(READ_TIMEOUT_MS),
     })
     if (!r.ok) throw new Error(`company rows ${r.status}`)
-    const rows = await r.json()
+    const rows: unknown = await r.json()
     if (!Array.isArray(rows)) throw new Error('company rows: not an array')
     out.push(...rows)
     if (rows.length < PAGE) return out
