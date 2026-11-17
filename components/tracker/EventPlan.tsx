@@ -10,6 +10,9 @@ import { EVENT_ANSWERS, eventStage, plannedEvent } from '@/lib/tracker/eventPlan
 import type { Application } from '@/lib/types'
 import Icon, { type IconName } from '@/components/ui/Icon'
 
+/** "Thu, Nov 19" — the day alone when the posting's hours are shown beside it, else the day and its start time. */
+const dayOf = (at: string, hasHours: boolean) => hasHours ? new Date(at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : whenLabel(at)
+
 const ORDER: Array<{ key: keyof typeof EVENT_ANSWERS; icon: IconName; good?: boolean }> = [
   { key: 'offer', icon: 'trophy', good: true },
   { key: 'interviewed', icon: 'circle-check', good: true },
@@ -27,7 +30,7 @@ export default function EventPlan({ app, onAnswer }: { app: Application; onAnswe
       <div className="app-check-note" style={{ marginTop: '.5rem', display: 'flex', gap: '.5rem', alignItems: 'flex-start' }} data-testid="event-plan">
         <Icon name="calendar" size={14} />
         <span>
-          {stage === 'today' ? `${label} today` : `Going: ${label} · ${whenLabel(plan.at)}`}
+          {stage === 'today' ? `${label} today` : `Going: ${label} · ${dayOf(plan.at, !!plan.time)}`}
           {plan.time ? ` · ${plan.time}` : ''}{plan.where ? ` · ${plan.where}` : ''}{plan.virtual ? ' · virtual' : ''}
         </span>
       </div>
@@ -36,7 +39,7 @@ export default function EventPlan({ app, onAnswer }: { app: Application; onAnswe
   return (
     <div className="app-check" onClick={e => e.stopPropagation()} data-testid="event-check">
       <div className="app-check-head">
-        <span className="app-check-tag"><span className="app-check-dot" />{label} · {whenLabel(plan.at)}</span>
+        <span className="app-check-tag"><span className="app-check-dot" />{label} · {dayOf(plan.at, true)}</span>
       </div>
       <div className="app-check-q">How did the {label.toLowerCase()} go?</div>
       <div className="app-check-opts">
