@@ -59,7 +59,7 @@ import { readAreaRows, rankArea, pageArea } from '../lib/server/areaSearch.js';
 import { MIN_HOURLY } from '../lib/jobs/pay.js';
 import { collapseLocationVariants, roleKey } from '../lib/jobs/groupListings.js';
 import { alsoSearched, paySummary, elsewhereClusters } from '../lib/jobs/searchContext.js';
-import { readUpcomingEvents, eventsNear } from '../lib/server/hiringEvents.js';
+import { readHiringEventsAnswer } from '../lib/server/hiringEvents.js';
 import { listingHiringEvent } from '../lib/jobs/hiringEvents.js';
 
 // ── Deadlines and load limits for this module's database reads (2026-11-12) ─────────────────────
@@ -1305,15 +1305,15 @@ function buildFallbackFilter(q) {
 const companyNameKey = n => String(n || '').toLowerCase().trim().replace(/[\s,]+(inc\.?|llc\.?|corp\.?|ltd\.?|co\.|plc\.?)\.?$/i, '').replace(/[\s-]+/g, ' ').trim();
 const companyIlike = name => encodeURIComponent(`*${String(name).toLowerCase().trim().replace(/[\s-]+/g, '*')}*`);
 
-// ── handleHiringEvents: upcoming hiring events, optionally within a radius of a typed place ─────────────────────
+// ── handleHiringEvents: upcoming hiring events (postings + external fairs/windows), optionally near a typed place ──
 async function handleHiringEvents(req, res, body) {
   const SUPABASE_URL = process.env.SUPABASE_URL, KEY = process.env.SUPABASE_SERVICE_KEY;
   if (!SUPABASE_URL || !KEY) return res.status(503).json({ error: 'DB unavailable', events: [] });
   const location = typeof body.location === 'string' ? body.location.trim().slice(0, 120) : '';
   try {
-    const all = await readUpcomingEvents({ supabaseUrl: SUPABASE_URL, serviceKey: KEY });
-    const events = eventsNear(all, location, body.radius).slice(0, 200);
-    return res.status(200).json({ ok: true, events, total: events.length });
+    // Posting events plus external ones (state job fairs, apprenticeship windows), each near the typed place.
+    const { events, external, external_from, partial } = await readHiringEventsAnswer({ supabaseUrl: SUPABASE_URL, serviceKey: KEY, location, radius: body.radius });
+    return res.status(200).json({ ok: true, events, total: events.length, external, external_total: external.length, external_from, partial });
   } catch (e) {
     logError('hiring_events', e.message, {});
     return res.status(502).json({ error: 'Could not read hiring events — try again.', events: [] });
