@@ -24,7 +24,7 @@ import type { Job, PostingEvent } from '@/lib/types'
 import { JobCache } from '@/lib/stores/JobCache'
 import { eventBelongs } from '@/lib/start/listingFilters.js'
 import { eventDateLabel, howToCome } from '@/lib/jobs/hiringEvents.js'
-import { fairLabel, windowDateLabel, windowLabel, windowState } from '@/lib/jobs/externalEvents.js'
+import { externalBelongs, fairLabel, windowDateLabel, windowLabel, windowState } from '@/lib/jobs/externalEvents.js'
 import GoingButton from '@/components/jobs/GoingButton'
 import Icon from '@/components/ui/Icon'
 import st from './guide.module.css'
@@ -95,13 +95,7 @@ export default function GuideEvents({ config, pos, loc, r, listingRows }: {
     const fromRows: EventRow[] = listingRows
       .filter((j) => j.hiring_event)
       .map((j) => ({ id: String(j.id), title: j.title, company: j.company, location: j.location, event: j.hiring_event as PostingEvent }))
-    const external = answer.external.filter((e) => {
-      if (!e.external || !e.event) return false
-      if (e.external.type === 'apprenticeship') return windowState(e, day).status !== 'closed' && eventBelongs(config, e, pos)
-      if (eventBelongs(config, e, pos)) return true
-      // A fair open to every field: on every field guide (never a company guide), only near a place.
-      return e.external.general === true && !!where && !config.employer
-    })
+    const external = answer.external.filter((e) => externalBelongs(config, e, pos, where, day))
     const seen = new Set<string>()
     return [...answer.events, ...fromRows, ...external]
       .filter((e) => e.event && e.event.next >= day && (e.external || eventBelongs(config, e, pos)))
