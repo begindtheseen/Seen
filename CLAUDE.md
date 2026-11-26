@@ -71,9 +71,13 @@ Editor — comments stripped, one block per migration, and say which to run firs
   instance. Shards come from `GET /api/job-index?shard=K&v=FORMAT&k=TOKEN` (`s-maxage=240, swr=86400`, token = HMAC of
   the service key) so the DB is read for the index ~once per shard per few minutes per region whatever the instance
   count; built by id-range keyset reads (cheap PK order). An instance loads at module start (~1.5–3 s), takes new rows
-  every 60 s (`created_at=gt.` — indexed), re-reads shards every 10 min, falls back to building a shard from the DB
-  itself when the CDN fails (2 at a time), never serves a partial index, and is OFF in tests/local unless
-  `JOB_INDEX=on` / `JOB_INDEX_BASE` (always on under `VERCEL`; `JOB_INDEX=off` kills it).
+  every 60 s (`created_at=gt.` — indexed), re-reads shards every 10 min, never serves a partial index,
+  and is OFF in tests/local unless `JOB_INDEX=on` / `JOB_INDEX_BASE` (always on under `VERCEL`; `JOB_INDEX=off` kills
+  it). On Vercel shards come ONLY from the CDN (a failed load retries in 30 s, searches read the DB meanwhile);
+  building shards in-process is for local runs (`JOB_INDEX_LOCAL=1`). Previews read production's shards (Vercel login
+  blocks a preview's own CDN without the automation bypass secret), so until this is on production no preview runs the
+  index path. The full load is never registered with `waitUntil` (an invocation past 60 s is ended with its instance
+  and its index).
 - **`evaluate.js queryIndex(index, qs)`** answers the PostgREST subset search uses (eq/neq/gt/gte/lt/lte/like/ilike/is/
   in, not., or/and trees, select, order with Postgres NULL defaults, limit/offset, the 1,000 max-rows cap) and returns
   `null` for anything else (a `description` select, `*`, unknown column/operator) → the caller reads the DB. Text
@@ -95,6 +99,13 @@ Editor — comments stripped, one block per migration, and say which to run firs
   (15–24 s on prod under load). Tests: `lib/server/jobIndex/{evaluate,index}.test.mjs`, `api/jobs.index.test.mjs`
   (DB vs index on fixtures, zero `ilike` reads with the index). NOT verified until the preview/prod run: the CDN
   self-fetch on Vercel (logs say `[job-index] loaded … cache HIT|MISS|LOCAL`), real-region latency.
+- **Preview findings (2026-11-26, fixed before merge):** (1) the first `guardAnswer` dropped Vercel's OWN inner
+  `res.setHeader`/`res.end` calls made by `res.json` → no search answer ever left the function (504 at 60 s);
+  local mocks never call `res.end` from `res.json`, so only a deployment showed it — `api/jobs.guard.test.mjs` now uses
+  a real http response with Vercel-style helpers (the old wrapper hangs it). Rule: never wrap `res` methods without
+  letting a method's own inner calls through. (2) instances building the index themselves when the CDN was out of
+  reach slowed every DB search on the preview to 15–24 s → CDN-only on Vercel. Endpoint verified on Vercel: shard MISS
+  7.5 s, then CDN HIT 142–291 ms, bad token 403.
 - **Rules:** a request path never sends `ilike` reads of `jobs` when the index is loaded; any new listing read goes
   through `searchRows`/`indexRead` (or `indexAwareDb`); bump `FORMAT` (shard.js) when columns/encoding change; a new
   column a search filters by must be added to `INDEX_COLUMNS` or that read silently goes to the DB.
