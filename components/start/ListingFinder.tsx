@@ -57,13 +57,20 @@ async function fetchAnswer(body: { query: string; location: string; radius: stri
   signal.addEventListener('abort', stop)
   const timer = setTimeout(stop, DEADLINE_MS)
   try {
-    const res = await fetch('/api/jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ctrl.signal })
-    if (!res.ok) return null
-    const data = await res.json()
-    answers.set(key, data)
-    return data
-  } catch {
-    return null
+    // One quiet retry on a failed answer (the server says "busy" rather than keep a phone waiting): a blip never
+    // empties a listings block.
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const res = await fetch('/api/jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ctrl.signal })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data = await res.json()
+        answers.set(key, data)
+        return data
+      } catch {
+        if (ctrl.signal.aborted || attempt >= 1) return null
+        await new Promise((r) => setTimeout(r, 800))
+      }
+    }
   } finally {
     clearTimeout(timer)
     signal.removeEventListener('abort', stop)
