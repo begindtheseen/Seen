@@ -62,6 +62,7 @@ import { alsoSearched, paySummary, elsewhereClusters } from '../lib/jobs/searchC
 import { readHiringEventsAnswer } from '../lib/server/hiringEvents.js';
 import { listingHiringEvent } from '../lib/jobs/hiringEvents.js';
 import { getJobIndex, indexRead, indexRows, warmJobIndex, jobIndexStatus } from '../lib/server/jobIndex/index.js';
+import { ensureSearchTable, routeJobsPath } from '../lib/server/searchTable.js';
 
 // The in-memory job index (lib/server/jobIndex): loading starts with the instance, so most searches find it ready.
 try { warmJobIndex(); } catch { /* the database path answers until it loads */ }
@@ -115,7 +116,8 @@ async function searchRows(supabaseUrl, headers, query) {
     if (hit && hit.status === 400 && cols.endsWith(',apply_mode')) { _applyModeCol = { ok: false, at: Date.now() }; hit = indexRead(`${query}&select=${POOL_COLUMNS}`); }
     if (hit && Array.isArray(hit.rows)) return hit.rows;
   }
-  const go = (cols) => searchRead(() => fetch(`${supabaseUrl}/rest/v1/jobs?${query}&select=${cols}`, { headers, signal: AbortSignal.timeout(SEARCH_READ_MS) }));
+  // The slim copy of the search columns (lib/server/searchTable.js) when it exists, else jobs: the same rows either way.
+  const go = (cols) => searchRead(() => fetch(`${supabaseUrl}/rest/v1/${routeJobsPath(`jobs?${query}&select=${cols}`)}`, { headers, signal: AbortSignal.timeout(SEARCH_READ_MS) }));
   try {
     const cols = poolColumns();
     let r = await go(cols);
@@ -525,6 +527,7 @@ function indexAwareDb(db) {
       const hit = indexRead(path.slice(5));
       if (hit && Array.isArray(hit.rows)) return Promise.resolve(new Response(JSON.stringify(hit.rows), { status: 200, headers: { 'Content-Type': 'application/json' } }));
       if (hit && hit.status === 400) return Promise.resolve(new Response('{"message":"column does not exist"}', { status: 400, headers: { 'Content-Type': 'application/json' } }));
+      return db(routeJobsPath(path), opts); // not the index's read: the slim table when it can answer it
     }
     return db(path, opts);
   };
@@ -918,6 +921,7 @@ export default async function handler(req, res) {
           loc && !isRemote && !searchedPlace ? withTimeout(geocodeLocation(loc, SUPABASE_URL, SUPABASE_SERVICE_KEY), 4000, null) : Promise.resolve(center),
           searchGate(),
           indexP,
+          withTimeout(ensureSearchTable(SUPABASE_URL, dbHeaders), 1500, 'jobs'),
         ]);
         if (gated) return;
         center = centerResolved;
@@ -1337,9 +1341,6 @@ async function corpusRelevant({ supabaseUrl, dbHeaders, terms, query, canonical,
 async function nearestListings(loc, supabaseUrl, dbHeaders) {
   if (!supabaseUrl) return [];
   const now = encodeURIComponent(new Date().toISOString());
-  // id + created_at must be in the select — without them mapUi's id was always null and
-  // /jobs/<id> permalinks from this fallback path could never resolve.
-  const cols = 'id,created_at,title,company,location,salary,apply_url,description,type,level,source,score,waste_score,ats_tenant';
   const mapUi = rows => (Array.isArray(rows) ? rows : []).map(j => ({
     id: j.id || null,
     title: j.title, company: j.company, location: j.location,
@@ -1351,32 +1352,31 @@ async function nearestListings(loc, supabaseUrl, dbHeaders) {
     posted_at: j.created_at || null,
     ats_tenant: j.ats_tenant || null,
   }));
-  // From the job index when it is loaded (light columns), with the postings read by id — the same rows.
-  if (indexRows()) {
-    const light = 'id,created_at,title,company,location,salary,apply_url,type,level,source,score,waste_score,ats_tenant';
-    const viaIndex = async (q) => {
-      const hit = indexRead(`${q}&select=${light}`);
-      if (!hit || !Array.isArray(hit.rows)) return null;
-      await hydrateDescriptions(supabaseUrl, dbHeaders, hit.rows);
-      for (const j of hit.rows) if (j.description === undefined) j.description = null;
-      return hit.rows;
-    };
-    const term = locationDbTerm(loc);
-    const local = term ? await viaIndex(`location=ilike.*${encodeURIComponent(term)}*&expires_at=gt.${now}&order=score.desc&limit=24`) : [];
-    if (local && local.length) return mapUi(local);
-    const any = await viaIndex(`expires_at=gt.${now}&order=last_seen_at.desc&limit=24`);
-    if (local !== null && any !== null) return mapUi(any);
-  }
+  // id + created_at must be in the select — without them mapUi's id was always null and /jobs/<id> permalinks from
+  // this fallback path could never resolve. Light columns from the job index when it is loaded, else from the slim search table (or jobs before it exists),
+  // with the postings read by id — the same rows as one read of jobs with the posting selected.
+  const light = 'id,created_at,title,company,location,salary,apply_url,type,level,source,score,waste_score,ats_tenant';
+  const lightRead = async (q) => {
+    let rows = null;
+    const hit = indexRows() ? indexRead(`${q}&select=${light}`) : null;
+    if (hit && Array.isArray(hit.rows)) rows = hit.rows;
+    else {
+      const r = await searchRead(() => fetch(`${supabaseUrl}/rest/v1/${routeJobsPath(`jobs?${q}&select=${light}`)}`, { headers: dbHeaders, signal: AbortSignal.timeout(SEARCH_READ_MS) }));
+      rows = r.ok ? await r.json() : [];
+      if (!Array.isArray(rows)) rows = [];
+    }
+    await hydrateDescriptions(supabaseUrl, dbHeaders, rows);
+    for (const j of rows) if (j.description === undefined) j.description = null;
+    return rows;
+  };
   try {
     const term = locationDbTerm(loc);
     if (term) {
-      const r = await searchRead(() => fetch(`${supabaseUrl}/rest/v1/jobs?location=ilike.*${encodeURIComponent(term)}*&expires_at=gt.${now}&select=${cols}&order=score.desc&limit=24`, { headers: dbHeaders, signal: AbortSignal.timeout(SEARCH_READ_MS) }));
-      const rows = r.ok ? await r.json() : [];
-      if (Array.isArray(rows) && rows.length) return mapUi(rows);
+      const rows = await lightRead(`location=ilike.*${encodeURIComponent(term)}*&expires_at=gt.${now}&order=score.desc&limit=24`);
+      if (rows.length) return mapUi(rows);
     }
     // Nothing local — surface the most recently-seen quality listings anywhere.
-    const r2 = await searchRead(() => fetch(`${supabaseUrl}/rest/v1/jobs?expires_at=gt.${now}&select=${cols}&order=last_seen_at.desc&limit=24`, { headers: dbHeaders, signal: AbortSignal.timeout(SEARCH_READ_MS) }));
-    return mapUi(r2.ok ? await r2.json() : []);
+    return mapUi(await lightRead(`expires_at=gt.${now}&order=last_seen_at.desc&limit=24`));
   } catch (e) {
     console.warn('nearestListings error:', e.message);
     return [];
@@ -1509,8 +1509,9 @@ async function handleCompanyJobs(req, res, body) {
   const nameKey = companyNameKey;
   try {
     const pattern = companyIlike(safeName);
+    await withTimeout(ensureSearchTable(SUPABASE_URL, dbHeaders), 1500, 'jobs');
     const r = await fetch(
-      `${SUPABASE_URL}/rest/v1/jobs?company=ilike.${pattern}&expires_at=gt.${now}&select=id,title,company,location,salary,apply_url,source,type,level,score,waste_score,ats_tenant&order=score.desc&limit=40`,
+      `${SUPABASE_URL}/rest/v1/${routeJobsPath(`jobs?company=ilike.${pattern}&expires_at=gt.${now}&select=id,title,company,location,salary,apply_url,source,type,level,score,waste_score,ats_tenant&order=score.desc&limit=40`)}`,
       { headers: dbHeaders }
     );
     const cached = preferFullText((r.ok ? await r.json() : []).filter(j => nameKey(j.company) === nameKey(safeName) && locationScope(j.location) !== 'non_us')).slice(0, 20);
@@ -1624,8 +1625,11 @@ async function buildRail(SUPABASE_URL, SUPABASE_SERVICE_KEY, user_id) {
     'Content-Type': 'application/json',
   };
   // Listing reads come from the in-memory job index when it is loaded (the same rows; nothing on the database).
-  const idx = await getJobIndex({ waitMs: 6000, waitUntil }).catch(() => null);
-  const db = idx ? indexAwareDb(serviceDb(SUPABASE_URL, SUPABASE_SERVICE_KEY)) : null;
+  await Promise.all([
+    getJobIndex({ waitMs: 6000, waitUntil }).catch(() => null),
+    withTimeout(ensureSearchTable(SUPABASE_URL, dbHeaders), 1500, 'jobs'),
+  ]);
+  const db = indexAwareDb(serviceDb(SUPABASE_URL, SUPABASE_SERVICE_KEY));
   const m = await findResumeMatches({ supabaseUrl: SUPABASE_URL, serviceKey: SUPABASE_SERVICE_KEY, userId: user_id, db });
   // a partial or unreadable answer is shown but never kept: the next request computes again
   const keep = !m.partial && m.reason !== 'unavailable';
@@ -1743,8 +1747,9 @@ async function handleAreaSearch(req, res, body) {
     pay: body.pay === true,
   };
   const headers = { apikey: K, Authorization: `Bearer ${K}` };
+  await withTimeout(ensureSearchTable(U, headers), 1500, 'jobs');
   const db = async (path) => {
-    const resp = await fetch(`${U}/rest/v1/${path}`, { headers });
+    const resp = await fetch(`${U}/rest/v1/${routeJobsPath(path)}`, { headers });
     if (!resp.ok) throw new Error(`area read ${resp.status}: ${(await resp.text()).slice(0, 160)}`);
     return resp.json();
   };
