@@ -541,21 +541,24 @@ function indexTag() {
 const SEARCH_ANSWER_MS = 9000;
 export function guardAnswer(res, ms, body) {
   if (typeof res.status !== 'function' || typeof res.json !== 'function') return;
-  let sent = false;
+  // `inner` > 0 while one of the response's own methods runs: Vercel's res.json calls res.setHeader and res.end
+  // itself, and those inner calls must go through (dropping them left every answer unsent until the 60 s limit).
+  let sent = false, inner = 0;
   const noop = () => res;
   const status = res.status.bind(res), json = res.json.bind(res), end = typeof res.end === 'function' ? res.end.bind(res) : noop;
   const set = typeof res.setHeader === 'function' ? res.setHeader.bind(res) : null;
+  const through = (fn, args) => { inner++; try { return fn(...args); } finally { inner--; } };
   const t = setTimeout(() => {
     if (sent || res.headersSent) return;
     sent = true;
     console.warn(`[jobs] answer deadline (${ms} ms) reached — sent 503`);
-    try { if (set) set('Cache-Control', 'no-store'); status(503); json(body); } catch { /* the connection is gone */ }
+    try { inner++; if (set) set('Cache-Control', 'no-store'); status(503); json(body); } catch (e) { console.warn('[jobs] deadline answer failed:', e && e.message); } finally { inner--; }
   }, ms);
   if (t.unref) t.unref();
-  res.status = (c) => { if (!sent) status(c); return res; };
-  res.json = (b) => { if (sent) return res; sent = true; clearTimeout(t); return json(b); };
-  res.end = (...a) => { if (sent) return res; sent = true; clearTimeout(t); return end(...a); };
-  if (set) res.setHeader = (k, v) => { if (sent || res.headersSent) return res; return set(k, v); };
+  res.status = (c) => { if (inner || !sent) status(c); return res; };
+  res.json = (b) => { if (inner) return json(b); if (sent) return res; sent = true; clearTimeout(t); return through(json, [b]); };
+  res.end = (...a) => { if (inner) return end(...a); if (sent) return res; sent = true; clearTimeout(t); return through(end, a); };
+  if (set) res.setHeader = (k, v) => { if (inner) return set(k, v); if (sent || res.headersSent) return res; return set(k, v); };
 }
 
 // Per-instance request coalescing: concurrent identical searches share one live aggregation
