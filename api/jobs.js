@@ -55,12 +55,16 @@ import { serviceDb, readRecentApplications } from '../lib/server/jobKeys.js';
 import { hasRailCache, readRailCache, writeRailCache, railSignature, railCacheState } from '../lib/server/railCache.js';
 import { geocodePlace, placesWithin } from '../lib/geo/usPlaces.js';
 import { placeListing, withinRadius, inState as geoInState, placeSearch, RADIUS_OPTIONS, stateName, isNonUsLocation } from '../lib/geo/radius.js';
-import { readAreaRows, rankArea, pageArea } from '../lib/server/areaSearch.js';
+import { readAreaRows, readAreaRowsFromIndex, rankArea, pageArea, warmPlacements } from '../lib/server/areaSearch.js';
 import { MIN_HOURLY } from '../lib/jobs/pay.js';
 import { collapseLocationVariants, roleKey } from '../lib/jobs/groupListings.js';
 import { alsoSearched, paySummary, elsewhereClusters } from '../lib/jobs/searchContext.js';
 import { readHiringEventsAnswer } from '../lib/server/hiringEvents.js';
 import { listingHiringEvent } from '../lib/jobs/hiringEvents.js';
+import { getJobIndex, indexRead, indexRows, warmJobIndex, jobIndexStatus } from '../lib/server/jobIndex/index.js';
+
+// The in-memory job index (lib/server/jobIndex): loading starts with the instance, so most searches find it ready.
+try { warmJobIndex(); } catch { /* the database path answers until it loads */ }
 
 // ── Deadlines and load limits for this module's database reads (2026-11-12) ─────────────────────
 // Production 2026-11-11: with the database stalled, /api/jobs calls waited on fetches that had no timeout until the
@@ -74,6 +78,7 @@ const fetch = (url, opts = {}) => globalThis.fetch(url, opts && opts.signal ? op
 // seconds, and a search must not queue behind it. Each read gives up after SEARCH_READ_MS.
 const SEARCH_IN_FLIGHT = 16;
 const SEARCH_READ_MS = 6000;
+const HYDRATE_READ_MS = 2500;
 let _searchActive = 0;
 const _searchQueue = [];
 function _searchPump() {
@@ -102,6 +107,14 @@ const poolColumns = () => (_applyModeCol.ok === false && Date.now() - _applyMode
 
 /** One read of `jobs` for the search: through the limiter, with a deadline; [] on any failure (as before). */
 async function searchRows(supabaseUrl, headers, query) {
+  // The job index answers the read when it is loaded (lib/server/jobIndex) — the same rows in the same order,
+  // from memory; the database only when it is not (an instance's first seconds) or the read is one it cannot answer.
+  {
+    const cols = poolColumns();
+    let hit = indexRead(`${query}&select=${cols}`);
+    if (hit && hit.status === 400 && cols.endsWith(',apply_mode')) { _applyModeCol = { ok: false, at: Date.now() }; hit = indexRead(`${query}&select=${POOL_COLUMNS}`); }
+    if (hit && Array.isArray(hit.rows)) return hit.rows;
+  }
   const go = (cols) => searchRead(() => fetch(`${supabaseUrl}/rest/v1/jobs?${query}&select=${cols}`, { headers, signal: AbortSignal.timeout(SEARCH_READ_MS) }));
   try {
     const cols = poolColumns();
@@ -130,20 +143,53 @@ function byScoreThenId(a, b) {
 }
 
 /** The postings (`description`) of these rows, by id, set on each row in place. Rows the read misses keep none. */
+// Postings already read on this instance (a posting rarely changes; the same listings answer many searches).
+const DESC_CACHE_MAX = 4000;
+const DESC_TTL_MS = 30 * 60_000;
+const _descCache = new Map(); // id → { d, at }
+function cachedDescription(id) {
+  const e = _descCache.get(id);
+  if (!e) return undefined;
+  if (Date.now() - e.at > DESC_TTL_MS) { _descCache.delete(id); return undefined; }
+  return e.d;
+}
+function rememberDescription(id, d) {
+  if (_descCache.size >= DESC_CACHE_MAX) _descCache.delete(_descCache.keys().next().value);
+  _descCache.set(id, { d, at: Date.now() });
+}
 async function hydrateDescriptions(supabaseUrl, headers, rows, { remoteWords = false } = {}) {
-  const want = [...new Set(rows.map((j) => j && j.id).filter((id) => /^[0-9a-f-]{36}$/i.test(String(id))))];
-  if (!want.length) return;
+  const ids = [...new Set(rows.map((j) => j && j.id).filter((id) => /^[0-9a-f-]{36}$/i.test(String(id))))];
+  if (!ids.length) return;
+  const got = new Map();
+  const want = [];
+  for (const id of ids) {
+    const d = cachedDescription(String(id));
+    if (d === undefined) want.push(id);
+    else if (!remoteWords || /remote|work from home|work from anywhere/i.test(String(d || ''))) got.set(String(id), d);
+  }
+  if (!want.length) {
+    for (const j of rows) if (j && got.has(String(j.id))) j.description = got.get(String(j.id));
+    return got;
+  }
   // remoteWords: only rows whose posting mentions one of the words the remote reading needs (isRemoteListing) —
   // the rest cannot read as remote, and their postings are never fetched.
   const extra = remoteWords ? `&or=${encodeURIComponent('(description.ilike.*remote*,description.ilike.*work from home*,description.ilike.*work from anywhere*)')}` : '';
-  const got = new Map();
-  await Promise.all(Array.from({ length: Math.ceil(want.length / 150) }, (_, i) => want.slice(i * 150, i * 150 + 150)).map(async (ids) => {
+  // With the index serving the search, a posting read is the only database read left on the request path: it gets
+  // a short deadline, and a row it misses is ranked without its posting (as a failed read always left it).
+  const ms = indexRows() ? HYDRATE_READ_MS : SEARCH_READ_MS;
+  // The deadline counts from here — waiting for a free slot in the limiter included — so a burst of searches can
+  // never stack posting reads behind each other past it.
+  const reads = Promise.all(Array.from({ length: Math.ceil(want.length / 150) }, (_, i) => want.slice(i * 150, i * 150 + 150)).map(async (part) => {
     try {
-      const r = await searchRead(() => fetch(`${supabaseUrl}/rest/v1/jobs?id=in.(${ids.join(',')})${extra}&select=id,description`, { headers, signal: AbortSignal.timeout(SEARCH_READ_MS) }));
+      const r = await searchRead(() => fetch(`${supabaseUrl}/rest/v1/jobs?id=in.(${part.join(',')})${extra}&select=id,description`, { headers, signal: AbortSignal.timeout(ms) }));
       const list = r.ok ? await r.json() : [];
-      for (const row of (Array.isArray(list) ? list : [])) got.set(String(row.id), row.description ?? null);
+      for (const row of (Array.isArray(list) ? list : [])) {
+        got.set(String(row.id), row.description ?? null);
+        rememberDescription(String(row.id), row.description ?? null);
+      }
     } catch { /* a missed read: those rows keep no posting (as a failed read always left them) */ }
   }));
+  await withTimeout(reads, ms, null);
   for (const j of rows) {
     if (!j || !got.has(String(j.id))) continue;
     j.description = got.get(String(j.id));
@@ -190,6 +236,21 @@ export async function exactTop(items, K, { query, synonyms, canonical, fit, prim
   const head = cand.slice(0, K);
   const inHead = new Set(head);
   return [...head, ...pess.filter((x) => !inHead.has(x))];
+}
+
+// query_expansions rows are written by past runs only (Seen calls no model): remembered per instance for 30 minutes,
+// a miss included, so a search reads that table at most once per query per instance.
+const _expCache = new Map();
+async function cachedExpansion(qNorm, supabaseUrl, headers) {
+  const hit = _expCache.get(qNorm);
+  if (hit && Date.now() - hit.at < 30 * 60_000) return hit.v;
+  const fallback = { canonical: qNorm, related: [] };
+  const v = await withTimeout(getQueryExpansion(qNorm, supabaseUrl, headers), 1500, null);
+  if (v) {
+    if (_expCache.size > 2000) _expCache.delete(_expCache.keys().next().value);
+    _expCache.set(qNorm, { at: Date.now(), v });
+  }
+  return v || fallback;
 }
 
 // Admin-tunable aggregation target (feature_flags.job_search_target), read at most once a minute per instance
@@ -455,6 +516,48 @@ async function resolveSearchFit(req, url, headers) {
   } catch { return null; }
 }
 
+// A database handle (lib/server/jobKeys.js serviceDb) whose reads of `jobs` are answered by the job index when it can
+// (lib/server/jobIndex); every other read or write goes to the database unchanged.
+function indexAwareDb(db) {
+  return (path, opts = {}) => {
+    const method = String((opts && opts.method) || 'GET').toUpperCase();
+    if (method === 'GET' && typeof path === 'string' && path.startsWith('jobs?')) {
+      const hit = indexRead(path.slice(5));
+      if (hit && Array.isArray(hit.rows)) return Promise.resolve(new Response(JSON.stringify(hit.rows), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+      if (hit && hit.status === 400) return Promise.resolve(new Response('{"message":"column does not exist"}', { status: 400, headers: { 'Content-Type': 'application/json' } }));
+    }
+    return db(path, opts);
+  };
+}
+
+// For the search log lines: whether the job index answered (and how big it is), or the database did.
+function indexTag() {
+  const st = jobIndexStatus();
+  return st.loaded ? `[index ${st.rows}]` : '[db]';
+}
+
+// ── The answer deadline ──────────────────────────────────────────────────────────────────────
+// After `ms`, a request that has not answered gets a 503 with `body`; anything the handler sends later is dropped.
+const SEARCH_ANSWER_MS = 9000;
+export function guardAnswer(res, ms, body) {
+  if (typeof res.status !== 'function' || typeof res.json !== 'function') return;
+  let sent = false;
+  const noop = () => res;
+  const status = res.status.bind(res), json = res.json.bind(res), end = typeof res.end === 'function' ? res.end.bind(res) : noop;
+  const set = typeof res.setHeader === 'function' ? res.setHeader.bind(res) : null;
+  const t = setTimeout(() => {
+    if (sent || res.headersSent) return;
+    sent = true;
+    console.warn(`[jobs] answer deadline (${ms} ms) reached — sent 503`);
+    try { if (set) set('Cache-Control', 'no-store'); status(503); json(body); } catch { /* the connection is gone */ }
+  }, ms);
+  if (t.unref) t.unref();
+  res.status = (c) => { if (!sent) status(c); return res; };
+  res.json = (b) => { if (sent) return res; sent = true; clearTimeout(t); return json(b); };
+  res.end = (...a) => { if (sent) return res; sent = true; clearTimeout(t); return end(...a); };
+  if (set) res.setHeader = (k, v) => { if (sent || res.headersSent) return res; return set(k, v); };
+}
+
 // Per-instance request coalescing: concurrent identical searches share one live aggregation
 const _inflight = new Map();
 
@@ -574,6 +677,11 @@ export default async function handler(req, res) {
   // the same cap, the same 429, one round trip less. (A request over the cap may still have made those cheap reads.)
   const _t0 = Date.now();
   setCORS(req, res);
+  // A search answers within SEARCH_ANSWER_MS, always: past it the person gets a quick "busy, try again" (the page
+  // retries once by itself) instead of a spinner that waits on the 60 s function limit. With the job index loaded a
+  // search takes well under a second; this only ever fires on an instance whose index is not loaded while the
+  // database is struggling.
+  guardAnswer(res, SEARCH_ANSWER_MS, { error: 'Search is busy — trying again.', retry: true, jobs: [] });
   const searchLimitP = rateLimit(req, 'job-search', { bucketKey: rlBucket.key });
   let _gated = null;
   const searchGate = () => (_gated ||= searchLimitP.then(({ allowed, remaining, limit }) => {
@@ -644,7 +752,10 @@ export default async function handler(req, res) {
     // Board slug → registered employer name (lib/server/tenantNames.js), cached per instance; a row
     // still stored under its slug ("plscareers") is served as the name the registry holds for it.
     const tenantNamesP = SUPABASE_URL && SUPABASE_SERVICE_KEY ? tenantNamesFast(SUPABASE_URL, dbHeaders) : Promise.resolve(new Map());
-    const fitP = withTimeout(resolveSearchFit(req, SUPABASE_URL, dbHeaders), 3000, null);
+    const fitP = withTimeout(resolveSearchFit(req, SUPABASE_URL, dbHeaders), 2000, null);
+    // The job index (lib/server/jobIndex): a cold instance waits a few seconds for it — far less than the database
+    // reads it replaces; `db_only` (the silent re-read after a live top-up) first takes the listings just saved.
+    const indexP = getJobIndex({ waitMs: 6000, waitUntil, fresh: body.db_only === true }).catch(() => null);
     // Only serve() needs these two (cached per instance): loaded beside the search's reads, not in front of them.
     const suppressedP = getSuppressedSet(SUPABASE_URL, dbHeaders);
     const featuredP = getFeaturedSet(SUPABASE_URL, dbHeaders);
@@ -797,15 +908,18 @@ export default async function handler(req, res) {
         // Each of these answers within a few seconds or falls back to what a failure always gave (no expansion,
         // the default target, an unplaced location → the coarse text match).
         const [expansion, tgtRows, centerResolved, gated] = await Promise.all([
-          withTimeout(getQueryExpansion(qNorm, SUPABASE_URL, dbHeaders), 3000, { canonical: qNorm, related: [] }),
+          cachedExpansion(qNorm, SUPABASE_URL, dbHeaders),
           // Admin-tunable aggregation target (feature_flags.job_search_target.percentage), cached a minute.
           readSearchTarget(SUPABASE_URL, dbHeaders),
           // 'remote' is not a place, and a whole state is a filter, not a point.
           loc && !isRemote && !searchedPlace ? withTimeout(geocodeLocation(loc, SUPABASE_URL, SUPABASE_SERVICE_KEY), 4000, null) : Promise.resolve(center),
           searchGate(),
+          indexP,
         ]);
         if (gated) return;
         center = centerResolved;
+        // Start placing the index's rows for the area search in the background (no wait).
+        indexP.then((i) => { if (i) areaIndexReady(i); }).catch(() => null);
 
         // DB-side geo scope applied to EVERY pool query:
         //  • center → indexed bounding-box range scan (jobs_latlng_idx, migration 033) OR the row's
@@ -958,7 +1072,7 @@ export default async function handler(req, res) {
         if (kept.length >= TARGET) dbMatches = await rank(kept);
         else { dbMatchesP = rank(kept); dbMatches = kept.map((x) => x.ui); }
         if (dbMatches.length >= TARGET) {
-          console.log(`DB HIT: "${query}" → "${canonical}" @ "${loc}" (${radiusMiles}mi) — ${dbMatches.length} in-radius results (no API call)`);
+          console.log(`DB HIT: "${query}" → "${canonical}" @ "${loc}" (${radiusMiles}mi) — ${dbMatches.length} in-radius results (no API call) ${indexTag()} ${Date.now() - _t0}ms`);
           const jobs = await serve(candidates(dbMatches));
           if (seedsDropped) console.log(`SEED ROWS DROPPED: ${seedsDropped}`);
           return res.status(200).json({ ok: true, jobs, in_radius: countInRadius(jobs), query, location: loc, radius: Number.isFinite(radiusMiles) ? radiusMiles : null, offset: 0, has_more: dbMatches.length > PAGE || (poolFull && dbMatches.length >= PAGE), _src: 'db', ...searchContext(jobs) });
@@ -1014,7 +1128,12 @@ export default async function handler(req, res) {
       ]);
       return topupBucket.allowed && topupGlobal.allowed ? 'pull' : 'budget';
     })();
-    const [{ page, fallback, pool: corpusPool }, decision] = await Promise.all([pageP, decisionP]);
+    // The answer never waits on that decision (a pull log read + two rate-limit counters — database round trips that
+    // a busy database makes slow): once the page is ready it waits at most DECIDE_MS more, and an undecided top-up
+    // is decided after the response (said as topup:'pending'; the page's one silent re-read is cheap either way).
+    const DECIDE_MS = 250;
+    const { page, fallback, pool: corpusPool } = await pageP;
+    const decision = await withTimeout(decisionP, DECIDE_MS, 'deciding');
 
     // The live pull after the response is bounded by TOPUP_BUDGET_MS from the request's start (the function has
     // 60 s; production 2026-11-11 logged top-ups that ran into that limit). Past it the response is long sent, the
@@ -1022,7 +1141,8 @@ export default async function handler(req, res) {
     // time to finish.
     const TOPUP_BUDGET_MS = 50_000;
     const topupLeft = () => TOPUP_BUDGET_MS - (Date.now() - _t0);
-    if (decision === 'pull' && !_inflight.has(inflightKey)) {
+    const startPull = (d) => {
+      if (d !== 'pull' || _inflight.has(inflightKey)) return;
       const key = inflightKey;
       const outOfTime = new Promise((r) => setTimeout(() => r('deadline'), Math.max(0, topupLeft())));
       const work = Promise.race([liveTopUp().then(() => 'done'), outOfTime])
@@ -1035,7 +1155,9 @@ export default async function handler(req, res) {
       _inflight.set(key, work);
       setTimeout(() => _inflight.delete(key), 90_000);
       waitUntil(work);
-    }
+    };
+    if (decision === 'deciding') waitUntil(decisionP.then(startPull).catch(() => null));
+    else startPull(decision);
 
     // The live pull (runs after the response). Everything it finds is upserted into the corpus by
     // aggregateWithSources / aggregateForQuery; nothing here touches the response.
@@ -1078,13 +1200,13 @@ export default async function handler(req, res) {
       }
     }
 
-    const pending = decision === 'pull' || decision === 'inflight';
+    const pending = decision === 'pull' || decision === 'inflight' || decision === 'deciding';
     const widened = dbMatches.length === 0 && page.length > 0;
     // serve() puts every in-area row first (the corpus fill-ins carry in_radius:false) and the
     // response says how many are in the radius, so the client can label the page honestly.
     const jobs = await serve(page);
     const inRadius = countInRadius(jobs);
-    console.log(`INSTANT: "${query}" @ "${loc}" — ${jobs.length} served (${inRadius} in radius, fallback ${fallback || 'none'}), top-up ${decision}`);
+    console.log(`INSTANT: "${query}" @ "${loc}" — ${jobs.length} served (${inRadius} in radius, fallback ${fallback || 'none'}), top-up ${decision} ${indexTag()} ${Date.now() - _t0}ms`);
     return res.status(200).json({
       ok: true, jobs, in_radius: inRadius, query, location: loc, radius: Number.isFinite(radiusMiles) ? radiusMiles : null,
       offset: 0, has_more: dbMatches.length > PAGE || (poolFull && dbMatches.length >= PAGE),
@@ -1226,6 +1348,22 @@ async function nearestListings(loc, supabaseUrl, dbHeaders) {
     posted_at: j.created_at || null,
     ats_tenant: j.ats_tenant || null,
   }));
+  // From the job index when it is loaded (light columns), with the postings read by id — the same rows.
+  if (indexRows()) {
+    const light = 'id,created_at,title,company,location,salary,apply_url,type,level,source,score,waste_score,ats_tenant';
+    const viaIndex = async (q) => {
+      const hit = indexRead(`${q}&select=${light}`);
+      if (!hit || !Array.isArray(hit.rows)) return null;
+      await hydrateDescriptions(supabaseUrl, dbHeaders, hit.rows);
+      for (const j of hit.rows) if (j.description === undefined) j.description = null;
+      return hit.rows;
+    };
+    const term = locationDbTerm(loc);
+    const local = term ? await viaIndex(`location=ilike.*${encodeURIComponent(term)}*&expires_at=gt.${now}&order=score.desc&limit=24`) : [];
+    if (local && local.length) return mapUi(local);
+    const any = await viaIndex(`expires_at=gt.${now}&order=last_seen_at.desc&limit=24`);
+    if (local !== null && any !== null) return mapUi(any);
+  }
   try {
     const term = locationDbTerm(loc);
     if (term) {
@@ -1482,7 +1620,10 @@ async function buildRail(SUPABASE_URL, SUPABASE_SERVICE_KEY, user_id) {
     Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
     'Content-Type': 'application/json',
   };
-  const m = await findResumeMatches({ supabaseUrl: SUPABASE_URL, serviceKey: SUPABASE_SERVICE_KEY, userId: user_id });
+  // Listing reads come from the in-memory job index when it is loaded (the same rows; nothing on the database).
+  const idx = await getJobIndex({ waitMs: 6000, waitUntil }).catch(() => null);
+  const db = idx ? indexAwareDb(serviceDb(SUPABASE_URL, SUPABASE_SERVICE_KEY)) : null;
+  const m = await findResumeMatches({ supabaseUrl: SUPABASE_URL, serviceKey: SUPABASE_SERVICE_KEY, userId: user_id, db });
   // a partial or unreadable answer is shown but never kept: the next request computes again
   const keep = !m.partial && m.reason !== 'unavailable';
   const hasResume = m.hasResume;
@@ -1548,6 +1689,20 @@ const AREA_TYPES = new Set(['Full-time', 'Part-time']);
 const AREA_POSTED = new Set(['1', '7', '30']);
 const AREA_NICHES = new Set(['tech', 'healthcare', 'retail', 'logistics', 'finance', 'other']);
 
+// The area search reads the index only once every row of it has its place worked out (warmPlacements: a few seconds
+// in the background per index build); until then it reads the database as before. Each full reload of the index
+// places only rows whose location text it has not seen (the placements are remembered by text).
+let _placedIndex = null, _placing = null;
+function areaIndexReady(idx) {
+  if (_placedIndex === idx.rows) return true;
+  if (_placing !== idx.rows) {
+    const rows = idx.rows;
+    _placing = rows;
+    warmPlacements(indexRows() || rows, () => { if (_placing === rows) _placedIndex = rows; });
+  }
+  return false;
+}
+
 async function handleAreaSearch(req, res, body) {
   const t0 = Date.now();
   const U = process.env.SUPABASE_URL, K = process.env.SUPABASE_SERVICE_KEY;
@@ -1595,11 +1750,15 @@ async function handleAreaSearch(req, res, body) {
     const [suppressed, tenantNames] = await Promise.all([getSuppressedSet(U, headers), loadTenantNames(U, headers)]);
     const exclude = (row) => isSeedListing(row) || titleNamesNonUs(row.title) || (row.apply_url && suppressed.has(_normUrl(row.apply_url)));
     const rankOpts = { includeRemote, filters, sort, exclude, level: inferLevel, salary: honestSalary };
+    // The job index (lib/server/jobIndex) answers the area read from memory once it is loaded on this instance.
+    const idx = await getJobIndex({ waitMs: 6000, waitUntil }).catch(() => null);
+    const useIndex = !!(idx && areaIndexReady(idx));
+    const areaRead = (m, budgetMs) => (useIndex && indexRows() ? Promise.resolve(readAreaRowsFromIndex(indexRows(), place, m)) : readAreaRows({ db, area: place, miles: m, budgetMs, waitUntil }));
     const count = async (m) => {
-      const { rows } = await readAreaRows({ db, area: place, miles: m, budgetMs: 4000, waitUntil });
+      const { rows } = await areaRead(m, 4000);
       return rankArea(rows, place, m, rankOpts);
     };
-    const { rows, complete, cached, pending, reads } = await readAreaRows({ db, area: place, miles: miles ?? 0, waitUntil });
+    const { rows, complete, cached, pending, reads } = await areaRead(miles ?? 0, 8000);
     const { list, remoteTotal, onsiteTotal } = rankArea(rows, place, miles ?? 0, rankOpts);
     const { page, hasMore, nextCursor, before } = pageArea(list, typeof body.cursor === 'string' ? body.cursor : null, AREA_PAGE, sort);
 
@@ -1607,7 +1766,15 @@ async function handleAreaSearch(req, res, body) {
     let full = [];
     if (page.length) {
       const ids = page.map((x) => x.row.id).filter((id) => /^[0-9a-f-]{36}$/i.test(String(id)));
-      const got = ids.length ? await db(`jobs?id=in.(${ids.join(',')})&select=${AREA_FULL_COLS}`) : [];
+      let got = null;
+      // From the index (every column but the posting) + the postings by id (cached, short deadline).
+      const hit = ids.length && idx ? indexRead(`id=in.(${ids.join(',')})&select=${AREA_FULL_COLS.replace(',description', '')}`) : null;
+      if (hit && Array.isArray(hit.rows)) {
+        await hydrateDescriptions(U, headers, hit.rows);
+        for (const j of hit.rows) if (j.description === undefined) j.description = null;
+        got = hit.rows;
+      }
+      if (!got) got = ids.length ? await db(`jobs?id=in.(${ids.join(',')})&select=${AREA_FULL_COLS}`) : [];
       const byId = new Map((Array.isArray(got) ? got : []).map((j) => [String(j.id), j]));
       full = page.map((x) => {
         const j = byId.get(String(x.row.id));
@@ -1627,7 +1794,7 @@ async function handleAreaSearch(req, res, body) {
       const next = RADIUS_OPTIONS.find((o) => o > miles);
       if (next) { const w = await count(next); wider = { radius: next, total: w.list.length, remote_total: w.remoteTotal }; }
     }
-    console.log(`AREA: "${loc}" ${miles ?? 'state'}mi — ${list.length} (${onsiteTotal} on-site, ${remoteTotal} remote) of ${rows.length} rows, ${reads} reads${cached ? ' (cached)' : ''}, page from ${before}, ${Date.now() - t0}ms${complete ? '' : pending ? ' STILL READING' : ' INCOMPLETE'}`);
+    console.log(`AREA: "${loc}" ${miles ?? 'state'}mi — ${list.length} (${onsiteTotal} on-site, ${remoteTotal} remote) of ${rows.length} rows, ${reads} reads${cached ? ' (cached)' : ''}${useIndex ? ' (index)' : ''}, page from ${before}, ${Date.now() - t0}ms${complete ? '' : pending ? ' STILL READING' : ' INCOMPLETE'}`);
     // Not user-specific (no position, no account): the edge may serve it to the next visitor for two minutes.
     // A partial answer ("still counting") is never cached.
     if (complete && !place.device) res.setHeader('Cache-Control', 'public, s-maxage=120, stale-while-revalidate=300');

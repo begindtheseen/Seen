@@ -57,6 +57,48 @@ Editor — comments stripped, one block per migration, and say which to run firs
 - **Skill:** `.claude/skills/ui-ux-pro-max/` (UX rules, patterns, charts, WCAG — Python search over local CSVs) is for
   decisions INSIDE this system; never use its `--design-system` output to pick a palette or font.
 
+## Session 2026-11-26: job search answered from an in-memory index — never the database (branch claude/eager-brahmagupta-y9g38d)
+- **Owner:** "Job searches take entirely too long and upon stress loading with multiple phones the site falls apart… Jobs
+  should never take long to open ever again… start pages the same." Screenshot: "Couldn't load job listings" on /jobs.
+- **Measured on prod (Vercel logs 2026-11-26 17:36–17:41 UTC, the owner's own test):** searches took 15–24 s, three hit
+  the 60 s limit, the rate-limit RPC timed out at 350 ms, an Austin area search took 22.9 s (11 reads). A search sent
+  20–30 `ilike` reads (6 terms × title/stamp × 2 geo chunks + company + keyword + corpus + postings); a read of
+  `title ilike %engineer%` ordered by score hits Postgres' 8 s statement timeout EVERY time (probed), so a few phones
+  at once queued everything behind those reads. Locally the old path made 298 `jobs` reads (210 s of DB time) for 16
+  searches.
+- **The fix (how established boards do it — search from an index, never the main DB):** `lib/server/jobIndex/`.
+  Every open listing's searchable columns (21, never `description`; ~146k rows, 32 shards × ~1.5 MB) held in memory per
+  instance. Shards come from `GET /api/job-index?shard=K&v=FORMAT&k=TOKEN` (`s-maxage=240, swr=86400`, token = HMAC of
+  the service key) so the DB is read for the index ~once per shard per few minutes per region whatever the instance
+  count; built by id-range keyset reads (cheap PK order). An instance loads at module start (~1.5–3 s), takes new rows
+  every 60 s (`created_at=gt.` — indexed), re-reads shards every 10 min, falls back to building a shard from the DB
+  itself when the CDN fails (2 at a time), never serves a partial index, and is OFF in tests/local unless
+  `JOB_INDEX=on` / `JOB_INDEX_BASE` (always on under `VERCEL`; `JOB_INDEX=off` kills it).
+- **`evaluate.js queryIndex(index, qs)`** answers the PostgREST subset search uses (eq/neq/gt/gte/lt/lte/like/ilike/is/
+  in, not., or/and trees, select, order with Postgres NULL defaults, limit/offset, the 1,000 max-rows cap) and returns
+  `null` for anything else (a `description` select, `*`, unknown column/operator) → the caller reads the DB. Text
+  columns are also kept as ONE lowercased NUL-joined string scanned with native `indexOf` (row objects scanned one by
+  one cost 40–70 ms a condition; this ~5 ms), candidates always re-tested by the exact predicate; whole-index matches
+  memoised as bitmaps per build; `id=eq/in` is a Map lookup; new rows sit in `fresh` (+`shadow` for replaced ids) so
+  the memo survives the minute merges. Rows are one object literal each (stable shape: 368 → 179 MB heap).
+- **Wired:** `searchRows` (title search + corpus fill), `nearestListings`, area search (`readAreaRowsFromIndex`: box
+  for coordinate rows + every coordinate-less row, measured by rankArea — waits for `warmPlacements`, placements memoised
+  by location text), the area page's full rows, the matched-jobs rail (`findResumeMatches({ db })` with
+  `indexAwareDb`). Postings are still read by id (only DB read left on the path): per-instance cache (4,000, 30 min)
+  and a 2.5 s TOTAL deadline incl. limiter queue. Off the response path: the top-up decision (≤250 ms after the page),
+  query expansion (cached 30 min, 1.5 s cap), fit 2 s. **Every search answers within 9 s** (`guardAnswer` → 503
+  "busy", the page retries once); start-page `ListingFinder` retries once quietly.
+- **Verified (prod data, writes blocked):** the real handler, 16 searches (title, city, remote, state, place-only) —
+  index vs DB results IDENTICAL in order; 268/278 captured reads byte-identical (the 10 = unordered area reads, same
+  sets); a later diff traced to 11 listings created after the DB run (the delta working). Load (one process, 25 at
+  once, posting reads at DC latency): warm p50 1.4 s / max 3.9 s, 0 failures; single search 0.3–0.9 s vs 1–6 s idle DB
+  (15–24 s on prod under load). Tests: `lib/server/jobIndex/{evaluate,index}.test.mjs`, `api/jobs.index.test.mjs`
+  (DB vs index on fixtures, zero `ilike` reads with the index). NOT verified until the preview/prod run: the CDN
+  self-fetch on Vercel (logs say `[job-index] loaded … cache HIT|MISS|LOCAL`), real-region latency.
+- **Rules:** a request path never sends `ilike` reads of `jobs` when the index is loaded; any new listing read goes
+  through `searchRows`/`indexRead` (or `indexAwareDb`); bump `FORMAT` (shard.js) when columns/encoding change; a new
+  column a search filters by must be added to `INDEX_COLUMNS` or that read silently goes to the DB.
+
 ## Session 2026-11-17: 20 more start guides, external hiring events, company pages that answer first — PR #405 (same branch)
 - **Owner ask ("WE NEED SOMETHING HUGE… Do all of it"):** 20 new guides (security, retail, restaurants, hotels, delivery, callcenter,
   dental, energy, secondchance, federal; amazon, walmart, target, ups, fedex, costco, starbucks, homedepot, usps, lowes), hiring events
