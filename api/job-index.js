@@ -12,6 +12,11 @@ import { timingSafeEqual } from 'crypto';
 import { FORMAT, SHARD_COUNT, encodeShard, readShardRows } from '../lib/server/jobIndex/shard.js';
 import { indexToken } from '../lib/server/jobIndex/index.js';
 
+// One build per shard per instance at a time, kept 2 minutes: several search instances starting together (a deploy
+// empties the CDN) ask for the same shards at once, and one instance answering them builds each shard once.
+const BUILT_MS = 120_000;
+const _built = new Map(); // shard → { at, p: Promise<{ body, rows, reads }> }
+
 const same = (a, b) => {
   const x = Buffer.from(String(a || '')), y = Buffer.from(String(b || ''));
   return x.length === y.length && timingSafeEqual(x, y);
@@ -31,8 +36,13 @@ export default async function handler(req, res) {
   const get = (path) => fetch(`${U}/rest/v1/${path}`, { headers, signal: AbortSignal.timeout(12_000) });
   const t0 = Date.now();
   try {
-    const { rows, missing, reads } = await readShardRows(get, k);
-    const body = encodeShard(k, rows, { missing });
+    let e = _built.get(k);
+    if (!e || Date.now() - e.at > BUILT_MS) {
+      e = { at: Date.now(), p: readShardRows(get, k).then(({ rows, missing, reads }) => ({ body: encodeShard(k, rows, { missing }), rows, reads })) };
+      e.p.catch(() => { if (_built.get(k) === e) _built.delete(k); });
+      _built.set(k, e);
+    }
+    const { body, rows, reads } = await e.p;
     // Fresh for 4 minutes at the edge; after that the edge keeps answering with this copy while it fetches the
     // next one in the background (a loading instance never waits on the database).
     res.setHeader('Cache-Control', 'public, s-maxage=240, stale-while-revalidate=86400');
