@@ -110,6 +110,34 @@ Editor — comments stripped, one block per migration, and say which to run firs
   through `searchRows`/`indexRead` (or `indexAwareDb`); bump `FORMAT` (shard.js) when columns/encoding change; a new
   column a search filters by must be added to `INDEX_COLUMNS` or that read silently goes to the DB.
 
+## Session 2026-11-26 B: the permanent, free search tier — `job_search`, a slim copy kept in memory (same branch / PR #406)
+- **Owner (after #406):** "This needs to be a permanent fix… tailored towards what we currently have… built for hundreds of
+  simultaneous users." Chose option 2 (Postgres done right) — "do 1 [dedicated search engine, Typesense] when we have paying
+  users. Until then this site must run for basically free." Do not relitigate: no paid search vendor until there is revenue.
+- **Why the DB was slow (measured):** `admin_db_size` → DB 1.0 GB, `jobs` 927 MB, on Supabase's base Pro server (~1 GB
+  memory): a text search on jobs reads from disk. Local copy of the 146,452 open rows + posting-sized text, cold cache:
+  `title ilike %engineer%` top 200 touched 19,576 pages (~153 MB) on jobs vs 604 on the slim table.
+- **The fix:** `supabase/migrations/20261126120000_job_search_mirror.sql` — `public.job_search` (the 21 search columns =
+  `INDEX_COLUMNS`, every jobs row, ~56 MB heap / 117 MB with indexes), filled from jobs and kept exact by AFTER triggers
+  (`trg_jobs_search_sync_ins|upd|del` → `job_search_sync()`; the UPDATE trigger fires only on copied columns; the
+  upsert skips no-op writes; last_seen_at/expires_at unindexed → HOT updates for re-seen rows). Trigram GIN on
+  title/company/search_query/location, (score desc nulls last, id), (lat,lng), created_at. RLS on, service-only.
+  Verified locally (Postgres 16): 0 differences after insert / dedupe re-seen / posting-only edit (no mirror write) /
+  copied-column edit / employer supersede / delete / 500-row sweep / re-run; runs as ONE transaction in 4.7 s.
+  `20261126130000_jobs_autovacuum.sql`: jobs vacuums at 2% churn (was 20%). NOT applied — SQL given to the owner.
+- **Code:** `lib/server/searchTable.js` — `ensureSearchTable` probes `job_search?select=id&limit=1` (live only when it
+  answers ROWS; an empty table/404/error → jobs; rechecked every 10 min; `SEARCH_TABLE=off` kills it), `routeJobsPath`
+  moves a `jobs?…` read only when every selected/filtered/ordered column is in the mirror (description, `*`,
+  availability_status, employer_user_id… stay on jobs). Routed: `searchRows`, nearest fallback (now light read +
+  postings by id), area reads, the rail (`indexAwareDb` → index, else mirror), company_jobs' open-roles read, the index's
+  shard builder and minute delta. Backward compatible: until the SQL is run every read goes to jobs as before.
+- **The in-memory index (#406) is now the accelerator, the mirror the floor:** `JOB_INDEX_MAX_ROWS` (default 600,000) —
+  past it the index is not loaded (re-checked every 6 h) and every search reads `job_search`. Layering: memory → slim
+  table → (later, with revenue) Typesense.
+- **Verified:** suite 4,093 / 0 fail; tsc; `api/jobs.index.test.mjs` third pass (mirror live: same answers, light reads on
+  job_search, jobs only for postings by id / employer pool); `lib/server/searchTable.test.mjs`; index cap test. NOT verified
+  until the owner runs the SQL: prod timings on job_search (check `[db]` search log lines and a direct probe).
+
 ## Session 2026-11-17: 20 more start guides, external hiring events, company pages that answer first — PR #405 (same branch)
 - **Owner ask ("WE NEED SOMETHING HUGE… Do all of it"):** 20 new guides (security, retail, restaurants, hotels, delivery, callcenter,
   dental, energy, secondchance, federal; amazon, walmart, target, ups, fedex, costco, starbucks, homedepot, usps, lowes), hiring events

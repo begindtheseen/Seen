@@ -11,6 +11,7 @@
 import { timingSafeEqual } from 'crypto';
 import { FORMAT, SHARD_COUNT, encodeShard, readShardRows } from '../lib/server/jobIndex/shard.js';
 import { indexToken } from '../lib/server/jobIndex/index.js';
+import { ensureSearchTable, routeJobsPath } from '../lib/server/searchTable.js';
 
 // One build per shard per instance at a time, kept 2 minutes: several search instances starting together (a deploy
 // empties the CDN) ask for the same shards at once, and one instance answering them builds each shard once.
@@ -33,7 +34,9 @@ export default async function handler(req, res) {
   if (!Number.isInteger(k) || k < 0 || k >= SHARD_COUNT) return res.status(400).json({ error: 'shard' });
 
   const headers = { apikey: K, Authorization: `Bearer ${K}` };
-  const get = (path) => fetch(`${U}/rest/v1/${path}`, { headers, signal: AbortSignal.timeout(12_000) });
+  // From the slim search table once it exists (lib/server/searchTable.js): the same rows, far fewer database pages.
+  await ensureSearchTable(U, headers).catch(() => null);
+  const get = (path) => fetch(`${U}/rest/v1/${routeJobsPath(path)}`, { headers, signal: AbortSignal.timeout(12_000) });
   const t0 = Date.now();
   try {
     let e = _built.get(k);
