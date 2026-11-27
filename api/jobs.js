@@ -1769,8 +1769,10 @@ async function handleAreaSearch(req, res, body) {
   };
   const headers = { apikey: K, Authorization: `Bearer ${K}` };
   await withTimeout(ensureSearchTable(U, headers), 1500, 'jobs');
+  // The area read keeps going after an answer on purpose: it fills the per-instance area cache the page's re-ask
+  // (and the next visitor) reads, and it is bounded on its own (lib/server/areaSearch.js: 4 reads in flight per
+  // instance, 40 s in all).
   const db = async (path) => {
-    if (requestCtx.getStore()?.expired) throw new Error('request answered');
     const resp = await fetch(`${U}/rest/v1/${routeJobsPath(path)}`, { headers });
     if (!resp.ok) throw new Error(`area read ${resp.status}: ${(await resp.text()).slice(0, 160)}`);
     return resp.json();
@@ -1788,7 +1790,9 @@ async function handleAreaSearch(req, res, body) {
       const { rows } = await areaRead(m, 4000);
       return rankArea(rows, place, m, rankOpts);
     };
-    const { rows, complete, cached, pending, reads } = await areaRead(miles ?? 0, 8000);
+    // Answer with what has been read by 6 s (the page re-asks a partial answer a few seconds later, from the cache this
+    // read keeps filling) — well inside the 9 s answer deadline.
+    const { rows, complete, cached, pending, reads } = await areaRead(miles ?? 0, 6000);
     const { list, remoteTotal, onsiteTotal } = rankArea(rows, place, miles ?? 0, rankOpts);
     const { page, hasMore, nextCursor, before } = pageArea(list, typeof body.cursor === 'string' ? body.cursor : null, AREA_PAGE, sort);
 
