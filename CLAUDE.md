@@ -126,6 +126,9 @@ Editor — comments stripped, one block per migration, and say which to run firs
   deadline fires, the request's queued/new reads are dropped (`searchRead`, area `db`). Tests: `api/job-index.test.mjs`
   (no mirror → 503 and no jobs read), `api/jobs.guard.test.mjs` (0 reads start after the answer; with the check disabled
   the test was still reading at 100 s).
+- **Rollout now in steps (owner: "take the lead"):** the in-memory index is OFF unless `JOB_INDEX=on` (was: on under
+  `VERCEL`). Step 1 = #407 + the job_search SQL: every light search read goes to the slim table. Step 2 = only after
+  job_search is measured on production, switch the index on with `JOB_INDEX=on` in Vercel.
 - **Lessons:** (1) never let a cache-miss path read the big table on production — gate expensive builders on the cheap
   source existing; (2) a merge can happen before a dependency the PR body names — the code must be safe in every
   order, not just the documented one; (3) the deadline must also STOP the work, not only answer.
