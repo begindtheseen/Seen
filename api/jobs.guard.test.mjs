@@ -58,3 +58,30 @@ test('past the deadline the person gets a 503 at once; the late answer is droppe
   await new Promise((r) => setTimeout(r, 350));
   assert.equal(lateErr, null);
 });
+
+test('after the deadline, the request stops reading: its queued reads are dropped', async () => {
+  process.env.SEARCH_ANSWER_MS = '300';
+  process.env.SUPABASE_URL = 'https://db.example';
+  process.env.SUPABASE_SERVICE_KEY = 'service-key';
+  let reads = 0;
+  globalThis.fetch = async (url) => {
+    const u = new URL(String(url));
+    if (u.pathname.startsWith('/rest/v1/jobs') || u.pathname.startsWith('/rest/v1/job_search')) {
+      reads++;
+      await new Promise((r) => setTimeout(r, 400)); // a saturated database
+      return new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    return new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  const { default: handler } = await import('./jobs.js?expire=' + Date.now());
+  const got = await new Promise((resolve) => {
+    const res = { statusCode: 200, h: {}, setHeader(k, v) { this.h[k] = v; }, status(c) { this.statusCode = c; return this; }, json(b) { resolve({ code: this.statusCode, body: b }); return this; }, end() { return this; } };
+    handler({ method: 'POST', headers: { 'x-forwarded-for': '10.0.0.9' }, body: { query: 'warehouse associate', location: 'Phoenix, AZ', radius: '25' }, query: {} }, res);
+  });
+  assert.equal(got.code, 503);
+  const atAnswer = reads;
+  await new Promise((r) => setTimeout(r, 2500));
+  // reads already in flight finish; nothing new is started (before the fix the queue kept issuing ~16 at a time)
+  assert.ok(reads - atAnswer <= 16, `${reads - atAnswer} reads started after the answer`);
+  delete process.env.SEARCH_ANSWER_MS;
+});

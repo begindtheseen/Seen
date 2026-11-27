@@ -1,5 +1,6 @@
 import { orLiteral, ilikeContains } from '../lib/server/pgrest.js';
 import { createHmac, timingSafeEqual } from 'crypto';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { getQueryExpansion } from '../lib/server/expand.js';
 import { applyRateLimit, rateLimit, rateLimitGlobal, resolveRateBucket, setCORS } from '../lib/server/ratelimit.js';
 import { jobsReadFromQuery, setPublicCache } from '../lib/server/publicRead.js';
@@ -85,11 +86,22 @@ const _searchQueue = [];
 function _searchPump() {
   while (_searchActive < SEARCH_IN_FLIGHT && _searchQueue.length) {
     const job = _searchQueue.shift();
+    // A request that has already answered (its 9 s deadline sent "busy") no longer reads anything: its queued reads
+    // are dropped instead of holding the database and the queue for the requests still waiting (production
+    // 2026-11-26: answered requests kept issuing reads for minutes behind a saturated database).
+    if (job.ctx && job.ctx.expired) { job.rej(new Error('request answered')); continue; }
     _searchActive++;
     job.fn().then(job.res, job.rej).finally(() => { _searchActive--; _searchPump(); });
   }
 }
-const searchRead = (fn) => new Promise((res, rej) => { _searchQueue.push({ fn, res, rej }); _searchPump(); });
+// Per-request state the limiter can see (set by the default export): { expired } once the answer deadline fired.
+const requestCtx = new AsyncLocalStorage();
+const searchRead = (fn) => new Promise((res, rej) => {
+  const ctx = requestCtx.getStore() || null;
+  if (ctx && ctx.expired) { rej(new Error('request answered')); return; }
+  _searchQueue.push({ fn, res, rej, ctx });
+  _searchPump();
+});
 /** Test seam: reads of `jobs` in flight right now through the search limiter. */
 export function _searchInFlight() { return _searchActive; }
 const withTimeout = (p, ms, fallback) => new Promise((resolve) => {
@@ -541,8 +553,8 @@ function indexTag() {
 
 // ── The answer deadline ──────────────────────────────────────────────────────────────────────
 // After `ms`, a request that has not answered gets a 503 with `body`; anything the handler sends later is dropped.
-const SEARCH_ANSWER_MS = 9000;
-export function guardAnswer(res, ms, body) {
+const SEARCH_ANSWER_MS = Number(process.env.SEARCH_ANSWER_MS) || 9000;
+export function guardAnswer(res, ms, body, onExpire = null) {
   if (typeof res.status !== 'function' || typeof res.json !== 'function') return;
   // `inner` > 0 while one of the response's own methods runs: Vercel's res.json calls res.setHeader and res.end
   // itself, and those inner calls must go through (dropping them left every answer unsent until the 60 s limit).
@@ -554,6 +566,7 @@ export function guardAnswer(res, ms, body) {
   const t = setTimeout(() => {
     if (sent || res.headersSent) return;
     sent = true;
+    if (onExpire) { try { onExpire(); } catch { /* best effort */ } }
     console.warn(`[jobs] answer deadline (${ms} ms) reached — sent 503`);
     try { inner++; if (set) set('Cache-Control', 'no-store'); status(503); json(body); } catch (e) { console.warn('[jobs] deadline answer failed:', e && e.message); } finally { inner--; }
   }, ms);
@@ -567,7 +580,12 @@ export function guardAnswer(res, ms, body) {
 // Per-instance request coalescing: concurrent identical searches share one live aggregation
 const _inflight = new Map();
 
-export default async function handler(req, res) {
+// Every request runs with its own context, so work left over after the answer deadline can stop (searchRead).
+export default function handler(req, res) {
+  return requestCtx.run({ expired: false }, () => handleRequest(req, res));
+}
+
+async function handleRequest(req, res) {
   const _o=req.headers.origin||'';
   const _devO=!_o||_o.includes('localhost')||_o.includes('127.0.0.1');
   res.setHeader('Access-Control-Allow-Origin',(_devO||['https://seenjobs.io','https://www.seenjobs.io'].includes(_o))?(_o||'*'):'https://seenjobs.io');
@@ -687,7 +705,10 @@ export default async function handler(req, res) {
   // retries once by itself) instead of a spinner that waits on the 60 s function limit. With the job index loaded a
   // search takes well under a second; this only ever fires on an instance whose index is not loaded while the
   // database is struggling.
-  guardAnswer(res, SEARCH_ANSWER_MS, { error: 'Search is busy — trying again.', retry: true, jobs: [] });
+  guardAnswer(res, SEARCH_ANSWER_MS, { error: 'Search is busy — trying again.', retry: true, jobs: [] }, () => {
+    const ctx = requestCtx.getStore();
+    if (ctx) ctx.expired = true;
+  });
   const searchLimitP = rateLimit(req, 'job-search', { bucketKey: rlBucket.key });
   let _gated = null;
   const searchGate = () => (_gated ||= searchLimitP.then(({ allowed, remaining, limit }) => {
@@ -1749,6 +1770,7 @@ async function handleAreaSearch(req, res, body) {
   const headers = { apikey: K, Authorization: `Bearer ${K}` };
   await withTimeout(ensureSearchTable(U, headers), 1500, 'jobs');
   const db = async (path) => {
+    if (requestCtx.getStore()?.expired) throw new Error('request answered');
     const resp = await fetch(`${U}/rest/v1/${routeJobsPath(path)}`, { headers });
     if (!resp.ok) throw new Error(`area read ${resp.status}: ${(await resp.text()).slice(0, 160)}`);
     return resp.json();

@@ -110,6 +110,26 @@ Editor — comments stripped, one block per migration, and say which to run firs
   through `searchRows`/`indexRead` (or `indexAwareDb`); bump `FORMAT` (shard.js) when columns/encoding change; a new
   column a search filters by must be added to `INDEX_COLUMNS` or that read silently goes to the DB.
 
+## INCIDENT 2026-11-26 20:35 → 2026-11-27 ~00:50 UTC: #406 in production saturated the database — rolled back
+- **What happened:** the owner merged #406 (merge 658ceee, prod dpl_G9AYo4reyRrWym53V9bfTcAM85wE) before the slim table
+  existed. Every instance asked the CDN for 32 shards; each CDN miss built a shard from `jobs` (927 MB on a ~1 GB
+  server): 7 reads × ~6.4 s = ~45 s a shard, the first wave of 32 timed out ("read failed: network" after 36–59 s), and
+  instances retried every 30 s. A one-row read of jobs took 8.4 s; searches answered "busy" at 9 s. Requests already
+  answered by the deadline kept issuing their reads (log lines "[db] 1076391ms" = a handler finishing 18 min later).
+- **Mitigation:** Vercel rollback to the pre-merge deployment dpl_7irxCEmA2zuko3PvhdqdGCHa9Zng (ed32881) at ~00:50 UTC
+  (a worker restart delayed it). After: jobs one-row read 0.25–0.6 s, /api/job-index 404, search 200. **Production is
+  pinned to that rollback: any merge to next-migration redeploys #406 — the hotfix PR must land first.**
+- **Hotfix (this branch, restarted from next-migration with the slim-table commit cherry-picked):**
+  `api/job-index.js` builds shards ONLY from `job_search` (503 `search_table_missing`, no jobs read, until it exists;
+  `JOB_INDEX_FROM_JOBS=1` for local only), CDN `s-maxage=900`; the loader stops a first load at the first failed shard
+  and retries after 10 min (was 30 s); `api/jobs.js` runs each request in an AsyncLocalStorage context — when the 9 s
+  deadline fires, the request's queued/new reads are dropped (`searchRead`, area `db`). Tests: `api/job-index.test.mjs`
+  (no mirror → 503 and no jobs read), `api/jobs.guard.test.mjs` (0 reads start after the answer; with the check disabled
+  the test was still reading at 100 s).
+- **Lessons:** (1) never let a cache-miss path read the big table on production — gate expensive builders on the cheap
+  source existing; (2) a merge can happen before a dependency the PR body names — the code must be safe in every
+  order, not just the documented one; (3) the deadline must also STOP the work, not only answer.
+
 ## Session 2026-11-26 B: the permanent, free search tier — `job_search`, a slim copy kept in memory (same branch / PR #406)
 - **Owner (after #406):** "This needs to be a permanent fix… tailored towards what we currently have… built for hundreds of
   simultaneous users." Chose option 2 (Postgres done right) — "do 1 [dedicated search engine, Typesense] when we have paying
