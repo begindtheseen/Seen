@@ -1779,20 +1779,24 @@ async function handleAreaSearch(req, res, body) {
   };
 
   try {
-    const [suppressed, tenantNames] = await Promise.all([getSuppressedSet(U, headers), loadTenantNames(U, headers)]);
-    const exclude = (row) => isSeedListing(row) || titleNamesNonUs(row.title) || (row.apply_url && suppressed.has(_normUrl(row.apply_url)));
-    const rankOpts = { includeRemote, filters, sort, exclude, level: inferLevel, salary: honestSalary };
-    // The job index (lib/server/jobIndex) answers the area read from memory once it is loaded on this instance.
-    const idx = await getJobIndex({ waitMs: 6000, waitUntil }).catch(() => null);
+    // Everything the answer needs starts at once (production preview 2026-11-27: a fresh server spent its first seconds
+    // reading the employer-name registry inline before the listings read began, and the page got "busy"). The names
+    // come from the per-instance cache (≤ 4 s cold); the index is used only if it is already loaded here.
+    const namesP = Promise.all([getSuppressedSet(U, headers), tenantNamesFast(U, headers)]);
+    const idx = await getJobIndex({ waitMs: 0, waitUntil }).catch(() => null);
     const useIndex = !!(idx && areaIndexReady(idx));
     const areaRead = (m, budgetMs) => (useIndex && indexRows() ? Promise.resolve(readAreaRowsFromIndex(indexRows(), place, m)) : readAreaRows({ db, area: place, miles: m, budgetMs, waitUntil }));
+    // Answer with what has been read by 5 s (the page re-asks a partial answer a few seconds later, from the cache this
+    // read keeps filling) — well inside the 9 s answer deadline.
+    const firstReadP = areaRead(miles ?? 0, 5000);
+    const [suppressed, tenantNames] = await namesP;
+    const exclude = (row) => isSeedListing(row) || titleNamesNonUs(row.title) || (row.apply_url && suppressed.has(_normUrl(row.apply_url)));
+    const rankOpts = { includeRemote, filters, sort, exclude, level: inferLevel, salary: honestSalary };
     const count = async (m) => {
-      const { rows } = await areaRead(m, 4000);
+      const { rows } = await areaRead(m, 3000);
       return rankArea(rows, place, m, rankOpts);
     };
-    // Answer with what has been read by 6 s (the page re-asks a partial answer a few seconds later, from the cache this
-    // read keeps filling) — well inside the 9 s answer deadline.
-    const { rows, complete, cached, pending, reads } = await areaRead(miles ?? 0, 6000);
+    const { rows, complete, cached, pending, reads } = await firstReadP;
     const { list, remoteTotal, onsiteTotal } = rankArea(rows, place, miles ?? 0, rankOpts);
     const { page, hasMore, nextCursor, before } = pageArea(list, typeof body.cursor === 'string' ? body.cursor : null, AREA_PAGE, sort);
 
@@ -1808,7 +1812,10 @@ async function handleAreaSearch(req, res, body) {
         for (const j of hit.rows) if (j.description === undefined) j.description = null;
         got = hit.rows;
       }
-      if (!got) got = ids.length ? await db(`jobs?id=in.(${ids.join(',')})&select=${AREA_FULL_COLS}`) : [];
+      // The page's full rows by id, with a deadline: a slow read shows the light rows already in hand (no posting text;
+      // the job's own page reads it) rather than a "busy" answer.
+      if (!got) got = ids.length ? await withTimeout(db(`jobs?id=in.(${ids.join(',')})&select=${AREA_FULL_COLS}`).catch(() => null), 2500, null) : [];
+      if (!Array.isArray(got)) got = page.map((x) => ({ ...x.row, description: null }));
       const byId = new Map((Array.isArray(got) ? got : []).map((j) => [String(j.id), j]));
       full = page.map((x) => {
         const j = byId.get(String(x.row.id));
