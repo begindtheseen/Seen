@@ -110,6 +110,57 @@ Editor — comments stripped, one block per migration, and say which to run firs
   through `searchRows`/`indexRead` (or `indexAwareDb`); bump `FORMAT` (shard.js) when columns/encoding change; a new
   column a search filters by must be added to `INDEX_COLUMNS` or that read silently goes to the DB.
 
+## INCIDENT 2026-11-26 20:35 → 2026-11-27 ~00:50 UTC: #406 in production saturated the database — rolled back
+- **What happened:** the owner merged #406 (merge 658ceee, prod dpl_G9AYo4reyRrWym53V9bfTcAM85wE) before the slim table
+  existed. Every instance asked the CDN for 32 shards; each CDN miss built a shard from `jobs` (927 MB on a ~1 GB
+  server): 7 reads × ~6.4 s = ~45 s a shard, the first wave of 32 timed out ("read failed: network" after 36–59 s), and
+  instances retried every 30 s. A one-row read of jobs took 8.4 s; searches answered "busy" at 9 s. Requests already
+  answered by the deadline kept issuing their reads (log lines "[db] 1076391ms" = a handler finishing 18 min later).
+- **Mitigation:** Vercel rollback to the pre-merge deployment dpl_7irxCEmA2zuko3PvhdqdGCHa9Zng (ed32881) at ~00:50 UTC
+  (a worker restart delayed it). After: jobs one-row read 0.25–0.6 s, /api/job-index 404, search 200. **Production is
+  pinned to that rollback: any merge to next-migration redeploys #406 — the hotfix PR must land first.**
+- **Hotfix (this branch, restarted from next-migration with the slim-table commit cherry-picked):**
+  `api/job-index.js` builds shards ONLY from `job_search` (503 `search_table_missing`, no jobs read, until it exists;
+  `JOB_INDEX_FROM_JOBS=1` for local only), CDN `s-maxage=900`; the loader stops a first load at the first failed shard
+  and retries after 10 min (was 30 s); `api/jobs.js` runs each request in an AsyncLocalStorage context — when the 9 s
+  deadline fires, the request's queued/new reads are dropped (`searchRead`, area `db`). Tests: `api/job-index.test.mjs`
+  (no mirror → 503 and no jobs read), `api/jobs.guard.test.mjs` (0 reads start after the answer; with the check disabled
+  the test was still reading at 100 s).
+- **Rollout now in steps (owner: "take the lead"):** the in-memory index is OFF unless `JOB_INDEX=on` (was: on under
+  `VERCEL`). Step 1 = #407 + the job_search SQL: every light search read goes to the slim table. Step 2 = only after
+  job_search is measured on production, switch the index on with `JOB_INDEX=on` in Vercel.
+- **Lessons:** (1) never let a cache-miss path read the big table on production — gate expensive builders on the cheap
+  source existing; (2) a merge can happen before a dependency the PR body names — the code must be safe in every
+  order, not just the documented one; (3) the deadline must also STOP the work, not only answer.
+
+## Session 2026-11-26 B: the permanent, free search tier — `job_search`, a slim copy kept in memory (same branch / PR #406)
+- **Owner (after #406):** "This needs to be a permanent fix… tailored towards what we currently have… built for hundreds of
+  simultaneous users." Chose option 2 (Postgres done right) — "do 1 [dedicated search engine, Typesense] when we have paying
+  users. Until then this site must run for basically free." Do not relitigate: no paid search vendor until there is revenue.
+- **Why the DB was slow (measured):** `admin_db_size` → DB 1.0 GB, `jobs` 927 MB, on Supabase's base Pro server (~1 GB
+  memory): a text search on jobs reads from disk. Local copy of the 146,452 open rows + posting-sized text, cold cache:
+  `title ilike %engineer%` top 200 touched 19,576 pages (~153 MB) on jobs vs 604 on the slim table.
+- **The fix:** `supabase/migrations/20261126120000_job_search_mirror.sql` — `public.job_search` (the 21 search columns =
+  `INDEX_COLUMNS`, every jobs row, ~56 MB heap / 117 MB with indexes), filled from jobs and kept exact by AFTER triggers
+  (`trg_jobs_search_sync_ins|upd|del` → `job_search_sync()`; the UPDATE trigger fires only on copied columns; the
+  upsert skips no-op writes; last_seen_at/expires_at unindexed → HOT updates for re-seen rows). Trigram GIN on
+  title/company/search_query/location, (score desc nulls last, id), (lat,lng), created_at. RLS on, service-only.
+  Verified locally (Postgres 16): 0 differences after insert / dedupe re-seen / posting-only edit (no mirror write) /
+  copied-column edit / employer supersede / delete / 500-row sweep / re-run; runs as ONE transaction in 4.7 s.
+  `20261126130000_jobs_autovacuum.sql`: jobs vacuums at 2% churn (was 20%). NOT applied — SQL given to the owner.
+- **Code:** `lib/server/searchTable.js` — `ensureSearchTable` probes `job_search?select=id&limit=1` (live only when it
+  answers ROWS; an empty table/404/error → jobs; rechecked every 10 min; `SEARCH_TABLE=off` kills it), `routeJobsPath`
+  moves a `jobs?…` read only when every selected/filtered/ordered column is in the mirror (description, `*`,
+  availability_status, employer_user_id… stay on jobs). Routed: `searchRows`, nearest fallback (now light read +
+  postings by id), area reads, the rail (`indexAwareDb` → index, else mirror), company_jobs' open-roles read, the index's
+  shard builder and minute delta. Backward compatible: until the SQL is run every read goes to jobs as before.
+- **The in-memory index (#406) is now the accelerator, the mirror the floor:** `JOB_INDEX_MAX_ROWS` (default 600,000) —
+  past it the index is not loaded (re-checked every 6 h) and every search reads `job_search`. Layering: memory → slim
+  table → (later, with revenue) Typesense.
+- **Verified:** suite 4,093 / 0 fail; tsc; `api/jobs.index.test.mjs` third pass (mirror live: same answers, light reads on
+  job_search, jobs only for postings by id / employer pool); `lib/server/searchTable.test.mjs`; index cap test. NOT verified
+  until the owner runs the SQL: prod timings on job_search (check `[db]` search log lines and a direct probe).
+
 ## Session 2026-11-17: 20 more start guides, external hiring events, company pages that answer first — PR #405 (same branch)
 - **Owner ask ("WE NEED SOMETHING HUGE… Do all of it"):** 20 new guides (security, retail, restaurants, hotels, delivery, callcenter,
   dental, energy, secondchance, federal; amazon, walmart, target, ups, fedex, costco, starbucks, homedepot, usps, lowes), hiring events

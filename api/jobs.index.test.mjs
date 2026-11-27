@@ -71,12 +71,18 @@ function cond(expr) { // "col.op.value" | "and(...)" | "or(...)"
   return () => true;
 }
 const urls = [];
+let mirrorOn = false;
+const tableReads = { jobs: 0, job_search: 0 };
 let fitReads = 0;
 globalThis.fetch = async (url) => {
   const u = new URL(String(url));
   urls.push(decodeURIComponent(u.pathname + u.search));
   const json = (b) => new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } });
-  if (u.pathname === '/rest/v1/jobs') {
+  if (u.pathname === '/rest/v1/job_search') tableReads.job_search++;
+  if (u.pathname === '/rest/v1/jobs') tableReads.jobs++;
+  // The slim copy (migration 20261126120000) answers exactly as jobs; until a test turns it on it does not exist.
+  if (u.pathname === '/rest/v1/job_search' && !mirrorOn) return new Response('{"code":"PGRST205"}', { status: 404 });
+  if (u.pathname === '/rest/v1/jobs' || u.pathname === '/rest/v1/job_search') {
     if (u.searchParams.get('employer_user_id')) return json([]);
     let rows = CORPUS;
     for (const [k, v] of u.searchParams) {
@@ -98,6 +104,7 @@ globalThis.fetch = async (url) => {
 };
 const { default: handler } = await import('./jobs.js');
 const { _setIndexForTest, _clearIndexForTest } = await import('../lib/server/jobIndex/index.js');
+const { _setSearchTableForTest } = await import('../lib/server/searchTable.js');
 function call(body, headers = {}) {
   const res = { code: 200, body: null, setHeader() {}, status(c) { this.code = c; return this; }, json(o) { this.body = o; return this; }, end() { return this; } };
   return handler({ method: 'POST', body, headers: { 'x-forwarded-for': `10.9.${Math.floor(Math.random() * 200)}.1`, ...headers }, query: {}, socket: { remoteAddress: '10.0.0.1' } }, res).then(() => res);
@@ -151,5 +158,27 @@ test('the index serves the same listings, in the same order, as the database for
   // With the index loaded, no text-matching read reaches the database (only postings by id).
   assert.deepEqual(ilikeReads().filter((u) => !/[?&]id=in\./.test(u)), []);
   _clearIndexForTest();
+  delete process.env.JOB_INDEX;
+});
+
+test('with the slim search table in place, every light read goes there and the answers are the same', async () => {
+  process.env.JOB_INDEX = 'off';
+  _clearIndexForTest();
+  mirrorOn = false; _setSearchTableForTest(false);
+  const viaJobs = [];
+  for (const s of SEARCHES) viaJobs.push(await call(s));
+  mirrorOn = true; _setSearchTableForTest(true);
+  tableReads.jobs = 0; tableReads.job_search = 0;
+  urls.length = 0;
+  for (let i = 0; i < SEARCHES.length; i++) {
+    const r = await call(SEARCHES[i]);
+    assert.equal(r.code, 200);
+    assert.deepEqual(view(r), view(viaJobs[i]), `search ${JSON.stringify(SEARCHES[i])}`);
+  }
+  assert.ok(tableReads.job_search > 10, `${tableReads.job_search} reads of job_search`);
+  // jobs is read only for what the slim table does not hold: postings by id (and the employer-posted pool)
+  const onJobs = urls.filter((u) => u.startsWith('/rest/v1/jobs?'));
+  for (const u of onJobs) assert.ok(/[?&]id=in\.|description|employer_user_id/.test(u), `a light read stayed on jobs: ${u}`);
+  mirrorOn = false; _setSearchTableForTest(null);
   delete process.env.JOB_INDEX;
 });

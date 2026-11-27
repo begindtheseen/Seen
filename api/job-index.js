@@ -11,6 +11,7 @@
 import { timingSafeEqual } from 'crypto';
 import { FORMAT, SHARD_COUNT, encodeShard, readShardRows } from '../lib/server/jobIndex/shard.js';
 import { indexToken } from '../lib/server/jobIndex/index.js';
+import { ensureSearchTable, routeJobsPath } from '../lib/server/searchTable.js';
 
 // One build per shard per instance at a time, kept 2 minutes: several search instances starting together (a deploy
 // empties the CDN) ask for the same shards at once, and one instance answering them builds each shard once.
@@ -33,7 +34,16 @@ export default async function handler(req, res) {
   if (!Number.isInteger(k) || k < 0 || k >= SHARD_COUNT) return res.status(400).json({ error: 'shard' });
 
   const headers = { apikey: K, Authorization: `Bearer ${K}` };
-  const get = (path) => fetch(`${U}/rest/v1/${path}`, { headers, signal: AbortSignal.timeout(12_000) });
+  // Built ONLY from the slim search table (lib/server/searchTable.js, migration 20261126120000). Production
+  // 2026-11-26: built from jobs (927 MB on a ~1 GB server) a shard took ~45 s and 32 of them at once saturated the
+  // database for every visitor. Until job_search exists the index is simply not offered: searches read the database
+  // as before. (JOB_INDEX_FROM_JOBS=1 allows jobs, for a local run against a small database only.)
+  const table = await ensureSearchTable(U, headers).catch(() => 'jobs');
+  if (table !== 'job_search' && process.env.JOB_INDEX_FROM_JOBS !== '1') {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(503).json({ error: 'search_table_missing' });
+  }
+  const get = (path) => fetch(`${U}/rest/v1/${routeJobsPath(path)}`, { headers, signal: AbortSignal.timeout(12_000) });
   const t0 = Date.now();
   try {
     let e = _built.get(k);
@@ -43,9 +53,10 @@ export default async function handler(req, res) {
       _built.set(k, e);
     }
     const { body, rows, reads } = await e.p;
-    // Fresh for 4 minutes at the edge; after that the edge keeps answering with this copy while it fetches the
-    // next one in the background (a loading instance never waits on the database).
-    res.setHeader('Cache-Control', 'public, s-maxage=240, stale-while-revalidate=86400');
+    // Fresh for 15 minutes at the edge; after that the edge keeps answering with this copy while it fetches the next
+    // one in the background (a loading instance never waits on the database). New listings reach instances through
+    // their minute delta read, not through these shards.
+    res.setHeader('Cache-Control', 'public, s-maxage=900, stale-while-revalidate=86400');
     res.setHeader('X-Robots-Tag', 'noindex');
     console.log(`[job-index] shard ${k}: ${rows.length} rows, ${reads} reads, ${Date.now() - t0} ms`);
     return res.status(200).json(body);
